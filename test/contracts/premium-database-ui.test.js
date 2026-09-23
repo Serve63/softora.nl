@@ -504,7 +504,7 @@ test('premium database keeps bootstrap rows hidden until the canonical inventory
   assert.doesNotMatch(pageSource, /function serializeCustomerList/);
   assert.match(pageSource, /function customerListsDiffer\(nextCustomers\) \{ return state\.klanten !== nextCustomers; \}/);
   assert.match(pageSource, /function applyCustomerList\(nextCustomers, forceRender, alreadyCanonical, deferRender\) \{ const reconciledCustomers = alreadyCanonical \? nextCustomers : window\.SoftoraDatabaseMailReadySnapshot\.reconcileCustomerList\(state, nextCustomers\);/);
-  assert.match(pageSource, /applyCustomerList\(sortedCustomers, false, true, deferRender\); window\.performance\?\.mark\?\.\("softora:database:applied"\);/);
+  assert.match(pageSource, /applyCustomerList\(sortedCustomers, false, true, deferRender\); void currentCampaignMediaController\.refresh\(\); window\.performance\?\.mark\?\.\("softora:database:applied"\);/);
   assert.match(mailReadySnapshotSource, /config\.applyCustomerList\(hasCanonicalCustomers \? mergeWithCanonicalSnapshots[\s\S]*combinedSnapshotCustomers, false, hasCanonicalCustomers, deferBootRender\);/);
   assert.match(pageSource, /mailReady: raw && raw\.mailReady === true, mailReadySnapshot: raw && raw\.mailReadySnapshot === true, availableSnapshot: raw && raw\.availableSnapshot === true,/);
 });
@@ -2313,6 +2313,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260923-phase-timing/);
   assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260923-id-match/);
+  assert.match(pageSource, /assets\/premium-database-current-campaign-media\.js\?v=20260923-design-visibility/);
+  assert.match(pageSource, /currentCampaignMediaController\.refresh\(\)/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(options = \{\}\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
   assert.match(snapshotSource, /const PAGE_LIMIT = 4500;/);
@@ -2453,7 +2455,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /class="result-count-stack"/);
   assert.match(pageSource, /<div class="company-heading"><div class="table-search"><div class="search">[\s\S]*<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/);
   assert.match(pageSource, /class="filter-metrics" aria-label="Database statistieken"/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260922-today-channel-total/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260923-softora-purple/);
   assert.match(pageSource, /class="mail-roi-calculator" aria-label="Mail ROI calculator"/);
   assert.doesNotMatch(pageSource, /class="mail-roi-note"|Break-even: 1 klant van €850 per 10\.000 mails/);
   assert.doesNotMatch(pageSource, /id="databaseAutopilotCard"|id="databaseAutopilotToggle"/);
@@ -2932,7 +2934,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
-  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260922-today-channel-total/);
+  assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260923-softora-purple/);
   assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260923-fresh-stats/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
@@ -2962,7 +2964,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(filterGroupsCssSource, /\.mail-roi-card--autopilot\s*\{[\s\S]*grid-area: autopilot;[\s\S]*border-color: rgba\(139, 34, 82, \.42\);[\s\S]*box-shadow: 0 8px 18px rgba\(139, 34, 82, \.055\);/);
   assert.match(filterGroupsCssSource, /\.mail-roi-card--today\s*\{[\s\S]*grid-area: today;[\s\S]*border-color: rgba\(139, 34, 82, \.42\);/);
   assert.match(filterGroupsCssSource, /\.mail-roi-value--today-split\s*\{[\s\S]*display: inline-flex;[\s\S]*white-space: nowrap;/);
-  assert.match(filterGroupsCssSource, /\.mail-roi-value-softora\s*\{[\s\S]*color: var\(--purple\);/);
+  assert.match(filterGroupsCssSource, /\.mail-roi-value-softora\s*\{[\s\S]*color: var\(--crimson\);/);
   assert.match(filterGroupsCssSource, /\.mail-roi-value-instantly\s*\{[\s\S]*color: var\(--blue\);/);
   assert.match(filterGroupsCssSource, /\.mail-roi-value-combined\s*\{[\s\S]*color: #1a1a1a;/);
   assert.match(systemMailCountScriptSource, /systemMailInstantlySentTodayCount/);

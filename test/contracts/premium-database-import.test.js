@@ -127,6 +127,44 @@ test('premium database archive requires the premium access guard before serving 
   assert.equal(customerArchiveReads, 1);
 });
 
+test('current campaign media is premium-only and returns only requested signed designs', async () => {
+  const routes = new Map();
+  const app = { post() {}, get(route, ...handlers) { routes.set(route, handlers); } };
+  let mediaReads = 0;
+  const coordinator = createPremiumDatabaseCustomersPageCoordinator({ dataOpsStore: {
+    async listDesignPhotosWithSignedUrls(options) {
+      mediaReads += 1;
+      assert.deepEqual(options.customerIds, ['ready-1', 'ready-2']);
+      assert.equal(options.maxMatches, 8);
+      return [
+        { customerId: 'ready-1', websitePhotoUrl: 'https://media.test/design.png', websiteMockupUrl: 'https://media.test/mockup.png', signedUrlExpiresAt: '2026-09-23T22:00:00Z' },
+        { customerId: 'ready-1', websitePhotoUrl: 'https://media.test/older.png' },
+        { customerId: 'not-requested', websitePhotoUrl: 'https://media.test/other.png' },
+      ];
+    },
+  } });
+  registerPremiumDatabaseImportRoutes(app, {
+    coordinator: {}, customersPageCoordinator: coordinator,
+    requirePremiumApiAccess(_req, res, next) { if (!res.allowed) return res.status(401).json({ ok: false }); next(); },
+  });
+  const [guard, handler] = routes.get('/api/premium-database/current-campaign-media');
+  const request = { query: { ids: 'ready-1,ready-2' } };
+  const denied = createMockResponse();
+  denied.allowed = false;
+  guard(request, denied, () => handler(request, denied));
+  assert.equal(denied.statusCode, 401);
+  assert.equal(mediaReads, 0);
+  const allowed = createMockResponse();
+  allowed.allowed = true;
+  await new Promise((resolve) => guard(request, allowed, () => Promise.resolve(handler(request, allowed)).then(resolve)));
+  assert.equal(allowed.statusCode, 200);
+  assert.equal(allowed.headers['Cache-Control'], 'private, no-store, max-age=0');
+  assert.deepEqual(allowed.body.media.map((row) => row.customerId), ['ready-1']);
+  assert.equal(allowed.body.media[0].websitePhoto, 'https://media.test/design.png');
+  assert.equal(allowed.body.media[0].websiteMockup, 'https://media.test/mockup.png');
+  assert.equal(mediaReads, 1);
+});
+
 function escapeXml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -1952,6 +1990,7 @@ test('premium database import route is registered behind the premium api surface
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/remove-webdesign-assets', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/customers', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/customers\/archive', requirePremiumApiAccess/);
+  assert.match(routeSource, /app\.get\('\/api\/premium-database\/current-campaign-media', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/mail-ready-snapshot\/archive', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/mail-ready-snapshot'/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/deep-search-estimate'/);
