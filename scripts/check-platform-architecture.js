@@ -7,6 +7,30 @@ const { getKnownHtmlPageFiles, createKnownPrettyPageSlugToFile } = require('../s
 const REGISTRY = 'server/config/platform-pages.json';
 const MODES = new Set(['legacy-document', 'public-document', 'isolated-document', 'application-module']);
 
+function validateNewPersonnelPageStyle(file, source) {
+  if (!/^(?:premium-|personeel-)[^/]+\.html$/.test(file) ||
+      !/data-sidebar-shell|<aside\b[^>]*class=["'][^"']*\bsidebar\b/i.test(source)) return [];
+
+  const errors = [];
+  const required = [
+    [/\bdata-sidebar-shell=["']canonical["']/i, 'canonical sidebar shell'],
+    [/<body\b[^>]*\bdata-personnel-page\b/i, 'data-personnel-page on body'],
+    [/\bhref=["'][^"']*\/assets\/fonts\.css(?:\?[^"']*)?["']/i, 'shared fonts.css'],
+    [/\bhref=["'][^"']*\/assets\/personnel-theme\.css(?:\?[^"']*)?["']/i, 'shared personnel-theme.css'],
+    [/\bhref=["'][^"']*\/assets\/personnel-page-base\.css(?:\?[^"']*)?["']/i, 'shared personnel-page-base.css'],
+    [/<h1\b[^>]*\bclass=["'][^"']*\bpage-title\b[^"']*["']/i, 'h1.page-title'],
+    [/<p\b[^>]*\bclass=["'][^"']*\bpage-subtitle\b[^"']*["']/i, 'p.page-subtitle'],
+  ];
+  for (const [pattern, label] of required) {
+    if (!pattern.test(source)) errors.push(`${file}: new personnel page needs ${label}.`);
+  }
+  const stylesheets = source.match(/<link\b(?=[^>]*\brel=["']stylesheet["'])[^>]*>/gi) || [];
+  if (!/\/assets\/personnel-page-base\.css(?:\?[^"']*)?["']/i.test(stylesheets.at(-1) || '')) {
+    errors.push(`${file}: load personnel-page-base.css after page-specific stylesheets.`);
+  }
+  return errors;
+}
+
 function validatePlatformArchitecture({ files, registry, baseline, baselineFiles, readFile }) {
   const errors = [];
   const pages = registry?.pages || {};
@@ -25,6 +49,9 @@ function validatePlatformArchitecture({ files, registry, baseline, baselineFiles
     const previous = baseline?.pages?.[file];
     if (previous && page.targetReadyMs > previous.targetReadyMs) {
       errors.push(`${file}: readiness budget cannot grow.`);
+    }
+    if (!baselineFiles.has(file) && /^(?:premium-|personeel-)[^/]+\.html$/.test(file)) {
+      errors.push(...validateNewPersonnelPageStyle(file, readFile(file)));
     }
     if (page.delivery === 'legacy-document') {
       // The first registry may only grandfather files already present on the base branch.
@@ -115,4 +142,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { validatePlatformArchitecture, checkPlatformArchitecture, readBaseline, resolveBaselineRef };
+module.exports = { validateNewPersonnelPageStyle, validatePlatformArchitecture, checkPlatformArchitecture, readBaseline, resolveBaselineRef };
