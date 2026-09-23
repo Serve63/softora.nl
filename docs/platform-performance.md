@@ -18,8 +18,13 @@ repositories blijven de bron van waarheid. Gedeelde browserdata is afgeleide dat
 ## Verplichte richting voor nieuwe functionaliteit
 
 - Ingelogde modules delen navigatie, sessieafbakening, gegevensverzoeken en versies.
-- Een module krijgt prepare, mount, update en dispose; timers, listeners en aanvragen
+- Een module krijgt prepare, mount, ready, update en dispose; timers, listeners en aanvragen
   hebben een eigenaar en worden bij verlaten opgeruimd.
+- De gereedheidscontrole krijgt een begrensd tijdsbudget. De shell toont de nieuwe
+  module pas als alle vereiste inhoud en bediening aantoonbaar klaar zijn; een
+  onvolledig scherm blijft verborgen en de bestaande module blijft zichtbaar.
+- Ook een routewissel binnen dezelfde module bouwt met `update` een nieuwe verborgen
+  root op. De zichtbare root mag tijdens die voorbereiding niet worden gewijzigd.
 - Prepare voert uitsluitend geregistreerde reads uit, met begrensde bytes, aanvragen
   en geheugen; nooit provider-sync, mails, uploads of betaalde generatie.
 - Expliciete wijzigingen maken alle betrokken leesresultaten ongeldig. Een eerder
@@ -55,8 +60,10 @@ Dit werkt binnen het huidige document. Het is nog geen blijvende applicatieshell
 geen cross-tab-sessieprotocol en geen volledige vervanging voor domein-readmodels.
 
 `assets/premium-application-runtime.js` bevat een geteste modulelevenscyclus voor
-geregistreerde reads, begrensde voorbereiding, montage, updates, formulierblokkades
-en sessiegebonden cache wissen. `assets/premium-application-navigation.js` bevat een
+geregistreerde reads, begrensde voorbereiding, montage, gereedheidscontrole, updates,
+formulierblokkades en sessiegebonden cache wissen. `assets/premium-application-host.js`
+bouwt een volgend scherm verborgen op en houdt het huidige scherm zichtbaar tot de
+nieuwe module gereed is. `assets/premium-application-navigation.js` bevat een
 geteste router voor geregistreerde routes, browsergeschiedenis en navigatieblokkades.
 De twee kernen zijn nog niet door Dashboard of Opdrachten geladen. Die routes blijven
 `legacy-document` tot de blijvende shell en complete browsergedrag bewezen zijn. Een

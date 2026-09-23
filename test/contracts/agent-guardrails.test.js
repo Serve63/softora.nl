@@ -60,7 +60,9 @@ test('platform performance plan distinguishes lifecycle core from a migrated bro
   const navigation = readRepoFile('assets/premium-application-navigation.js');
   const performancePlan = readRepoFile('docs/platform-performance.md');
   assert.match(runtime, /function createPremiumApplicationRuntime/);
-  assert.match(runtime, /\['prepare', 'mount', 'update', 'dispose'\]/);
+  assert.match(runtime, /\['prepare', 'mount', 'ready', 'update', 'dispose'\]/);
+  assert.match(runtime, /readyBudgetMs/);
+  assert.match(readRepoFile('assets/premium-application-host.js'), /function createPremiumApplicationHost/);
   assert.match(runtime, /prepareBudget\.maxBytes/);
   assert.match(runtime, /dataClient\.clearSession/);
   assert.match(navigation, /function createPremiumApplicationNavigation/);
@@ -70,6 +72,7 @@ test('platform performance plan distinguishes lifecycle core from a migrated bro
   assert.match(performancePlan, /volledig bruikbaar binnen 3000 ms/);
   assert.match(performancePlan, /binnen 100–300 ms, zonder zichtbaar laadscherm/);
   assert.match(performancePlan, /gegevens die\s+later nog binnendruppelen/);
+  assert.match(performancePlan, /gereedheidscontrole/);
 });
 
 test('screen readiness behavior stays covered by the critical contract suite', () => {

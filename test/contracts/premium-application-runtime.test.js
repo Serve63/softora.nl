@@ -40,8 +40,10 @@ function moduleDefinition(id, overrides = {}) {
   return {
     reads: [],
     prepareBudget: { maxReads: 0, maxBytes: 0, maxMs: 500 },
+    readyBudgetMs: 500,
     prepare: async () => ({ id }),
     mount: async ({ root }) => { root.mounted = true; },
+    ready: async () => true,
     update: async ({ root, route }) => { root.route = route; },
     dispose: async () => {},
     ...overrides,
@@ -56,7 +58,57 @@ function deferred() {
 
 test('application runtime validates lifecycle methods and bounded prepare budgets at registration', () => {
   assert.throws(() => createHarness({ modules: { bad: { ...moduleDefinition('bad'), update: null } } }), /bad: module mist update\(\)/);
+  assert.throws(() => createHarness({ modules: { bad: { ...moduleDefinition('bad'), ready: null } } }), /bad: module mist ready\(\)/);
   assert.throws(() => createHarness({ modules: { bad: moduleDefinition('bad', { prepareBudget: { maxReads: 1 } }) } }), /maxReads, maxBytes en maxMs/);
+  assert.throws(() => createHarness({ modules: { bad: moduleDefinition('bad', { readyBudgetMs: 3001 }) } }), /readyBudgetMs/);
+});
+
+test('a module becomes visible only after it confirms complete readiness', async () => {
+  const pending = deferred();
+  const harness = createHarness({ modules: {
+    dashboard: moduleDefinition('dashboard'),
+    orders: moduleDefinition('orders', { ready: () => pending.promise }),
+  } });
+  assert.equal((await harness.runtime.navigate('dashboard')).status, 'mounted');
+  const previous = harness.visible.root;
+  const navigation = harness.runtime.navigate('orders');
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(harness.visible.root, previous);
+  pending.resolve(true);
+  assert.equal((await navigation).status, 'mounted');
+  assert.equal(harness.visible.root.moduleId, 'orders');
+});
+
+test('incomplete readiness releases the staged module and retains the previous screen', async () => {
+  const errors = [];
+  const harness = createHarness({ modules: {
+    dashboard: moduleDefinition('dashboard'),
+    orders: moduleDefinition('orders', { ready: async () => false }),
+  }, onError: (event) => errors.push(event) });
+  assert.equal((await harness.runtime.navigate('dashboard')).status, 'mounted');
+  const previous = harness.visible.root;
+  assert.equal((await harness.runtime.navigate('orders')).status, 'error');
+  assert.equal(harness.visible.root, previous);
+  assert.equal(errors[0].stage, 'ready');
+  assert.ok(harness.log.includes('remove:orders'));
+});
+
+test('a session change during readiness never reveals the staged user data', async () => {
+  const pending = deferred();
+  const harness = createHarness({ modules: {
+    dashboard: moduleDefinition('dashboard'),
+    orders: moduleDefinition('orders', { ready: () => pending.promise }),
+  } });
+  assert.equal((await harness.runtime.navigate('dashboard')).status, 'mounted');
+  const navigation = harness.runtime.navigate('orders');
+  await Promise.resolve();
+  await Promise.resolve();
+  harness.setSession({ authenticated: true, scope: 'other-user', role: 'admin' });
+  pending.resolve(true);
+  assert.equal((await navigation).status, 'session-changed');
+  assert.equal(harness.visible.root, null);
+  assert.equal(harness.log.includes('activate:orders'), false);
 });
 
 test('prepare can use only registered reads and failed preparation keeps the current module visible', async () => {
@@ -121,22 +173,49 @@ test('a superseded module mount is aborted and never replaces the newer view', a
   assert.deepEqual(harness.log.filter((entry) => entry.startsWith('activate:')), ['activate:fast']);
 });
 
-test('same-module navigation updates in place and dirty modules can block leaving', async () => {
+test('same-module navigation stages a replacement and dirty modules can block leaving', async () => {
   let allowLeave = true;
   const modules = {
-    dashboard: moduleDefinition('dashboard', { canLeave: async () => allowLeave }),
+    dashboard: moduleDefinition('dashboard', {
+      canLeave: async () => allowLeave,
+      update: async ({ root, previousRoot, route }) => {
+        assert.notEqual(root, previousRoot);
+        root.route = route;
+      },
+    }),
     orders: moduleDefinition('orders'),
   };
   const harness = createHarness({ modules });
   assert.equal((await harness.runtime.navigate('dashboard', { path: '/dashboard' })).status, 'mounted');
   const root = harness.visible.root;
   assert.equal((await harness.runtime.navigate('dashboard', { path: '/dashboard?tab=agenda' })).status, 'updated');
-  assert.equal(harness.visible.root, root);
-  assert.deepEqual(root.route, { path: '/dashboard?tab=agenda' });
+  assert.notEqual(harness.visible.root, root);
+  assert.deepEqual(harness.visible.root.route, { path: '/dashboard?tab=agenda' });
+  assert.deepEqual(root.route, { path: '/dashboard' });
+  assert.ok(harness.log.includes('remove:dashboard'));
   allowLeave = false;
   assert.equal((await harness.runtime.navigate('orders')).status, 'blocked');
   assert.equal(harness.runtime.getState().activeModuleId, 'dashboard');
   assert.ok(!harness.log.includes('create:orders'));
+});
+
+test('same-module update keeps the old screen visible until the new route is complete', async () => {
+  const pending = deferred();
+  const harness = createHarness({ modules: {
+    dashboard: moduleDefinition('dashboard', {
+      ready: ({ route }) => route.path === '/dashboard' ? true : pending.promise,
+      update: async ({ root, route }) => { root.route = route; },
+    }),
+  } });
+  assert.equal((await harness.runtime.navigate('dashboard', { path: '/dashboard' })).status, 'mounted');
+  const previous = harness.visible.root;
+  const navigation = harness.runtime.navigate('dashboard', { path: '/dashboard?tab=agenda' });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(harness.visible.root, previous);
+  pending.resolve(true);
+  assert.equal((await navigation).status, 'updated');
+  assert.notEqual(harness.visible.root, previous);
 });
 
 test('session changes clear the shell and session-scoped data before mounting the next view', async () => {
