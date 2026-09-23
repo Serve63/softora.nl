@@ -6,7 +6,7 @@ const gzipAsync = promisify(gzip);
 const PAGE_LIMIT = 1000;
 const CHUNK_LIMIT = 5000;
 const PAGE_CONCURRENCY = 4;
-const CHUNK_CONCURRENCY = 3;
+const CHUNK_CONCURRENCY = 5;
 const MAX_CUSTOMERS = 25000;
 const MAX_ARCHIVE_BYTES = 3500000;
 const ARCHIVE_CACHE_CONTROL = 'private, no-cache, max-age=0, must-revalidate';
@@ -57,14 +57,17 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
     return customers;
   }
 
-  async function encodeArchive(customers, total, version, startedAt, method) {
+  async function encodeArchive(customers, total, version, startedAt, method, readTimings = {}) {
+    const verifyStartedAt = nowMs();
     const finalMeta = await readPage(0, 1, true);
     if (!version || finalMeta.total !== total || String(finalMeta.snapshotVersion || '').trim() !== version) {
       throw new Error('Klantdatabase wijzigde tijdens het archiveren.');
     }
     const loadedAt = nowMs();
+    const verifyMs = loadedAt - verifyStartedAt;
     const json = JSON.stringify({ ok: true, source: 'canonical-customers-archive', completeDataset: true,
       customers, total, snapshotVersion: version });
+    const serializedAt = nowMs();
     const buffer = await gzipAsync(Buffer.from(json, 'utf8'), { level: 6 });
     if (buffer.length > MAX_ARCHIVE_BYTES) {
       const error = new Error('Klantdatabase-archief is te groot voor een enkele respons.');
@@ -72,7 +75,9 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       throw error;
     }
     const encodedAt = nowMs();
-    return { buffer, total, version, method, loadMs: loadedAt - startedAt, encodeMs: encodedAt - loadedAt };
+    return { buffer, total, version, method, loadMs: loadedAt - startedAt,
+      encodeMs: encodedAt - loadedAt, serializeMs: serializedAt - loadedAt,
+      gzipMs: encodedAt - serializedAt, verifyMs, ...readTimings };
   }
 
   async function buildArchiveWithPages(startedAt) {
@@ -96,6 +101,7 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
 
   async function buildArchiveWithChunks(startedAt) {
     const firstMeta = await readPage(0, 1, true);
+    const firstMetaMs = nowMs() - startedAt;
     const total = validatedTotal(firstMeta);
     const version = String(firstMeta.snapshotVersion || '').trim();
     if (!version) throw new Error('Klantdatabase heeft geen veilige versie.');
@@ -110,6 +116,7 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       return customers;
     };
     const pages = new Map();
+    const chunksStartedAt = nowMs();
     const offsets = [];
     for (let offset = 0; offset < total; offset += CHUNK_LIMIT) offsets.push(offset);
     let cursor = 0;
@@ -126,7 +133,9 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
     }
     await Promise.all(Array.from({ length: Math.min(CHUNK_CONCURRENCY, offsets.length) }, worker));
     if (readFailure) throw readFailure;
-    return encodeArchive(assemblePages(pages, total, CHUNK_LIMIT), total, version, startedAt, 'chunks');
+    const chunksMs = nowMs() - chunksStartedAt;
+    return encodeArchive(assemblePages(pages, total, CHUNK_LIMIT), total, version, startedAt,
+      'chunks', { firstMetaMs, chunksMs, chunkCount: offsets.length });
   }
 
   async function buildArchive(startedAt) {
@@ -183,6 +192,9 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       res.setHeader('Server-Timing', `customers;dur=${loadMs}, encode;dur=${encodeMs}, cache;desc=${cacheHit ? 'hit' : 'miss'}`);
       logger?.info?.(JSON.stringify({ event: 'premium-customers-archive', loadMs,
         encodeMs, compressedBytes: archive.buffer.length, total: archive.total, cacheHit,
+        firstMetaMs: archive.firstMetaMs, chunksMs: archive.chunksMs,
+        chunkCount: archive.chunkCount, verifyMs: archive.verifyMs,
+        serializeMs: archive.serializeMs, gzipMs: archive.gzipMs,
         method: archive.method, validatorReceived: Boolean(requestedTag),
         validatorMatchedFinal: Boolean(requestedTag && requestedTag.split(',')
           .some((tag) => tag.trim() === archiveEtag(archive.total, archive.version))) }));
