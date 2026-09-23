@@ -2,6 +2,7 @@
     "use strict";
 
     const ENDPOINT = "/api/premium-database/customers";
+    const ARCHIVE_ENDPOINT = ENDPOINT + "/archive";
     const PAGE_LIMIT = 1000;
     const PAGE_CONCURRENCY = 4;
     const MAX_CUSTOMERS = 25000;
@@ -49,6 +50,22 @@
             seen.add(id);
             return true;
         });
+    }
+
+    async function fetchArchive(config) {
+        const response = await config.fetchJsonWithTimeout(ARCHIVE_ENDPOINT, {
+            method: "GET", cache: "no-store", credentials: "same-origin"
+        }, REQUEST_TIMEOUT_MS);
+        const payload = await response.json().catch(function () { return {}; });
+        const total = Number(payload.total);
+        const customers = Array.isArray(payload.customers) ? payload.customers : [];
+        const version = String(payload.snapshotVersion || "").trim();
+        if (!response.ok || payload.ok !== true || payload.completeDataset !== true ||
+            !Number.isInteger(total) || total < 0 || total > MAX_CUSTOMERS || !version ||
+            customers.length !== total || dedupeCustomers(customers).length !== total) {
+            throw new Error("Volledig klantdatabase-archief is niet beschikbaar.");
+        }
+        return { changed: true, customers: customers, total: total, snapshotVersion: version };
     }
 
     async function fetchRemainingPages(config, total) {
@@ -104,11 +121,16 @@
                 };
             }
         }
-        return loadCompleteSnapshot(options, true);
+        try {
+            return await fetchArchive(options);
+        } catch (_archiveError) {
+            return loadCompleteSnapshot(options, true);
+        }
     }
 
     const api = {
         endpoint: ENDPOINT,
+        archiveEndpoint: ARCHIVE_ENDPOINT,
         pageLimit: PAGE_LIMIT,
         maxCustomers: MAX_CUSTOMERS,
         dedupeCustomers: dedupeCustomers,

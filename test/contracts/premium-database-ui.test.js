@@ -1781,13 +1781,17 @@ test('mail-ready snapshot client retries when new companies arrive during pagina
   assert.deepEqual(state.availableSnapshotCustomers.map((customer) => customer.id), ['safe-existing']);
 });
 
-test('premium database customer loader fetches every structured page and skips unchanged reloads', async () => {
+test('premium database customer loader accepts one complete archive and skips unchanged reloads', async () => {
   const client = loadPremiumDatabaseCustomersClient();
   const customers = Array.from({ length: 2001 }, (_item, index) => ({ id: `customer-${index + 1}` }));
   const requests = [];
   const fetchJsonWithTimeout = async (url) => {
     requests.push(url);
     const parsed = new URL(url, 'https://softora.test');
+    if (parsed.pathname.endsWith('/archive')) {
+      return { ok: true, json: async () => ({ ok: true, completeDataset: true,
+        total: customers.length, snapshotVersion: '2001:v1', customers }) };
+    }
     if (parsed.searchParams.get('meta') === '1') {
       return { ok: true, json: async () => ({ ok: true, total: customers.length, snapshotVersion: '2001:v1', customers: [] }) };
     }
@@ -1808,11 +1812,7 @@ test('premium database customer loader fetches every structured page and skips u
   assert.equal(loaded.changed, true);
   assert.equal(loaded.total, 2001);
   assert.equal(loaded.customers.length, 2001);
-  assert.deepEqual(requests.filter((url) => !url.includes('meta=1')).sort(), [
-    '/api/premium-database/customers?offset=0&limit=1000',
-    '/api/premium-database/customers?offset=1000&limit=1000',
-    '/api/premium-database/customers?offset=2000&limit=1000',
-  ]);
+  assert.deepEqual(requests, ['/api/premium-database/customers/archive']);
 
   requests.length = 0;
   const unchanged = await client.load({ previousSnapshotVersion: '2001:v1', fetchJsonWithTimeout });
@@ -1821,12 +1821,37 @@ test('premium database customer loader fetches every structured page and skips u
   assert.deepEqual(requests, ['/api/premium-database/customers?meta=1']);
 });
 
+test('premium database customer loader falls back to verified pages when the archive is incomplete', async () => {
+  const client = loadPremiumDatabaseCustomersClient();
+  const customers = Array.from({ length: 2001 }, (_item, index) => ({ id: `customer-${index + 1}` }));
+  const requests = [];
+  const loaded = await client.load({ fetchJsonWithTimeout: async (url) => {
+    requests.push(url);
+    const parsed = new URL(url, 'https://softora.test');
+    if (parsed.pathname.endsWith('/archive')) return { ok: true, json: async () => ({ ok: true,
+      completeDataset: true, total: customers.length, snapshotVersion: '2001:v1', customers: customers.slice(0, 1000) }) };
+    if (parsed.searchParams.get('meta') === '1') return { ok: true, json: async () => ({ ok: true,
+      total: customers.length, snapshotVersion: '2001:v1', customers: [] }) };
+    const offset = Number(parsed.searchParams.get('offset')) || 0;
+    return { ok: true, json: async () => ({ ok: true, total: customers.length,
+      snapshotVersion: '2001:v1', customers: customers.slice(offset, offset + 1000) }) };
+  } });
+  assert.equal(loaded.customers.length, 2001);
+  assert.deepEqual(requests, [
+    '/api/premium-database/customers/archive',
+    '/api/premium-database/customers?offset=0&limit=1000',
+    '/api/premium-database/customers?offset=1000&limit=1000',
+    '/api/premium-database/customers?offset=2000&limit=1000',
+    '/api/premium-database/customers?meta=1',
+  ]);
+});
+
 test('premium database customer loader retries one transient 503 and still requires a complete snapshot', async () => {
   const client = loadPremiumDatabaseCustomersClient();
   const requests = [];
   const fetchJsonWithTimeout = async (url) => {
     requests.push(url);
-    if (requests.length === 1) {
+    if (requests.length <= 2) {
       return { ok: false, status: 503, json: async () => ({ ok: false, error: 'Tijdelijk niet beschikbaar' }) };
     }
     return { ok: true, status: 200, json: async () => ({
@@ -1839,6 +1864,7 @@ test('premium database customer loader retries one transient 503 and still requi
   assert.equal(loaded.total, 1);
   assert.deepEqual(loaded.customers.map((customer) => customer.id), ['customer-1']);
   assert.deepEqual(requests, [
+    '/api/premium-database/customers/archive',
     '/api/premium-database/customers?offset=0&limit=1000',
     '/api/premium-database/customers?offset=0&limit=1000',
     '/api/premium-database/customers?meta=1',
@@ -1849,7 +1875,7 @@ test('premium database customer loader retries one transient 503 and still requi
     failedRequests += 1;
     return { ok: false, status: 503, json: async () => ({ ok: false }) };
   } }), /Klantdatabase laden mislukt/);
-  assert.equal(failedRequests, 2, 'the shared retry budget must stay bounded');
+  assert.equal(failedRequests, 3, 'archive fallback and the shared page retry budget must stay bounded');
 });
 
 test('mail-ready snapshot client preserves valid rows when a response has a count without category rows', async () => {
@@ -2114,7 +2140,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260923-retry/);
+  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260923-full-archive/);
   assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260923-archive/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
