@@ -4,13 +4,12 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('node:vm');
 const databaseBootSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-boot.js'), 'utf8');
+const databaseBoot = require('../../assets/premium-database-boot');
 
 test('database boot draws the complete screen once after visible photos are ready', async () => {
   const events = [];
   const state = { klanten: [], photoRestorePending: false };
-  const windowObject = { performance: { mark(name) { events.push(name); } } };
-  vm.runInNewContext(databaseBootSource, { window: windowObject, console });
-  await windowObject.SoftoraDatabaseBoot.run({
+  await databaseBoot.run({
     state,
     databaseHadBootstrapCustomers: false,
     databaseHasFastSnapshotBootstrap: false,
