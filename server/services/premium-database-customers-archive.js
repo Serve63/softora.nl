@@ -6,6 +6,7 @@ const gzipAsync = promisify(gzip);
 const PAGE_LIMIT = 1000;
 const CHUNK_LIMIT = 5000;
 const PAGE_CONCURRENCY = 4;
+const CHUNK_CONCURRENCY = 3;
 const MAX_CUSTOMERS = 25000;
 const MAX_ARCHIVE_BYTES = 3500000;
 const ARCHIVE_CACHE_CONTROL = 'private, no-cache, max-age=0, must-revalidate';
@@ -109,17 +110,22 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       return customers;
     };
     const pages = new Map();
-    if (total) pages.set(0, await readChunk(0));
     const offsets = [];
-    for (let offset = CHUNK_LIMIT; offset < total; offset += CHUNK_LIMIT) offsets.push(offset);
+    for (let offset = 0; offset < total; offset += CHUNK_LIMIT) offsets.push(offset);
     let cursor = 0;
+    let readFailure = null;
     async function worker() {
-      while (cursor < offsets.length) {
+      while (cursor < offsets.length && !readFailure) {
         const offset = offsets[cursor++];
-        pages.set(offset, await readChunk(offset));
+        try {
+          pages.set(offset, await readChunk(offset));
+        } catch (error) {
+          readFailure = error;
+        }
       }
     }
-    await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker));
+    await Promise.all(Array.from({ length: Math.min(CHUNK_CONCURRENCY, offsets.length) }, worker));
+    if (readFailure) throw readFailure;
     return encodeArchive(assemblePages(pages, total, CHUNK_LIMIT), total, version, startedAt, 'chunks');
   }
 
