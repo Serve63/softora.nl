@@ -28,6 +28,7 @@ async function database() {
       message_key text, message_id text, sender_name text, date timestamptz, created_at timestamptz);`);
   for (const file of ['20260921093527_mailbox_luna_presentations.sql','20260922155819_mailbox_ai_incoming_gate.sql'])
     await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/'+file),'utf8'));
+  await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923111119_mailbox_ai_queue_lookup_indexes.sql'),'utf8'));
   return db;
 }
 test('SQL settles old/new usage exactly once, retains unknown costs and preserves the approved ceiling', async () => {

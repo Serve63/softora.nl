@@ -122,4 +122,4 @@ $$;
 revoke all on function public.softora_mailbox_ai_states(text[]) from public, anon, authenticated;
 grant execute on function public.softora_mailbox_ai_states(text[]) to service_role;
 
-create index softora_mailbox_ai_received_date_idx on public.softora_mailbox_messages(date desc,message_key) where folder in ('inbox','instantly','allmail','coldmail') and has_body and not body_truncated and deleted_at is null and generation_superseded_at is null;
+
