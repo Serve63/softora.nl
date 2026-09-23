@@ -84,6 +84,28 @@ test('a deferred action binding is checked after the remaining page scripts load
   assert.equal(missing.readiness.getState().status, 'loading');
 });
 
+test('a screen cannot report ready while rendered required content is missing', async () => {
+  const env = createEnvironment({ readyState: 'interactive' });
+  let contentReady = false;
+  const input = readyInput({ contentReady: () => contentReady });
+  assert.equal(await env.readiness.markReady(input), false);
+  assert.equal(env.readiness.getState().status, 'loading');
+
+  contentReady = true;
+  const pending = env.readiness.markReady(input);
+  await new Promise((resolve) => setImmediate(resolve));
+  contentReady = false;
+  env.document.readyState = 'complete';
+  env.listeners.get('load')();
+  assert.equal(await pending, false);
+  assert.equal(env.marks.length, 0);
+  assert.equal(env.readiness.getState().status, 'loading');
+
+  contentReady = true;
+  assert.equal(await env.readiness.markReady(input), true);
+  assert.equal(env.readiness.getState().status, 'ready');
+});
+
 test('a screen stays loading while a required image is decoding', async () => {
   const env = createEnvironment({ readyState: 'interactive' });
   const image = createImage();
@@ -247,19 +269,21 @@ test('Dashboard and Opdrachten load readiness checks before releasing their boot
 
   assert.match(helper, /performanceApi\.mark\('softora:screen-ready'\)/);
   assert.match(helper, /waitForDocumentLoad\(win, doc\)/);
-  assert.match(dashboard, /premium-screen-readiness\.js\?v=20260922b/);
+  assert.match(dashboard, /premium-screen-readiness\.js\?v=20260923a/);
   assert.match(dashboardRefresh, /customers: state\.customersHydrated,[\s\S]*activeOrders: state\.ordersHydrated/);
   assert.match(dashboardRefresh, /if \(!complete\) \{\s*\/\/ Keep the boot shell up while recovery reads are still running\.\s*return false;/);
   assert.match(dashboardRefresh, /if \(!results\[0\] && results\[1\]\) showUnavailable\(\)/);
   assert.match(guardrails, /premium-screen-readiness\.test\.js/);
   assert.match(dashboardRefresh, /requiredActions: \['#dashboardAiChatToggle', '#aiManagementConfigSave'\]/);
+  assert.match(dashboardRefresh, /contentReady: isRenderedContentReady/);
+  assert.match(dashboardRefresh, /\^\\d\+\$\/\.test\(active\.querySelector/);
   assert.match(dashboardRefresh, /chat\?\.dataset\.softoraActionBound === 'true' && save\?\.dataset\.softoraActionBound === 'true'/);
   assert.match(dashboardChat, /toggleButton\.dataset\.softoraActionBound = 'true';/);
   assert.match(dashboard, /aiManagementConfigSave\.dataset\.softoraActionBound = 'true';/);
   assert.match(dashboard, /id="dashboardAiChatToggle"/);
   assert.match(dashboard, /id="aiManagementConfigSave"/);
   assert.match(dashboardCore, /if \(!isPremiumDashboardScreenReadyForRelease\(\)\) return false;/);
-  assert.match(ordersPage, /premium-screen-readiness\.js\?v=20260922b/);
+  assert.match(ordersPage, /premium-screen-readiness\.js\?v=20260923a/);
   assert.match(ordersPage, /premium-active-orders-readiness\.js\?v=20260922b/);
   assert.match(orders, /remoteUiStateLoaded === true\);/);
   assert.match(ordersBoot, /readiness\.publish\(\{ dataComplete: dataComplete === true \}\)/);

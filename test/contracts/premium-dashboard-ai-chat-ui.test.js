@@ -181,7 +181,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.doesNotMatch(pageSource, /if \(!loaded && !hadPremiumDashboardBootstrapData\) renderPremiumDashboardOrders\(\);/);
   assert.match(pageSource, /ordersHydrated: false,/);
   assert.match(pageSource, /customersHydrated: false,/);
-  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20260710b/);
+  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20260923a/);
   assert.match(dataStatusSource, /const unavailableMessage = "Supabase-data tijdelijk niet geladen\. Je data is niet verwijderd; probeer zo opnieuw\.";/);
   assert.match(dataStatusSource, /let hasClearedUnavailable = false;/);
   assert.match(dataStatusSource, /clear\(\) \{\s*hasClearedUnavailable = true;\s*setStatus\(""\);/);

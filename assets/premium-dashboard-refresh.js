@@ -16,6 +16,18 @@
     let retryOrders = false;
     let retryCustomers = false;
 
+    function isRenderedContentReady() {
+        const doc = root.document;
+        const requiredKpis = ['kpiRevenueYear', 'kpiRecurringRevenue', 'kpiTotalClients'];
+        if (!requiredKpis.every(id => {
+            const value = doc.getElementById(id)?.innerText?.trim();
+            return value && value !== '--';
+        })) return false;
+        const active = doc.getElementById('kpiActiveOrders');
+        return Boolean(active && ['website', 'business', 'voice', 'chatbot'].every(type =>
+            /^\d+$/.test(active.querySelector(`[data-kpi-active-${type}]`)?.textContent?.trim() || '')));
+    }
+
     function clearRecovery() {
         if (recoveryTimer !== null) root.clearTimeout(recoveryTimer);
         recoveryTimer = null;
@@ -37,6 +49,7 @@
         if (!force && lastRefreshAt && now - lastRefreshAt < 1200) return Promise.resolve(false);
         const run = generation;
         const current = () => !disposed && run === generation;
+        const hadCompleteSnapshot = state.ordersHydrated && state.customersHydrated;
         const shouldLoadOrders = !onlyMissing || retryOrders || !state.ordersHydrated;
         const shouldLoadCustomers = !onlyMissing || retryCustomers || !state.customersHydrated;
         // Render whichever read finishes first, but complete only after BOTH reads settle.
@@ -53,9 +66,9 @@
         const customersResult = customersPromise.then(loaded => {
             if (!current()) return false;
             if (loaded) render();
-            else showUnavailable();
+            else if (!hadCompleteSnapshot) showUnavailable();
             return Boolean(loaded);
-        }).catch(() => { if (current()) showUnavailable(); return false; });
+        }).catch(() => { if (current() && !hadCompleteSnapshot) showUnavailable(); return false; });
         pending = Promise.all([ordersResult, customersResult]).then(results => {
             if (!current()) return false;
             retryOrders = !results[0];
@@ -63,7 +76,8 @@
             const complete = results.every(Boolean) && state.ordersHydrated && state.customersHydrated;
             if (complete) clearRecovery();
             else {
-                if (!results[0] && results[1]) showUnavailable();
+                if (hadCompleteSnapshot) root.SoftoraDashboardDataStatus?.showStale();
+                else if (!results[0] && results[1]) showUnavailable();
                 scheduleRecovery();
             }
             lastRefreshAt = (root.Date || Date).now();
@@ -96,6 +110,7 @@
             },
             requiredActions: ['#dashboardAiChatToggle', '#aiManagementConfigSave'],
             requiredImages: Array.from((main || doc).querySelectorAll('img:not([loading="lazy"])')),
+            contentReady: isRenderedContentReady,
             actionsBound: () => {
                 const chat = doc.getElementById('dashboardAiChatToggle');
                 const save = doc.getElementById('aiManagementConfigSave');
