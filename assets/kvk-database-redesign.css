@@ -149,6 +149,10 @@ button,input,select,textarea{font-family:inherit}
 .planning-details::after,.latest-treated-panel::after{background:linear-gradient(180deg,#fff,#fcfafb);border-top-color:rgba(110,85,97,.10)}
 .header-controls .transfer-button{background:linear-gradient(180deg,#fff,#faf6f8);border-color:rgba(142,47,95,.18);box-shadow:0 1px 2px rgba(66,33,49,.04),inset 0 1px 0 #fff}
 .planning-help-button{box-shadow:0 1px 2px rgba(66,33,49,.06)}
+
+/* Give the numbered location markers and the following text one compact rhythm. */
+.planning-panel .location-button{grid-template-columns:16px minmax(0,1fr) auto;column-gap:7px;padding-left:12px}
+.planning-panel .rank{width:16px;height:16px;font-size:6.5px;line-height:1}
 @media(prefers-reduced-motion:reduce){.latest-treated-panel tbody tr,.planning-panel .location-button{transition:none}}
 
 /* Subtle live activity beneath each total, without growing the dashboard cards. */

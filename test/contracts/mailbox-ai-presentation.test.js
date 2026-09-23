@@ -135,16 +135,27 @@ test('failed second review never releases an unreviewed first selection or start
   } });
   await assert.rejects(classifier.classify(buildSource(message)), /review unavailable/); assert.equal(calls, 2);
 });
-test('selection indices retain original positions across blank lines and reject invalid removals before review', async () => {
+test('selection indices retain original positions and reject selections with no valid evidence', async () => {
   const source = buildSource({ ...message, body: 'Hoi,\n\nEen inhoudelijk verzoek.\n\nRobin' });
   assert.deepEqual(JSON.parse(buildRequest(source).input[1].content).lines.map((row) => row.line), [0,2,4]);
-  for (const signatureLines of [[1], [5], [-1], [4,4], ['4']]) {
+  for (const signatureLines of [[1], [5], [-1], ['4']]) {
     let calls = 0;
     const classifier = createMailboxAiClassifier({ getApiKey: () => 'offline-secret', fetchImpl: async () => {
       calls++; return { ok: true, json: async () => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify({ signatureLines, contacts: [] }) }] }] }) };
     } });
     await assert.rejects(classifier.classify(source), /MAILBOX_AI_INVALID_RESULT/); assert.equal(calls, 1);
   }
+  let calls = 0;
+  const classifier = createMailboxAiClassifier({ getApiKey: () => 'offline-secret', fetchImpl: async () => {
+    calls++;
+    const value = calls === 1 ? { signatureLines: [4,4,1], contacts: [] } : { safeToRemove: [4] };
+    return { ok: true, json: async () => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(value) }] }] }) };
+  } });
+  const result = await classifier.classify(source);
+  assert.equal(calls, 2);
+  assert.equal(contract.validate(source.body, result.decision), true);
+  assert.equal(result.decision.labels[1], 'authored');
+  assert.equal(result.decision.labels[4], 'signature');
 });
 test('feature is dormant by default; reads never call model; nested current messages share source-safe result', async () => {
   const no = () => { throw new Error('must not call'); };
