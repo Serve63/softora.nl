@@ -14,6 +14,20 @@ test('the live schedule is reconciled into today while invalid dates are rejecte
   await assert.rejects(service.get('2026-09-23'),{status:400});
   await assert.rejects(service.set({date:'2026-09-22',done:'true'}),{status:400});
 });
+test('the plan and daily session start loading together',async()=>{
+  let finishPlan,finishSession;
+  const started=[];
+  const repo={
+    plan:()=>{started.push('plan');return new Promise(resolve=>{finishPlan=resolve;});},
+    read:()=>{started.push('session');return new Promise(resolve=>{finishSession=resolve;});},
+  };
+  const service=createLogboekCutService({now:()=>new Date('2026-09-22T18:00:00Z'),repo});
+  const response=service.get();
+  assert.deepEqual(started,['plan','session']);
+  finishPlan({payload:{days:{tuesday:{orders:[],exercises:{}}}},updatedAt:'2026-09-22T17:00:00Z'});
+  finishSession({training_date:'2026-09-22',exercises:[],checks:{}});
+  assert.equal((await response).session.training_date,'2026-09-22');
+});
 test('stale cut sessions are refreshed from the complete canonical logbook exercise source',async()=>{
   const plan={
     days:{tuesday:{orders:['7'],exercises:{7:{title:'Old press',exerciseKey:'press',sets:'2',reps:'8',kg:'old',notes:'old day copy'}}}},
