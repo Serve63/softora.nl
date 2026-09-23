@@ -87,7 +87,7 @@
     const text = String(value || '').trim();
     if (!text) return 'Niet gevonden';
     const href = /^https?:\/\//i.test(text) ? text : `https://${text}`;
-    const label = text.replace(/^https?:\/\//i, '');
+    const label = text.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, '');
     return `<a class="website-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
   }
 

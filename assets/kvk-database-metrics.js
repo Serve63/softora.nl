@@ -121,6 +121,7 @@
     if (numberNode) numberNode.textContent = `${count > 0 ? '+' : ''}${numberFormat.format(count)}`;
     if (labelNode) labelNode.textContent = 'laatste 60 min';
     element.classList.toggle('is-zero', count === 0);
+    element.classList.toggle('is-negative', count < 0);
   }
 
   function renderUnusableGradeLast60(element, activity, fallbackAdded = 0, showRemoved = true) {
