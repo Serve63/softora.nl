@@ -1350,7 +1350,8 @@ test('SEO uses the shared black heading and outer frame without changing the sid
 test('database loading repair keeps its premium shell and serves matching design eligibility assets', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
   assert.ok(extractSidebarLinkTargets(source).database);
-  assert.match(source, /premium-database-boot\.js\?v=20260908a/);
+  assert.match(source, /premium-database-boot\.js\?v=20260922b/);
+  assert.match(source, /premium-database-readiness\.js\?v=20260922a/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260908-publish/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(source, /premium-database-webdesign-action\.js\?v=20260921-mailready-parity/);
