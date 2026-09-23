@@ -7,12 +7,22 @@ const { buildWebdesignGenerationProvenance } = require('../../server/services/de
 
 const {
   buildDeviceMockupSvg,
-  createPremiumDatabaseWebdesignJobsCoordinator,
+  createPremiumDatabaseWebdesignJobsCoordinator: createCoordinatorImpl,
   diagnoseWebdesignMockupRecord,
   getDeviceMockupRendererSpec,
   isSuspectWebdesignMockupRenderer,
   trimUniformWebdesignSideGuttersDataUrl,
 } = require('../../server/services/premium-database-webdesign-jobs');
+
+function createPremiumDatabaseWebdesignJobsCoordinator(options = {}) {
+  return createCoordinatorImpl({
+    ...options,
+    dataOpsStore: {
+      assignWebdesignOwner: async () => 'serve@softora.nl',
+      ...(options.dataOpsStore || {}),
+    },
+  });
+}
 const {
   registerPremiumDatabaseWebdesignJobRoutes,
 } = require('../../server/routes/premium-database-webdesign-jobs');
@@ -20,12 +30,37 @@ const {
 const TINY_PNG_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg==';
 
-test('Instantly photo provenance records only the authenticated approved generator, not a batch guess', () => {
+test('photo provenance uses the durable design owner without changing the Softora sending mailbox', () => {
   const photo = buildWebdesignGenerationProvenance({ id: 'job-1', ownerKey: 'serve@softora.nl::user-a', customer: { webdesignMailProvider: 'instantly' } });
   assert.equal(photo.senderEmail, 'serve@softora.nl');
+  assert.equal(buildWebdesignGenerationProvenance({ id: 'job-rotated', ownerKey: 'serve@softora.nl::user-a', assignedDesignOwnerEmail: 'martijn@softora.nl', customer: { webdesignMailProvider: 'instantly' } }).senderEmail, 'martijn@softora.nl');
   assert.equal(buildWebdesignGenerationProvenance({ id: 'job-2', ownerKey: 'martijn@softora.nl::user-b', customer: { webdesignMailProvider: 'instantly' } }).senderEmail, 'martijn@softora.nl');
   assert.equal(buildWebdesignGenerationProvenance({ id: 'job-3', ownerKey: 'other@softora.nl::user-c', customer: { webdesignMailProvider: 'instantly' } }).senderEmail, undefined);
   assert.equal(buildWebdesignGenerationProvenance({ id: 'job-4', ownerKey: 'serve@softora.nl::user-a', customer: { webdesignMailProvider: 'softora' } }).senderEmail, undefined);
+  const softora = buildWebdesignGenerationProvenance({ id: 'job-5', ownerKey: 'serve@softora.nl::user-a', assignedDesignOwnerEmail: 'martijn@softora.nl', customer: { webdesignMailProvider: 'softora' } });
+  assert.equal(softora.designOwnerEmail, 'martijn@softora.nl');
+  assert.equal(softora.senderEmail, undefined);
+});
+
+test('webdesign refuses to start before a central owner is recorded', async () => {
+  let generated = false;
+  const coordinator = createCoordinatorImpl({
+    logger: { error() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    dataOpsStore: { upsertWebdesignJob: async () => ({ ok: true }) },
+    aiToolsCoordinator: { runWebsitePreviewGeneratePipeline: async () => { generated = true; } },
+  });
+  const res = createResponseRecorder();
+  await coordinator.startJobResponse({
+    premiumAuth: { email: 'serve@softora.nl', userId: 'serve' },
+    body: {
+      websiteUrl: 'https://example.nl',
+      customer: { id: 'customer-unassigned', bedrijf: 'Example', webdesignMailProvider: 'instantly' },
+    },
+  }, res);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.ok, false);
+  assert.equal(generated, false);
 });
 
 function createResponseRecorder() {
@@ -429,6 +464,7 @@ test('premium database webdesign jobs generate and persist a customer photo in t
     logger: { error() {} },
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength = 500) => String(value || '').slice(0, maxLength),
+    dataOpsStore: { assignWebdesignOwner: async () => 'martijn@softora.nl' },
     aiToolsCoordinator: {
       runWebsitePreviewGeneratePipeline: async (url, options) => {
         pipelineCalls.push({ url, options });
@@ -484,6 +520,8 @@ test('premium database webdesign jobs generate and persist a customer photo in t
 
   const photoMap = JSON.parse(values.softora_database_photos_v1);
   assert.equal(photoMap['customer-1'].id, 'customer-1');
+  assert.equal(photoMap['customer-1'].designOwnerEmail, 'martijn@softora.nl');
+  assert.equal(photoMap['customer-1'].senderEmail, undefined);
   assert.equal(photoMap['customer-1'].identityKey, 'softora|serve|31612345678');
   assert.equal(values['softora_database_photo_data_v1_customer-1_0'], TINY_PNG_DATA_URL);
   assert.match(values['softora_database_photo_data_v1_customer-1_mockup_0'], /^data:image\/jpeg;base64,/);
@@ -598,6 +636,10 @@ test('premium database webdesign jobs persist status and generated photos throug
   const uploadedPhotos = [];
   let latestJob = null;
   const dataOpsStore = {
+    assignWebdesignOwner: async (customerId) => {
+      assert.equal(customerId, 'customer-persist');
+      return 'martijn@softora.nl';
+    },
     upsertWebdesignJob: async (job) => {
       latestJob = {
         ...job,
@@ -646,6 +688,7 @@ test('premium database webdesign jobs persist status and generated photos throug
 
   assert.equal(startRes.statusCode, 202);
   assert.equal(startRes.body.job.status, 'queued');
+  assert.equal(latestJob.assignedDesignOwnerEmail, 'martijn@softora.nl');
   assert.deepEqual(persistedJobs, ['queued']);
   assert.equal(uploadedPhotos.length, 0);
 
@@ -668,6 +711,8 @@ test('premium database webdesign jobs persist status and generated photos throug
   assert.equal(uploadedPhotos[0].entry.mockupOrientation, 'upright');
   assert.equal(uploadedPhotos[0].entry.mockupQualityStatus, 'checked');
   assert.equal(uploadedPhotos[0].entry.legacyMeta.webdesignMailProvider, 'instantly');
+  assert.equal(uploadedPhotos[0].entry.legacyMeta.senderEmail, 'martijn@softora.nl');
+  assert.equal(uploadedPhotos[0].entry.legacyMeta.designOwnerEmail, 'martijn@softora.nl');
   assert.equal(uploadedPhotos[0].meta.source, 'premium-database-webdesign-jobs');
 
   const resumedCoordinator = createPremiumDatabaseWebdesignJobsCoordinator({

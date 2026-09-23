@@ -24,12 +24,14 @@ function buildWebdesignPipelineOptions({ variant: inputVariant, source, company 
 
 function buildWebdesignGenerationProvenance(job = {}) {
   const authenticatedEmail = String(job.ownerKey || '').split('::')[0].trim().toLowerCase();
+  const assignedEmail = String(job.assignedDesignOwnerEmail || '').trim().toLowerCase();
   const senderEmail = job.customer && job.customer.webdesignMailProvider === 'instantly' &&
-    OUTBOUND_SENDER_PROFILE_KEYS[authenticatedEmail] ? authenticatedEmail : '';
+    OUTBOUND_SENDER_PROFILE_KEYS[assignedEmail || authenticatedEmail] ? assignedEmail || authenticatedEmail : '';
   return {
     generationPolicy: WEBDESIGN_GENERATION_POLICY,
     generationJobId: String(job.id || '').trim(),
     generationVariant: normalizeWebdesignVariant(job.variant),
+    ...(assignedEmail ? { designOwnerEmail: assignedEmail } : {}),
     ...(senderEmail ? { senderEmail } : {}),
     ...(job.generation ? { generation: job.generation } : {}),
   };
