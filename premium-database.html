@@ -2759,11 +2759,10 @@
                 if (customerResult && customerResult.changed === false && state.remoteCustomersLoaded) { if (ordersChanged) applyCustomerList(mergeCustomersWithResponsible(state.klanten, state.orders), false); lastCustomerRefreshAtMs = Date.now(); return true; }
                 const remoteCustomers = parseCustomers(customerResult && customerResult.customers || []); if (!remoteCustomers.length) throw new Error("Geen bruikbare Supabase-klantdata ontvangen."); window.performance?.mark?.("softora:database:normalized");
                 const enrichedCustomers = mergeCustomersWithResponsible(remoteCustomers, state.orders); window.performance?.mark?.("softora:database:responsible");
-                const customersWithFallbackMedia = mergeCustomersWithPhotos(enrichedCustomers, {}, state.klanten, true);
-                let customersWithPhotos = customersWithFallbackMedia; if (!skipPhotoRestore && !(state.mailReadySnapshotLoaded && state.availableSnapshotLoaded)) { try {
-                        const photoMap = await loadCustomerPhotoMap(enrichedCustomers, { force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true });
-                        customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, customersWithFallbackMedia, true);
+                let photoMap = {}; if (!skipPhotoRestore && !(state.mailReadySnapshotLoaded && state.availableSnapshotLoaded)) { try {
+                        photoMap = await loadCustomerPhotoMap(enrichedCustomers, { force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true });
                     } catch (error) { state.photoRestoreFailed = true; console.warn("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error); } }
+                const customersWithPhotos = mergeCustomersWithPhotos(enrichedCustomers, photoMap, state.klanten, true);
                 window.performance?.mark?.("softora:database:photos-merged"); const canonicalCustomers = window.SoftoraDatabaseMailReadySnapshot.mergeWithCanonicalSnapshots(customersWithPhotos, state.mailReadySnapshotCustomers, state.availableSnapshotCustomers, state.instantlyReadySnapshotCustomers); window.performance?.mark?.("softora:database:canonical-merged");
                 const outreachAutomation = outreachController.applyAutomation(canonicalCustomers);
                 const sortedCustomers = getSortedCustomers(outreachAutomation.customers); window.performance?.mark?.("softora:database:sorted");
