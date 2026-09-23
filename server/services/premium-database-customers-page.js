@@ -8,6 +8,50 @@ function createPremiumDatabaseCustomersPageCoordinator(deps = {}) {
   const { dataOpsStore = null } = deps;
   const sendCustomersArchiveResponse = createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore });
 
+  async function sendCurrentCampaignMediaResponse(req, res) {
+    if (!dataOpsStore || typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function') {
+      return res.status(503).json({ ok: false, error: 'Webdesigns zijn tijdelijk niet beschikbaar.' });
+    }
+    const rawIds = normalizeString(req && req.query && req.query.ids);
+    const customerIds = Array.from(new Set(rawIds.split(',').map(normalizeString).filter(Boolean)));
+    if (customerIds.length > 100 || customerIds.some((id) => id.length > 128 || !/^[a-zA-Z0-9._:-]+$/.test(id))) {
+      return res.status(400).json({ ok: false, error: 'Ongeldige klantselectie.' });
+    }
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    if (!customerIds.length) return res.status(200).json({ ok: true, media: [] });
+    const rows = await dataOpsStore.listDesignPhotosWithSignedUrls({
+      customerIds,
+      maxMatches: Math.min(500, customerIds.length * 4),
+      expiresInSeconds: 60 * 60,
+      bypassReadCache: true,
+      bypassReadFailureCooldown: true,
+      suppressReadFailureCooldown: true,
+      suppressTransientReadFailureLog: true,
+    });
+    if (!Array.isArray(rows)) {
+      return res.status(503).json({ ok: false, error: 'Webdesigns konden niet worden geladen.' });
+    }
+    const requested = new Set(customerIds);
+    const seen = new Set();
+    return res.status(200).json({
+      ok: true,
+      media: rows.filter((row) => {
+        const id = normalizeString(row && row.customerId);
+        if (!requested.has(id) || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      }).map((row) => ({
+        customerId: normalizeString(row.customerId),
+        identityKey: normalizeString(row.identityKey),
+        websitePhoto: normalizeString(row.websitePhotoUrl),
+        websitePhotoName: normalizeString(row.fileName),
+        websiteMockup: normalizeString(row.websiteMockupUrl),
+        websiteMockupName: normalizeString(row.websiteMockupName),
+        signedUrlExpiresAt: normalizeString(row.signedUrlExpiresAt),
+      })),
+    });
+  }
+
   async function sendCustomersPageResponse(req, res) {
     if (!dataOpsStore || typeof dataOpsStore.listCustomersPage !== 'function') {
       return res.status(503).json({ ok: false, error: 'De officiële klantdatabase is tijdelijk niet beschikbaar.' });
@@ -52,7 +96,7 @@ function createPremiumDatabaseCustomersPageCoordinator(deps = {}) {
     return res.status(200).json({ ok: true, ...page });
   }
 
-  return { sendCustomersPageResponse, sendCustomersArchiveResponse };
+  return { sendCustomersPageResponse, sendCustomersArchiveResponse, sendCurrentCampaignMediaResponse };
 }
 
 module.exports = { createPremiumDatabaseCustomersPageCoordinator };
