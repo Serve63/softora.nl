@@ -190,7 +190,13 @@
 
         for (var index = 0; index < urls.length; index += 1) {
             try {
-                var response = await fetchWithTimeout(urls[index], options, label, timeoutMs);
+                var readModelClient = options && options.readModelKey && global.SoftoraReadModelClient;
+                var response = readModelClient
+                    ? await readModelClient.fetchResponse(urls[index], { method: options.method, cache: options.cache }, {
+                        key: options.readModelKey,
+                        fetchImpl: function (url, init) { return fetchWithTimeout(url, init, label, timeoutMs); }
+                    })
+                    : await fetchWithTimeout(urls[index], options, label, timeoutMs);
                 if (!response.ok) {
                     var statusError = new Error(label + " mislukt (" + response.status + ")");
                     statusError.status = response.status;
@@ -221,7 +227,8 @@
         }
         var promise = requestWithFallback(
             getReadUrls(scope),
-            { method: "GET", cache: "no-store" },
+            // Versioned scopes are completed from the verified local copy when unchanged.
+            { method: "GET", cache: "no-store", readModelKey: "ui-state:" + cacheKey },
             "UI-state GET"
         ).then(async function (data) {
             if (generation !== sessionGeneration) throw new Error("UI-state sessie gewijzigd.");

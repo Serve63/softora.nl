@@ -282,3 +282,75 @@ test('Mailsysteem loads the read model client before the mail metrics', () => {
   assert.ok(store > 0 && store < client && client < metrics);
   assert.equal(page.split('assets/premium-readmodel-store.js').length, 2, 'the store is loaded once');
 });
+
+test('ui-state reads are versioned by content for allow-listed scopes only', () => {
+  const { buildUiStateGetBody, uiStateReadModelVersion } = require('../../server/services/ui-state-readmodel');
+  const state = { values: { guard: '{"entries":[1,2]}' }, source: 'supabase', updatedAt: '2026-09-24T08:00:00Z' };
+  const version = uiStateReadModelVersion('premium_coldmail_send_guard', state);
+  assert.match(version, /^rm1-[a-f0-9]{40}$/);
+
+  const full = buildUiStateGetBody({ headers: {} }, 'premium_coldmail_send_guard', state);
+  assert.deepEqual(full.values, state.values);
+  assert.deepEqual(full.readModel, { key: 'ui-state:premium_coldmail_send_guard', version, unchanged: false,
+    fields: ['scope', 'values', 'source', 'updatedAt'] });
+
+  const unchanged = buildUiStateGetBody({ headers: { 'x-softora-readmodel-version': version } }, 'premium_coldmail_send_guard', state);
+  assert.deepEqual(unchanged, { ok: true, scope: 'premium_coldmail_send_guard',
+    readModel: { key: 'ui-state:premium_coldmail_send_guard', version, unchanged: true } });
+
+  const edited = { ...state, values: { guard: '{"entries":[1,2,3]}' } };
+  assert.notEqual(uiStateReadModelVersion('premium_coldmail_send_guard', edited), version, 'any value change is a new version');
+  assert.equal(uiStateReadModelVersion('premium_coldmail_send_guard', { ...state, source: 'memory' }), '',
+    'an in-memory fallback is never presented as a verified copy');
+  const runtimeOps = fs.readFileSync(path.join(repoRoot, 'server/services/runtime-ops.js'), 'utf8');
+  assert.match(runtimeOps, /if \(!isPasswordRegisterScope\(scope\)\) \{\n\s+\/\/ Only non-vault scopes can reach read-model versioning\./);
+  for (const scope of ['premium_password_register', 'premium_customers_database', 'premium_active_orders', 'premium_database_photos']) {
+    assert.equal(uiStateReadModelVersion(scope, state), '', scope);
+    const body = buildUiStateGetBody({ headers: { 'x-softora-readmodel-version': version } }, scope, state, { revision: 3 });
+    assert.equal(body.readModel, undefined);
+    assert.deepEqual(body.values, state.values);
+    assert.equal(body.revision, 3);
+  }
+});
+
+test('mail-ready archive answers unchanged for the snapshot content the browser already holds', async () => {
+  const { createPremiumDatabaseSnapshotArchiveResponder } = require('../../server/services/premium-database-snapshot-archive');
+  const snapshot = { ok: true, source: 'structured-mail-ready-snapshot', generatedAt: '2026-09-24T08:00:00Z',
+    snapshotVersion: 'sha256:abc', total: 1, customers: [{ id: 'a' }], availableTotal: 1,
+    availableCustomers: [{ id: 'b', bedrijf: 'B' }], instantlyReadyTotal: 0, instantlyReadyCustomers: [],
+    foundTotal: 1, foundCustomerIds: ['a'], timings: { buildMs: 5 } };
+  const responder = createPremiumDatabaseSnapshotArchiveResponder({ buildSnapshot: async () => snapshot,
+    nowMs: Date.now, logger: { info() {}, warn() {} }, source: 'structured-mail-ready-snapshot' });
+  const full = { statusCode: 0, headers: {}, setHeader(name, value) { this.headers[name] = value; },
+    status(code) { this.statusCode = code; return this; }, end(body) { this.body = body; return this; }, json(body) { this.body = body; return this; } };
+  await responder({ query: { compact: '1' }, headers: {} }, full);
+  const payload = JSON.parse(require('node:zlib').gunzipSync(full.body).toString('utf8'));
+  assert.equal(payload.readModel.unchanged, false);
+  assert.deepEqual(payload.availableCustomers, [{ id: 'b', availableSnapshot: true }]);
+  assert.ok(payload.readModel.fields.includes('availableCustomers'));
+  assert.ok(!payload.readModel.fields.includes('timings') && !payload.readModel.fields.includes('ok'));
+
+  const again = { ...full, headers: {}, body: null };
+  await responder({ query: { compact: '1' }, headers: { 'x-softora-readmodel-version': payload.readModel.version } }, again);
+  assert.deepEqual(again.body, { ok: true, source: 'structured-mail-ready-snapshot',
+    readModel: { key: 'mail-ready-snapshot', version: payload.readModel.version, unchanged: true } });
+
+  const otherMode = { ...full, headers: {}, body: null };
+  await responder({ query: {}, headers: { 'x-softora-readmodel-version': payload.readModel.version } }, otherMode);
+  assert.ok(Buffer.isBuffer(otherMode.body), 'the compact copy never answers for the full archive');
+});
+
+test('read model client completes whole-response read models and acts like a fetch response', async () => {
+  const client = loadClient();
+  const version = 'rm1-' + '1'.repeat(40);
+  const store = { read: async () => ({ version, fields: { values: { a: 1 }, scope: 's' } }), write: async () => true };
+  const response = await client.fetchResponse('/api/ui-state-get?scope=s', { method: 'GET' }, {
+    key: 'ui-state:s', store, session: { authenticated: true, email: 'serve@softora.nl' },
+    fetchImpl: async () => jsonResponse({ ok: true, scope: 's', readModel: { version, unchanged: true } }),
+  });
+  assert.equal(response.ok, true);
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.deepEqual(payload.values, { a: 1 });
+  assert.equal(payload.ok, true);
+});

@@ -655,47 +655,46 @@ function createRuntimeOpsCoordinator(deps = {}) {
       return sendPasswordRegisterOwnerDenied(req, res, ownerDecision);
     }
 
-    const state = isPasswordRegisterScope(scope)
-      ? await getAuthoritativePasswordRegisterState(scope)
-      : await getUiStateValuesForScope(scope);
-    if (!state) {
-      return res.status(503).json({
-        ok: false,
-        error: 'Kon UI state niet laden zonder geldige Supabase-opslag.',
-      });
+    const unavailable = () => res.status(503).json({
+      ok: false,
+      error: 'Kon UI state niet laden zonder geldige Supabase-opslag.',
+    });
+    if (!isPasswordRegisterScope(scope)) {
+      // Only non-vault scopes can reach read-model versioning.
+      const uiState = await getUiStateValuesForScope(scope);
+      if (!uiState) return unavailable();
+      return res.status(200).json(require('./ui-state-readmodel').buildUiStateGetBody(req, scope, uiState));
     }
 
-
-    if (isPasswordRegisterScope(scope)) {
-      const vaultValidation = validatePasswordRegisterValues(state.values || {});
-      if (!vaultValidation.ok) {
-        return sendPasswordRegisterVaultInvalid(
-          req,
-          res,
-          503,
-          'Wachtwoordenregister-read geweigerd wegens ongeldig versleuteld opslagformaat.'
-        );
-      }
-      appendPasswordRegisterAuditEvent(
+    const state = await getAuthoritativePasswordRegisterState(scope);
+    if (!state) return unavailable();
+    const vaultValidation = validatePasswordRegisterValues(state.values || {});
+    if (!vaultValidation.ok) {
+      return sendPasswordRegisterVaultInvalid(
         req,
-        {
-          type: 'password_register_vault_read',
-          success: true,
-          detail: vaultValidation.empty
-            ? 'Lege wachtwoordenkluis veilig gelezen.'
-            : `Versleutelde wachtwoordenkluis v${vaultValidation.version} veilig gelezen.`,
-        },
-        'security_password_register_vault_read'
+        res,
+        503,
+        'Wachtwoordenregister-read geweigerd wegens ongeldig versleuteld opslagformaat.'
       );
     }
-
+    appendPasswordRegisterAuditEvent(
+      req,
+      {
+        type: 'password_register_vault_read',
+        success: true,
+        detail: vaultValidation.empty
+          ? 'Lege wachtwoordenkluis veilig gelezen.'
+          : `Versleutelde wachtwoordenkluis v${vaultValidation.version} veilig gelezen.`,
+      },
+      'security_password_register_vault_read'
+    );
     return res.status(200).json({
       ok: true,
       scope,
       values: state.values || {},
       source: state.source || 'supabase',
       updatedAt: state.updatedAt || null,
-      ...(isPasswordRegisterScope(scope) ? { revision: state.revision } : {}),
+      revision: state.revision,
     });
   }
 

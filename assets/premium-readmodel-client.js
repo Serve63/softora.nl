@@ -30,7 +30,13 @@
         try { return await response.json(); } catch (_error) { return null; }
     }
 
-    // options: { key, path, fetchImpl, store?, session? }. Resolves { response, payload }.
+    function copyOf(value) {
+        try { return typeof global.structuredClone === "function" ? global.structuredClone(value) : JSON.parse(JSON.stringify(value)); }
+        catch (_error) { return null; }
+    }
+
+    // options: { key, path?, fetchImpl, store?, session? }. Without a path the whole
+    // response is the read model. Resolves { response, payload }.
     async function fetchJson(url, init, options) {
         const config = options || {};
         const fetchImpl = config.fetchImpl || global.fetch;
@@ -38,7 +44,7 @@
         const identity = identityOf(config.session || global.SoftoraPageBootstrapSession?.get?.());
         const storeKey = "versioned:" + String(config.key || "").trim();
         const path = String(config.path || "").trim();
-        const canCache = Boolean(store && identity && config.key && path);
+        const canCache = Boolean(store && identity && config.key);
         let local = null;
         if (canCache && config.skipLocal !== true) {
             try {
@@ -50,27 +56,38 @@
         if (local) headers[VERSION_HEADER] = local.version;
         const response = await fetchImpl(url, Object.assign({}, init, { headers: headers }));
         const payload = await readJson(response);
-        const part = payload && path ? payload[path] : null;
+        const part = payload && typeof payload === "object" ? (path ? payload[path] : payload) : null;
         const meta = part && part.readModel;
         if (!response.ok || !part || !meta) return { response: response, payload: payload };
         if (meta.unchanged === true) {
             if (local && local.version === meta.version) {
-                payload[path] = Object.assign({}, part, local.fields);
-                return { response: response, payload: payload };
+                const completed = Object.assign({}, part, local.fields);
+                return { response: response, payload: path ? Object.assign(payload, { [path]: completed }) : completed };
             }
             // The copy vanished between read and answer: ask once for the full part.
             return fetchJson(url, init, Object.assign({}, config, { skipLocal: true }));
         }
         if (canCache && Array.isArray(meta.fields) && VERSION_PATTERN.test(String(meta.version || ""))) {
-            const copy = { version: meta.version, fields: pick(part, meta.fields) };
-            whenIdle(function () {
+            // Copied on arrival: whatever the page later does with the payload never reaches the stored copy.
+            const copy = copyOf({ version: meta.version, fields: pick(part, meta.fields) });
+            if (copy) whenIdle(function () {
                 Promise.resolve(store.write(storeKey, identity, copy)).catch(function () { return false; });
             });
         }
         return { response: response, payload: payload };
     }
 
-    const api = Object.freeze({ fetchJson: fetchJson, versionHeader: VERSION_HEADER });
+    // Same protocol for callers that expect a fetch Response: json() yields the
+    // completed payload, status and ok are those of the real response.
+    async function fetchResponse(url, init, options) {
+        const result = await fetchJson(url, init, options);
+        const response = result.response || {};
+        const payload = result.payload;
+        return { ok: Boolean(response.ok), status: response.status, headers: response.headers,
+            json: function () { return payload === null ? Promise.reject(new Error("Geen JSON-antwoord.")) : Promise.resolve(payload); } };
+    }
+
+    const api = Object.freeze({ fetchJson: fetchJson, fetchResponse: fetchResponse, versionHeader: VERSION_HEADER });
     global.SoftoraReadModelClient = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
