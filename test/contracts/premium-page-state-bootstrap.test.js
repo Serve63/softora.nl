@@ -280,7 +280,7 @@ test('mailbox-bootstrap leest bij een koude server eerst het duurzame snapshot',
   assert.equal(payload.mailbox.messages[0].from, 'Direct zichtbaar');
   assert.equal(payload.mailbox.messages[0].body, 'Deze mail staat al in de eerste HTML.');
   assert.equal(payload.mailbox.sync.source, 'campaign-replies-snapshot');
-  assert.equal(mailboxReads, 1);
+  assert.equal(mailboxReads, 0);
 });
 
 test('mailbox-bootstrap levert een afgekapt duurzaam snapshot nooit als volledige beginlijst', async () => {

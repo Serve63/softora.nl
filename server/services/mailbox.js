@@ -2238,7 +2238,7 @@ function createMailboxService(deps = {}) {
     }
   }
 
-  async function syncInstantlyMailboxResponse(req, res) { return respondToInstantlyMailboxSync({ instantlyMailboxService, req, res, logger, normalizeString }); }
+  async function syncInstantlyMailboxResponse(req, res) { return respondToInstantlyMailboxSync({ instantlyMailboxService, req, res, logger, normalizeString, afterSync: req.method === 'GET' ? () => listCampaignReplies({ limit: 200, includeSnapshotMessages: true, hydrateBodies: false, requireSnapshotPersistence: true }) : null }); }
   async function hideConversationResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};

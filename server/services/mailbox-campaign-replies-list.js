@@ -29,6 +29,7 @@ function createMailboxCampaignRepliesList({
     includeSnapshotMessages = false,
     hydrateBodies = true,
     preferSnapshot = false,
+    requireSnapshotPersistence = false,
   } = {}) {
     const startedAt = Date.now();
     if (preferSnapshot && !hydrateBodies && !includeSnapshotMessages && !refreshInstantly) {
@@ -59,14 +60,20 @@ function createMailboxCampaignRepliesList({
     const serializedSnapshot = includeSnapshotMessages && serializeMailboxCampaignSnapshot({ ...result, messages: snapshotMessages, sync: { ...result.sync, source: snapshotInstantlyReplies.length ? 'campaign-replies-index+instantly' : 'campaign-replies-index' } });
     if (serializedSnapshot && parseMailboxCampaignSnapshot(serializedSnapshot)?.complete === true) {
       try {
-        await setUiStateValues(
+        const saved = await setUiStateValues(
           MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
           { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: serializedSnapshot },
           { source: 'mailbox-campaign-replies', actor: 'Mailbox index' }
         );
+        if (requireSnapshotPersistence && saved?.source !== 'supabase') {
+          throw new Error('Volledige mailboxweergave kon niet duurzaam worden opgeslagen.');
+        }
       } catch (error) {
         logger.warn('[Mailbox][CampaignSnapshot]', error?.message || error);
+        if (requireSnapshotPersistence) throw error;
       }
+    } else if (requireSnapshotPersistence) {
+      throw new Error('Volledige mailboxweergave past niet in het duurzame snapshot.');
     }
     logger.info?.('[Mailbox][CampaignListTiming]', { indexMs: indexedAt - startedAt, providerMs: mergedAt - indexedAt, snapshotMs: Date.now() - mergedAt, totalMs: Date.now() - startedAt, messages: messages.length, hydrateBodies });
     return includeSnapshotMessages ? { ...result, snapshotMessages } : result;

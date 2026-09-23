@@ -54,6 +54,8 @@
     const getFolder = typeof options.getFolder === 'function' ? options.getFolder : () => 'inbox';
     const getOwner = typeof options.getOwner === 'function' ? options.getOwner : () => '';
     const loadMessages = typeof options.loadMessages === 'function' ? options.loadMessages : async () => {};
+    const readStored = typeof options.readStored === 'function' ? options.readStored : null;
+    const getLastSnapshotAt = typeof options.getLastSnapshotAt === 'function' ? options.getLastSnapshotAt : () => 0;
     const showToast = typeof options.toast === 'function' ? options.toast : () => {};
     const request = typeof options.fetch === 'function' ? options.fetch : global.fetch.bind(global);
     const scheduleTimeout = typeof options.setTimeout === 'function' ? options.setTimeout : global.setTimeout?.bind(global);
@@ -78,12 +80,14 @@
     let refreshTimer = 0;
     let refreshAgeTimer = 0;
     let activeRequest = null;
+    let backgroundRequest = null;
     let requestGeneration = 0;
     let lifecycleGeneration = 0;
     let failureCount = 0;
     let initialCheckPending = options.initiallyChecking === true;
 
     function handleDetailPriority() {
+      backgroundRequest?.controller?.abort?.();
       if (!activeRequest || activeRequest.foreground) return;
       activeRequest.interruptedByDetail = true;
       activeRequest.controller?.abort?.();
@@ -111,6 +115,8 @@
       const scopeKey = getScopeKey(scope);
       const state = getFreshness(scope);
       const age = formatRefreshAge(state.lastSuccessfulAt, getNow());
+      const snapshotAt = Number(getLastSnapshotAt()) || 0;
+      const snapshotAge = formatRefreshAge(snapshotAt, getNow());
       const checking = isChecking(scopeKey);
       const ownerText = scope.folder === 'outreach' ? ` voor ${scope.owner}` : ` voor ${scope.account || scope.folder}`;
       const checkedText = state.lastSuccessfulAt
@@ -122,7 +128,11 @@
           ? `Niet alle mailboxproviders konden worden bijgewerkt${ownerText}.`
           : state.status === 'recovering'
             ? `Verbindingsfout${ownerText}; de huidige mailbox blijft zichtbaar. Klik om opnieuw te proberen; automatisch herstel blijft actief.`
-            : `Laatste volledige providercontrole${ownerText}: ${checkedText}`;
+            : state.lastSuccessfulAt
+              ? `Laatste volledige providercontrole${ownerText}: ${checkedText}`
+              : snapshotAt
+                ? `Opgeslagen mailboxweergave${ownerText}: ${new Date(snapshotAt).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`
+                : `Mailboxproviders zijn nog niet handmatig gecontroleerd${ownerText}.`;
       if (ageLabel) {
         if (checking) {
           ageLabel.textContent = 'Controleren…';
@@ -131,7 +141,7 @@
         } else if (state.status === 'recovering') {
           ageLabel.textContent = 'Verbindingsfout · opnieuw proberen';
         } else {
-          ageLabel.textContent = age ? `${age} gecontroleerd` : 'Nog niet gecontroleerd';
+          ageLabel.textContent = age ? `${age} gecontroleerd` : snapshotAge ? `${snapshotAge} bijgewerkt` : 'Nog niet gecontroleerd';
         }
         ageLabel.setAttribute('title', statusText);
         ageLabel.setAttribute('aria-label', statusText);
@@ -180,6 +190,31 @@
         refreshTimer = 0;
         void refresh({ reason: 'scheduled' });
       }, Math.max(0, Number(delayMs) || 0));
+    }
+
+    function refreshStored() {
+      if (!readStored || destroyed || paused) return Promise.resolve(false);
+      if (activeRequest) return activeRequest.promise || Promise.resolve(false);
+      if (backgroundRequest) return backgroundRequest.promise;
+      const requestState = {
+        controller: new AbortController(),
+        generation: lifecycleGeneration,
+        scopeKey: getScopeKey(getScope()),
+        promise: null,
+      };
+      backgroundRequest = requestState;
+      requestState.promise = Promise.resolve()
+        .then(() => readStored({ signal: requestState.controller.signal }))
+        .then((result) => result !== false)
+        .catch(() => false)
+        .finally(() => {
+          if (backgroundRequest === requestState) backgroundRequest = null;
+          if (!destroyed && !paused && requestState.generation === lifecycleGeneration && !activeRequest) {
+            updateRefreshAge();
+            scheduleNext();
+          }
+        });
+      return requestState.promise;
     }
 
     async function boundedOperation(operation, signal) {
@@ -286,6 +321,11 @@
 
     function refresh({ manual = false } = {}) {
       if (destroyed || paused) return Promise.resolve(false);
+      if (!manual && readStored) return refreshStored();
+      if (manual && backgroundRequest) {
+        backgroundRequest.controller.abort();
+        backgroundRequest = null;
+      }
       if (!manual && Number(global.SoftoraMailboxDetailState?.snapshot?.().inFlight) > 0) {
         scheduleNext(1500);
         return Promise.resolve(false);
@@ -410,14 +450,17 @@
 
     function scopeChanged() {
       lifecycleGeneration += 1;
-      initialCheckPending = initialCheckPending || started;
+      backgroundRequest?.controller?.abort?.();
+      backgroundRequest = null;
+      initialCheckPending = initialCheckPending || (started && !readStored);
       activeRequest?.controller?.abort?.();
       if (activeRequest) inFlightRequests.delete(activeRequest.token);
       activeRequest = null;
       failureCount = 0;
       setRefreshing();
       updateRefreshAge();
-      requestImmediateRefresh();
+      if (readStored) scheduleNext(VISIBLE_REFRESH_INTERVAL_MS);
+      else requestImmediateRefresh();
     }
 
     function startRefreshAgeTimer() {
@@ -434,6 +477,8 @@
       if (event?.persisted === true) {
         paused = true;
         lifecycleGeneration += 1;
+        backgroundRequest?.controller?.abort?.();
+        backgroundRequest = null;
         activeRequest?.controller?.abort?.();
         if (activeRequest) inFlightRequests.delete(activeRequest.token);
         activeRequest = null;
@@ -466,7 +511,7 @@
       windowRef?.addEventListener?.('pageshow', handlePageShow);
       windowRef?.addEventListener?.('softora:mailbox-detail-priority', handleDetailPriority);
       updateRefreshAge();
-      scheduleNext(0);
+      scheduleNext(readStored ? VISIBLE_REFRESH_INTERVAL_MS : 0);
     }
 
     function destroy() {
@@ -475,6 +520,8 @@
       paused = false;
       initialCheckPending = false;
       lifecycleGeneration += 1;
+      backgroundRequest?.controller?.abort?.();
+      backgroundRequest = null;
       activeRequest?.controller?.abort?.();
       if (activeRequest) inFlightRequests.delete(activeRequest.token);
       activeRequest = null;

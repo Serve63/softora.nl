@@ -335,7 +335,7 @@
         ? { ...activeMessageAtLoad }
         : null;
       const normalizeMessage = (message) => options.normalizeMessage?.(message, scope) || message;
-      setBusy(true);
+      if (!loadOptions.silentRead) setBusy(true);
       try {
         const campaignResult = await options.campaignInbox?.load(
           scope.folder,
@@ -346,10 +346,11 @@
             signal: loadSignal,
             skipBootstrap: loadOptions.skipPageBootstrap === true,
             refreshInstantly: loadOptions.skipProviderRefresh !== true,
+            preferSnapshot: loadOptions.preferSnapshot === true,
           }
         );
         if (!canApply(candidate) || loadSignal?.aborted) {
-          setBusy(false);
+          if (!loadOptions.silentRead) setBusy(false);
           return false;
         }
         if (campaignResult) {
@@ -370,7 +371,7 @@
           options.renderList?.({ openLatest: loadOptions.openLatest !== false });
           keepConversationOpen(messages, activeId, loadOptions, previousActiveMessage);
           options.setStatus?.('');
-          setBusy(false);
+          if (!loadOptions.silentRead) setBusy(false);
           if (campaignResult.fromBootstrap && canApply(candidate) && options.deferPostBootstrapRead !== true) {
             void load({
               skipPageBootstrap: true,
@@ -398,7 +399,7 @@
           throw new Error(data?.detail || data?.error || 'Mailbox laden mislukt');
         }
         if (!canApply(candidate) || loadSignal?.aborted) {
-          setBusy(false);
+          if (!loadOptions.silentRead) setBusy(false);
           return false;
         }
         const sync = data?.sync && typeof data.sync === 'object' ? data.sync : null;
@@ -423,11 +424,11 @@
         if (sync?.refreshRecommended && !loadOptions.skipBackgroundSync) {
           void options.syncInBackground?.();
         }
-        setBusy(false);
+        if (!loadOptions.silentRead) setBusy(false);
         return true;
       } catch (error) {
         if (!canApply(candidate) || loadSignal?.aborted || isAbortError(error)) {
-          setBusy(false);
+          if (!loadOptions.silentRead) setBusy(false);
           return false;
         }
         const currentMessages = options.getMessages?.() || [];
@@ -440,7 +441,7 @@
             currentSelectionVersion !== selectionVersionAtLoad
           );
           if (selectionChanged) {
-            setBusy(false);
+            if (!loadOptions.silentRead) setBusy(false);
             return false;
           }
           const activeMessage = currentMessages.find(
@@ -454,15 +455,16 @@
           releaseTransientLoadingState(currentMessages);
           if (String(activeIdAtLoad || '') && !recoveryMessage) {
             options.setStatus?.('');
-            setBusy(false);
+            if (!loadOptions.silentRead) setBusy(false);
             return false;
           }
           options.renderList?.({ openLatest: false });
           if (recoveryMessage) openMessage(recoveryMessage.id, loadOptions, { skipReadPersist: true });
           options.setStatus?.('');
-          setBusy(false);
+          if (!loadOptions.silentRead) setBusy(false);
           return false;
         }
+        if (loadOptions.silentRead) return false;
         options.setSync?.(null);
         options.setMessages?.([]);
         options.setStatus?.('Opnieuw verbinden…');

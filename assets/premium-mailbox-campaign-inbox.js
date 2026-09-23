@@ -1044,7 +1044,7 @@
         owner
       ),
       sync: data?.sync && typeof data.sync === 'object'
-        ? data.sync
+        ? { ...data.sync, ...(data.savedAt ? { snapshotSavedAt: data.savedAt } : {}) }
         : {
             indexed: true,
             stale: false,
@@ -1094,7 +1094,7 @@
       metadataOnly: '1',
       owner: owner === 'both' ? '' : owner,
       refreshInstantly: !options?.skipBootstrap || options.refreshInstantly === false ? '0' : '1',
-      ...(!options?.skipBootstrap ? { preferSnapshot: '1' } : {}),
+      ...(!options?.skipBootstrap || options?.preferSnapshot ? { preferSnapshot: '1' } : {}),
     });
     try {
       const response = await request(`/api/mailbox/campaign-replies?${params.toString()}`, {

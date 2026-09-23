@@ -201,7 +201,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
-  assert.match(page, /assets\/premium-mailbox\.js\?v=20260921c/);
+  assert.match(page, /assets\/premium-mailbox\.js\?v=20260923a/);
   assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260907b/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260826a/);
@@ -209,11 +209,11 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-ui-state\.js\?v=20260907a/);
   assert.match(page, /assets\/premium-mailbox-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-body-section\.js\?v=20260818c/);
-  assert.match(page, /assets\/premium-mailbox-refresh\.js\?v=20260909a/);
-  assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260921c/);
+  assert.match(page, /assets\/premium-mailbox-refresh\.js\?v=20260923a/);
+  assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260923a/);
   assert.match(page, /assets\/premium-mailbox-owner-preference\.js\?v=20260822a/);
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
-  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260921c/);
+  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260923a/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260908a/);
   assert.match(page, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
@@ -227,7 +227,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-contact-view.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260921c') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
-  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260921c'));
+  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260923a'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260905c'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260905c') < page.indexOf('premium-mailbox-index.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-browser-storage.js?v=20260828b'));
@@ -4646,9 +4646,9 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260921c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260923a/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260910a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260921c/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260923a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260921c/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -4741,13 +4741,13 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /<button class="topbar-mailbox-switcher" id="mailbox-account-switcher" type="button" aria-haspopup="menu" aria-expanded="false">/);
   assert.match(pageSource, /<span class="topbar-mailbox-switcher-label" id="topbar-mailbox-account">Servé Creusen<\/span>/);
   assert.match(pageSource, /<div class="topbar-mailbox-menu" id="mailbox-account-menu" role="menu" aria-label="Campagne-eigenaar"><\/div>/);
-  assert.match(pageSource, /<button class="topbar-refresh is-refreshing" id="mailbox-refresh" type="button" data-mailbox-action="refresh-mailbox" aria-label="Mailboxproviders worden gecontroleerd\."[^>]*aria-busy="true" disabled>/);
-  assert.match(pageSource, /<span class="topbar-refresh-age" id="mailbox-refresh-age" aria-live="polite" aria-label="Mailboxproviders worden gecontroleerd\.">Controleren…<\/span>/);
+  assert.match(pageSource, /<button class="topbar-refresh" id="mailbox-refresh" type="button" data-mailbox-action="refresh-mailbox" aria-label="Mailbox nu controleren"[^>]*aria-busy="false">/);
+  assert.match(pageSource, /<span class="topbar-refresh-age" id="mailbox-refresh-age" aria-live="polite">Mailbox beschikbaar<\/span>/);
   assert.match(pageSource, /<div class="mail-sync-status" id="mail-sync-status" hidden><\/div>/);
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
-  assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260909a/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260921c/);
+  assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260923a/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260923a/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -4769,7 +4769,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(scriptSource, /async function loadMailboxAccounts\(\)/);
   assert.match(scriptSource, /async function loadMailboxMessages\(options = \{\}\)/);
   assert.match(scriptSource, /window\.SoftoraMailboxRefresh\?\.create\(/);
-  assert.match(scriptSource, /SoftoraMailboxRefresh\?\.create\(\{ autoStart: false, initiallyChecking: true,/);
+  assert.match(scriptSource, /SoftoraMailboxRefresh\?\.create\(\{ autoStart: false, initiallyChecking: false,/);
   assert.match(scriptSource, /\} catch \(error\) \{[\s\S]*\} finally \{\s*window\.SoftoraMailboxBoot\?\.markReady\?\.\(\);\s*mailboxRefreshController\?\.start\?\.\(\);/);
   assert.equal((scriptSource.match(/mailboxRefreshController\?\.start\?\.\(\)/g) || []).length, 1);
   assert.match(refreshSource, /const VISIBLE_REFRESH_INTERVAL_MS = 60 \* 1000;/);
@@ -9115,6 +9115,48 @@ test('ownerrefresh met HTTP 207 laat een lopende providerlookup dezelfde convers
   }
 });
 
+test('automatische mailboxverversing leest alleen de opgeslagen weergave zonder providercontrole', async () => {
+  const attributes = new Map();
+  const timers = new Map();
+  let nextTimerId = 0;
+  let storedReads = 0;
+  let providerReads = 0;
+  const ageLabel = { textContent: '', setAttribute() {} };
+  const button = {
+    disabled: false,
+    classList: { toggle() {} },
+    setAttribute(name, value) { attributes.set(name, value); },
+    addEventListener() {},
+  };
+  const controller = refreshModule.create({
+    autoStart: false,
+    initiallyChecking: false,
+    button, ageLabel,
+    getFolder: () => 'outreach',
+    getOwner: () => 'serve',
+    getLastSnapshotAt: () => Date.now() - 120_000,
+    readStored: async ({ signal }) => { assert.equal(signal.aborted, false); storedReads += 1; return true; },
+    fetch: async () => { providerReads += 1; throw new Error('Provider mag niet automatisch draaien'); },
+    setTimeout(handler, delay) { const id = ++nextTimerId; timers.set(id, { handler, delay }); return id; },
+    clearTimeout(id) { timers.delete(id); },
+    setInterval: () => 1,
+    clearInterval() {},
+  });
+  try {
+    controller.start();
+    assert.equal([...timers.values()][0].delay, 60_000);
+    assert.match(ageLabel.textContent, /bijgewerkt/);
+    assert.equal(button.disabled, false);
+    assert.equal(attributes.get('aria-busy'), 'false');
+    assert.equal(await controller.refresh(), true);
+    assert.equal(storedReads, 1);
+    assert.equal(providerReads, 0);
+    assert.equal(attributes.get('aria-busy'), 'false');
+  } finally {
+    controller.destroy();
+  }
+});
+
 test('ownerrefresh geeft de no-loader-intentie door aan alle behouden detailpaden', async () => {
   const current = {
     id: 'serve@softora.nl|inbox:focus-owner',
@@ -9977,7 +10019,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
   assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260907b/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20260921c/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20260923a/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);
@@ -11435,6 +11477,12 @@ test('coldmail inbox laadt alleen gekoppelde mailboxberichten van de gekozen eig
     return { ok: true, json: async () => ({ ok: true, messages: [], sync: {} }) };
   }, { owner: 'serve', skipBootstrap: true, refreshInstantly: true });
   assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=200&metadataOnly=1&owner=serve&refreshInstantly=1');
+  calls.length = 0;
+  await campaignInboxModule.load('outreach', (message) => message, async (url) => {
+    calls.push({ url: String(url) });
+    return { ok: true, json: async () => ({ ok: true, messages: [], sync: {} }) };
+  }, { owner: 'serve', skipBootstrap: true, refreshInstantly: false, preferSnapshot: true });
+  assert.equal(calls[0].url, '/api/mailbox/campaign-replies?limit=200&metadataOnly=1&owner=serve&refreshInstantly=0&preferSnapshot=1');
 });
 
 test('mailbox gebruikt server-bootstrap zonder zichtbare laadtekst of eerste client-request', async () => {
@@ -11453,6 +11501,7 @@ test('mailbox gebruikt server-bootstrap zonder zichtbare laadtekst of eerste cli
           mailbox: {
             ok: true,
             complete: true,
+            savedAt: '2026-09-23T16:38:24.473Z',
             owner: 'serve',
             messages: [{ id: 'reply-bootstrap', accountEmail: 'serve@softora.nl', from: 'Direct zichtbaar' }],
             sync: { source: 'campaign-replies-index' },
@@ -11470,6 +11519,7 @@ test('mailbox gebruikt server-bootstrap zonder zichtbare laadtekst of eerste cli
     });
     assert.equal(result.messages[0].id, 'reply-bootstrap');
     assert.equal(result.fromBootstrap, true);
+    assert.equal(result.sync.snapshotSavedAt, '2026-09-23T16:38:24.473Z');
     assert.equal(fetchCalls, 0);
   } finally {
     globalThis.document = previousDocument;

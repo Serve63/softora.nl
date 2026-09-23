@@ -23,7 +23,87 @@ const {
 const {
   createDefaultInstantlyMailboxService,
   mergeCampaignReplies,
+  syncInstantlyMailboxResponse,
 } = require('../../server/services/mailbox-instantly-integration');
+
+test('vijfminutencron slaat de volledige mailboxweergave op na beide geslaagde providersyncs', async () => {
+  const calls = [];
+  const res = { status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+  await syncInstantlyMailboxResponse({
+    instantlyMailboxService: {
+      getStatus: () => ({ configured: true }),
+      syncOwner: async (owner) => { calls.push(owner); return { ok: true, stored: 0 }; },
+    },
+    req: { method: 'GET', query: {} }, res,
+    logger: { error() {} }, normalizeString: (value) => String(value || '').trim(),
+    afterSync: async () => { calls.push('snapshot'); },
+  });
+  assert.deepEqual(calls, ['serve', 'martijn', 'snapshot']);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+});
+
+test('gedeeltelijke providersync publiceert geen snapshot als compleet', async () => {
+  let refreshed = false;
+  const res = { status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+  await syncInstantlyMailboxResponse({
+    instantlyMailboxService: {
+      getStatus: () => ({ configured: true }),
+      syncOwner: async (owner) => ({ ok: owner !== 'martijn' }),
+    },
+    req: { method: 'GET', query: {} }, res,
+    logger: { error() {} }, normalizeString: (value) => String(value || '').trim(),
+    afterSync: async () => { refreshed = true; },
+  });
+  assert.equal(refreshed, false);
+  assert.equal(res.body.ok, false);
+});
+
+test('geslaagde maar afgekapt verwerkte providersync publiceert geen verouderde volledige weergave', async () => {
+  let refreshed = false;
+  const res = { status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+  await syncInstantlyMailboxResponse({
+    instantlyMailboxService: {
+      getStatus: () => ({ configured: true }),
+      syncOwner: async (owner) => ({ ok: true, partial: owner === 'martijn' }),
+    },
+    req: { method: 'GET', query: {} }, res,
+    logger: { error() {} }, normalizeString: (value) => String(value || '').trim(),
+    afterSync: async () => { refreshed = true; },
+  });
+  assert.equal(refreshed, false);
+  assert.equal(res.body.ok, true);
+});
+
+test('een nog lopende providersync publiceert geen tussentijdse mailboxweergave', async () => {
+  let refreshed = false;
+  const res = { status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+  await syncInstantlyMailboxResponse({
+    instantlyMailboxService: {
+      getStatus: () => ({ configured: true }),
+      syncOwner: async (owner) => owner === 'serve'
+        ? { ok: true, skipped: true, reason: 'sync-in-progress' }
+        : { ok: true, stored: 0 },
+    },
+    req: { method: 'GET', query: {} }, res,
+    logger: { error() {} }, normalizeString: (value) => String(value || '').trim(),
+    afterSync: async () => { refreshed = true; },
+  });
+  assert.equal(refreshed, false);
+});
+
+test('mislukte snapshotopbouw wordt als aparte cronfout gemeld', async () => {
+  const res = { status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+  await syncInstantlyMailboxResponse({
+    instantlyMailboxService: { getStatus: () => ({ configured: false }) },
+    req: { method: 'GET', query: {} }, res,
+    logger: { error() {} }, normalizeString: (value) => String(value || '').trim(),
+    afterSync: async () => { throw new Error('DB tijdelijk niet bereikbaar'); },
+  });
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.code, 'MAILBOX_SNAPSHOT_REFRESH_FAILED');
+  assert.equal(res.body.error, 'Mailboxweergave vernieuwen mislukt');
+});
 
 function createStore(initialMessages = []) {
   const rows = initialMessages.slice();

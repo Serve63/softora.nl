@@ -285,15 +285,9 @@ function createPremiumPageStateBootstrapService(deps = {}) {
         snapshot: reconciledSnapshot,
         cachedAt: preferPersisted ? Date.now() : cachedEntry.cachedAt,
       };
-      if (cacheAgeMs > Math.max(0, Number(freshCacheMs) || 0)) {
-        void refreshMailboxSnapshot();
-      }
       return reconciledSnapshot;
     }
     if (shouldPreferPersistedMailboxSnapshot(persistedSnapshot, cachedEntry?.snapshot)) {
-      if (!cachedEntry || cacheAgeMs > Math.max(0, Number(freshCacheMs) || 0)) {
-        void refreshMailboxSnapshot();
-      }
       return persistedSnapshot;
     }
     if (cachedEntry && cacheAgeMs <= Math.max(0, Number(staleCacheMs) || 0)) {
@@ -304,7 +298,6 @@ function createPremiumPageStateBootstrapService(deps = {}) {
       return cachedEntry.snapshot;
     }
     if (persistedSnapshot) {
-      void refreshMailboxSnapshot();
       return persistedSnapshot;
     }
     return refreshMailboxSnapshot();

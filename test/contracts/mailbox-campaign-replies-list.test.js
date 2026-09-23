@@ -178,7 +178,7 @@ test('campaign replies coordinator behoudt response en durable snapshot contract
     },
     instantlyMailboxService: { isConfigured: () => false },
     filterVisibleMailboxMessages: (messages) => messages,
-    setUiStateValues: async (...args) => { writes.push(args); },
+    setUiStateValues: async (...args) => { writes.push(args); return { source: 'supabase' }; },
     logger: { warn() {} },
     normalizeString: (value) => String(value || '').trim(),
     truncateText: (value, maxLength) => String(value || '').slice(0, maxLength),
@@ -188,6 +188,7 @@ test('campaign replies coordinator behoudt response en durable snapshot contract
     limit: 7,
     owner: '',
     includeSnapshotMessages: true,
+    requireSnapshotPersistence: true,
   });
 
   assert.deepEqual(reads, [{ limit: 7, owner: '' }]);
@@ -233,4 +234,18 @@ test('een gedeelde rebuild overschrijft de duurzame lijst niet met een afgekapt 
   const result = await listCampaignReplies({ includeSnapshotMessages: true });
   assert.equal(result.snapshotMessages.length, 401);
   assert.equal(writes, 0);
+  await assert.rejects(listCampaignReplies({ includeSnapshotMessages: true, requireSnapshotPersistence: true }), /past niet in het duurzame snapshot/);
+});
+
+test('cron meldt een niet-opgeslagen snapshot als fout', async () => {
+  const listCampaignReplies = createMailboxCampaignRepliesList({
+    mailboxCampaignRepliesService: { listReplies: async () => [{ id: 'reply', messageKey: 'reply', accountEmail: 'serve@softora.nl', receivedAt: '2026-09-23T00:00:00.000Z' }] },
+    instantlyMailboxService: { isConfigured: () => false },
+    filterVisibleMailboxMessages: (messages) => messages,
+    setUiStateValues: async () => null,
+    logger: { info() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength) => String(value || '').slice(0, maxLength),
+  });
+  await assert.rejects(listCampaignReplies({ includeSnapshotMessages: true, requireSnapshotPersistence: true }), /kon niet duurzaam worden opgeslagen/);
 });

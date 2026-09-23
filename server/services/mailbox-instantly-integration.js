@@ -462,11 +462,23 @@ async function syncInstantlyMailboxResponse({
   res,
   logger,
   normalizeString,
+  afterSync,
 }) {
   try {
+    async function refreshSnapshot() {
+      if (typeof afterSync !== 'function') return;
+      try {
+        await afterSync();
+      } catch (error) {
+        error.code = 'MAILBOX_SNAPSHOT_REFRESH_FAILED';
+        error.status = 503;
+        throw error;
+      }
+    }
     const startedAt = new Date().toISOString();
     const status = getInstantlyStatus(instantlyMailboxService);
     if (!status.configured) {
+      await refreshSnapshot();
       return res.status(200).json({
         ok: true,
         skipped: true,
@@ -497,6 +509,9 @@ async function syncInstantlyMailboxResponse({
     for (const owner of owners) {
       results.push(await instantlyMailboxService.syncOwner(owner, syncOptions));
     }
+    if (results.every((result) => result?.ok !== false && result?.partial !== true && result?.historyDeferred !== true && result?.reason !== 'sync-in-progress') && typeof afterSync === 'function') {
+      await refreshSnapshot();
+    }
     return res.status(200).json({
       ok: results.every((result) => result?.ok !== false),
       owners,
@@ -505,14 +520,15 @@ async function syncInstantlyMailboxResponse({
       results,
     });
   } catch (error) {
-    logger.error('[Mailbox][InstantlySync]', error?.message || error);
+    const snapshotFailed = error?.code === 'MAILBOX_SNAPSHOT_REFRESH_FAILED';
+    logger.error(snapshotFailed ? '[Mailbox][SnapshotRefresh]' : '[Mailbox][InstantlySync]', error?.message || error);
     const retryAfterMs = Math.max(0, Number(error?.retryAfterMs) || 0);
     if (retryAfterMs) res.setHeader?.('Retry-After', String(Math.ceil(retryAfterMs / 1000)));
     return res.status(error.status || 500).json({
       ok: false,
       code: normalizeString(error?.code) || 'INSTANTLY_MAILBOX_SYNC_FAILED',
       ...(retryAfterMs ? { retryAfterMs, nextAllowedAt: error.nextAllowedAt } : {}),
-      error: 'Instantly-mailbox sync mislukt',
+      error: snapshotFailed ? 'Mailboxweergave vernieuwen mislukt' : 'Instantly-mailbox sync mislukt',
       detail: String(error?.message || 'Onbekende fout'),
     });
   }

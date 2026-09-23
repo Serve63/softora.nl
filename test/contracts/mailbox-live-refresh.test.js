@@ -1108,7 +1108,7 @@ test('ownerwissel tijdens checking toont nooit de status van de oude owner', asy
   owner = 'martijn';
   controller.scopeChanged();
   assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
-  assert.equal(ageLabel.attributes['aria-label'], 'Laatste volledige providercontrole voor martijn: nog niet voltooid');
+  assert.equal(ageLabel.attributes['aria-label'], 'Mailboxproviders zijn nog niet handmatig gecontroleerd voor martijn.');
   assert.equal(button.attributes['aria-label'], 'Mailbox nu controleren voor martijn');
   assert.equal(button.disabled, false);
   assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'idle' });
@@ -1116,7 +1116,7 @@ test('ownerwissel tijdens checking toont nooit de status van de oude owner', asy
   releaseOldOwner(successfulResponse());
   assert.equal(await oldOwnerRefresh, false);
   assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
-  assert.equal(ageLabel.attributes['aria-label'], 'Laatste volledige providercontrole voor martijn: nog niet voltooid');
+  assert.equal(ageLabel.attributes['aria-label'], 'Mailboxproviders zijn nog niet handmatig gecontroleerd voor martijn.');
   assert.equal(button.attributes['aria-label'], 'Mailbox nu controleren voor martijn');
   assert.doesNotMatch(ageLabel.attributes['aria-label'], /serve/);
   assert.doesNotMatch(button.attributes['aria-label'], /serve/);
