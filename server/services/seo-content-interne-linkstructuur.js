@@ -19,18 +19,18 @@ const INTERNE_LINKSTRUCTUUR_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       title: 'Google Search Central: Link best practices for Google',
       url: 'https://developers.google.com/search/docs/crawling-indexing/links-crawlable',
-      observedAt: '2026-07-26',
+      observedAt: '2026-09-23',
     }),
     Object.freeze({
       title: 'Google Search Central: What is a sitemap?',
       url: 'https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview',
-      observedAt: '2026-07-26',
+      observedAt: '2026-09-23',
     }),
   ]),
-  growthEventKind: 'substantial_refresh',
-  growthEventAt: '2026-07-26',
+  growthEventKind: 'other_growth_action',
+  growthEventAt: '2026-09-23',
   publishedAt: '2026-06-01',
-  updatedAt: '2026-07-26',
+  updatedAt: '2026-09-23',
   summary:
     'Een interne linkstructuur is het netwerk van klikbare routes tussen pagina’s op dezelfde website. Een goede structuur koppelt iedere belangrijke pagina aan een duidelijke rol, relevante context en een logische volgende stap.',
   sections: Object.freeze([
@@ -119,7 +119,9 @@ const INTERNE_LINKSTRUCTUUR_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       heading: 'Gebruik een kleine linkkaart vóór publicatie',
       paragraphs: Object.freeze([
-        'Een praktische linkkaart heeft vijf regels: de URL en primaire taak; de centrale money page; minimaal twee inhoudelijk passende uitgaande links; minimaal twee bestaande pagina’s die een ingang kunnen geven; en de ankertekst plus reden voor iedere link. Controleer ook of alle bestemmingen publiek, indexeerbaar, zelf-canoniek en daadwerkelijk live zijn.',
+        'Noteer in een linkkaart de bronpagina, de vervolgvraag, de bestemming, de zichtbare linktekst en de reden voor de link. Er is geen vast ideaal aantal links. Zorg dat iedere belangrijke pagina vanaf minstens één andere passende pagina bereikbaar is en kies uitgaande links alleen wanneer ze de lezer verder helpen. Controleer of de bestemming publiek, indexeerbaar en live is en de juiste voorkeurs-URL gebruikt.',
+        'Voorbeeld, geen klantresultaat: een onderhoudsgids beantwoordt wat beheer kost. Bij de vraag “wat moet ik vóór een verhuizing vastleggen?” past een link naar een migratieplan, met “URL-kaart voor een website-migratie” als linktekst. Vanuit dat plan leidt een uitleg over blijvende navigatie weer naar de interne-linkgids. Een extra link naar een willekeurige dienst voegt aan die vervolgvraag niets toe.',
+        'Laat de bouwer de link als een echte HTML-link met een href-bestemming plaatsen, niet alleen als een klikactie op een tekstvak. Test daarna met Tab en Enter: is de link herkenbaar, opent de bedoelde pagina en sluit de kop daar aan op de belofte? Noteer de geteste bron en bestemming plus de controledatum. Een vermelding in de sitemap vervangt deze bezoekersroute niet en garandeert geen indexering.',
         'Deze kaart voorkomt twee uitersten: een pagina die los in de sitemap staat en een pagina die naar bijna alles verwijst. Niet ieder artikel hoeft het hele cluster te verbinden. Het moet vooral de route ondersteunen die voor die specifieke lezer op dat moment logisch is.',
       ]),
     }),
