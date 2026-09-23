@@ -1351,3 +1351,33 @@ test('mail ROI reads recover after a transient REST timeout without a 39-second 
   assert.equal(roiReads.length, 2);
   assert.deepEqual(roiReads[1].requestOptions, { timeoutMs: 4000, ignoreFailureCooldown: true, suppressFailureCooldown: true });
 });
+
+test('customer and order reads do not inherit or open the shared Supabase REST cooldown', async () => {
+  const { RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE, RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE } = require('../../server/services/ui-seo-runtime');
+  let failNextCustomerRead = true;
+  const { store, restReads, loggerInfos } = createFixture({
+    uiStateReadTimeoutMsByScope: RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE,
+    uiStateReadOptionsByScope: RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE,
+    fetchResult: async (key, _columns, _count, options) => {
+      if (!options.ignoreFailureCooldown || (key === 'ui_state:premium_customers_database' && failNextCustomerRead)) {
+        if (key === 'ui_state:premium_customers_database') failNextCustomerRead = false;
+        return { ok: false, error: 'Supabase REST timeout / shared cooldown' };
+      }
+      return { ok: true, body: { payload: { values: { verified: key } } } };
+    },
+  });
+
+  assert.equal(await store.getUiStateValues('unrelated_scope'), null);
+  assert.equal(await store.getUiStateValues('premium_customers_database'), null);
+  assert.equal((await store.getUiStateValues('premium_customers_database')).values.verified, 'ui_state:premium_customers_database');
+  assert.equal((await store.getUiStateValues('premium_active_orders')).values.verified, 'ui_state:premium_active_orders');
+  assert.deepEqual(restReads.filter((read) => read.rowKey === 'ui_state:premium_customers_database')
+    .map((read) => read.requestOptions), [
+    { timeoutMs: 12000, ignoreFailureCooldown: true, suppressFailureCooldown: true },
+    { timeoutMs: 12000, ignoreFailureCooldown: true, suppressFailureCooldown: true },
+  ]);
+  assert.deepEqual(restReads.find((read) => read.rowKey === 'ui_state:premium_active_orders').requestOptions,
+    { timeoutMs: 4000, ignoreFailureCooldown: true, suppressFailureCooldown: true });
+  assert.equal(loggerInfos.some((args) => args[0] === '[UI State][Supabase][read-circuit-open]' &&
+    ['premium_customers_database', 'premium_active_orders'].includes(args[1])), false);
+});

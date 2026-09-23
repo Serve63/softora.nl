@@ -18,6 +18,8 @@ const { createSportschoolLogbookStore } = require('./sportschool-logbook-store')
 const RELIABLE_UI_STATE_READ_TIMEOUT_MS_BY_SCOPE = Object.freeze({
   premium_mailbox_preferences: 4000,
   premium_database_mail_roi: 4000,
+  premium_customers_database: 12000,
+  premium_active_orders: 4000,
   premium_live_momentum: 12000,
   website_preview_batches: 12000,
   premium_coldmail_autopilot: 12000,
@@ -32,7 +34,7 @@ const RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE = Object.freeze(
         preferSupabaseRestRead: scope !== 'premium_coldmail_send_guard',
         ignoreSupabaseRestFailureCooldown: true,
         suppressSupabaseRestFailureCooldown: true,
-        ...(['premium_mailbox_preferences', 'premium_database_mail_roi'].includes(scope) ? {
+        ...(['premium_mailbox_preferences', 'premium_database_mail_roi', 'premium_customers_database', 'premium_active_orders'].includes(scope) ? {
           bypassReadFailureCooldown: true,
           suppressReadFailureCooldown: true,
           suppressReadFailureLog: true,
