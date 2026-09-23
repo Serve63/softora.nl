@@ -264,7 +264,7 @@ test('customer loader reuses its local copy when the server proves it unchanged'
 });
 
 test('table version migration counts every write on both source tables through a locked-down function', () => {
-  const sql = fs.readFileSync(path.join(repoRoot, 'supabase/migrations/20260924000100_platform_table_versions.sql'), 'utf8');
+  const sql = fs.readFileSync(path.join(repoRoot, 'supabase/migrations/20260923222655_platform_table_versions.sql'), 'utf8');
   for (const table of ['softora_customers', 'softora_outbound_recipient_guards']) {
     assert.match(sql, new RegExp(`after insert or update or delete on public\\.${table}\\s+for each statement`));
     assert.match(sql, new RegExp(`after truncate on public\\.${table}\\s+for each statement`));
