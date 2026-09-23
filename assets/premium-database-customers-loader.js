@@ -65,6 +65,7 @@
             customers.length !== total || dedupeCustomers(customers).length !== total) {
             throw new Error("Volledig klantdatabase-archief is niet beschikbaar.");
         }
+        global.performance?.mark?.("softora:database:archive-validated");
         return { changed: true, customers: customers, total: total, snapshotVersion: version };
     }
 
