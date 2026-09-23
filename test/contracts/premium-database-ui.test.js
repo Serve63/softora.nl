@@ -632,8 +632,10 @@ test('premium database page keeps customers fixed from Haaren nearby to far away
   assert.match(pageSource, /targetCoords: "assets\/premium-database-target-coords\.js\?v=20260923-index"/);
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260923-cache/);
   assert.match(pageSource, /sortKey: "distance"/);
-  assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);\s*\}/);
+  assert.match(pageSource, /assets\/premium-database-sorted-lists\.js\?v=20260923a/);
+  assert.ok(pageSource.indexOf('assets/premium-database-sorted-lists.js') < pageSource.indexOf('const databaseSortedLists = window.SoftoraDatabaseSortedLists.create'));
+  assert.match(pageSource, /function sortCustomers\(list\) \{\s*return databaseSortedLists\.sort\(list\);\s*\}/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return databaseSortedLists\.sorted\(customers\);\s*\}/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(state\.klanten\.concat\(\[customer\]\)\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(mergeResult\.customers\);/);
   assert.match(pageSource, /const normalizedCustomers = sortCustomers\(customers\)\.filter/);
@@ -3121,7 +3123,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260921-mailready-parity/);
   assert.match(webdesignActionScriptSource, /Webdesign klaar\. De lead staat nu bij Mailklaar\./);
-  assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \};/);
+  assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \}; const databaseSortedLists = window\.SoftoraDatabaseSortedLists\.create/);
   assert.match(pageSource, /function setDatabaseTableBodyHtml\(html\) \{[\s\S]*data-photo-loaded=[\s\S]*databaseRenderRuntime\.tableStructureSignature === structuralSignature[\s\S]*nodes\.tbody\.innerHTML = nextHtml;/);
   assert.match(pageSource, /function getCustomerSearchHaystack\(customer\)/);
   assert.match(pageSource, /databaseRenderRuntime\.activeAssetCache = new WeakMap\(\);/);
@@ -5178,7 +5180,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /outreachController\.renderMeta\(customer, showOutreachActionColumn && outreachController\.isTrackedOutreachCustomer\(customer\)\)/);
   assert.match(pageSource, /showSentActions \? outreachController\.renderActions\(customer, \{ hideMailButton: outreachController\.hasInstantlyOutreachSignal\(customer\) \}\)/);
   assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showSentActions \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);\s*\}/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return databaseSortedLists\.sorted\(customers\);\s*\}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(6\), table\.outreach-action-mode tbody td:nth-child\(6\) \{ width: 24%; text-align: center; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
   assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto/);
@@ -6697,7 +6699,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Haaren', ()
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260923-cache/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);\s*\}/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return databaseSortedLists\.sorted\(customers\);\s*\}/);
   assert.match(sorterSource, /const OISTERWIJK_COORDS = \{ lat: 51\.5792, lng: 5\.1889 \};/);
   assert.match(sorterSource, /function resolveCustomerCoords\(customer\)/);
   assert.match(sorterSource, /function getDistanceKm\(customer\)/);
