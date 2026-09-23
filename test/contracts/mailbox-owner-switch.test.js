@@ -56,6 +56,38 @@ test('mailbox owner session behandelt account, folder en owner als een atomische
   assert.equal(session.isCurrent(token, { owner: 'serve', account: '', folder: 'sent' }), false);
 });
 
+test('mailbox boot waits for the selected message to finish before reporting a complete load', async () => {
+  let resolveDetail;
+  let messages = [];
+  const view = ownerSession.createView({
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      load: async () => ({ messages: [{ id: 'first-message' }], sync: { indexed: true } }),
+      filterMessages: (value) => value,
+    },
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    filterDeleted: (value) => value,
+    getListElement: () => ({ setAttribute() {} }),
+    renderList: () => new Promise((resolve) => { resolveDetail = resolve; }),
+  });
+  let completed = false;
+  const pending = view.load({ waitForDetail: true }).then((result) => {
+    completed = true;
+    return result;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(completed, false);
+  assert.deepEqual(messages.map((message) => message.id), ['first-message']);
+  resolveDetail({ committed: true });
+  assert.equal(await pending, true);
+
+  const incomplete = view.load({ waitForDetail: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  resolveDetail({ committed: false });
+  assert.equal(await incomplete, false);
+});
+
 test('timeout van refresh annuleert alleen de lijst en een laat antwoord overschrijft niets', async () => {
   let messages = [{ id: 'huidig-bericht' }];
   let release;

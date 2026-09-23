@@ -465,10 +465,10 @@ async function syncInstantlyMailboxResponse({
   afterSync,
 }) {
   try {
-    async function refreshSnapshot() {
+    async function refreshSnapshot(input) {
       if (typeof afterSync !== 'function') return;
       try {
-        await afterSync();
+        await afterSync(input);
       } catch (error) {
         error.code = 'MAILBOX_SNAPSHOT_REFRESH_FAILED';
         error.status = 503;
@@ -478,7 +478,7 @@ async function syncInstantlyMailboxResponse({
     const startedAt = new Date().toISOString();
     const status = getInstantlyStatus(instantlyMailboxService);
     if (!status.configured) {
-      await refreshSnapshot();
+      await refreshSnapshot({ results: [], configured: false });
       return res.status(200).json({
         ok: true,
         skipped: true,
@@ -510,7 +510,7 @@ async function syncInstantlyMailboxResponse({
       results.push(await instantlyMailboxService.syncOwner(owner, syncOptions));
     }
     if (results.every((result) => result?.ok !== false && result?.partial !== true && result?.historyDeferred !== true && result?.reason !== 'sync-in-progress') && typeof afterSync === 'function') {
-      await refreshSnapshot();
+      await refreshSnapshot({ results, configured: true });
     }
     return res.status(200).json({
       ok: results.every((result) => result?.ok !== false),

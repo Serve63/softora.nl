@@ -17,6 +17,7 @@ const { buildRecentSyncResult } = require('./instantly-mailbox-sync-cadence');
 const { createInstantlyMailboxApi } = require('./instantly-mailbox-api');
 const { acquireInstantlyMailboxSyncLock } = require('./instantly-mailbox-sync-lock');
 const { finalizeInstantlyAcceptedReply } = require('./mailbox-instantly-reply-acceptance');
+const { getMailboxProviderContentRevision } = require('./mailbox-provider-content-revision');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
 const DEFAULT_PAGE_LIMIT = 100;
@@ -734,6 +735,10 @@ function createInstantlyMailboxService(deps = {}) {
                 accountEmails: accounts.map((account) => account.email),
               })
             : [];
+        const contentRevision = getMailboxProviderContentRevision({
+          indexed,
+          activeAudit: activeConversationAuditMessages,
+        });
         const { indexedThreadMessages } = buildIndexedThreadAuditState({
           indexedMessages: indexed,
           activeConversationAuditMessages,
@@ -804,6 +809,7 @@ function createInstantlyMailboxService(deps = {}) {
           pages: page,
           partial: Boolean(cursor) || historyDeferred,
           historyDeferred,
+          ...(contentRevision ? { contentRevision } : {}),
           syncedAt: now().toISOString(),
         };
       } catch (error) {

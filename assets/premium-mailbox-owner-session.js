@@ -293,7 +293,7 @@
           ? null
           : (Array.isArray(messages) ? messages[0] : null)
       );
-      if (nextMessage) openMessage(nextMessage.id, loadOptions);
+      if (nextMessage) return openMessage(nextMessage.id, loadOptions);
       else if (loadOptions.allowUnrelatedFallback !== false) {
         options.setActiveMail?.(null);
         options.resetDetail?.();
@@ -368,10 +368,15 @@
           if (campaignResult.fromCache) releaseTransientLoadingState(messages);
           options.setMessages?.(messages);
           options.prewarm?.(messages);
-          options.renderList?.({ openLatest: loadOptions.openLatest !== false });
-          keepConversationOpen(messages, activeId, loadOptions, previousActiveMessage);
+          const openedDetail = options.renderList?.({ openLatest: loadOptions.openLatest !== false });
+          const preservedDetail = keepConversationOpen(messages, activeId, loadOptions, previousActiveMessage);
           options.setStatus?.('');
           if (!loadOptions.silentRead) setBusy(false);
+          if (loadOptions.waitForDetail) {
+            const details = await Promise.allSettled([openedDetail, preservedDetail]);
+            if (details.some((detail) => detail.status === 'rejected' || detail.value?.committed === false)) return false;
+          }
+          if (!canApply(candidate) || loadSignal?.aborted) return false;
           if (campaignResult.fromBootstrap && canApply(candidate) && options.deferPostBootstrapRead !== true) {
             void load({
               skipPageBootstrap: true,
@@ -417,14 +422,19 @@
         options.setSync?.(sync);
         options.setMessages?.(messages);
         options.prewarm?.(messages);
-        options.renderList?.({ openLatest: loadOptions.openLatest !== false });
-        keepConversationOpen(messages, activeId, loadOptions, previousActiveMessage);
+        const openedDetail = options.renderList?.({ openLatest: loadOptions.openLatest !== false });
+        const preservedDetail = keepConversationOpen(messages, activeId, loadOptions, previousActiveMessage);
         void hydrateOutreachContexts(candidate, loadOptions).catch(() => {});
         options.setStatus?.(sync?.warming ? 'Mailbox wordt bijgewerkt…' : '');
         if (sync?.refreshRecommended && !loadOptions.skipBackgroundSync) {
           void options.syncInBackground?.();
         }
         if (!loadOptions.silentRead) setBusy(false);
+        if (loadOptions.waitForDetail) {
+          const details = await Promise.allSettled([openedDetail, preservedDetail]);
+          if (details.some((detail) => detail.status === 'rejected' || detail.value?.committed === false)) return false;
+        }
+        if (!canApply(candidate) || loadSignal?.aborted) return false;
         return true;
       } catch (error) {
         if (!canApply(candidate) || loadSignal?.aborted || isAbortError(error)) {

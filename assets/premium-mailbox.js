@@ -819,10 +819,12 @@ async function loadMailboxAccounts() {
       }
       renderMailboxAccountMenu(); setMailboxAccountUi(activeMailboxAccount);
       if (activeFolder === 'outreach') void mailboxDiscoveryController?.loadContactTimeline?.(findMailById(activeMail));
+      return true;
     }
   } catch (_) {
     toast('Mailboxaccounts laden mislukt');
   }
+  return false;
 }
 async function syncMailboxInBackground() {
   if (activeFolder === 'outreach' || !window.SoftoraMailboxIndex || typeof window.SoftoraMailboxIndex.syncInBackground !== 'function') return;
@@ -851,7 +853,7 @@ async function applyMailboxAccount(email, options = {}) {
   resetMailboxViewForScopeChange(); mailboxRefreshController?.scopeChanged?.();
   applyMailboxFolderUi(activeFolder);
   setMailboxAccountUi(activeMailboxAccount);
-  await loadMailboxMessages({ openLatest: options.openLatest !== false });
+  return loadMailboxMessages({ openLatest: options.openLatest !== false, waitForDetail: true });
 }
 async function pinMailboxAccount(email) {
   const normalizedEmail = normalizeMailboxEmail(email);
@@ -1152,6 +1154,7 @@ window.addEventListener('keydown', (event) => {
   closeMailboxAccountMenu();
 });
 (async function initMailboxAccount() {
+  let bootReady = false;
   try {
     await initializeMailboxAccountPreference();
     const intent = window.SoftoraMailboxOutreach && typeof window.SoftoraMailboxOutreach.readIntent === 'function'
@@ -1162,22 +1165,33 @@ window.addEventListener('keydown', (event) => {
     if (initialFolder === 'outreach') {
       activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder); const accountLoad = loadMailboxAccounts();
       setMailboxAccountUi(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT); resetDetailEmpty();
-      await loadMailboxMessages({ openLatest: !(intent.message || intent.email || intent.query) });
-      await accountLoad;
+      const messagesReady = await loadMailboxMessages({ openLatest: !(intent.message || intent.email || intent.query), waitForDetail: true });
+      const accountsReady = await accountLoad;
+      bootReady = messagesReady === true && accountsReady === true;
       return;
     }
-    await loadMailboxAccounts();
+    const accountsReady = await loadMailboxAccounts();
     if (intent.account && mailboxAccounts.some((account) => account.email === intent.account)) {
       activeMailboxAccount = intent.account;
     }
-    await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT, {
+    const messagesReady = await applyMailboxAccount(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT, {
       folder: intent.folder || 'outreach',
       keepSearch: true,
       openLatest: !(intent.message || intent.email || intent.query),
     });
+    bootReady = accountsReady === true && messagesReady === true;
   } catch (error) {
     toast(String(error?.message || 'Mailbox laden mislukt'));
   } finally {
+    const readiness = window.SoftoraScreenReadiness;
+    if (bootReady) {
+      const ready = await readiness?.markReady?.({
+        page: 'premium-mailbox', requiredData: { mailbox: true, accounts: true }, actionsBound: true,
+        requiredActions: ['#mail-items', '#mail-detail', '#mailbox-account-switcher'],
+        requiredImages: document.querySelectorAll('#mail-detail img'),
+      });
+      if (ready !== true) readiness?.markDegraded?.({ page: 'premium-mailbox', reason: 'mailbox-readiness-incomplete' });
+    } else readiness?.markDegraded?.({ page: 'premium-mailbox', reason: 'mailbox-data-incomplete' });
     window.SoftoraMailboxBoot?.markReady?.();
     mailboxRefreshController?.start?.();
   }

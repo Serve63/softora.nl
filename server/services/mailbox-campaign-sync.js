@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { hasNewCampaignRelevantMail } = require('./mailbox-campaign-refresh-signal');
 const { createMailboxImapSession } = require('./mailbox-imap-session');
 const {
   CAMPAIGN_MAILBOX_ACCOUNTS,
@@ -301,6 +302,7 @@ async function syncMailboxRequest({
   defaultFolders = ['inbox', 'sent'],
   defaultLimit = 50,
   cronLimit = 30,
+  afterSync = null,
 } = {}) {
   const payload = body && typeof body === 'object' ? body : {};
   const params = query && typeof query === 'object' ? query : {};
@@ -394,6 +396,10 @@ async function syncMailboxRequest({
       maxConcurrentAccounts: 1,
     });
   }
+  if (defaultCronRequest && result.ok && typeof afterSync === 'function'
+    && result.results.some((entry) => entry.campaignChanged === true)
+    && result.results.every((entry) => entry.ok !== false && !entry.rebuildPending
+      && (!entry.skipped || entry.reason === 'folder_missing'))) await afterSync();
   return result;
 }
 
@@ -787,6 +793,7 @@ function createMailboxSyncService({
           folder: normalizedFolder,
           synced: messages.length,
           upserted: Number(saved.upserted) || messages.length,
+          campaignChanged: hasNewCampaignRelevantMail({ messages, folder: normalizedFolder, lastSyncedUid }),
           historyBackfill: Boolean(campaignOnly && !incrementalOnly),
           historyBeforeUid: Number(oldestIndexedCampaignUid) || 0,
           targetedThreadReferences: threadReferenceIds.length,
@@ -1024,6 +1031,7 @@ function createMailboxSyncService({
         folder: normalizedFolder,
         synced: messages.length,
         upserted: Number(committed.upserted) || 0,
+        campaignChanged: hasNewCampaignRelevantMail({ messages, folder: normalizedFolder, lastSyncedUid }),
         historyBackfill: Boolean(campaignOnly && !incrementalOnly),
         historyBeforeUid: Number(oldestIndexedCampaignUid) || 0,
         targetedThreadReferences: threadReferenceIds.length,

@@ -2225,7 +2225,7 @@ function createMailboxService(deps = {}) {
         normalizeFolder,
         defaultFolders: DEFAULT_SYNC_FOLDERS,
         defaultLimit: DEFAULT_SYNC_LIMIT,
-        cronLimit: CRON_SYNC_LIMIT,
+        cronLimit: CRON_SYNC_LIMIT, afterSync: req.method === 'GET' ? () => listCampaignReplies.refreshAfterSync({ force: true }) : null,
       });
       return res.status(result.ok ? 200 : 207).json(result);
     } catch (error) {
@@ -2238,7 +2238,7 @@ function createMailboxService(deps = {}) {
     }
   }
 
-  async function syncInstantlyMailboxResponse(req, res) { return respondToInstantlyMailboxSync({ instantlyMailboxService, req, res, logger, normalizeString, afterSync: req.method === 'GET' ? () => listCampaignReplies({ limit: 200, includeSnapshotMessages: true, hydrateBodies: false, requireSnapshotPersistence: true }) : null }); }
+  async function syncInstantlyMailboxResponse(req, res) { return respondToInstantlyMailboxSync({ instantlyMailboxService, req, res, logger, normalizeString, afterSync: req.method === 'GET' ? listCampaignReplies.refreshAfterSync : null }); }
   async function hideConversationResponse(req, res) {
     try {
       const body = req.body && typeof req.body === 'object' ? req.body : {};

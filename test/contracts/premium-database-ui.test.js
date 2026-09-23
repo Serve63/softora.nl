@@ -7004,3 +7004,12 @@ test("sent list removes the result count column completely", () => {
   assert.ok(page.includes('classList.toggle("sent-list-mode", state.activeStatus === "verstuurd" || state.activeStatus === "instantly-queued" || state.activeStatus === "instantly")'));
   assert.ok(page.includes('showSentActions = state.activeStatus === "benaderd"'));
 });
+
+test('database table updates mail statistics once for each rendered view', () => {
+  const page = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
+  const renderTable = page.split('function renderTable() {')[1]?.split('function renderPage() {')[0];
+  assert.ok(renderTable);
+  assert.match(renderTable, /if \(window\.SoftoraDatabaseSentRegister\.render\([\s\S]*?\)\) \{ window\.SoftoraDatabaseSystemMailCount\.render\(state\.klanten, \{\}\); return; \}/);
+  assert.equal((renderTable.match(/SoftoraDatabaseSystemMailCount\.render\(state\.klanten,/g) || []).length, 2);
+  assert.equal((renderTable.match(/SoftoraDatabaseSystemMailCount\.render\(\[\],/g) || []).length, 1);
+});

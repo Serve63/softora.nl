@@ -9,6 +9,7 @@ const {
   serializeMailboxCampaignSnapshot,
 } = require('./mailbox-campaign-snapshot');
 const { createMailboxCampaignSnapshotRead } = require('./mailbox-campaign-snapshot-read');
+const { createMailboxCampaignSnapshotRefresh } = require('./mailbox-campaign-snapshot-refresh');
 
 function createMailboxCampaignRepliesList({
   mailboxCampaignRepliesService,
@@ -22,7 +23,7 @@ function createMailboxCampaignRepliesList({
   truncateText,
 }) {
   const readCampaignSnapshot = createMailboxCampaignSnapshotRead({ getUiStateValues, mailboxIndexStore, filterVisibleMailboxMessages });
-  return async function listCampaignReplies({
+  async function listCampaignReplies({
     limit = 100,
     owner = '',
     refreshInstantly = false,
@@ -77,7 +78,20 @@ function createMailboxCampaignRepliesList({
     }
     logger.info?.('[Mailbox][CampaignListTiming]', { indexMs: indexedAt - startedAt, providerMs: mergedAt - indexedAt, snapshotMs: Date.now() - mergedAt, totalMs: Date.now() - startedAt, messages: messages.length, hydrateBodies });
     return includeSnapshotMessages ? { ...result, snapshotMessages } : result;
-  };
+  }
+  if (typeof getUiStateValues === 'function' && typeof setUiStateValues === 'function') {
+    listCampaignReplies.refreshAfterSync = createMailboxCampaignSnapshotRefresh({
+      getUiStateValues,
+      setUiStateValues,
+      rebuild: () => listCampaignReplies({
+        limit: 200,
+        includeSnapshotMessages: true,
+        hydrateBodies: false,
+        requireSnapshotPersistence: true,
+      }),
+    });
+  }
+  return listCampaignReplies;
 }
 
 module.exports = {
