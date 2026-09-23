@@ -50,14 +50,24 @@ begin
   -- Global concurrency cap, including overlapping cron invocations.
   if (select count(*) from public.softora_mailbox_ai_presentations where status='running' and started_at>now()-interval '10 minutes') >= 8 then return; end if;
   select p.* into job from public.softora_mailbox_ai_presentations p
-    join lateral (select m.created_at, m.date from public.softora_mailbox_messages m
-      where m.account_email=p.account_email and (m.message_key=p.message_key or m.message_id=p.source->>'identity')
+    join lateral (
+      -- Try the canonical primary key first; only stale keys need JSON identity fallback.
+      select m.created_at,m.date from public.softora_mailbox_messages m
+      where m.account_email=p.account_email and m.message_key=p.message_key
         and m.deleted_at is null and m.generation_superseded_at is null
-        and m.folder in ('inbox','instantly','allmail')
-        and coalesce(m.payload->>'direction','received')<>'sent'
-        and lower(m.sender_email)<>lower(m.account_email)
+        and m.folder in ('inbox','instantly','allmail') and lower(m.sender_email)<>lower(m.account_email)
         and (budget.include_history or budget.incoming_after is null or m.created_at>=budget.incoming_after)
-      order by m.created_at desc limit 1) canonical on true
+      union all
+      select m.created_at,m.date from public.softora_mailbox_messages m
+      where m.account_email=p.account_email and m.message_id=p.source->>'identity'
+        and m.deleted_at is null and m.generation_superseded_at is null
+        and m.folder in ('inbox','instantly','allmail') and lower(m.sender_email)<>lower(m.account_email)
+        and (budget.include_history or budget.incoming_after is null or m.created_at>=budget.incoming_after)
+        and not exists (select 1 from public.softora_mailbox_messages exact
+          where exact.message_key=p.message_key and exact.account_email=p.account_email
+            and exact.deleted_at is null and exact.generation_superseded_at is null)
+      order by created_at desc limit 1
+    ) canonical on true
     where p.status='queued' and p.version='mailbox-luna-v1'
     order by (canonical.created_at>=budget.incoming_after) desc nulls last, canonical.date desc nulls last, p.id
     limit 1 for update of p skip locked;

@@ -63,12 +63,15 @@ test('SQL prioritizes incoming, admits approved history, caps global concurrency
         select 'm'||i,'a',case when i=1 then now() else now()-interval '1 day' end,now(), 'inbox','sender','Hello',true,false,'{}' from generate_series(1,10) i;
       insert into softora_mailbox_ai_presentations(id,version,account_email,message_key,source)
         select message_key,'mailbox-luna-v1','a',message_key,'{}' from softora_mailbox_messages;`);
+    await db.exec(`update softora_mailbox_messages set message_id='stable-id' where message_key='m2';
+      update softora_mailbox_ai_presentations set message_key='stale-key',source='{"identity":"stable-id"}' where id='m2';`);
     const claim="select * from softora_claim_mailbox_ai('00000000-0000-0000-0000-000000000001')";
     assert.equal((await db.query(claim)).rows[0].id,'m1'); assert.equal((await db.query(claim)).rows.length,0);
     await db.exec('update softora_mailbox_ai_budget set include_history=true');
     assert.equal((await db.query("select gate from softora_mailbox_ai_states(array['m2'])")).rows[0].gate,true);
     for(let i=0;i<7;i++) assert.equal((await db.query(claim)).rows.length,1);
     assert.equal((await db.query(claim)).rows.length,0);
+    assert.equal((await db.query("select status from softora_mailbox_ai_presentations where id='m2'")).rows[0].status,'running');
     await db.exec("update softora_mailbox_ai_presentations set status='failed' where status='running'");
     await db.exec('update softora_mailbox_ai_budget set approved_micro_usd=reserved_micro_usd+299999');
     assert.equal((await db.query(claim)).rows.length,0);
