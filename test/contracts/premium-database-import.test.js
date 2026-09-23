@@ -460,6 +460,63 @@ test('premium database customer archive transfers every verified row in one priv
   assert.deepEqual(calls.map((call) => call.metaOnly ? 'meta' : call.offset).sort(), [0, 1000, 2000, 'meta'].sort());
 });
 
+test('premium database customer archive uses bounded chunks and verifies the full version', async () => {
+  const customers = Array.from({ length: 10001 }, (_row, index) => ({
+    id: `customer-${index}`, bedrijf: `Bedrijf ${index}`,
+  }));
+  const calls = [];
+  const responder = createPremiumDatabaseCustomersArchiveResponder({
+    dataOpsStore: {
+      async listCustomersPage(options) {
+        assert.equal(options.metaOnly, true);
+        calls.push('meta');
+        return { customers: [], total: customers.length, snapshotVersion: '10001:v1' };
+      },
+      async listCustomersArchiveChunk(options) {
+        calls.push(options.offset);
+        assert.equal(options.limit, 5000);
+        return customers.slice(options.offset, options.offset + options.limit);
+      },
+    },
+    logger: { info() {}, warn() {} },
+  });
+  const response = createMockResponse();
+
+  await responder({}, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(calls.sort(), [0, 5000, 10000, 'meta', 'meta'].sort());
+  const payload = JSON.parse(gunzipSync(response.body).toString('utf8'));
+  assert.equal(payload.total, customers.length);
+  assert.deepEqual(payload.customers.map((customer) => customer.id), customers.map((customer) => customer.id));
+});
+
+test('premium database customer archive safely falls back when the chunk RPC is unavailable', async () => {
+  const customers = Array.from({ length: 1201 }, (_row, index) => ({ id: `customer-${index}` }));
+  const calls = [];
+  const responder = createPremiumDatabaseCustomersArchiveResponder({
+    dataOpsStore: {
+      async listCustomersPage(options) {
+        calls.push(options.metaOnly ? 'meta' : options.offset);
+        return { customers: options.metaOnly ? [] : customers.slice(options.offset, options.offset + options.limit),
+          total: customers.length, snapshotVersion: '1201:v1' };
+      },
+      async listCustomersArchiveChunk(options) {
+        calls.push(`chunk-${options.offset}`);
+        return null;
+      },
+    },
+    logger: { info() {}, warn() {} },
+  });
+  const response = createMockResponse();
+
+  await responder({}, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(calls, ['meta', 'chunk-0', 0, 1000, 'meta']);
+  assert.equal(JSON.parse(gunzipSync(response.body).toString('utf8')).customers.length, customers.length);
+});
+
 test('premium database customer archive reuses only the current verified version', async () => {
   const customers = [{ id: 'one', bedrijf: 'Original' }, { id: 'two', bedrijf: 'Second' }];
   const calls = [];

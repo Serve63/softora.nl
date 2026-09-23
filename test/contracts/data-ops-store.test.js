@@ -1562,6 +1562,30 @@ test('data ops store returns one stable exact customer page for the premium data
   assert.equal(calls.find((call) => call[0] === 'select')[2], undefined);
 });
 
+test('data ops store reads a bounded customer archive chunk through service-only RPC', async () => {
+  const calls = [];
+  const client = {
+    rpc(name, params) {
+      calls.push([name, params]);
+      return Promise.resolve({ data: { rows: [
+        { customer_id: 'lead-1', payload: { bedrijf: 'Softora' }, updated_at: '2026-09-23T00:00:00Z' },
+      ] }, error: null });
+    },
+  };
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client,
+    logger: { error() {}, warn() {} },
+  });
+
+  const chunk = await store.listCustomersArchiveChunk({ offset: 5000, limit: 5000 });
+
+  assert.deepEqual(calls, [['softora_customer_archive_chunk', { p_offset: 5000, p_limit: 5000 }]]);
+  assert.deepEqual(chunk, [{ id: 'lead-1', bedrijf: 'Softora', email: '', databaseStatus: '' }]);
+  assert.equal(await store.listCustomersArchiveChunk({ offset: 0, limit: 5001 }), null);
+  assert.equal(calls.length, 1);
+});
+
 test('data ops store reads compact dashboard customers from structured rows', async () => {
   const calls = [];
   const rows = [

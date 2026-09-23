@@ -1025,7 +1025,7 @@ function createSoftoraDataOpsStore(deps = {}) {
       suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
     });
   }
-  const { listCustomersPage, listCustomersByEmails, listCustomersByIds, listUniqueCustomersByEmails } = createDataOpsCustomerLookups({
+  const { listCustomersPage, listCustomersArchiveChunk, listCustomersByEmails, listCustomersByIds, listUniqueCustomersByEmails } = createDataOpsCustomerLookups({
     cachedRead, run, tableName: TABLES.customers, normalizeString,
     readQueryTimeoutMs: dataOpsReadQueryTimeoutMs,
   });
@@ -2415,7 +2415,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     listDesignPhotoAssetFlags,
     listActiveOrders,
     listCustomers,
-    listCustomersPage,
+    listCustomersPage, listCustomersArchiveChunk,
     listCustomersByEmails, listCustomersByIds, listUniqueCustomersByEmails,
     listCustomerIdentityKeys,
     listDesignPhotosWithDataUrls,
