@@ -2980,6 +2980,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(databaseBootSource, /void databasePendingJobsPromise\.catch/);
   assert.doesNotMatch(pageSource, /void bootstrapCustomers\(\)\.catch\(function \(error\) \{ console\.error\("Database sync na snelle boot mislukt:", error\); \}\);/);
   assert.match(pageSource, /function refreshCustomerStateSilently\(\)/);
+  assert.match(pageSource, /const CUSTOMER_DB_RECENT_LOAD_MS = 5 \* 1000;/);
+  assert.match(pageSource, /if \(customerStateRefreshInFlight \|\| state\.dataLoading \|\| Date\.now\(\) - lastCustomerRefreshAtMs < CUSTOMER_DB_RECENT_LOAD_MS/);
+  assert.match(pageSource, /state\.remoteCustomersLoaded = true; lastCustomerRefreshAtMs = Date\.now\(\);/);
+  assert.match(pageSource, /if \(customerResult && customerResult\.changed === false && state\.remoteCustomersLoaded\) \{[^}]*lastCustomerRefreshAtMs = Date\.now\(\); return true;/);
   assert.match(pageSource, /window\.setInterval\(function \(\) \{[\s\S]*void refreshCustomerStateSilently\(\);[\s\S]*\}, CUSTOMER_DB_SYNC_INTERVAL_MS\);/);
   assert.match(pageSource, /startCustomerStateAutoRefresh\(\);/);
   assert.doesNotMatch(pageSource, /if \(databaseHadBootstrapCustomers\) releaseDatabaseBootShell\(\); await bootstrapCustomers\(\);/);
