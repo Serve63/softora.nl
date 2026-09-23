@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { validatePlatformArchitecture, readBaseline, resolveBaselineRef } = require('../../scripts/check-platform-architecture');
+const { validateNewPersonnelPageStyle, validatePlatformArchitecture, readBaseline, resolveBaselineRef } = require('../../scripts/check-platform-architecture');
 const { createKnownPrettyPageSlugToFile } = require('../../server/config/page-routing');
 
 function fixture() {
@@ -24,6 +24,31 @@ test('initial inventory accepts only actual pre-existing documents', () => {
   assert.match(validatePlatformArchitecture(input).join('\n'), /not registered/);
   input.registry.pages['new.html'] = { delivery: 'legacy-document', targetReadyMs: 3000 };
   assert.match(validatePlatformArchitecture(input).join('\n'), /new legacy exceptions/);
+});
+
+test('new personnel pages must use the canonical visual foundation', () => {
+  const template = fs.readFileSync(path.join(__dirname, '../../templates/premium-personnel-page.html'), 'utf8');
+  assert.deepEqual(validateNewPersonnelPageStyle('premium-new.html', template), []);
+  assert.deepEqual(validateNewPersonnelPageStyle('personeel-new.html', template), []);
+  assert.deepEqual(validateNewPersonnelPageStyle('public-new.html', '<html></html>'), []);
+
+  const input = fixture();
+  input.files.add('premium-new.html');
+  input.registry.pages['premium-new.html'] = {
+    delivery: 'public-document', targetReadyMs: 3000,
+    readinessContract: 'test/contracts/new-page.test.js',
+    requiredData: [], requiredImages: [], freshness: 'static',
+  };
+  input.readFile = (file) => file === 'premium-new.html'
+    ? '<body><div data-sidebar-shell="canonical"><aside class="sidebar"></aside><h1>Nieuw</h1></div></body>'
+    : 'test contract';
+  const errors = validatePlatformArchitecture(input).join('\n');
+  assert.match(errors, /new personnel page needs shared fonts\.css/);
+  assert.match(errors, /new personnel page needs h1\.page-title/);
+  assert.match(errors, /new personnel page needs p\.page-subtitle/);
+  assert.match(errors, /load personnel-page-base\.css after page-specific stylesheets/);
+  input.readFile = (file) => file === 'premium-new.html' ? template : 'test contract';
+  assert.deepEqual(validatePlatformArchitecture(input), []);
 });
 
 test('migration cannot regress or quietly increase its complete readiness budget', () => {
