@@ -1,4 +1,5 @@
 const { createPremiumDatabaseCustomersArchiveResponder } = require('./premium-database-customers-archive');
+const { createPremiumDatabaseCustomersDeltaResponder } = require('./premium-database-customers-delta');
 
 function normalizeString(value) {
   return String(value || '').trim();
@@ -7,6 +8,7 @@ function normalizeString(value) {
 function createPremiumDatabaseCustomersPageCoordinator(deps = {}) {
   const { dataOpsStore = null } = deps;
   const sendCustomersArchiveResponse = createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore });
+  const sendCustomersDeltaResponse = createPremiumDatabaseCustomersDeltaResponder({ dataOpsStore });
 
   async function sendCurrentCampaignMediaResponse(req, res) {
     if (!dataOpsStore || typeof dataOpsStore.listDesignPhotosWithSignedUrls !== 'function') {
@@ -96,7 +98,7 @@ function createPremiumDatabaseCustomersPageCoordinator(deps = {}) {
     return res.status(200).json({ ok: true, ...page });
   }
 
-  return { sendCustomersPageResponse, sendCustomersArchiveResponse, sendCurrentCampaignMediaResponse };
+  return { sendCustomersPageResponse, sendCustomersArchiveResponse, sendCustomersDeltaResponse, sendCurrentCampaignMediaResponse };
 }
 
 module.exports = { createPremiumDatabaseCustomersPageCoordinator };

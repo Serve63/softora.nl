@@ -34,6 +34,10 @@ function registerPremiumDatabaseImportRoutes(app, deps = {}) {
     customersPageCoordinator.sendCustomersArchiveResponse(req, res)
   );
 
+  app.get('/api/premium-database/customers/archive/delta', requirePremiumApiAccess, (req, res) =>
+    customersPageCoordinator.sendCustomersDeltaResponse(req, res)
+  );
+
   app.get('/api/premium-database/current-campaign-media', requirePremiumApiAccess, (req, res) =>
     customersPageCoordinator.sendCurrentCampaignMediaResponse(req, res)
   );

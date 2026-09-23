@@ -317,6 +317,8 @@ test('agent guardrails allow browser storage only in approved local-state helper
   assert.equal(isApprovedBrowserStoragePath('assets/personnel-theme.js'), true);
   assert.equal(isApprovedBrowserStoragePath('assets/premium-sidebar-profile-prefill.js'), true);
   assert.equal(isApprovedBrowserStoragePath('assets/sportschool-logboek.js'), true);
+  assert.equal(isApprovedBrowserStoragePath('assets/premium-readmodel-store.js'), true);
+  assert.equal(isApprovedBrowserStoragePath('assets/premium-database-customers-loader.js'), false);
   assert.equal(isApprovedBrowserStoragePath('assets/premium-mailbox-campaign-inbox.js'), false);
   assert.equal(isApprovedBrowserStoragePath('assets/premium-mailbox-state-outbox.js'), false);
 });

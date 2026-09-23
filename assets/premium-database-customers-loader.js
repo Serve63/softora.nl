@@ -11,6 +11,94 @@
     const VALIDATOR_KEY = "premium-database-archive-validator:v1";
     const VALIDATOR_PATTERN = /^"softora-customers-v1-[a-f0-9]{32}"$/;
     const VALIDATOR_MAX_AGE_MS = 15 * 60 * 1000;
+    const DELTA_ENDPOINT = ARCHIVE_ENDPOINT + "/delta";
+    const READ_MODEL_KEY = "premium-database-customers:v1";
+    // The delta path is exact, but a full re-verification once a day bounds the
+    // lifetime of any local copy even if a write ever bypassed updated_at.
+    const FULL_VERIFY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+    function readModelScope(config) {
+        const store = config.readModelStore === undefined ? global.SoftoraReadModelStore : config.readModelStore;
+        const session = config.validatorSession || global.SoftoraPageBootstrapSession?.get?.();
+        const identity = String(session && (session.userId || session.email) || "").trim().toLowerCase();
+        return store && session?.authenticated && identity ? { store: store, identity: identity } : null;
+    }
+
+    function snapshotCursor(version) {
+        const text = String(version || "");
+        const separator = text.indexOf(":");
+        const cursor = separator > 0 ? text.slice(separator + 1) : "";
+        return cursor && Number.isFinite(Date.parse(cursor)) ? cursor : "";
+    }
+
+    async function readLocalCopy(scope) {
+        try {
+            const copy = await scope.store.read(READ_MODEL_KEY, scope.identity);
+            const total = Number(copy && copy.total);
+            if (!copy || !Array.isArray(copy.customers) || !Number.isInteger(total) || copy.customers.length !== total ||
+                !snapshotCursor(copy.snapshotVersion) || !Number.isFinite(Number(copy.fullSyncedAt))) return null;
+            return copy;
+        } catch (_error) { return null; }
+    }
+
+    function whenIdle(callback) {
+        if (typeof global.requestIdleCallback === "function") global.requestIdleCallback(callback, { timeout: 5000 });
+        else setTimeout(callback, 3000);
+    }
+
+    // The page builds new objects from these rows and never mutates them, so the
+    // copy can be written after the screen is ready instead of on its critical path.
+    function persistLocalCopy(scope, result, fullSyncedAt) {
+        if (!scope || !snapshotCursor(result.snapshotVersion)) return;
+        whenIdle(function () {
+            scope.store.write(READ_MODEL_KEY, scope.identity, { customers: result.customers, total: result.total,
+                snapshotVersion: result.snapshotVersion, fullSyncedAt: fullSyncedAt }).catch(function () { return false; });
+        });
+    }
+
+    async function fetchDelta(config, local) {
+        const response = await config.fetchJsonWithTimeout(DELTA_ENDPOINT + "?since=" +
+            encodeURIComponent(snapshotCursor(local.snapshotVersion)), {
+            method: "GET", cache: "no-store", credentials: "same-origin"
+        }, REQUEST_TIMEOUT_MS);
+        const payload = await response.json().catch(function () { return {}; });
+        if (!response.ok || payload.ok !== true) throw new Error("Klantdatabase-wijzigingen niet beschikbaar.");
+        if (payload.resync === true) return null;
+        const total = Number(payload.total);
+        const version = String(payload.snapshotVersion || "").trim();
+        const upserts = Array.isArray(payload.upserts) ? payload.upserts : null;
+        const deletedIds = Array.isArray(payload.deletedIds) ? payload.deletedIds : null;
+        if (payload.completeDelta !== true || !upserts || !deletedIds || !Number.isInteger(total) || total < 0 ||
+            total > MAX_CUSTOMERS || !snapshotCursor(version)) throw new Error("Klantdatabase-delta is onvolledig.");
+        const changedIds = new Set(upserts.map(function (customer) { return String(customer && customer.id || "").trim(); })
+            .concat(deletedIds.map(function (id) { return String(id || "").trim(); })));
+        // Changed rows carry the newest updated_at, so putting them first keeps
+        // the archive's updated_at-descending order.
+        const merged = upserts.concat(local.customers.filter(function (customer) {
+            return !changedIds.has(String(customer && customer.id || "").trim());
+        }));
+        const customers = dedupeCustomers(merged);
+        if (changedIds.has("") || customers.length !== merged.length || customers.length !== total) {
+            throw new Error("Klantdatabase-delta sluit niet aan op de lokale kopie.");
+        }
+        global.performance?.mark?.("softora:database:delta-validated");
+        return { changed: true, customers: customers, total: total, snapshotVersion: version,
+            source: "delta", deltaSize: upserts.length + deletedIds.length };
+    }
+
+    function scheduleFullVerify(config, scope, delta, fullSyncedAt) {
+        if (Date.now() - Number(fullSyncedAt) < FULL_VERIFY_INTERVAL_MS) return;
+        whenIdle(function () {
+            fetchArchive(config).then(function (archive) {
+                if (archive.snapshotVersion === delta.snapshotVersion &&
+                    JSON.stringify(archive.customers) !== JSON.stringify(delta.customers)) {
+                    console.warn("[SoftoraReadModel] premium-database-customers: lokale kopie week af; vervangen door volledig archief.");
+                    global.performance?.mark?.("softora:database:readmodel-drift");
+                }
+                persistLocalCopy(scope, archive, Date.now());
+            }).catch(function () { /* Next opening retries; the delta result stays valid. */ });
+        });
+    }
 
     function validatorCache(config) {
         const bootstrap = global.SoftoraPageBootstrapSession;
@@ -158,11 +246,26 @@
                 };
             }
         }
-        try {
-            return await fetchArchive(options);
-        } catch (_archiveError) {
-            return loadCompleteSnapshot(options, true);
+        const scope = readModelScope(options);
+        const local = scope ? await readLocalCopy(scope) : null;
+        if (local) {
+            try {
+                const synced = await fetchDelta(options, local);
+                if (synced) {
+                    persistLocalCopy(scope, synced, local.fullSyncedAt);
+                    scheduleFullVerify(options, scope, synced, local.fullSyncedAt);
+                    return synced;
+                }
+            } catch (_deltaError) { /* A full verified archive replaces an unusable copy. */ }
         }
+        let result;
+        try {
+            result = await fetchArchive(options);
+        } catch (_archiveError) {
+            result = await loadCompleteSnapshot(options, true);
+        }
+        persistLocalCopy(scope, result, Date.now());
+        return result;
     }
 
     const api = {
