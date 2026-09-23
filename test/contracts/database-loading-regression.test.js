@@ -72,7 +72,6 @@ test('compact snapshot waits for canonical details and defers the boot render', 
       prepareAutoSync: async () => ({}),
       startAutoSync() { finished = true; return { ok: true, configured: false }; },
     },
-    providerDeliverySync: Promise.resolve({ ok: true }),
   };
   assert.match(page, /window\.SoftoraDatabaseBoot\.run\(/);
   assert.match(page, /compactAvailableDuringBoot: options\.boot === true, deferRenderDuringBoot: options\.boot === true/);
