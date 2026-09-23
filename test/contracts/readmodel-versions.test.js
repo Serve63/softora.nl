@@ -302,6 +302,8 @@ test('ui-state reads are versioned by content for allow-listed scopes only', () 
   assert.notEqual(uiStateReadModelVersion('premium_coldmail_send_guard', edited), version, 'any value change is a new version');
   assert.equal(uiStateReadModelVersion('premium_coldmail_send_guard', { ...state, source: 'memory' }), '',
     'an in-memory fallback is never presented as a verified copy');
+  const runtimeOps = fs.readFileSync(path.join(repoRoot, 'server/services/runtime-ops.js'), 'utf8');
+  assert.match(runtimeOps, /if \(isPasswordRegisterScope\(scope\)\) \{\n\s+\/\/ The vault never passes through read-model versioning or hashing\./);
   for (const scope of ['premium_password_register', 'premium_customers_database', 'premium_active_orders', 'premium_database_photos']) {
     assert.equal(uiStateReadModelVersion(scope, state), '', scope);
     const body = buildUiStateGetBody({ headers: { 'x-softora-readmodel-version': version } }, scope, state, { revision: 3 });

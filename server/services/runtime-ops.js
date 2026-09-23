@@ -689,8 +689,12 @@ function createRuntimeOpsCoordinator(deps = {}) {
       );
     }
 
-    return res.status(200).json(require('./ui-state-readmodel').buildUiStateGetBody(req, scope, state,
-      isPasswordRegisterScope(scope) ? { revision: state.revision } : {}));
+    if (isPasswordRegisterScope(scope)) {
+      // The vault never passes through read-model versioning or hashing.
+      return res.status(200).json({ ok: true, scope, values: state.values || {}, source: state.source || 'supabase',
+        updatedAt: state.updatedAt || null, revision: state.revision });
+    }
+    return res.status(200).json(require('./ui-state-readmodel').buildUiStateGetBody(req, scope, state));
   }
 
   async function sendUiStateSetResponse(req, res, scopeRaw) {
