@@ -84,4 +84,5 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
   .sets { gap: 7px; }
   .set { min-width: 80px; min-height: 40px; }
   .note-editor { margin-top: 12px; }
+  .note-editor textarea { font-size: 16px; }
 }

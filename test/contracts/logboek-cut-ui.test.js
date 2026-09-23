@@ -30,6 +30,13 @@ test('logboek-cut fills the page without an outer card on desktop and mobile', (
   assert.doesNotMatch(css, /\.app::before\s*\{/, 'The day heading must not have a colored top stripe.');
 });
 
+test('mobile note textareas use a font size that does not trigger iOS focus zoom', () => {
+  const css = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.css'), 'utf8');
+  const mobileRules = css.split('@media(max-width:700px) {')[1];
+  assert.ok(mobileRules, 'Expected mobile styles for the logbook.');
+  assert.match(mobileRules, /\.note-editor textarea\s*\{\s*font-size:\s*16px\s*;/);
+});
+
 test('logboek-cut has no training progress badge or progress bar', () => {
   const html = fs.readFileSync(path.join(__dirname, '../../logboek-cut.html'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.js'), 'utf8');
