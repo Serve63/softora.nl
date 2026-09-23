@@ -2,8 +2,13 @@ const { resolveInstantlyDesignOwner } = require('./instantly-design-owner');
 const { isRemoteLeadConfirmedSent } = require('./instantly-campaign-replacement');
 
 const APPROVED_CAMPAIGNS = Object.freeze({
-  serve: { id: '6ba410c6-d97a-4186-a414-83ba95022b1a', name: 'Servé Creusen Softora.nl' },
-  martijn: { id: '79b1f8c0-35de-4687-95ea-8384c4c491bd', name: 'Martijn van de Ven Softora.nl - nieuwe leads' },
+  serve: { id: '7a94c361-d83c-4857-9395-e9c5ba603f90', name: 'Servé Creusen Softora.nl - frisse start' },
+  martijn: { id: 'e4f7df3a-6c53-4c03-911c-beb758d9231c', name: 'Martijn van de Ven Softora.nl - frisse start' },
+});
+
+const LEGACY_CAMPAIGNS = Object.freeze({
+  serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
+  martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd',
 });
 
 function text(value) {
@@ -88,10 +93,10 @@ function createInstantlyAutoUpload(deps = {}) {
       throw createError('Instantly-campagne heeft niet meer de goedgekeurde naam.', 'INSTANTLY_AUTO_CAMPAIGN_IDENTITY_MISMATCH', 503);
     }
     const status = Number(campaign.status);
-    // A paused campaign remains a valid, exact upload target: Instantly accepts
-    // new leads while it is paused and only sends them after a deliberate resume.
-    if (![1, 2, 3].includes(status)) {
-      throw createError('Instantly-campagne is ongezond of nog een concept.', 'INSTANTLY_AUTO_CAMPAIGN_NOT_SENDABLE', 503);
+    // Draft and paused campaigns may receive leads but cannot send until the
+    // owner deliberately launches or resumes them. Never activate either here.
+    if (![0, 1, 2, 3].includes(status)) {
+      throw createError('Instantly-campagne heeft een onbekende status.', 'INSTANTLY_AUTO_CAMPAIGN_NOT_SENDABLE', 503);
     }
     return { approved, status };
   }
@@ -147,6 +152,57 @@ function createInstantlyAutoUpload(deps = {}) {
   function getRemoteUploadId(lead) {
     const payload = getRemoteLeadPayload(lead);
     return text(payload.softora_instantly_upload_id || payload.softoraInstantlyUploadId);
+  }
+
+  async function reconcileMovedLeadLinks(rows, actor, at) {
+    if (typeof persistSingleRow !== 'function') return 0;
+    let updated = 0;
+    for (const owner of ['serve', 'martijn']) {
+      const candidates = rows.filter((row) =>
+        text(row && row.instantlyCampaignId) === LEGACY_CAMPAIGNS[owner] &&
+        text(row && row.instantlyStatus).toLowerCase() === 'synced' &&
+        text(row && row.instantlyLeadId) &&
+        !text(row && (row.instantlyEmailSentAt || row.lastInstantlySentAt || row.instantlySentAt))
+      );
+      if (!candidates.length) continue;
+      const { approved } = await readApprovedCampaign(owner);
+      const [newLeads, oldLeads] = await Promise.all([
+        listCampaignLeads(approved.id, 10000),
+        listCampaignLeads(LEGACY_CAMPAIGNS[owner], 10000),
+      ]);
+      for (const row of candidates) {
+        const email = text(row.email || row.contactEmail).toLowerCase();
+        const customerId = text(row.id || row.customerId || row.databaseId);
+        const uploadId = text(row.instantlyManualUploadId);
+        const matches = (newLeads || []).filter((lead) =>
+          getRemoteLeadEmail(lead) === email &&
+          (getRemoteLeadId(lead) === text(row.instantlyLeadId) ||
+            (customerId && getRemoteCustomerId(lead) === customerId) ||
+            (uploadId && getRemoteUploadId(lead) === uploadId))
+        );
+        if (!matches.length) continue;
+        if (matches.length !== 1 || !getRemoteLeadId(matches[0]) || isRemoteLeadConfirmedSent(matches[0]) ||
+            (oldLeads || []).some((lead) => getRemoteLeadEmail(lead) === email)) {
+          throw createError('Verplaatste lead is niet uniek, niet onverzonden of staat nog in de oude campagne.',
+            'INSTANTLY_AUTO_MOVED_LEAD_AMBIGUOUS', 503);
+        }
+        const linked = { ...row, instantlyCampaignId: approved.id,
+          instantlyLeadId: getRemoteLeadId(matches[0]), instantlyLastEventAt: at, updatedAt: at,
+          hist: [{ type: 'instantly_verplaatst', label: 'Verplaatst naar nieuwe Instantly-campagne',
+            date: at, actor, source: 'instantly-auto-upload-moved-link',
+            messageKey: `instantly-campaign-move:${getRemoteLeadId(matches[0])}:${approved.id}`,
+            subject: 'Instantly-campagne gewisseld',
+            preview: 'De onverstuurde lead staat uitsluitend in de nieuwe campagne.' },
+          ...(Array.isArray(row.hist) ? row.hist : [])].slice(0, 50),
+        };
+        if (!(await persistLinkedRow(linked, actor))) {
+          throw createError('Verplaatste Instantly-lead kon niet in Softora worden gekoppeld.',
+            'INSTANTLY_AUTO_MOVED_LEAD_LINK_FAILED', 502);
+        }
+        updated += 1;
+      }
+    }
+    return updated;
   }
 
   async function persistLinkedRow(row, actor) {
@@ -316,6 +372,10 @@ function createInstantlyAutoUpload(deps = {}) {
     const at = now().toISOString();
     const loaded = await loadRows();
     const rows = Array.isArray(loaded && loaded.rows) ? loaded.rows : [];
+    const movedLinks = await reconcileMovedLeadLinks(rows, actor, at);
+    if (movedLinks) {
+      return { ok: true, skipped: true, reason: 'moved_leads_linked', movedLinks, finishedAt: at };
+    }
     const recoveredLink = await recoverAcceptedLeadLink(rows, actor, at);
     if (recoveredLink) {
       return { ok: true, skipped: true, reason: 'accepted_lead_linked', ...recoveredLink, finishedAt: at };
