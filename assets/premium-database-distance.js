@@ -152,10 +152,15 @@
     coords[entry[0]] = { lat: entry[1], lng: entry[2] };
     return coords;
   }, Object.create(null));
-  const PLACE_KEYS_BY_LENGTH = Object.keys(PLACE_COORDS).sort(function (left, right) {
+  const PLACE_MATCHERS_BY_LENGTH = Object.keys(PLACE_COORDS).sort(function (left, right) {
     return right.length - left.length;
+  }).map(function (key) {
+    const normalizedKey = normalizeText(key);
+    return { key: key, pattern: new RegExp("(^|\\s)" + normalizedKey.replace(/\s+/g, "\\s+") + "(\\s|$)") };
   });
-  const DISTANCE_CACHE_LIMIT = 12000;
+  // The durable database snapshot can contain 25,000 rows; keep one full pass
+  // cached so hydration does not re-run the location lookup for its tail.
+  const DISTANCE_CACHE_LIMIT = 25000;
   const customerDistanceCache = new Map();
   const targetDistanceCache = new Map();
 
@@ -213,11 +218,9 @@
   function resolvePlaceCoords(value) {
     const normalized = normalizeText(value);
     if (!normalized) return null;
-    for (let index = 0; index < PLACE_KEYS_BY_LENGTH.length; index += 1) {
-      const key = PLACE_KEYS_BY_LENGTH[index];
-      const searchableKey = normalizeText(key);
-      const pattern = new RegExp("(^|\\s)" + searchableKey.replace(/\s+/g, "\\s+") + "(\\s|$)");
-      if (pattern.test(normalized)) return PLACE_COORDS[key];
+    for (let index = 0; index < PLACE_MATCHERS_BY_LENGTH.length; index += 1) {
+      const matcher = PLACE_MATCHERS_BY_LENGTH[index];
+      if (matcher.pattern.test(normalized)) return PLACE_COORDS[matcher.key];
     }
     return null;
   }

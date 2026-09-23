@@ -526,7 +526,7 @@ test('premium database page keeps customers fixed from Haaren nearby to far away
     ['Oisterwijk Winkel', 'Alphen Service', 'Chaam Garage', 'Roosendaal Zaak', 'Onbekend Ver Weg']
   );
   assert.match(pageSource, /targetCoords: "assets\/premium-database-target-coords\.js\?v=20260616a"/);
-  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260915-haaren-order-1/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260923-cache/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);\s*\}/);
@@ -6497,7 +6497,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Haaren', ()
   const sorterSource = fs.readFileSync(sorterPath, 'utf8');
 
   assert.match(pageSource, /targetCoords: "assets\/premium-database-target-coords\.js\?v=20260616a"/);
-  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260915-haaren-order-1/);
+  assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260923-cache/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
   assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return sortCustomers\(customers\);\s*\}/);

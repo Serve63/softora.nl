@@ -307,6 +307,25 @@ test('premium database durable snapshot compresses and restores more than the ol
   assert.equal(parseMailReadySnapshotCacheValue(serialized).availableCustomers.length, 6008);
 });
 
+test('durable snapshot restores the complete distance order for every category', () => {
+  const codec = createPremiumDatabaseSnapshotCacheCodec({ maxLimit: 25000, formatVersion: 2 });
+  const far = { id: 'far', bedrijf: 'Far', adres: 'Maastricht' };
+  const near = { id: 'near', bedrijf: 'Near', adres: 'Haaren' };
+  const raw = JSON.stringify({
+    version: 2, generatedAt: '2026-09-23T00:00:00Z',
+    total: 2, customers: [far, near],
+    availableTotal: 2, availableCustomers: [far, near],
+    instantlyReadyTotal: 2, instantlyReadyCustomers: [far, near],
+  });
+
+  const restored = codec.parseMailReadySnapshotCacheValue(raw);
+
+  for (const category of ['customers', 'availableCustomers', 'instantlyReadyCustomers']) {
+    assert.deepEqual(restored[category].map((row) => row.id), ['near', 'far']);
+  }
+  assert.equal(codec.isMailReadySnapshotCoherent(restored), true);
+});
+
 test('premium database mail-ready snapshot honors limit and offset', async () => {
   const customers = Array.from({ length: 5 }, (_, index) => ({
     customer_id: `ready-${index + 1}`,
