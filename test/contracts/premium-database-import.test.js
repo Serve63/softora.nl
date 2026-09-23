@@ -460,6 +460,51 @@ test('premium database customer archive transfers every verified row in one priv
   assert.deepEqual(calls.map((call) => call.metaOnly ? 'meta' : call.offset).sort(), [0, 1000, 2000, 'meta'].sort());
 });
 
+test('premium database customer archive reuses only the current verified version', async () => {
+  const customers = [{ id: 'one', bedrijf: 'Original' }, { id: 'two', bedrijf: 'Second' }];
+  const calls = [];
+  let version = '2:v1';
+  let metaUnavailable = false;
+  const responder = createPremiumDatabaseCustomersArchiveResponder({
+    dataOpsStore: { async listCustomersPage(options) {
+      calls.push(options.metaOnly ? 'meta' : options.offset);
+      if (options.metaOnly && metaUnavailable) return null;
+      return { customers: options.metaOnly ? [] : customers.slice(options.offset, options.offset + options.limit),
+        total: customers.length, snapshotVersion: version };
+    } },
+    logger: { info() {}, warn() {} },
+  });
+
+  const first = createMockResponse();
+  await responder({}, first);
+  assert.equal(first.statusCode, 200);
+  assert.match(first.headers['Server-Timing'], /cache;desc=miss/);
+
+  calls.length = 0;
+  const warm = createMockResponse();
+  await responder({}, warm);
+  assert.deepEqual(calls, ['meta']);
+  assert.equal(warm.statusCode, 200);
+  assert.match(warm.headers['Server-Timing'], /cache;desc=hit/);
+  assert.deepEqual(warm.body, first.body);
+
+  customers[0] = { id: 'one', bedrijf: 'Updated' };
+  version = '2:v2';
+  calls.length = 0;
+  const refreshed = createMockResponse();
+  await responder({}, refreshed);
+  assert.deepEqual(calls, ['meta', 0, 'meta']);
+  assert.equal(refreshed.statusCode, 200);
+  assert.match(refreshed.headers['Server-Timing'], /cache;desc=miss/);
+  assert.equal(JSON.parse(gunzipSync(refreshed.body).toString('utf8')).customers[0].bedrijf, 'Updated');
+
+  metaUnavailable = true;
+  const blocked = createMockResponse();
+  await responder({}, blocked);
+  assert.equal(blocked.statusCode, 503);
+  assert.equal(blocked.headers['Content-Encoding'], undefined);
+});
+
 test('premium database customer archive refuses stale or incomplete data', async () => {
   for (const variant of ['stale', 'duplicate']) {
     const responder = createPremiumDatabaseCustomersArchiveResponder({
