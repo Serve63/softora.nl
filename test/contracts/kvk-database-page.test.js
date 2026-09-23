@@ -107,14 +107,16 @@ test('directory links keep their target but display only the site name and a rea
   }
 });
 
-test('kvk database snapshot page contains the local Bedrijven Scraper dashboard', () => {
+test('kvk database snapshot page contains the approved compact dashboard', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
 
-  assert.match(pageSource, /<title>Softora Database \| Bedrijven Scraper<\/title>/);
+  assert.match(pageSource, /<title>Softora \| Bedrijvendatabase<\/title>/);
   assert.match(pageSource, /<meta name="robots" content="noindex,nofollow">/);
   assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
-  assert.match(pageSource, /<h1>Bedrijven Scraper<\/h1>/);
+  assert.match(pageSource, /<h1>Bedrijvendatabase<\/h1>/);
+  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260923q/);
+  assert.match(pageSource, /<button class="transfer-button" type="button" disabled>Upload naar mailsysteem/);
   assert.match(pageSource, /id="companies-treated"/);
   assert.match(pageSource, /id="companies-total-card" class="stat-card stat-card-directory kvk-stat-card-enhanced"/);
   assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*stat-card-primary/);
@@ -142,23 +144,17 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /aria-label="Totaal Gevonden inklappen"/);
   assert.match(pageSource, /<div hidden aria-hidden="true">[\s\S]*?id="main-table-frame"/);
   assert.match(pageSource, /id="companies-successful-found"/);
-  assert.ok(
-    pageSource.indexOf('id="companies-successful-found"') <
-      pageSource.indexOf('id="companies-usable"'),
-    'De verklaringen horen voor de beschikbare voorraad te staan'
-  );
-  const decisionIds = ['companies-successful-found', 'companies-declared-unusable', 'companies-control-room', 'companies-usable'];
-  for (let i = 1; i < decisionIds.length; i++) {
-    assert.ok(pageSource.indexOf(`id="${decisionIds[i - 1]}"`) < pageSource.indexOf(`id="${decisionIds[i]}"`));
-  }
+  assert.ok(pageSource.indexOf('id="companies-usable"') < pageSource.indexOf('id="companies-successful-found"'));
+  assert.ok(pageSource.indexOf('id="companies-successful-found"') < pageSource.indexOf('id="companies-control-room"'));
+  assert.ok(pageSource.indexOf('id="companies-control-room"') < pageSource.indexOf('id="companies-declared-unusable"'));
   assert.doesNotMatch(pageSource, /"companies_found"|"kvk_nummer"|"contact_research_note"/);
   assert.doesNotMatch(pageSource, /id="planning-search-input"/);
   assert.doesNotMatch(pageSource, /planning-scroll-status/);
-  assert.match(pageSource, /<h2>Laatste 10 Behandeld<\/h2>/);
+  assert.match(pageSource, /<h2>Recent onderzocht<\/h2>/);
   assert.match(pageSource, /id="latest-luna-errors-table-frame"/);
   assert.ok(
-    pageSource.indexOf('<h2>Laatste 10 Behandeld</h2>') < pageSource.indexOf('<h2>Planning</h2>'),
-    'De nieuwe Robot-resultaten en Controleur-correcties horen boven Planning te staan'
+    pageSource.indexOf('<h2 class="fixed-section-title">Locatieplanning</h2>') < pageSource.indexOf('<h2>Recent onderzocht</h2>'),
+    'Locatieplanning hoort boven de recente onderzoeksresultaten te staan'
   );
   assert.doesNotMatch(pageSource, /id="latest-treated-table-frame"/);
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
@@ -174,7 +170,7 @@ test('kvk database snapshot page contains the local Bedrijven Scraper dashboard'
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260914a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260909a/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
 
@@ -437,9 +433,9 @@ test('scraper website labels hide HTTP and HTTPS while preserving working link d
   }
 });
 
-test('planning explains its three cumulative checkmark stages beside the heading', () => {
+test('planning explains its three cumulative checkmark stages through the help button', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
-  assert.match(html, /class="planning-heading"[\s\S]*?<h2>Planning<\/h2>[\s\S]*?class="planning-legend"/);
+  assert.match(html, /<h2 class="fixed-section-title">Locatieplanning<\/h2>[\s\S]*?popovertarget="planning-legend-popover"[\s\S]*?id="planning-legend-popover"[^>]*popover/);
   assert.doesNotMatch(html, /id="planning-search-input"/);
   const legend = html.match(/<ul class="planning-legend"[\s\S]*?<\/ul>/)[0];
   assert.equal((legend.match(/class="status-box is-done"/g) || []).length, 6);
@@ -448,11 +444,11 @@ test('planning explains its three cumulative checkmark stages beside the heading
   assert.match(html, /3 vinkjes: <\/span>Gecontroleerd &amp; volledig af/);
 });
 
-test('unused company totals and website subcategories form one labelled group', () => {
+test('unused company totals and website subcategories form the inventory panel', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
-  const group = html.slice(html.indexOf('<div class="stat-new-group"'), html.indexOf('<article class="stat-card stat-card-unusable'));
-  assert.match(group, /role="group" aria-labelledby="stat-new-group-label"/);
-  assert.match(group, />Nieuw\. Nog niet gebruikt<\/p>/);
+  const group = html.slice(html.indexOf('<section class="inventory"'), html.indexOf('<section class="research-details"'));
+  assert.match(group, /aria-label="Ongebruikte voorraad"/);
+  assert.match(group, />Klaar voor gebruik:<\/span>/);
   assert.equal((group.match(/<article /g) || []).length, 3);
   for (const id of ['companies-usable', 'companies-with-website', 'companies-without-website']) {
     assert.ok(group.includes(`id="${id}"`));
@@ -611,7 +607,7 @@ test('kvk database omits the fill status widget and keeps worker control read-on
   assert.match(controlStyles, /\.database-fill-toggle__track/);
   assert.match(controlStyles, /translateX\(15px\)/);
   assert.match(controlStyles, /cursor: default/);
-  assert.match(pageSource, /stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced[\s\S]*?<span>Mét Website<\/span>/);
+  assert.match(pageSource, /stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced[\s\S]*?<span>Mét website<\/span>/);
   assert.match(pageSource, /stat-card stat-card-usable stat-card-without-website stat-card-directory kvk-stat-card-enhanced/);
   assert.match(metricsStyles, /\.stat-card-without-website \.stat-main > span/);
   assert.match(pageSource, /stat-card stat-card-successful-found stat-card-decision stat-card-directory kvk-stat-card-enhanced[\s\S]*?<span>Bruikbaar verklaard<\/span>/);
@@ -626,7 +622,7 @@ test('kvk framed content uses the same solid background as the surrounding page'
 
   assert.match(pageSource, /assets\/kvk-database-frame\.css\?v=20260824a/);
   assert.match(directorySource, /assets\/kvk-database-frame\.css\?v=20260824a/);
-  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260909a/);
+  assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(
     frameStyleSource,
     /html\[data-softora-sidebar-content-frame="1"\]:root,\s*html\[data-softora-sidebar-content-frame="1"\]:root body\s*\{\s*background:\s*#f4f1ed !important;/
@@ -691,10 +687,11 @@ test('online KVK directory tables are server-only and protected by RLS', () => {
   assert.match(searchMigrationSource, /using gin \(search_text extensions\.gin_trgm_ops\);/i);
 });
 
-test('KVK header shows worker status without a settings back link and total found has a matching footer', () => {
+test('KVK header shows the disabled mail upload action without a settings back link', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   assert.doesNotMatch(pageSource, /data-settings-module-back-host|settings-module-back\.(?:js|css)/);
-  assert.match(pageSource, /class="header-controls">\s*<div id="kvk-worker-status"/);
+  assert.match(pageSource, /class="header-controls">\s*<button class="transfer-button" type="button" disabled>Upload naar mailsysteem/);
+  assert.doesNotMatch(pageSource, /id="kvk-worker-status"/);
   assert.match(pageSource, /id="companies-total">0<\/strong>\s*<\/div>\s*<div class="stat-delta"><span class="stat-delta-label">Alles gevonden<\/span>/);
   assert.ok(pageSource.indexOf('/assets/kvk-database-worker-status.js') < pageSource.indexOf('/assets/kvk-database.js'));
 });

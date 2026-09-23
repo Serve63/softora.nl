@@ -39,7 +39,8 @@
       row.closest('.location-item')?.classList.toggle('is-complete', complete);
       if (!complete) return;
       const path = normalizedPath(row.querySelector('.location-path')?.textContent);
-      const usable = state.usableByPath.get(path) ?? 0;
+      const usable = state.usableByPath.get(path);
+      if (usable === undefined) return;
       const badge = row.querySelector('.badge');
       if (badge) {
         const badgeText = `${locationNumberFormat.format(usable)} bruikbaar`;
@@ -57,10 +58,15 @@
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !Array.isArray(payload?.locations)) return;
-      state.usableByPath = new Map(payload.locations.map((location) => [
-        normalizedPath([location.land, location.provincie, location.gemeente, location.woonplaats].join(' | ')),
-        Number(location.bruikbareBedrijven || 0),
-      ]));
+      state.usableByPath = new Map(payload.locations.flatMap((location) => {
+        const rawCount = location.bruikbareBedrijven ?? location.bruikbare_bedrijven;
+        const usable = Number(rawCount);
+        if (rawCount === undefined || rawCount === null || rawCount === '' || !Number.isSafeInteger(usable) || usable < 0) return [];
+        return [[
+          normalizedPath([location.land, location.provincie, location.gemeente, location.woonplaats].join(' | ')),
+          usable,
+        ]];
+      }));
       decorateLocations();
     } catch {
       // De hoofdweergave blijft bruikbaar wanneer alleen de compacte locatiestatistiek tijdelijk faalt.
