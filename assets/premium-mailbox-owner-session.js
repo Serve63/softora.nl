@@ -371,7 +371,7 @@
           keepConversationOpen(messages, activeId, loadOptions, previousActiveMessage);
           options.setStatus?.('');
           setBusy(false);
-          if (campaignResult.fromBootstrap && canApply(candidate)) {
+          if (campaignResult.fromBootstrap && canApply(candidate) && options.deferPostBootstrapRead !== true) {
             void load({
               skipPageBootstrap: true,
               skipBackgroundSync: true,
