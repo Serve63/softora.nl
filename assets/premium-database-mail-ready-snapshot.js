@@ -242,18 +242,28 @@
         const availableRows = dedupeCustomers(availableSnapshotCustomers).filter(isSnapshotAvailableCustomer);
         const instantlyRows = dedupeCustomers(instantlyReadySnapshotCustomers).filter(isSnapshotInstantlyReadyCustomer);
         if (!snapshotRows.length && !availableRows.length && !instantlyRows.length) return remoteCustomers;
-        const remoteMap = buildSnapshotMap(remoteCustomers);
+        const remoteById = new Map();
+        remoteCustomers.forEach(function (customer) {
+            remoteById.set(normalizeMatchValue(customer.id), customer);
+        });
+        let remoteMap = null;
+        function findRemoteMatch(customer) {
+            const directMatch = remoteById.get(normalizeMatchValue(customer && customer.id));
+            if (directMatch) return directMatch;
+            if (!remoteMap) remoteMap = buildSnapshotMap(remoteCustomers);
+            return findSnapshotMatch(remoteMap, customer);
+        }
         const consumed = new Set();
         const canonical = snapshotRows.map(function (snapshotCustomer) {
-            const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
+            const remoteMatch = findRemoteMatch(snapshotCustomer);
             if (remoteMatch) consumed.add(remoteMatch);
             return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, true);
         }).concat(instantlyRows.map(function (snapshotCustomer) {
-            const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
+            const remoteMatch = findRemoteMatch(snapshotCustomer);
             if (remoteMatch) consumed.add(remoteMatch);
             return mergeInstantlySnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer);
         })).concat(availableRows.map(function (snapshotCustomer) {
-            const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
+            const remoteMatch = findRemoteMatch(snapshotCustomer);
             if (snapshotCustomer.compactAvailable === true && !remoteMatch) throw new Error("Een beschikbare snapshotklant ontbreekt in de officiële klantdatabase.");
             if (remoteMatch) consumed.add(remoteMatch);
             return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, false);

@@ -1591,6 +1591,21 @@ test('canonical mail-ready merge clears stale category flags from unmatched remo
   );
 });
 
+test('canonical snapshot merge prefers exact customer IDs and retains legacy email matching', () => {
+  const client = loadDatabaseMailReadySnapshotClient();
+  const merged = client.mergeWithCanonicalSnapshots([
+    { id: 'current-id', email: 'shared@example.test', bedrijf: 'Direct match', status: 'direct' },
+    { id: 'new-legacy-id', email: 'legacy@example.test', bedrijf: 'Legacy match', status: 'legacy' },
+  ], [
+    { id: 'current-id', email: 'legacy@example.test', mailReady: true, mailReadySnapshot: true },
+    { id: 'old-legacy-id', email: 'legacy@example.test', mailReady: true, mailReadySnapshot: true },
+  ], []);
+
+  assert.deepEqual(merged.map((customer) => customer.id), ['current-id', 'new-legacy-id']);
+  assert.deepEqual(merged.map((customer) => customer.status), ['direct', 'legacy']);
+  assert.ok(merged.every(client.isSnapshotMailReadyCustomer));
+});
+
 test('Instantly design wins over a stale available snapshot and is counted once with signed media', () => {
   const client = loadDatabaseMailReadySnapshotClient();
   const merged = client.mergeWithCanonicalSnapshots([
