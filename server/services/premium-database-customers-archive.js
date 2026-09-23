@@ -20,7 +20,7 @@ function archiveEtag(total, version) {
 
 function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = Date.now, logger = console }) {
   let cachedArchive = null;
-  let buildSequence = 0;
+  let buildPromise = null;
 
   async function readPage(offset, limit, metaOnly = false) {
     const page = await dataOpsStore.listCustomersPage({
@@ -159,6 +159,7 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
     try {
       let archive = cachedArchive;
       let cacheHit = false;
+      let sharedBuild = false;
       const requestedTag = String(req?.get?.('X-Softora-Archive-Validator')
         || req?.headers?.['x-softora-archive-validator'] || req?.get?.('If-None-Match')
         || req?.headers?.['if-none-match'] || req?.headers?.['If-None-Match'] || '').trim();
@@ -179,9 +180,14 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
         }
       }
       if (!archive) {
-        const buildId = ++buildSequence;
-        archive = await buildArchive(startedAt);
-        if (buildId === buildSequence) cachedArchive = archive;
+        sharedBuild = Boolean(buildPromise);
+        if (!buildPromise) {
+          buildPromise = buildArchive(startedAt).then((built) => {
+            cachedArchive = built;
+            return built;
+          }).finally(() => { buildPromise = null; });
+        }
+        archive = await buildPromise;
       }
       const loadMs = cacheHit ? nowMs() - startedAt : archive.loadMs;
       const encodeMs = cacheHit ? 0 : archive.encodeMs;
@@ -191,9 +197,9 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Content-Encoding', 'gzip');
       res.setHeader('Content-Length', String(archive.buffer.length));
-      res.setHeader('Server-Timing', `customers;dur=${loadMs}, encode;dur=${encodeMs}, cache;desc=${cacheHit ? 'hit' : 'miss'}`);
+      res.setHeader('Server-Timing', `customers;dur=${loadMs}, encode;dur=${encodeMs}, cache;desc=${cacheHit ? 'hit' : 'miss'}, build;desc=${cacheHit ? 'none' : sharedBuild ? 'shared' : 'own'}`);
       logger?.info?.(JSON.stringify({ event: 'premium-customers-archive', loadMs,
-        encodeMs, compressedBytes: archive.buffer.length, total: archive.total, cacheHit,
+        encodeMs, compressedBytes: archive.buffer.length, total: archive.total, cacheHit, sharedBuild,
         firstMetaMs: archive.firstMetaMs, chunksMs: archive.chunksMs,
         chunkCount: archive.chunkCount, verifyMs: archive.verifyMs,
         serializeMs: archive.serializeMs, gzipMs: archive.gzipMs,

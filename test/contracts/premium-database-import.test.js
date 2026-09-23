@@ -538,6 +538,69 @@ test('premium database customer archive uses bounded chunks and verifies the ful
   assert.deepEqual(payload.customers.map((customer) => customer.id), customers.map((customer) => customer.id));
 });
 
+test('concurrent customer archive requests share one verified build', async () => {
+  const customers = [{ id: 'one', bedrijf: 'Eerste' }, { id: 'two', bedrijf: 'Tweede' }];
+  let metaReads = 0;
+  let chunkReads = 0;
+  let releaseChunk;
+  const chunkGate = new Promise((resolve) => { releaseChunk = resolve; });
+  const responder = createPremiumDatabaseCustomersArchiveResponder({
+    dataOpsStore: {
+      async listCustomersPage() {
+        metaReads += 1;
+        return { customers: [], total: customers.length, snapshotVersion: '2:v1' };
+      },
+      async listCustomersArchiveChunk() {
+        chunkReads += 1;
+        await chunkGate;
+        return customers;
+      },
+    },
+    logger: { info() {}, warn() {} },
+  });
+  const first = createMockResponse();
+  const second = createMockResponse();
+  const firstRequest = responder({}, first);
+  const secondRequest = responder({}, second);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(chunkReads, 1);
+  releaseChunk();
+  await Promise.all([firstRequest, secondRequest]);
+
+  assert.equal(metaReads, 2, 'one initial version and one final version check');
+  assert.equal(first.statusCode, 200);
+  assert.equal(second.statusCode, 200);
+  assert.match(first.headers['Server-Timing'], /build;desc=own/);
+  assert.match(second.headers['Server-Timing'], /build;desc=shared/);
+  assert.deepEqual(first.body, second.body);
+});
+
+test('a failed shared archive build does not block a later retry', async () => {
+  let failFirstRead = true;
+  let chunkReads = 0;
+  const responder = createPremiumDatabaseCustomersArchiveResponder({
+    dataOpsStore: {
+      async listCustomersPage() {
+        if (failFirstRead) { failFirstRead = false; return null; }
+        return { customers: [], total: 1, snapshotVersion: '1:v1' };
+      },
+      async listCustomersArchiveChunk() {
+        chunkReads += 1;
+        return [{ id: 'one' }];
+      },
+    },
+    logger: { info() {}, warn() {} },
+  });
+  const failed = createMockResponse();
+  await responder({}, failed);
+  assert.equal(failed.statusCode, 503);
+
+  const recovered = createMockResponse();
+  await responder({}, recovered);
+  assert.equal(recovered.statusCode, 200);
+  assert.equal(chunkReads, 1);
+});
+
 test('premium database customer archive safely falls back when the chunk RPC is unavailable', async () => {
   const customers = Array.from({ length: 5001 }, (_row, index) => ({ id: `customer-${index}` }));
   const calls = [];
