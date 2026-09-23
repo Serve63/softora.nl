@@ -1852,9 +1852,10 @@
                 || /@websiteopdrachtvo\.nl$/i.test(email);
         }
 
+        // Both callers supply normalized rows; canonical reconciliation is sorted once afterward.
         function mergeCustomersWithResponsible(customers, orders) {
             if (!Array.isArray(customers) || !customers.length) return [];
-            if (!Array.isArray(orders) || !orders.length) return sortCustomers(customers);
+            if (!Array.isArray(orders) || !orders.length) return customers;
 
             const responsibleByCustomerKey = new Map();
             orders.forEach(function (order) {
@@ -1866,16 +1867,15 @@
                 }
             });
 
-            return sortCustomers(customers.map(function (customer, index) {
-                const normalizedCustomer = normalizeCustomer(customer, "customer-merge-" + index);
+            return customers.map(function (customer) {
                 const explicitResponsible = parseResponsibleValue(getResponsibleSourceValue(customer));
-                const key = buildCustomerIdentityKey(normalizedCustomer);
-                const matchedResponsible = explicitResponsible || responsibleByCustomerKey.get(key) || normalizedCustomer.verantwoordelijk;
-                if (matchedResponsible === normalizedCustomer.verantwoordelijk) {
-                    return normalizedCustomer;
+                const key = buildCustomerIdentityKey(customer);
+                const matchedResponsible = explicitResponsible || responsibleByCustomerKey.get(key) || customer.verantwoordelijk;
+                if (matchedResponsible === customer.verantwoordelijk) {
+                    return customer;
                 }
-                return { ...normalizedCustomer, verantwoordelijk: matchedResponsible };
-            }));
+                return { ...customer, verantwoordelijk: matchedResponsible };
+            });
         }
         function resolveBootstrapCustomers() {
             if (normalizeString(customersBootstrapPayload && customersBootstrapPayload.source) === "orders") return [];

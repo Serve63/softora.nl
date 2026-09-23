@@ -436,6 +436,32 @@ test('premium database keeps bootstrap rows hidden until the canonical inventory
   assert.match(pageSource, /mailReady: raw && raw\.mailReady === true, mailReadySnapshot: raw && raw\.mailReadySnapshot === true, availableSnapshot: raw && raw\.availableSnapshot === true,/);
 });
 
+test('responsible merge preserves normalized rows and their existing distance order', () => {
+  const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
+  const start = pageSource.indexOf('        function mergeCustomersWithResponsible(customers, orders) {');
+  const end = pageSource.indexOf('\n        function resolveBootstrapCustomers()', start);
+  assert.ok(start >= 0 && end > start);
+  const customers = [
+    { id: 'first', bedrijf: 'First', verantwoordelijk: '' },
+    { id: 'second', bedrijf: 'Second', verantwoordelijk: 'Mia' },
+  ];
+  const context = {
+    customers,
+    orders: [{ bedrijf: 'First', claimedBy: 'Servé' }],
+    buildDerivedCustomerSeedFromOrder: (order) => ({ bedrijf: order.bedrijf, verantwoordelijk: order.claimedBy }),
+    buildCustomerIdentityKey: (customer) => customer.bedrijf,
+    parseResponsibleValue: (value) => value,
+    getResponsibleSourceValue: (customer) => customer.verantwoordelijk,
+    normalizeCustomer: () => { throw new Error('already normalized'); },
+    sortCustomers: () => { throw new Error('sort only after canonical merge'); },
+  };
+  vm.runInNewContext(`${pageSource.slice(start, end)}\nresult = mergeCustomersWithResponsible(customers, orders);\nnoOrders = mergeCustomersWithResponsible(customers, []);`, context);
+  assert.equal(context.result[0].verantwoordelijk, 'Servé');
+  assert.equal(context.result[0].id, 'first');
+  assert.equal(context.result[1], customers[1]);
+  assert.equal(context.noOrders, customers);
+});
+
 test('canonical inventory gate never publishes compact or capped counts', () => {
   const client = loadDatabaseMailReadySnapshotClient();
   const state = { canonicalInventoryReady: false, remoteCustomersLoaded: false, dataLoading: true, dataUnavailable: false, klanten: [{ id: 'canonical-1' }], mailReadySnapshotLoaded: true, mailReadySnapshotPending: false, mailReadySnapshotTotal: 0, mailReadySnapshotCustomers: [], availableSnapshotLoaded: true, availableSnapshotTotal: 0, availableSnapshotCustomers: [], foundSnapshotLoaded: true, foundSnapshotTotal: 0, foundSnapshotCustomerIdSet: new Set() };
