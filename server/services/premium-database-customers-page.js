@@ -1,9 +1,12 @@
+const { createPremiumDatabaseCustomersArchiveResponder } = require('./premium-database-customers-archive');
+
 function normalizeString(value) {
   return String(value || '').trim();
 }
 
 function createPremiumDatabaseCustomersPageCoordinator(deps = {}) {
   const { dataOpsStore = null } = deps;
+  const sendCustomersArchiveResponse = createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore });
 
   async function sendCustomersPageResponse(req, res) {
     if (!dataOpsStore || typeof dataOpsStore.listCustomersPage !== 'function') {
@@ -49,7 +52,7 @@ function createPremiumDatabaseCustomersPageCoordinator(deps = {}) {
     return res.status(200).json({ ok: true, ...page });
   }
 
-  return { sendCustomersPageResponse };
+  return { sendCustomersPageResponse, sendCustomersArchiveResponse };
 }
 
 module.exports = { createPremiumDatabaseCustomersPageCoordinator };

@@ -30,6 +30,10 @@ function registerPremiumDatabaseImportRoutes(app, deps = {}) {
     customersPageCoordinator.sendCustomersPageResponse(req, res)
   );
 
+  app.get('/api/premium-database/customers/archive', requirePremiumApiAccess, (req, res) =>
+    customersPageCoordinator.sendCustomersArchiveResponse(req, res)
+  );
+
   app.get('/api/premium-database/mail-ready-snapshot/archive', requirePremiumApiAccess, (req, res) =>
     mailReadySnapshotService && typeof mailReadySnapshotService.sendMailReadySnapshotArchiveResponse === 'function'
       ? mailReadySnapshotService.sendMailReadySnapshotArchiveResponse(req, res)
