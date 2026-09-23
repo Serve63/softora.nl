@@ -22,9 +22,7 @@
       ['bcc', 'cc'].includes(String(mail.copyContext.kind || '').toLowerCase())
       ? String(mail.copyContext.kind).toUpperCase()
       : '';
-    const providerKind = String(mail && mail.provider || '').trim().toLowerCase() === 'instantly'
-      ? 'INSTANTLY'
-      : '';
+    const isInstantly = String(mail && mail.provider || '').trim().toLowerCase() === 'instantly';
     const conversationAction = global.SoftoraMailboxCampaignInbox &&
       typeof global.SoftoraMailboxCampaignInbox.getConversationAction === 'function'
       ? global.SoftoraMailboxCampaignInbox.getConversationAction(mail)
@@ -35,14 +33,15 @@
     const searchSnippet = searchMatch && global.SoftoraMailboxDiscovery?.renderSearchSnippet?.(
       searchMatch, mail.searchQuery, escapeHtml
     );
-    const badges = [
-      copyKind ? `<span class="mail-copy-badge">${escapeHtml(copyKind)}</span>` : '',
-      providerKind ? `<span class="mail-source-badge mail-source-badge-instantly">${escapeHtml(providerKind)}</span>` : '',
-    ].filter(Boolean).join('');
+    const badges = copyKind ? `<span class="mail-copy-badge">${escapeHtml(copyKind)}</span>` : '';
+    const cornerLabel = isInstantly
+      ? needsReply ? 'Instantly · wacht op jouw antwoord' : 'Instantly'
+      : needsReply ? 'Wacht op jouw antwoord' : '';
+    const cornerClass = isInstantly ? 'mail-provider-corner-instantly' : 'mail-reply-corner';
     return `
     <div class="mail-item ${mail.unread ? 'unread' : ''} ${needsReply ? 'needs-reply' : ''} ${String(options.activeMail) === String(mail.id) ? 'active' : ''}" data-mailbox-received-at="${escapeHtml(activityAt)}">
       ${mail.unread ? '<div class="unread-dot"></div>' : ''}
-      ${needsReply ? '<span class="mail-reply-corner" role="img" aria-label="Wacht op jouw antwoord" title="Wacht op jouw antwoord"></span>' : ''}
+      ${cornerLabel ? `<span class="${cornerClass}" role="img" aria-label="${escapeHtml(cornerLabel)}" title="${escapeHtml(cornerLabel)}"></span>` : ''}
       <button class="mail-item-open" type="button" data-mailbox-action="open-mail" data-mailbox-id="${escapeHtml(mail.id)}" aria-label="${escapeHtml(primaryText)} openen">
         <span class="mail-item-content">
           <span class="mail-item-top">

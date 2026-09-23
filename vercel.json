@@ -60,6 +60,7 @@
     }
   },
   "crons": [
+    { "path": "/api/samenvatten/cleanup", "schedule": "41 2 * * *" },
     { "path": "/api/mailbox/presentation/process", "schedule": "* * * * *" },
     {
       "path": "/api/mailbox/sync",

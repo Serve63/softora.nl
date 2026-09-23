@@ -55,6 +55,11 @@ const { registerWorldWatcherRoutes } = require('../routes/world-watcher');
 const { registerWhatsAppReadOnlyRoutes } = require('../routes/whatsapp-read-only');
 const { registerLogboekCutRoutes } = require('../routes/logboek-cut');
 const {
+  registerPremiumSamenvattenRoutes,
+  registerPremiumSamenvattenCleanupRoute,
+} = require('../routes/premium-samenvatten');
+const { createPremiumSamenvattenService } = require('./premium-samenvatten');
+const {
   createPremiumDatabaseImportCoordinator,
 } = require('./premium-database-import');
 const {
@@ -196,6 +201,10 @@ function registerFeatureRoutes(app, deps = {}) {
     config: whatsappReadOnly.config,
     getSupabaseClient: whatsappReadOnly.getSupabaseClient,
   });
+  const samenvattenService = createPremiumSamenvattenService({
+    getSupabaseClient: whoopHealth.getSupabaseClient,
+    env: deps.env || process.env,
+  });
 
   registerColdcallingWebhookRoutes(app, {
     handleTwilioInboundVoice,
@@ -224,10 +233,17 @@ function registerFeatureRoutes(app, deps = {}) {
     cronSecret: mailboxCronSecret,
   });
 
+  registerPremiumSamenvattenCleanupRoute(app, {
+    service: samenvattenService,
+    cronSecret: mailboxCronSecret,
+  });
+
   createPremiumRouteRuntime({
     app,
     ...premiumRouteRuntime,
   });
+
+  registerPremiumSamenvattenRoutes(app, { service: samenvattenService });
 
   registerGoogleAdsProtectedRoutes(app, {
     service: googleAdsService,

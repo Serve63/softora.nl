@@ -993,10 +993,19 @@ test('BCC en CC verschijnen alleen met exacte provenance in lijst en detail', ()
     receivedAt: '2026-07-29T12:00:00.000Z',
   };
   const instantlyHtml = listModule.renderItem(instantly, baseOptions);
-  assert.match(instantlyHtml, /mail-source-badge-instantly">INSTANTLY/);
-  assert.doesNotMatch(listModule.renderItem(direct, baseOptions), /mail-source-badge/);
+  assert.match(instantlyHtml, /mail-provider-corner-instantly/);
+  assert.doesNotMatch(instantlyHtml, /mail-source-badge/);
+  const longInstantlyHtml = listModule.renderItem({
+    ...instantly,
+    from: 'geenklusteklein@hotmail.com',
+    email: 'geenklusteklein@hotmail.com',
+  }, baseOptions);
+  assert.match(longInstantlyHtml, /<span class="mail-provider-corner-instantly"[^>]*><\/span>\s*<button class="mail-item-open"/);
+  assert.doesNotMatch(longInstantlyHtml, /mail-source-badge/);
+  assert.doesNotMatch(listModule.renderItem(direct, baseOptions), /mail-provider-corner-instantly/);
 
   const pageSource = readPage();
+  assert.match(pageSource, /\.mail-provider-corner-instantly \{[^}]*#2563eb/);
   assert.match(
     pageSource,
     /\.detail-routing \{[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent;/
@@ -1102,6 +1111,13 @@ test('lijst toont een roze omgevouwen hoek alleen wanneer het nieuwste echte ber
     }],
   }, baseOptions), /mail-reply-corner/);
   assert.doesNotMatch(listModule.renderItem(answered, baseOptions), /mail-reply-corner/);
+  const instantlyWaiting = listModule.renderItem({ ...waitingForReply, provider: 'instantly' }, baseOptions);
+  assert.match(instantlyWaiting, /mail-provider-corner-instantly/);
+  assert.match(instantlyWaiting, /Instantly · wacht op jouw antwoord/);
+  assert.doesNotMatch(instantlyWaiting, /mail-reply-corner/);
+  const instantlyAnswered = listModule.renderItem({ ...answered, provider: 'instantly' }, baseOptions);
+  assert.match(instantlyAnswered, /mail-provider-corner-instantly/);
+  assert.doesNotMatch(instantlyAnswered, /mail-reply-corner/);
   assert.match(readPage(), /\.mail-reply-corner \{[^}]*var\(--crimson\)/);
 });
 

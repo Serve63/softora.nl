@@ -150,3 +150,22 @@ button,input,select,textarea{font-family:inherit}
 .header-controls .transfer-button{background:linear-gradient(180deg,#fff,#faf6f8);border-color:rgba(142,47,95,.18);box-shadow:0 1px 2px rgba(66,33,49,.04),inset 0 1px 0 #fff}
 .planning-help-button{box-shadow:0 1px 2px rgba(66,33,49,.06)}
 @media(prefers-reduced-motion:reduce){.latest-treated-panel tbody tr,.planning-panel .location-button{transition:none}}
+
+/* Subtle live activity beneath each total, without growing the dashboard cards. */
+.inventory-grid .stat-delta,.research-grid .stat-delta{display:flex!important;align-items:center;gap:4px;margin:4px 0 0;padding:0;border:0;background:none;font:500 9px/1.15 'Inter',sans-serif;white-space:nowrap}
+.research-details .fixed-section-title{padding-top:5px;padding-bottom:2px}
+.research-grid{padding-bottom:0}
+.research-grid .stat-main{gap:2px!important}
+.research-grid .stat-main strong{font-size:18px!important}
+.research-grid .stat-delta{margin-top:2px;font-size:8px}
+.inventory-grid .stat-delta-number,.research-grid .stat-delta-number{font-weight:650;font-variant-numeric:tabular-nums}
+.inventory-grid .stat-delta.is-negative .stat-delta-number,.research-grid .stat-delta.is-negative .stat-delta-number{color:var(--accent)!important}
+.research-grid .stat-delta-flow .stat-delta-added{color:var(--green)!important}
+.research-grid .stat-delta-flow .stat-delta-removed{color:var(--accent)!important}
+.research-grid .stat-delta-flow.is-zero .stat-delta-added,.research-grid .stat-delta-flow.is-zero .stat-delta-removed{color:var(--muted)!important}
+.research-grid #companies-total-card .stat-delta{display:none!important}
+
+/* Keep the upload affordance visibly substantial while it is still disabled. */
+.header-controls .transfer-button{min-height:37px;padding:9px 15px;border-color:rgba(142,47,95,.27);background:linear-gradient(180deg,#fffafd,#f5eaf0);box-shadow:0 2px 5px rgba(77,35,57,.09),inset 0 1px 0 #fff;font-size:11px;font-weight:650;gap:10px}
+.header-controls .transfer-button span{font-size:14px}
+@media(max-width:700px){.inventory-grid .stat-delta,.research-grid .stat-delta{font-size:7px;gap:2px}.header-controls .transfer-button{min-height:34px;padding:7px 10px;font-size:10px}}

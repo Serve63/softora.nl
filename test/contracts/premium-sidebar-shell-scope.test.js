@@ -884,7 +884,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.ok(sendStateAssetIndex < sendResilienceAssetIndex, 'send-state hoort vóór send-resilience te laden');
   assert.ok(sendResilienceAssetIndex < composeControllerAssetIndex, 'send-resilience hoort vóór de controller te laden');
   assert.ok(acceptedSendAssetIndex < composeControllerAssetIndex, 'accepted-send state hoort vóór de controller te laden');
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260922a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-owner-session\.js\?v=20260923a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-discovery\.js\?v=20260907b"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260907b"><\/script><script src="assets\/premium-mailbox-detail-state\.js\?v=20260821a"><\/script><script src="assets\/premium-mailbox-detail-stability\.js\?v=20260905c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260921c"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260922a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-owner-session\.js\?v=20260923a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-discovery\.js\?v=20260907b"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260923a"><\/script><script src="assets\/premium-mailbox-detail-state\.js\?v=20260821a"><\/script><script src="assets\/premium-mailbox-detail-stability\.js\?v=20260905c"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260921c"><\/script>/);
   assert.match(pageSource, /<script src="assets\/premium-mailbox-compose-window\.js\?v=20260817c"><\/script><script src="assets\/premium-browser-storage\.js\?v=20260828b"><\/script><script src="assets\/premium-mailbox-attachment-digest\.js\?v=20260828c"><\/script><script src="assets\/premium-mailbox-compose-send-state\.js\?v=20260831b"><\/script><script src="assets\/premium-mailbox-compose-send-resilience\.js\?v=20260908a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-delete\.js\?v=20260820a"><\/script><script src="assets\/premium-mailbox-state-outbox\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20260826a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20260907a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-mailbox\.js\?v=20260923a"><\/script>/);
 });
 
@@ -1280,6 +1280,8 @@ test('Samenvatten staat als werkende beheerlink in de gedeelde premium-sidebar',
   assert.match(pageSource, /data-sidebar-shell="canonical"/);
   assert.match(pageSource, /assets\/premium-sidebar-links\.js\?v=20260818a/);
   assert.match(pageSource, /assets\/personnel-theme\.js\?v=20260519b/);
+  assert.match(pageSource, /id="summaryResult" hidden/);
+  assert.match(pageSource, /id="summaryTranscript"/);
 });
 
 test('unified premium sidebar splits ad channels from social media channels', () => {
@@ -1356,7 +1358,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-system-mail-count\.js\?v=20260923-fresh-stats/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260923-id-match/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(source, /premium-database-webdesign-action\.js\?v=20260921-mailready-parity/);
+  assert.match(source, /premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
   assert.match(source, /premium-database-table-helpers\.js\?v=20260923-owner/);
   assert.match(source, /const count = databaseTableHelpers\.getPhotoHeaderCount\(customers, \{ showPhotoColumn: showPhotoColumn, activeStatus: state\.activeStatus,/);
 });
