@@ -9,18 +9,20 @@ const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/premium-samenva
 const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/premium-samenvatten.css'), 'utf8');
 const baseStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/personnel-page-base.css'), 'utf8');
 
-test('Samenvatten toont de complete audio-upload en lege resultaatinterface', () => {
+test('Samenvatten toont audio-upload en resultaatinterface', () => {
   assert.match(pageSource, /<h1 class="page-title">Samenvatten<\/h1>/);
-  assert.match(pageSource, /<p class="page-subtitle">Zet een lang audiogesprek/);
+  assert.match(pageSource, /<p class="page-subtitle">Zet een audiogesprek/);
   assert.match(pageSource, /assets\/fonts\.css/);
   assert.match(pageSource, /assets\/personnel-page-base\.css\?v=20260923a/);
-  assert.match(pageSource, /id="audioFileInput"[\s\S]*accept="audio\/\*,\.mp3,\.m4a,\.wav,\.aac,\.ogg"/);
+  assert.match(pageSource, /id="audioFileInput"[\s\S]*accept="audio\/\*,\.mp3,\.m4a,\.wav,\.aac,\.ogg,\.webm"/);
   assert.match(pageSource, /Sleep je audiobestand hierheen/);
   assert.match(pageSource, /id="summarizeButton"[^>]*disabled/);
   assert.match(pageSource, /Nog geen samenvatting/);
-  assert.match(pageSource, /je bestand verlaat de browser niet/);
+  assert.match(pageSource, /resultaat na maximaal 24 uur/);
+  assert.match(pageSource, /id="summaryResult" hidden/);
+  assert.match(pageSource, /id="summaryTranscript"/);
   assert.match(pageSource, /assets\/premium-samenvatten\.css\?v=20260923a/);
-  assert.match(pageSource, /assets\/premium-samenvatten\.js\?v=20260820a/);
+  assert.match(pageSource, /assets\/premium-samenvatten\.js\?v=20260923b/);
 });
 
 test('Samenvatten gebruikt de gedeelde titel, lettertypen en achtergrond van personeelspagina’s', () => {
@@ -33,12 +35,13 @@ test('Samenvatten gebruikt de gedeelde titel, lettertypen en achtergrond van per
   assert.doesNotMatch(styleSource, /\.summarize-header\s+h1\s*\{|summarize-eyebrow|radial-gradient|background:\s*var\(--bg-primary\)/);
 });
 
-test('Samenvatten ondersteunt lokale bestandsselectie zonder upload of AI-aanroep', () => {
-  assert.match(scriptSource, /fileInput\.addEventListener\("change"/);
-  assert.match(scriptSource, /dropzone\.addEventListener\("drop"/);
-  assert.match(scriptSource, /summarizeButton\.disabled = !hasFile/);
-  assert.match(scriptSource, /samenvattingsfunctie wordt later gekoppeld/);
-  assert.doesNotMatch(scriptSource, /\bfetch\s*\(|XMLHttpRequest|sendBeacon|\/api\//);
+test('Samenvatten gebruikt privé-upload, serverstatus en veilige tekstweergave', () => {
+  assert.match(scriptSource, /fileInput\.addEventListener\('change'/);
+  assert.match(scriptSource, /dropzone\.addEventListener\('drop'/);
+  assert.match(scriptSource, /\/api\/samenvatten\/plan/);
+  assert.match(scriptSource, /\/api\/samenvatten\/jobs\/\$\{encodeURIComponent\(plan\.id\)\}\/start/);
+  assert.match(scriptSource, /textContent = part\.text/);
+  assert.doesNotMatch(scriptSource, /innerHTML/);
 });
 
 test('Samenvatten heeft een responsieve tweekolomsinterface met toegankelijke focusstates', () => {

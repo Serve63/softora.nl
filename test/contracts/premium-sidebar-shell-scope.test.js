@@ -1280,6 +1280,8 @@ test('Samenvatten staat als werkende beheerlink in de gedeelde premium-sidebar',
   assert.match(pageSource, /data-sidebar-shell="canonical"/);
   assert.match(pageSource, /assets\/premium-sidebar-links\.js\?v=20260818a/);
   assert.match(pageSource, /assets\/personnel-theme\.js\?v=20260519b/);
+  assert.match(pageSource, /id="summaryResult" hidden/);
+  assert.match(pageSource, /id="summaryTranscript"/);
 });
 
 test('unified premium sidebar splits ad channels from social media channels', () => {
