@@ -521,7 +521,8 @@ test('premium database customer archive uses bounded chunks and verifies the ful
   await responder({}, response);
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(calls.sort(), [0, 5000, 10000, 'meta', 'meta'].sort());
+  assert.deepEqual(calls, ['meta', 0, 5000, 10000, 'meta'],
+    'read the first bounded chunk before fanning out; five simultaneous chunks timed out in production');
   const payload = JSON.parse(gunzipSync(response.body).toString('utf8'));
   assert.equal(payload.total, customers.length);
   assert.deepEqual(payload.customers.map((customer) => customer.id), customers.map((customer) => customer.id));
