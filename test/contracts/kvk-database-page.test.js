@@ -115,7 +115,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijvendatabase<\/h1>/);
-  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260923r/);
+  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260923s/);
   assert.match(pageSource, /<button class="transfer-button" type="button" disabled>Upload naar mailsysteem/);
   assert.match(pageSource, /id="companies-treated"/);
   assert.match(pageSource, /id="companies-total-card" class="stat-card stat-card-directory kvk-stat-card-enhanced"/);
@@ -169,7 +169,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260914a/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260923-short-websites/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -419,11 +419,11 @@ test('kvk database shows every Robot result and only material Controller correct
   assert.equal(lunaErrors.activityStatus({ review_finding: 'incorrect_approval' }), 'Onterecht goedgekeurd');
 });
 
-test('scraper website labels hide HTTP and HTTPS while preserving working link destinations', () => {
+test('scraper website labels omit protocol, www and final slash while preserving link destinations', () => {
   const { activityRowHtml } = require('../../assets/kvk-database-luna-errors');
   for (const [website, href, label] of [
-    ['https://www.voorbeeld.nl/pad', 'https://www.voorbeeld.nl/pad', 'www.voorbeeld.nl/pad'],
-    ['http://voorbeeld.nl/', 'http://voorbeeld.nl/', 'voorbeeld.nl/'],
+    ['https://www.voorbeeld.nl/pad/', 'https://www.voorbeeld.nl/pad/', 'voorbeeld.nl/pad'],
+    ['http://voorbeeld.nl/', 'http://voorbeeld.nl/', 'voorbeeld.nl'],
     ['voorbeeld.nl', 'https://voorbeeld.nl', 'voorbeeld.nl'],
   ]) {
     const html = activityRowHtml({ website });
@@ -525,6 +525,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const metricsSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.js'), 'utf8');
   const metricsStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.css'), 'utf8');
+  const redesignStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-redesign.css'), 'utf8');
 
   assert.match(pageSource, /id="companies-treated-last60"/);
   assert.match(pageSource, /id="companies-successful-found"/);
@@ -540,7 +541,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260914-fast-progress/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260916-event-loop-fix/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260923-delta-style/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260917-control-orange/);
   assert.match(pageSource, /id="companies-control-room-last60"><span class="stat-delta-added"[^>]*>\+—<\/span><span class="stat-delta-removed"[^>]*>−—<\/span>/);
   assert.match(metricsSource, /companies-successful-found/);
@@ -558,7 +559,10 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.match(metricsSource, /unusableGrades\['3'\]/);
   assert.match(metricsSource, /deps\.window\.setInterval\(controller\.renderMetrics, 1000\)/);
   assert.match(metricsSource, /count > 0 \? '\+' : ''/);
+  assert.match(metricsSource, /classList\.toggle\('is-negative', count < 0\)/);
   assert.match(metricsStyles, /\.stat-delta-number/);
+  assert.match(redesignStyles, /\.inventory-grid \.stat-delta,\.research-grid \.stat-delta\{display:flex!important/);
+  assert.match(redesignStyles, /\.stat-delta\.is-negative \.stat-delta-number/);
   assert.match(metricsStyles, /\.unusable-grade-delta-removed/);
   assert.doesNotMatch(pageSource, /companies-control-open|companies-definitive-open|unusable-grade-grid/);
   assert.match(metricsSource, /elements\.unusableGrade2Last60,[\s\S]*?false,/);
@@ -692,8 +696,10 @@ test('online KVK directory tables are server-only and protected by RLS', () => {
 
 test('KVK header shows the disabled mail upload action without a settings back link', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
+  const redesignStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-redesign.css'), 'utf8');
   assert.doesNotMatch(pageSource, /data-settings-module-back-host|settings-module-back\.(?:js|css)/);
   assert.match(pageSource, /class="header-controls">\s*<button class="transfer-button" type="button" disabled>Upload naar mailsysteem/);
+  assert.match(redesignStyles, /\.header-controls \.transfer-button\{min-height:37px;padding:9px 15px/);
   assert.doesNotMatch(pageSource, /id="kvk-worker-status"/);
   assert.match(pageSource, /id="companies-total">0<\/strong>\s*<\/div>\s*<div class="stat-delta"><span class="stat-delta-label">Alles gevonden<\/span>/);
   assert.ok(pageSource.indexOf('/assets/kvk-database-worker-status.js') < pageSource.indexOf('/assets/kvk-database.js'));
