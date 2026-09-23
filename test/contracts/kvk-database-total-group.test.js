@@ -13,29 +13,18 @@ function readMetricsCss() {
   return fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.css'), 'utf8');
 }
 
-test('kvk totalen staan samen in een paarse groep met label', () => {
+test('kvk inventory and research totals keep their own ordered panels', () => {
   const html = readPage();
-  const openIndex = html.indexOf('<div class="stat-total-group"');
-  assert.ok(openIndex >= 0, 'totaalgroep aanwezig');
-  assert.match(
-    html,
-    /<p id="stat-total-group-label" class="stat-total-group-label">Alles bij elkaar<\/p>/
-  );
-  const closeIndex = html.indexOf(
-    '<article class="stat-card stat-card-control-room',
-    openIndex
-  );
-  assert.ok(closeIndex > openIndex, 'totaalgroep sluit voor de controlekamer');
-  const group = html.slice(openIndex, closeIndex);
-  for (const id of [
-    'companies-total-card',
-    'companies-treated-open',
-    'companies-successful-found-open',
-    'companies-declared-unusable-open',
-  ]) {
-    assert.ok(group.includes(id), `totaalgroep bevat ${id}`);
+  const inventory = html.slice(html.indexOf('<section class="inventory"'), html.indexOf('<section class="research-details"'));
+  const research = html.slice(html.indexOf('<section class="research-details"'), html.indexOf('<section class="planning-details"'));
+  for (const id of ['companies-usable', 'companies-with-website', 'companies-without-website']) {
+    assert.ok(inventory.includes(`id="${id}"`), `voorraad bevat ${id}`);
+    assert.ok(!research.includes(`id="${id}"`), `onderzoek bevat ${id} niet`);
   }
-  assert.ok(!group.includes('companies-control-room-open'), 'controlekamer blijft buiten de groep');
+  for (const id of ['companies-total', 'companies-treated', 'companies-successful-found', 'companies-control-room', 'companies-declared-unusable']) {
+    assert.ok(research.includes(`id="${id}"`), `onderzoek bevat ${id}`);
+    assert.ok(!inventory.includes(`id="${id}"`), `voorraad bevat ${id} niet`);
+  }
 });
 
 test('kvk totaalgroep gebruikt paars, vier kolommen en hetzelfde responsieve gedrag', () => {

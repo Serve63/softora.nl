@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Softora Database | Bedrijven Scraper</title>
+  <title>Softora | Bedrijvendatabase</title>
   <meta name="robots" content="noindex,nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
@@ -15,44 +18,74 @@
   <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809f">
   <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909c">
   <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909e">
+  <link rel="stylesheet" href="/assets/kvk-database-redesign.css?v=20260923q">
 </head>
 <body>
   <main class="app-shell">
     <header class="page-header">
       <div>
-        <p class="brand">Softora Database</p>
-        <h1>Bedrijven Scraper</h1>
+
+        <h1>Bedrijvendatabase</h1>
+        <p class="page-intro">Van onderzoek naar je volgende klant.</p>
       </div>
       <div class="header-controls">
-        <div id="kvk-worker-status" class="kvk-worker-status" aria-label="Actieve databasewerkers" aria-live="polite"></div>
+        <button class="transfer-button" type="button" disabled>Upload naar mailsysteem <span aria-hidden="true">↗</span></button>
         <span id="last-refresh-time" class="kvk-visually-hidden">--</span>
       </div>
     </header>
 
-    <section class="stats-grid" aria-label="Scraper status">
-      <div class="stat-total-group" role="group" aria-labelledby="stat-total-group-label">
-        <p id="stat-total-group-label" class="stat-total-group-label">Alles bij elkaar</p>
-      <article id="companies-total-card" class="stat-card stat-card-directory kvk-stat-card-enhanced">
+    <section class="inventory" aria-label="Ongebruikte voorraad">
+      <div class="inventory-grid">
+<article class="stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-usable-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bruikbare bedrijven" title="Bekijk alle bruikbare bedrijven">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
+        <div class="stat-main">
+          <span>Klaar voor gebruik:</span>
+          <strong id="companies-usable">0</strong>
+        </div>
+        <div class="stat-delta" id="companies-usable-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
+      </article><article class="stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-with-website-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven met website" title="Bekijk alle bedrijven met website">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
+        <div class="stat-main">
+          <span>Mét website</span>
+          <strong id="companies-with-website">0</strong>
+        </div>
+        <div class="stat-delta" id="companies-with-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
+      </article><article class="stat-card stat-card-usable stat-card-without-website stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-without-website-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven zonder werkende website" title="Bekijk alle bedrijven zonder werkende website">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
+        <div class="stat-main">
+          <span>Zonder werkende website</span>
+          <strong id="companies-without-website">0</strong>
+        </div>
+        <div class="stat-delta" id="companies-without-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
+      </article>
+      </div>
+    </section>
+    <section class="research-details"><h2 class="fixed-section-title">Onderzoeksvoortgang</h2><div class="research-grid">
+<article id="companies-total-card" class="stat-card stat-card-directory kvk-stat-card-enhanced">
         <button id="companies-total-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven" title="Bekijk alle bedrijven">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
         </button>
         <div class="stat-main">
-          <span>Totaal Gevonden</span>
+          <span>Gevonden in KvK</span>
           <strong id="companies-total">0</strong>
         </div>
         <div class="stat-delta"><span class="stat-delta-label">Alles gevonden</span></div>
-      </article>
-      <article class="stat-card stat-card-directory kvk-stat-card-enhanced">
+      </article><article class="stat-card stat-card-directory kvk-stat-card-enhanced">
         <button id="companies-treated-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle behandelde bedrijven" title="Bekijk alle behandelde bedrijven">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
         </button>
         <div class="stat-main">
-          <span>Totaal Behandeld</span>
+          <span>Behandeld</span>
           <strong id="companies-treated">0</strong>
         </div>
         <div class="stat-delta" id="companies-treated-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
-      </article>
-      <article class="stat-card stat-card-successful-found stat-card-decision stat-card-directory kvk-stat-card-enhanced">
+      </article><article class="stat-card stat-card-successful-found stat-card-decision stat-card-directory kvk-stat-card-enhanced">
         <button id="companies-successful-found-open" class="stat-card-directory__open" type="button" aria-label="Bekijk bruikbaar verklaarde bedrijven" title="Bekijk bruikbaar verklaarde bedrijven">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
         </button>
@@ -61,8 +94,16 @@
           <strong id="companies-successful-found">0</strong>
         </div>
         <div class="stat-delta" id="companies-successful-found-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
-      </article>
-      <article class="stat-card stat-card-declared-unusable stat-card-decision stat-card-directory kvk-stat-card-enhanced">
+      </article><article class="stat-card stat-card-control-room stat-card-decision stat-card-directory kvk-stat-card-enhanced">
+        <button id="companies-control-room-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven in de Controlekamer" title="Bekijk alle bedrijven in de Controlekamer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
+        <div class="stat-main">
+          <span>Controlekamer</span>
+          <strong id="companies-control-room">0</strong>
+        </div>
+        <div class="stat-delta stat-delta-flow" id="companies-control-room-last60"><span class="stat-delta-added" title="Binnengekomen in de Controlekamer">+—</span><span class="stat-delta-removed" title="Afgehandeld: bruikbaar of definitief onbruikbaar">−—</span><span class="stat-delta-label">laatste 60 min</span></div>
+      </article><article class="stat-card stat-card-declared-unusable stat-card-decision stat-card-directory kvk-stat-card-enhanced">
         <button id="companies-declared-unusable-open" class="stat-card-directory__open" type="button" aria-label="Bekijk onbruikbaar verklaarde bedrijven" title="Bekijk onbruikbaar verklaarde bedrijven">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
         </button>
@@ -72,88 +113,23 @@
         </div>
         <div class="stat-delta" id="companies-declared-unusable-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
       </article>
-      </div>
-      <article class="stat-card stat-card-control-room stat-card-decision stat-card-directory kvk-stat-card-enhanced">
-        <button id="companies-control-room-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven in de Controlekamer" title="Bekijk alle bedrijven in de Controlekamer">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
-        </button>
-        <div class="stat-main">
-          <span>Controlekamer</span>
-          <strong id="companies-control-room">0</strong>
-        </div>
-        <div class="stat-delta stat-delta-flow" id="companies-control-room-last60"><span class="stat-delta-added" title="Binnengekomen in de Controlekamer">+—</span><span class="stat-delta-removed" title="Afgehandeld: bruikbaar of definitief onbruikbaar">−—</span><span class="stat-delta-label">laatste 60 min</span></div>
-      </article>
-      <div class="stat-new-group" role="group" aria-labelledby="stat-new-group-label">
-        <p id="stat-new-group-label" class="stat-new-group-label">Nieuw. Nog niet gebruikt</p>
-      <article class="stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced">
-        <button id="companies-usable-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bruikbare bedrijven" title="Bekijk alle bruikbare bedrijven">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
-        </button>
-        <div class="stat-main">
-          <span>Bruikbaar</span>
-          <strong id="companies-usable">0</strong>
-        </div>
-        <div class="stat-delta" id="companies-usable-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
-      </article>
-      <article class="stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced">
-        <button id="companies-with-website-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven met website" title="Bekijk alle bedrijven met website">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
-        </button>
-        <div class="stat-main">
-          <span>Mét Website</span>
-          <strong id="companies-with-website">0</strong>
-        </div>
-        <div class="stat-delta" id="companies-with-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
-      </article>
-      <article class="stat-card stat-card-usable stat-card-without-website stat-card-directory kvk-stat-card-enhanced">
-        <button id="companies-without-website-open" class="stat-card-directory__open" type="button" aria-label="Bekijk alle bedrijven zonder werkende website" title="Bekijk alle bedrijven zonder werkende website">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
-        </button>
-        <div class="stat-main">
-          <span>Zonder Werkende Website</span>
-          <strong id="companies-without-website">0</strong>
-        </div>
-        <div class="stat-delta" id="companies-without-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">laatste 60 min</span></div>
-      </article>
-      </div>
-    </section>
+    </div></section>
 
-    <section class="panel data-panel wide-data-panel capped-data-panel latest-treated-panel" data-collapsible="latest-activity">
-      <div class="panel-heading data-heading">
-        <div>
-          <p class="eyebrow">Overzicht</p>
-          <h2>Laatste 10 Behandeld</h2>
-        </div>
-        <div class="heading-actions">
-          <button class="collapse-toggle" type="button" aria-label="Laatste 10 behandeld inklappen" aria-expanded="true"></button>
-        </div>
-      </div>
-      <div class="table-frame" id="latest-luna-errors-table-frame">
-        <table>
-          <thead id="latest-luna-errors-table-head"></thead>
-          <tbody id="latest-luna-errors-table-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="workspace-grid">
-      <aside class="panel planning-panel" data-collapsible="planning">
-        <div class="panel-heading split-heading">
-          <div class="planning-heading">
-            <div>
-              <p class="eyebrow">Locaties</p>
-              <h2>Planning</h2>
-            </div>
-            <ul class="planning-legend" aria-label="Betekenis van de vinkjes">
+    <section class="planning-details">
+      <div class="planning-title-row">
+        <h2 class="fixed-section-title">Locatieplanning</h2>
+        <button class="planning-help-button" type="button" popovertarget="planning-legend-popover" aria-label="Uitleg van de vinkjes">?</button>
+        <div id="planning-legend-popover" class="planning-legend-popover" popover>
+          <h3>Wat betekenen de vinkjes?</h3>
+          <ul class="planning-legend" aria-label="Betekenis van de vinkjes">
               <li><span class="planning-legend-checks" aria-hidden="true"><span class="status-box is-done">✓</span></span><span class="kvk-visually-hidden">1 vinkje: </span>KVK-gegevens</li>
               <li><span class="planning-legend-checks" aria-hidden="true"><span class="status-box is-done">✓</span><span class="status-box is-done">✓</span></span><span class="kvk-visually-hidden">2 vinkjes: </span>Volledig onderzocht</li>
               <li><span class="planning-legend-checks" aria-hidden="true"><span class="status-box is-done">✓</span><span class="status-box is-done">✓</span><span class="status-box is-done">✓</span></span><span class="kvk-visually-hidden">3 vinkjes: </span>Gecontroleerd &amp; volledig af</li>
             </ul>
-          </div>
-          <div class="heading-actions">
-            <button class="collapse-toggle" type="button" aria-label="Planning inklappen" aria-expanded="true"></button>
-          </div>
         </div>
+      </div>
+      <section class="workspace-grid">
+      <aside class="panel planning-panel">
         <div class="location-summary" id="location-summary">CBS en PDOK data wordt geladen</div>
         <ol class="location-list" id="location-list"></ol>
       </aside>
@@ -178,7 +154,27 @@
         <input id="unusable-search-input" type="search" tabindex="-1">
         <div id="unusable-table-frame"><table><thead id="unusable-table-head"></thead><tbody id="unusable-table-body"></tbody></table></div>
       </div>
+    </section></section>
+
+    <section class="panel data-panel wide-data-panel capped-data-panel latest-treated-panel">
+      <div class="panel-heading data-heading">
+        <div>
+
+          <h2>Recent onderzocht</h2>
+        </div>
+        <div class="heading-actions">
+
+        </div>
+      </div>
+      <div class="table-frame" id="latest-luna-errors-table-frame">
+        <table>
+          <thead id="latest-luna-errors-table-head"></thead>
+          <tbody id="latest-luna-errors-table-body"></tbody>
+        </table>
+      </div>
     </section>
+
+
   </main>
 
   <script id="kvkSnapshot" type="application/json">{}</script>
@@ -189,6 +185,6 @@
   <script src="/assets/kvk-database-total-found.js?v=20260914a"></script>
   <script src="/assets/kvk-database-metrics.js?v=20260916-event-loop-fix"></script>
   <script src="/assets/kvk-database-luna-errors.js?v=20260914a"></script>
-  <script src="/assets/kvk-database-control.js?v=20260909a"></script>
+  <script src="/assets/kvk-database-control.js?v=20260923-location-count"></script>
 </body>
 </html>
