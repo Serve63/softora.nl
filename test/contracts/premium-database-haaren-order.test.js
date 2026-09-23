@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const distance = require('../../assets/premium-database-distance');
+const sortedLists = require('../../assets/premium-database-sorted-lists');
 const { createPremiumDatabaseSnapshotCacheCodec } = require('../../server/services/premium-database-snapshot-cache');
 const {
   createPremiumDatabaseMailReadySnapshotService,
@@ -90,7 +91,8 @@ test('equal distances use deterministic company/id ties while retaining original
 
 test('every premium database filter sorts before visible-row pagination', () => {
   const state = { activeStatus: '' };
-  const sorted = isolatedFunction('premium-database.html', '        function getSortedCustomers(customers) {', '        function isDatabaseMediaDebugEnabled()', { state, sortCustomers: distance.sortCustomersByDistance });
+  const databaseSortedLists = sortedLists.create(distance.sortCustomersByDistance);
+  const sorted = isolatedFunction('premium-database.html', '        function getSortedCustomers(customers) {', '        function isDatabaseMediaDebugEnabled()', { state, databaseSortedLists });
   for (const status of ['beschikbaar', 'benaderbaar', 'instantly-ready', 'benaderd', 'instantly', 'verstuurd', 'klant']) {
     state.activeStatus = status;
     assert.deepEqual(ids(sorted([far, middle, near])), ['near', 'middle', 'far'], status);
@@ -98,6 +100,29 @@ test('every premium database filter sorts before visible-row pagination', () => 
   const source = read('premium-database.html');
   assert.match(source, /getSortedCustomers\(getFilteredCustomers\(\)\)/);
   assert.ok(source.indexOf('baseFiltered = getSortedCustomers(getFilteredCustomers())') < source.indexOf('getVisibleRows(visibleCustomers, state.visibleLimit'));
+});
+
+test('filtered customers retain proven distance order without a second sort', () => {
+  let sortCalls = 0;
+  const databaseSortedLists = sortedLists.create((rows) => { sortCalls += 1; return distance.sortCustomersByDistance(rows); });
+  const state = { klanten: databaseSortedLists.sort([far, near, middle]), query: '' };
+  sortCalls = 0;
+  const filtered = isolatedFunction('premium-database.html', '        function getFilteredCustomers() {', '        function hasActiveDatabaseSearch()', {
+    state, databaseSortedLists, normalizeSearchValue: (value) => String(value || ''),
+    matchesActiveDatabaseFilter: () => true, getCustomerSearchHaystack: () => '',
+  });
+  const sorted = isolatedFunction('premium-database.html', '        function getSortedCustomers(customers) {', '        function isDatabaseMediaDebugEnabled()', {
+    state, databaseSortedLists,
+  });
+  const readyRows = filtered();
+  assert.deepEqual(ids(readyRows), ['near', 'middle', 'far']);
+  assert.equal(sorted(readyRows), readyRows);
+  assert.equal(sortCalls, 0);
+
+  state.klanten = [far, near, middle];
+  const unverifiedRows = filtered();
+  assert.deepEqual(ids(sorted(unverifiedRows)), ['near', 'middle', 'far']);
+  assert.equal(sortCalls, 1);
 });
 
 test('the independent sent-register renderer sorts by distance, not newest send time', () => {
