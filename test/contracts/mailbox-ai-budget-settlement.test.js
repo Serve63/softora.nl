@@ -140,3 +140,38 @@ test('failed jobs settle known complete usage once, but partial failures keep th
     assert.equal(Number(b.reserved_micro_usd),300200);assert.equal(Number(b.spent_micro_usd),200);
   } finally {await db.close();}
 });
+
+test('campaign-only SQL excludes queued Gmail and admits proven coldmail across history and future arrivals', async () => {
+  const db=await database();
+  try {
+    await db.exec(migration);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923112643_mailbox_ai_failed_usage_settlement.sql'),'utf8'));
+    await db.exec(`alter table public.softora_mailbox_messages add column in_reply_to text;
+      alter table public.softora_mailbox_messages add column references_text text;
+      alter table public.softora_mailbox_messages add column recipients_text text;
+      alter table public.softora_mailbox_messages add column subject text;
+      create function public.softora_mailbox_message_has_campaign_proof(text,text,text,text,text,text,text,text,text,text,jsonb,text,text default null)
+      returns boolean language sql immutable as $$select $1 like 'campaign-%' and $8 = $12$$;
+      update public.softora_mailbox_ai_budget set approved_micro_usd=3000000,include_history=true,incoming_after=now()-interval '1 hour';
+      insert into public.softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,body_text,has_body,body_truncated,payload)
+        values ('gmail-new','owner',now(),now(),'inbox','other@example.nl','Private mail',true,false,'{}'),
+        ('campaign-old','owner',now()-interval '1 day',now()-interval '1 day','coldmail','reply@example.nl','Old reply',true,false,'{}'),
+        ('campaign-new','owner',now(),now(),'inbox','reply@example.nl','New reply',true,false,'{}');
+      update public.softora_mailbox_messages set in_reply_to='<sent@softora.nl>' where message_key='campaign-new';
+      update public.softora_mailbox_messages set in_reply_to='<personal@example.nl>' where message_key='gmail-new';
+      insert into public.softora_mailbox_ai_presentations(id,version,account_email,message_key,source)
+        select message_key,'mailbox-luna-v1','owner',message_key,'{}' from public.softora_mailbox_messages;`);
+    await db.exec(`create table public.softora_mailbox_campaign_lineage_members(message_key text,account_email text);
+      create table public.softora_mailbox_campaign_lineage_roots(message_key text,account_email text);
+      insert into public.softora_mailbox_campaign_lineage_members values ('campaign-old','owner');`);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923122053_mailbox_ai_campaign_only.sql'),'utf8'));
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923122633_mailbox_ai_campaign_hint.sql'),'utf8'));
+    assert.deepEqual((await db.query('select message_key from softora_mailbox_ai_candidates(20)')).rows.map(row=>row.message_key),['campaign-new','campaign-old']);
+    assert.equal((await db.query("select reason from softora_mailbox_ai_states(array['gmail-new'])")).rows[0].reason,'outside_scope');
+    const claim="select id from softora_claim_mailbox_ai('00000000-0000-0000-0000-000000000001')";
+    assert.equal((await db.query(claim)).rows[0].id,'campaign-new');
+    assert.equal((await db.query(claim)).rows[0].id,'campaign-old');
+    assert.equal((await db.query(claim)).rows.length,0);
+    assert.equal((await db.query("select status from softora_mailbox_ai_presentations where id='gmail-new'")).rows[0].status,'queued');
+  } finally { await db.close(); }
+});
