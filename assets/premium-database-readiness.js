@@ -33,6 +33,7 @@
             latestMetrics?.statsFresh === true ? undefined : metrics?.refreshTodaySentCount?.(),
             metrics?.loadPersistedDealCount?.({ force: true }),
         ]);
+        root.performance?.mark?.('softora:database:metrics-checked');
         const verified = metrics?.getMetricReadiness?.();
         const metricsReady = verified?.roi === true && verified?.stats === true && METRIC_IDS.every((id) => {
             const value = doc.getElementById(id)?.textContent?.trim();
