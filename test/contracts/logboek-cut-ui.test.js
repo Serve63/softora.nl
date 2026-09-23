@@ -36,11 +36,15 @@ test('logboek-cut has no training progress badge or progress bar', () => {
   assert.doesNotMatch(script, /\$\('training-completion'\)|\$\('progress-label'\)|\$\('percent'\)|\$\('progress'\)/);
 });
 
-test('completed exercise fill ends at the exercise separators', () => {
+test('completed exercise fill and separators reach the full screen width', () => {
   const css = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.css'), 'utf8');
-  const complete = css.match(/\.exercise\.complete\s*\{([^}]+)\}/)?.[1];
+  const row = css.match(/\.exercise::before\s*\{([^}]+)\}/)?.[1];
+  const complete = css.match(/\.exercise\.complete::before\s*\{([^}]+)\}/)?.[1];
+  assert.ok(row);
+  assert.match(row, /width:\s*100vw/);
+  assert.match(row, /border-top:\s*1px solid var\(--line\)/);
+  assert.match(css, /\.app\s*\{[^}]*overflow-x:\s*clip/);
   assert.ok(complete);
   assert.match(complete, /background:\s*#edf8ef/);
-  assert.match(complete, /border-radius:\s*0/);
-  assert.match(complete, /box-shadow:\s*none/);
+  assert.match(complete, /border-color:\s*#b9d9c0/);
 });
