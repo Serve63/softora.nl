@@ -26,3 +26,12 @@ test('logboek-cut fills the page without an outer card on desktop and mobile', (
   assert.match(css, /\.workout\s*\{[^}]*width:\s*100%[^}]*border:\s*0/);
   assert.match(css, /@media\s*\(max-width:\s*700px\)/);
 });
+
+test('logboek-cut shows completion in the heading without a separate progress bar', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../../logboek-cut.html'), 'utf8');
+  const script = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.js'), 'utf8');
+  assert.match(html, /id="training-completion"/);
+  assert.match(script, /\$\('training-completion'\)\.textContent/);
+  assert.doesNotMatch(html, /class="progress-head"|<progress\b|id="progress-label"|id="percent"/);
+  assert.doesNotMatch(script, /\$\('progress-label'\)|\$\('percent'\)|\$\('progress'\)/);
+});
