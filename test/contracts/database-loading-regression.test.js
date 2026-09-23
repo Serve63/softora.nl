@@ -144,6 +144,27 @@ test('one photo merge preserves canonical, stored and previous media precedence'
   assert.equal(onePass[2].websitePhoto, '');
 });
 
+test('photo merge reuses normalized boot rows without changing media precedence', () => {
+  const customers = [{ id: 'one', websitePhoto: '' }, { id: 'two', websitePhoto: 'https://example.nl/canonical.jpg' }];
+  const fallback = [{ id: 'one', websitePhoto: 'https://example.nl/old.jpg' }];
+  const photos = { one: { websitePhoto: 'https://example.nl/stored.jpg' } };
+  const helpers = {
+    normalizeCustomer: (customer) => ({ ...customer }),
+    sortCustomers: (rows) => rows,
+    buildCustomerIdentityKey: (customer) => customer.id,
+  };
+  const expected = assetClient.mergeCustomersWithPhotos(customers, photos, fallback, helpers);
+  const actual = assetClient.mergeCustomersWithPhotos(customers, photos, fallback, {
+    ...helpers,
+    normalizedInputs: true,
+    normalizeCustomer: () => { throw new Error('Already normalized customers must not be normalized again'); },
+  });
+  assert.deepEqual(actual, expected);
+  assert.equal(actual[0].websitePhoto, photos.one.websitePhoto);
+  assert.equal(actual[1].websitePhoto, customers[1].websitePhoto);
+  assert.equal(customers[0].websitePhoto, '');
+});
+
 test('a valid design website is independent of email eligibility while mail readiness stays blocked', () => {
   const build = assetClient.buildWebdesignAssetState;
   const helpers = { isMailLeadEligible: () => false };

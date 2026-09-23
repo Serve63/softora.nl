@@ -5,6 +5,9 @@
     const COLDMAIL_STATS_URL = "/api/coldmailing/stats?includeRecipients=1";
     const TODAY_SENT_REFRESH_MS = 60000;
     const STATS_READINESS_FRESH_MS = 15000;
+    const AMSTERDAM_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit"
+    });
     let roiControlsBound = false;
     let roiSaveLifecycleBound = false;
     let todaySentRefreshBound = false;
@@ -96,12 +99,7 @@
         const parsed = new Date(String(value || ""));
         if (!Number.isFinite(parsed.getTime())) return "";
         try {
-            const parts = new Intl.DateTimeFormat("en-CA", {
-                timeZone: "Europe/Amsterdam",
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit"
-            }).formatToParts(parsed);
+            const parts = AMSTERDAM_DATE_FORMATTER.formatToParts(parsed);
             const get = function (type) {
                 const match = parts.find(function (part) { return part.type === type; });
                 return match ? match.value : "";

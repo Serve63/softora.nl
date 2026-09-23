@@ -68,13 +68,14 @@
         const shouldShowWebsitePhoto = typeof options.shouldShowWebsitePhoto === "function" ? options.shouldShowWebsitePhoto : function () { return true; };
         const isValidWebsitePhotoSource = typeof options.isValidWebsitePhotoSource === "function" ? options.isValidWebsitePhotoSource : defaultIsValidPhotoSource;
         const buildCustomerIdentityKey = typeof options.buildCustomerIdentityKey === "function" ? options.buildCustomerIdentityKey : function () { return ""; };
+        const normalizedInputs = options.normalizedInputs === true;
         const photos = photoMap && typeof photoMap === "object" ? photoMap : {};
         const photosByIdentity = new Map();
         const fallbackPhotosById = new Map();
         const fallbackPhotosByIdentity = new Map();
         function hasAnyMedia(item) { return isValidWebsitePhotoSource(item && item.websitePhoto) || isValidWebsitePhotoSource(item && item.websiteMockup); }
         function rememberFallbackMedia(customer) {
-            const normalized = normalizeCustomer(customer);
+            const normalized = normalizedInputs && customer && typeof customer === "object" ? customer : normalizeCustomer(customer);
             if (!normalized.id || !hasAnyMedia(normalized)) return;
             fallbackPhotosById.set(normalized.id, normalized);
             const identityKey = buildCustomerIdentityKey(normalized);
@@ -101,7 +102,7 @@
         });
         (Array.isArray(fallbackCustomers) ? fallbackCustomers : []).forEach(rememberFallbackMedia);
         return sortCustomers((customers || []).map(function (customer, index) {
-            const normalized = normalizeCustomer(customer, "photo-merge-" + index);
+            const normalized = normalizedInputs && customer && typeof customer === "object" ? customer : normalizeCustomer(customer, "photo-merge-" + index);
             if (!shouldShowWebsitePhoto(normalized)) return { ...normalized, websitePhoto: "", websitePhotoName: "", websiteMockup: "", websiteMockupName: "", mockupRenderer: "", mockupOrientation: "", mockupQualityStatus: "", mockupQualityCheckedAt: "" };
             const identityKey = buildCustomerIdentityKey(normalized);
             const photo = photos[normalized.id] || photosByIdentity.get(identityKey) || null;
