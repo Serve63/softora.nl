@@ -869,6 +869,8 @@ test('een eigenaarloze serverbootstrap levert elke eigenaar exact zijn eigen ber
           session: { authenticated: true, userId: 'user-1', email: 'serve@softora.nl' },
           mailbox: {
             ok: true,
+            complete: true,
+            expectedMessages: 4,
             messages: [
               { id: 'serve-imap', accountEmail: 'serve@softora.nl' },
               { id: 'martijn-imap', accountEmail: 'martijn@softora.nl' },
@@ -1000,15 +1002,15 @@ test('campaign tabcache is per ingelogde identiteit en per gekozen eigenaar gesc
   try {
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('serve'),
-      'mailbox_campaign_replies_v18:user-1:serve'
+      'mailbox_campaign_replies_v19:user-1:serve'
     );
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('martijn'),
-      'mailbox_campaign_replies_v18:user-1:martijn'
+      'mailbox_campaign_replies_v19:user-1:martijn'
     );
     assert.equal(
       campaignInbox.getMailboxTabCacheKey('both'),
-      'mailbox_campaign_replies_v18:user-1:both'
+      'mailbox_campaign_replies_v19:user-1:both'
     );
   } finally {
     global.SoftoraPageBootstrapSession = previousSession;

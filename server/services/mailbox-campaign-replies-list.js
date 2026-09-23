@@ -5,6 +5,7 @@ const {
 const {
   MAILBOX_CAMPAIGN_SNAPSHOT_KEY,
   MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,
+  parseMailboxCampaignSnapshot,
   serializeMailboxCampaignSnapshot,
 } = require('./mailbox-campaign-snapshot');
 const { createMailboxCampaignSnapshotRead } = require('./mailbox-campaign-snapshot-read');
@@ -56,7 +57,7 @@ function createMailboxCampaignRepliesList({
     // Only the explicit shared rebuild may replace the shared presentation cache.
     // Interactive owner reads return their canonical result without another write.
     const serializedSnapshot = includeSnapshotMessages && serializeMailboxCampaignSnapshot({ ...result, messages: snapshotMessages, sync: { ...result.sync, source: snapshotInstantlyReplies.length ? 'campaign-replies-index+instantly' : 'campaign-replies-index' } });
-    if (serializedSnapshot) {
+    if (serializedSnapshot && parseMailboxCampaignSnapshot(serializedSnapshot)?.complete === true) {
       try {
         await setUiStateValues(
           MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE,

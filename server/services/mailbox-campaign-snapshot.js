@@ -5,11 +5,14 @@ const {
 } = require('./mailbox-message-image');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const { resolveConversationActivity } = require('./mailbox-conversation-activity');
+const { gzipSync, gunzipSync } = require('node:zlib');
 
 const MAILBOX_CAMPAIGN_SNAPSHOT_KEY = 'softora_mailbox_campaign_snapshot_v2';
 const MAILBOX_CAMPAIGN_SNAPSHOT_VERSION = 16;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES = 400;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS = 850_000;
+const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_INFLATED_BYTES = 16_000_000;
+const MAILBOX_CAMPAIGN_SNAPSHOT_ENCODING = 'gzip-base64-v1';
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS = 25_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS = 80_000;
@@ -384,12 +387,40 @@ function sanitizeMessage(value, options = {}) {
 }
 
 function serialize(value) {
-  return JSON.stringify(value);
+  // The stored snapshot is sanitized again when read. Omit values that the
+  // sanitizer restores by default so conversation identity and thread proof
+  // fit without sacrificing older conversations to the byte budget.
+  function compactMessage(source) {
+    if (Array.isArray(source)) return source.map(compactMessage);
+    if (!source || typeof source !== 'object') return source;
+    const compact = {};
+    for (const [key, entry] of Object.entries(source)) {
+      if (entry === '' || entry === false || entry === 0 || entry === null
+        || (Array.isArray(entry) && entry.length === 0)) continue;
+      compact[key] = compactMessage(entry);
+    }
+    return compact;
+  }
+  return JSON.stringify({
+    ...value,
+    messages: value.messages.map(compactMessage),
+  });
+}
+
+function encodeSnapshot(snapshot) {
+  const serialized = serialize(snapshot);
+  if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
+  if (Buffer.byteLength(serialized, 'utf8') > MAILBOX_CAMPAIGN_SNAPSHOT_MAX_INFLATED_BYTES) return '';
+  const encoded = JSON.stringify({
+    encoding: MAILBOX_CAMPAIGN_SNAPSHOT_ENCODING,
+    data: gzipSync(Buffer.from(serialized, 'utf8'), { level: 3 }).toString('base64'),
+  });
+  return encoded.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS ? encoded : '';
 }
 
 function fitSnapshotToBudget(snapshot) {
-  let serialized = serialize(snapshot);
-  if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
+  let serialized = encodeSnapshot(snapshot);
+  if (serialized) return serialized;
 
   // Proxy image URLs are tiny and let the browser render images immediately.
   // Drop the much larger bodies from the oldest messages first, so the newest
@@ -405,9 +436,9 @@ function fitSnapshotToBudget(snapshot) {
         message.body = '';
       });
     }
-    serialized = serialize(snapshot);
-    if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
   }
+  serialized = encodeSnapshot(snapshot);
+  if (serialized) return serialized;
 
   // A single active conversation can contain years of correspondence. Keep
   // every message and its preview, but drop hydrated thread bodies when that
@@ -418,9 +449,9 @@ function fitSnapshotToBudget(snapshot) {
       if (message.body) message.bodyTruncated = true;
       message.body = '';
     });
-    serialized = serialize(snapshot);
-    if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
   }
+  serialized = encodeSnapshot(snapshot);
+  if (serialized) return serialized;
 
   // Only sacrifice image references if metadata plus all proxy URLs still do
   // not fit. In normal mailbox snapshots this fallback should not be needed.
@@ -431,27 +462,24 @@ function fitSnapshotToBudget(snapshot) {
       if (message.bodyImages.length) message.bodyImagesTruncated = true;
       message.bodyImages = [];
     });
-    serialized = serialize(snapshot);
-    if (serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return serialized;
   }
+  serialized = encodeSnapshot(snapshot);
+  if (serialized) return serialized;
 
   if (snapshot.messages[0]) {
     snapshot.messages[0].body = text(snapshot.messages[0].body, 20_000);
     snapshot.messages[0].bodyTruncated = true;
   }
-  serialized = serialize(snapshot);
-  while (
-    serialized.length > MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS &&
-    snapshot.messages.length > 1
-  ) {
-    snapshot.messages.pop();
-    serialized = serialize(snapshot);
-  }
-  return serialized;
+  serialized = encodeSnapshot(snapshot);
+  // An incomplete durable list would force a second canonical read and show
+  // conversations appearing later. Keep the previous durable value instead.
+  return serialized || '';
 }
 
 function serializeMailboxCampaignSnapshot(result, options = {}) {
-  const messages = selectSnapshotMessages(result && result.messages)
+  const sourceMessages = Array.isArray(result && result.messages) ? result.messages : [];
+  const selectedMessages = selectSnapshotMessages(sourceMessages);
+  const messages = selectedMessages
     .map((message, index) => sanitizeMessage(message, {
       includeBody: index < MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT,
       includeImages: index < MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT,
@@ -465,6 +493,8 @@ function serializeMailboxCampaignSnapshot(result, options = {}) {
     version: MAILBOX_CAMPAIGN_SNAPSHOT_VERSION,
     savedAt,
     ok: result && result.ok !== false,
+    expectedMessages: Math.max(selectedMessages.length, Number(result && result.expectedMessages) || 0),
+    complete: result?.complete !== false && selectedMessages.length === sourceMessages.length,
     messages,
     sync: result && result.sync && typeof result.sync === 'object'
       ? {
@@ -483,7 +513,17 @@ function serializeMailboxCampaignSnapshot(result, options = {}) {
 
 function parseMailboxCampaignSnapshot(rawValue) {
   try {
-    const parsed = JSON.parse(String(rawValue || ''));
+    const raw = String(rawValue || '');
+    if (raw.length > MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS) return null;
+    let parsed = JSON.parse(raw);
+    if (parsed?.encoding === MAILBOX_CAMPAIGN_SNAPSHOT_ENCODING) {
+      const data = parsed.data;
+      if (typeof data !== 'string' || data.length > MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS ||
+        !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) return null;
+      parsed = JSON.parse(gunzipSync(Buffer.from(data, 'base64'), {
+        maxOutputLength: MAILBOX_CAMPAIGN_SNAPSHOT_MAX_INFLATED_BYTES,
+      }).toString('utf8'));
+    }
     if (
       !parsed ||
       typeof parsed !== 'object' ||
@@ -495,6 +535,8 @@ function parseMailboxCampaignSnapshot(rawValue) {
     }
     return {
       ok: parsed.ok !== false,
+      complete: parsed.complete === true && Number(parsed.expectedMessages) === parsed.messages.length,
+      expectedMessages: Math.max(parsed.messages.length, Number(parsed.expectedMessages) || 0),
       savedAt: Number.isFinite(Date.parse(parsed.savedAt || ''))
         ? new Date(parsed.savedAt).toISOString()
         : null,
@@ -555,7 +597,11 @@ function removeMailboxCampaignSnapshotMessage(rawValue, identity = {}, options =
     changed: true,
     serialized: messages.length
       ? serializeMailboxCampaignSnapshot(
-          { ok: snapshot.ok, messages, sync: snapshot.sync },
+          {
+            ok: snapshot.ok, complete: snapshot.complete,
+            expectedMessages: snapshot.complete ? messages.length : snapshot.expectedMessages,
+            messages, sync: snapshot.sync,
+          },
           { savedAt: options.savedAt || new Date().toISOString() }
         )
       : '',
@@ -587,7 +633,8 @@ function markMailboxCampaignSnapshotReplyDismissed(rawValue, identity = {}, opti
   return {
     changed: true,
     serialized: serializeMailboxCampaignSnapshot(
-      { ok: snapshot.ok, messages, sync: snapshot.sync },
+      { ok: snapshot.ok, complete: snapshot.complete, expectedMessages: snapshot.expectedMessages,
+        messages, sync: snapshot.sync },
       { savedAt: options.savedAt || dismissedAt }
     ),
   };
@@ -616,7 +663,8 @@ function markMailboxCampaignSnapshotRead(rawValue, identity = {}, options = {}) 
   return {
     changed: true,
     serialized: serializeMailboxCampaignSnapshot(
-      { ok: snapshot.ok, messages, sync: snapshot.sync },
+      { ok: snapshot.ok, complete: snapshot.complete, expectedMessages: snapshot.expectedMessages,
+        messages, sync: snapshot.sync },
       { savedAt: options.savedAt || readAt }
     ),
   };

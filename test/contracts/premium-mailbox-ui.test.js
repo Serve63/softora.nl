@@ -11417,6 +11417,7 @@ test('mailbox gebruikt server-bootstrap zonder zichtbare laadtekst of eerste cli
           },
           mailbox: {
             ok: true,
+            complete: true,
             owner: 'serve',
             messages: [{ id: 'reply-bootstrap', accountEmail: 'serve@softora.nl', from: 'Direct zichtbaar' }],
             sync: { source: 'campaign-replies-index' },
@@ -11456,6 +11457,7 @@ test('mailbox leest complete unicode gespreksdata uit de veilige base64-bootstra
     },
     mailbox: {
       ok: true,
+      complete: true,
       owner: 'martijn',
       messages: [{
         id: 'ralph-conversation',
@@ -11500,6 +11502,42 @@ test('mailbox leest complete unicode gespreksdata uit de veilige base64-bootstra
   }
 });
 
+test('mailbox vraagt de volledige lijst wanneer de HTML slechts een afgekapt snapshot bevat', async () => {
+  const previousDocument = globalThis.document;
+  const previousApi = globalThis.SoftoraMailboxCampaignInbox;
+  const modulePath = require.resolve('../../assets/premium-mailbox-campaign-inbox.js');
+  globalThis.document = {
+    getElementById(id) {
+      return id === 'softoraPageStateBootstrap' ? {
+        textContent: JSON.stringify({ mailbox: {
+          ok: true, complete: false, expectedMessages: 2, owner: 'serve',
+          messages: [{ id: 'first', accountEmail: 'serve@softora.nl' }],
+        } }),
+      } : null;
+    },
+  };
+  delete require.cache[modulePath];
+  const freshCampaignInboxModule = require(modulePath);
+  let reads = 0;
+  try {
+    assert.equal(freshCampaignInboxModule.hasPageBootstrap('outreach'), false);
+    const result = await freshCampaignInboxModule.load('outreach', (message) => message, async () => {
+      reads += 1;
+      return { ok: true, json: async () => ({ ok: true, messages: [
+        { id: 'first', accountEmail: 'serve@softora.nl' },
+        { id: 'second', accountEmail: 'serve@softora.nl' },
+      ] }) };
+    }, { owner: 'serve' });
+    assert.equal(reads, 1);
+    assert.equal(result.fromBootstrap, false);
+    assert.deepEqual(result.messages.map((message) => message.id), ['first', 'second']);
+  } finally {
+    delete require.cache[modulePath];
+    globalThis.document = previousDocument;
+    globalThis.SoftoraMailboxCampaignInbox = previousApi;
+  }
+});
+
 test('mailbox toont de laatst bekende tabdata direct wanneer de server koud start', async () => {
   const previousDocument = globalThis.document;
   const previousBootstrapSession = globalThis.SoftoraPageBootstrapSession;
@@ -11510,9 +11548,10 @@ test('mailbox toont de laatst bekende tabdata direct wanneer de server koud star
     get() { return { authenticated: true, userId: 'usr_serve', email: 'serve@softora.nl' }; },
     cache: {
       read(key) {
-        assert.equal(key, 'mailbox_campaign_replies_v18:usr_serve:serve');
+        assert.equal(key, 'mailbox_campaign_replies_v19:usr_serve:serve');
         return {
           ok: true,
+          complete: true,
           owner: 'serve',
           messages: [{ id: 'reply-session-cache', accountEmail: 'serve@softora.nl', from: 'Direct uit tabcache' }],
           sync: { source: 'tab-session-cache' },
@@ -11553,6 +11592,7 @@ test('mailbox valt tijdens een tijdelijke indexstoring terug op de laatst bekend
       read() {
         return {
           ok: true,
+          complete: true,
           owner: 'serve',
           messages: [{ id: 'reply-session-recovery', accountEmail: 'serve@softora.nl', from: 'Bewaarde reactie' }],
           sync: { source: 'campaign-replies-index' },
@@ -11595,6 +11635,7 @@ test('mailbox verkiest de serverbootstrap boven een nieuwere maar verouderde tab
   const modulePath = require.resolve('../../assets/premium-mailbox-campaign-inbox.js');
   let cachedSnapshot = {
     ok: true,
+    complete: true,
     savedAt: '2026-07-23T08:00:00.000Z',
     messages: [
       { id: 'reply-delete', mailboxId: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl' },
@@ -11609,6 +11650,7 @@ test('mailbox verkiest de serverbootstrap boven een nieuwere maar verouderde tab
         textContent: JSON.stringify({
           mailbox: {
             ok: true,
+            complete: true,
             savedAt: '2026-07-23T07:00:00.000Z',
             messages: [
               { id: 'reply-keep', mailboxId: 'inbox:43', uid: 43, folder: 'inbox', accountEmail: 'serve@softora.nl' },
@@ -11662,6 +11704,7 @@ test('mailbox deelt een bevestigde verwijdering direct met andere open tabs', ()
   const openChannels = new Set();
   let cachedSnapshot = {
     ok: true,
+    complete: true,
     savedAt: '2026-07-23T08:00:00.000Z',
     messages: [
       { id: 'reply-delete', mailboxId: 'inbox:42', uid: 42, folder: 'inbox', accountEmail: 'serve@softora.nl' },

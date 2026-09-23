@@ -283,6 +283,30 @@ test('mailbox-bootstrap leest bij een koude server eerst het duurzame snapshot',
   assert.equal(mailboxReads, 1);
 });
 
+test('mailbox-bootstrap levert een afgekapt duurzaam snapshot nooit als volledige beginlijst', async () => {
+  const complete = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{ id: 'inbox:1', folder: 'inbox', accountEmail: 'serve@softora.nl' }],
+  });
+  const incomplete = JSON.stringify({ ...JSON.parse(complete), complete: false, expectedMessages: 2 });
+  let canonicalReads = 0;
+  const service = createPremiumPageStateBootstrapService({
+    getUiStateValues: async (scope) => scope === MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE
+      ? { values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: incomplete }, source: 'supabase' }
+      : { values: {}, source: 'supabase' },
+    mailboxCoordinator: {
+      listCampaignReplies: async () => {
+        canonicalReads += 1;
+        return { ok: true, messages: [] };
+      },
+    },
+  });
+
+  const payload = await service.buildPageStateBootstrapPayload('premium-mailbox.html');
+  assert.equal(Object.hasOwn(payload, 'mailbox'), false);
+  assert.equal(canonicalReads, 1);
+});
+
 test('mailbox-bootstrap verzoent verse procescache met duurzame afgehandeld-status', async () => {
   let mailboxReads = 0;
   let persisted = '';
