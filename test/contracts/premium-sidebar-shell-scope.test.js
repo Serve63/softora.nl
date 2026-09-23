@@ -1356,7 +1356,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-system-mail-count\.js\?v=20260923-fresh-stats/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260923-id-match/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(source, /premium-database-webdesign-action\.js\?v=20260921-mailready-parity/);
+  assert.match(source, /premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
   assert.match(source, /premium-database-table-helpers\.js\?v=20260923-owner/);
   assert.match(source, /const count = databaseTableHelpers\.getPhotoHeaderCount\(customers, \{ showPhotoColumn: showPhotoColumn, activeStatus: state\.activeStatus,/);
 });
