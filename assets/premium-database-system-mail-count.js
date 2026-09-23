@@ -19,6 +19,9 @@
     let lastRenderedMailCount = null;
     let roiDealsCount = 0;
     let roiStateLoadPromise = null;
+    let roiNextReadAtMs = 0;
+    let roiReadVerified = false;
+    let statsReadVerified = false;
     let roiDirtySinceLoad = false;
     let roiNeedsRemoteSync = false;
     let bootstrapStateApplied = false;
@@ -299,17 +302,18 @@
         }
     }
 
-    function loadPersistedDealCount() {
+    function loadPersistedDealCount(options) {
         if (roiStateLoadPromise) return roiStateLoadPromise;
+        if (Date.now() < roiNextReadAtMs && !(options && options.force === true)) return Promise.resolve(roiDealsCount);
         const client = getUiStateClient();
         if (!client) {
-            roiStateLoadPromise = Promise.resolve(roiDealsCount);
-            return roiStateLoadPromise;
+            return Promise.resolve(roiDealsCount);
         }
         // The HTML bootstrap may predate a confirmed +/- change in another request.
         // Always reconcile these editable values with a fresh central read.
         if (typeof client.invalidate === "function") client.invalidate(ROI_STATE_SCOPE);
         roiStateLoadPromise = client.get(ROI_STATE_SCOPE).then(function (state) {
+            if (!state || state.ok === false || !state.values || typeof state.values !== "object") throw new Error("Mail ROI gaf geen volledige gegevens terug.");
             const values = state && state.values && typeof state.values === "object" ? state.values : {};
             const storedCount = parseStoredDealCount(values[ROI_STATE_KEY]);
             if (storedCount !== null && !roiDirtySinceLoad) {
@@ -324,8 +328,13 @@
                 } catch (_) { roiAppointmentsCount = 0; }
                 renderRoiCalculator(lastRenderedMailCount, lastRenderedMailCount === null);
             }
+            roiReadVerified = true;
+            roiNextReadAtMs = 0;
             return roiDealsCount;
         }).catch(function (error) {
+            roiReadVerified = false;
+            roiNextReadAtMs = Date.now() + 2000;
+            roiStateLoadPromise = null;
             if (typeof console !== "undefined" && typeof console.error === "function") console.error("Mail ROI laden mislukt:", error);
             return roiDealsCount;
         });
@@ -594,6 +603,7 @@
             const payload = result.payload;
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
             const stats = payload.stats || {};
+            statsReadVerified = true;
             if (window.SoftoraDatabaseSentRegister) {
                 window.SoftoraDatabaseSentRegister.accept(stats.sentRegister);
                 lastStatsMailCount = stats.sentRegister.total;
@@ -612,6 +622,7 @@
             if (window.SoftoraDatabaseSentRegister) window.dispatchEvent(new Event("softora:sent-register"));
             return sentToday;
         }).catch(function (error) {
+            statsReadVerified = false;
             if (window.SoftoraDatabaseSentRegister) { window.SoftoraDatabaseSentRegister.markFailed(); window.dispatchEvent(new Event("softora:sent-register")); }
             renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, lastTodaySentCount === null && lastInstantlyTodaySentCount === null);
             renderHardBouncesCount(lastHardBouncesCount, lastHardBouncesCount === null);
@@ -708,6 +719,7 @@
     }
 
     window.SoftoraDatabaseSystemMailCount = {
+        getMetricReadiness: function () { return { roi: roiReadVerified, stats: statsReadVerified }; },
         hasSoftoraSystemMailSignal: hasSoftoraSystemMailSignal,
         getCustomerSoftoraSystemMailSentCount: getCustomerSoftoraSystemMailSentCount,
         getSoftoraSystemMailSentCount: getSoftoraSystemMailSentCount,

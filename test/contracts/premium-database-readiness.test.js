@@ -22,6 +22,7 @@ function environment() {
     SoftoraDatabaseSystemMailCount: {
       refreshTodaySentCount: async () => { events.push('stats'); },
       loadPersistedDealCount: async () => { events.push('roi'); },
+      getMetricReadiness: () => ({ roi: true, stats: true }),
     },
     SoftoraScreenReadiness: {
       markReady: async (input) => { events.push('ready'); return input.actionsBound(); },
@@ -61,4 +62,26 @@ test('Mailsysteem cannot claim readiness with missing metrics or incomplete medi
   assert.equal(await env.readiness.publish({ state: env.state }), false);
   assert.ok(env.events.includes('database-inventory-incomplete'));
   assert.ok(!env.events.includes('ready'));
+});
+
+test('Mailsysteem does not claim readiness from old bootstrap numbers after a failed live metric read', async () => {
+  const env = environment();
+  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: false, stats: true });
+  assert.equal(await env.readiness.publish({ state: env.state }), false);
+  assert.ok(env.events.includes('mail-metrics-unavailable'));
+  assert.ok(!env.events.includes('ready'));
+});
+
+test('Mailsysteem retries a transient metric failure and publishes readiness after fresh data arrives', async () => {
+  const env = environment();
+  let retry;
+  let delay;
+  let roiVerified = false;
+  env.root.setTimeout = (callback, ms) => { retry = callback; delay = ms; return 1; };
+  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: roiVerified, stats: true });
+  assert.equal(await env.readiness.publish({ state: env.state }), false);
+  assert.equal(delay, 2000);
+  roiVerified = true;
+  assert.equal(await retry(), true);
+  assert.equal(env.events.at(-1), 'ready');
 });

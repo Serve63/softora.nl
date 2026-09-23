@@ -2303,7 +2303,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(systemMailCountScriptSource, /function refreshTodaySentCount\(\)/);
   assert.match(systemMailCountScriptSource, /const ROI_STATE_SCOPE = "premium_database_mail_roi";/);
   assert.match(systemMailCountScriptSource, /const ROI_STATE_KEY = "premium_database_mail_roi_v1";/);
-  assert.match(systemMailCountScriptSource, /function loadPersistedDealCount\(\)/);
+  assert.match(systemMailCountScriptSource, /function loadPersistedDealCount\(options\)/);
   assert.match(systemMailCountScriptSource, /function flushPendingRoiSave\(\)/);
   assert.match(systemMailCountScriptSource, /addWindowListener\("pagehide", flushPendingRoiSave\)/);
   assert.match(systemMailCountScriptSource, /keepalive: persistOptions\.keepalive !== false/);
@@ -2704,7 +2704,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260922-today-channel-total/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260922-today-channel-total/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260923-roi-reliable/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
@@ -2920,7 +2920,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /renderPage\(\); releaseDatabaseBootShell\(\);/);
   assert.match(pageSource, /softoraDatabaseActionsBound = 'true';[\s\S]*databaseReadiness: window\.SoftoraDatabaseReadiness/);
   assert.match(pageSource, /premium-screen-readiness\.js\?v=20260922b/);
-  assert.match(pageSource, /premium-database-readiness\.js\?v=20260922a/);
+  assert.match(pageSource, /premium-database-readiness\.js\?v=20260923-roi-reliable/);
   assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 0\)/);
   assert.match(webdesignActionScriptSource, /async function preloadPhotoImages\(customers, limit, timeoutMs\)/);
   assert.match(webdesignActionScriptSource, /function waitForPhotoImage\(photo, timeoutMs, loadKey\)/);
@@ -3000,7 +3000,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260922a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260922b"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260915-haaren-order-1"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260922-today-channel-total"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260922b"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260915-haaren-order-1"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260923-roi-reliable"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
@@ -6596,6 +6596,31 @@ test('appointment reload refreshes a primed page snapshot after a confirmed decr
   assert.equal(nodes.mailRoiAppointmentsCount.textContent, '0');
   assert.equal(nodes.mailRoiAppointmentRatio.textContent, '—');
   assert.equal(nodes.mailRoiDealsCount.textContent, '4');
+});
+
+test('mail ROI retries a failed central read and only then reports fresh metrics', async () => {
+  let reads = 0;
+  const client = loadDatabaseSystemMailCountClient({
+    document: { getElementById: () => null, querySelectorAll: () => [] },
+    SoftoraUiStateClient: {
+      get: async () => {
+        reads += 1;
+        if (reads === 1) throw new Error('tijdelijk niet beschikbaar');
+        return { ok: true, values: { premium_database_mail_roi_v1: '{"dealCount":4}' } };
+      },
+      set: async () => ({ ok: true }),
+    },
+    fetch: async () => ({ ok: true, json: async () => ({ ok: true, stats: { systemTotalSent: 10 } }) }),
+  });
+  await client.loadPersistedDealCount();
+  assert.equal(client.getMetricReadiness().roi, false);
+  await client.loadPersistedDealCount();
+  assert.equal(reads, 1, 'a failed read must not trigger a request on every render');
+  await client.loadPersistedDealCount({ force: true });
+  assert.equal(reads, 2);
+  assert.equal(client.getMetricReadiness().roi, true);
+  await client.refreshTodaySentCount();
+  assert.equal(client.getMetricReadiness().stats, true);
 });
 
 test('database places eight compact metrics next to filters and search on its own row', () => {
