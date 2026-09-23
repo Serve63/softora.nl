@@ -37,13 +37,13 @@ progress { display: block; width: 100%; height: 3px; appearance: none; border: 0
 progress::-webkit-progress-bar { background: var(--soft); }
 progress::-webkit-progress-value { background: var(--accent); }
 progress::-moz-progress-bar { background: var(--accent); }
-.exercise { padding: 10px 0; border-top: 1px solid var(--line); }
+.exercise { padding: 12px 0; border-top: 1px solid var(--line); }
 .exercise-top { display: flex; gap: 7px; align-items: center; }
 .number { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 5px; background: var(--soft); color: var(--accent); font-size: 8px; font-weight: 650; flex-shrink: 0; }
 .exercise h3 { font-size: 10px; letter-spacing: .1px; margin: 0; flex: 1; }
 .weight { font-size: 18px; font-weight: 700; letter-spacing: -.5px; white-space: nowrap; color: var(--accent); }
 .weight small { font-size: 9px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
-.details { margin: 3px 0 7px 27px; font-size: 9px; color: var(--muted); }
+.details { margin: 6px 0 9px; font-size: 9px; line-height: 1.4; color: var(--muted); text-align: left; }
 .sets { display: flex; gap: 6px; flex-wrap: wrap; }
 .set { flex: 1; min-width: 75px; display: flex; justify-content: center; align-items: center; gap: 6px; border: 1px solid var(--line); background: #fff; min-height: 32px; border-radius: 7px; font: inherit; font-size: 10px; color: var(--muted); cursor: pointer; }
 .tick { width: 14px; height: 14px; border: 1px solid #d7b1c2; border-radius: 4px; display: grid; place-items: center; font-size: 10px; }
@@ -66,9 +66,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .note { margin: 8px 0 2px; padding: 0; background: transparent; border-radius: 0; color: var(--ink); font-size: 11px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .exercise-photo { width: 42px; height: 42px; object-fit: cover; border-radius: 7px; border: 1px solid var(--line); flex-shrink: 0; background: var(--soft); }
-.details { margin-left: 49px; margin-top: -9px; margin-bottom: 9px; }
-.exercise-top { align-items: flex-start; }
-.exercise-top h3 { padding-top: 5px; }
 
 /* Completion is green; the full exercise changes only after every set. */
 .set[aria-pressed=true] { background: #eaf7ed; border-color: #9bcba6; color: #216b36; }
