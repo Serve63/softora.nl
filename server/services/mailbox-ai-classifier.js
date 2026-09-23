@@ -50,7 +50,7 @@ function buildRequest(source) {
       lines: contract.linesOf(source.body).map((text, line) => ({ line, text })).filter((row) => row.text.trim()), htmlEvidence: source.html }),
     text: { format: { type: 'json_schema', name: 'mailbox_presentation', strict: true, schema: SCHEMA } } };
   // Includes prompt, schema and JSON overhead. Conservative reservation: <100K input bytes
-  // plus 16384 output/reasoning tokens at Luna standard rates ($0.20/$1.20 per million).
+  // plus 16384 output/reasoning tokens at Luna 6 standard rates ($0.10/$0.50 per million).
   if (Buffer.byteLength(JSON.stringify(request)) > 100000) throw new Error('MAILBOX_AI_INPUT_LIMIT');
   return request;
 }
