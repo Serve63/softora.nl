@@ -1,12 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 
 const { createReadModelStore } = require('../../assets/premium-readmodel-store');
 
-const scriptSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-monthly-costs-dynamic.js'), 'utf8');
+const scriptPath = path.join(__dirname, '../../assets/premium-monthly-costs-dynamic.js');
 
 function createStorage() {
   const map = new Map();
@@ -27,9 +25,20 @@ function loadPage({ storage, fetchImpl }) {
     setInterval: () => 1, clearInterval() {}, setTimeout: () => 1, clearTimeout() {}, addEventListener() {},
   };
   const document = { readyState: 'complete', hidden: false, addEventListener() {} };
-  vm.runInNewContext(scriptSource, { window, document, URL, fetch: fetchImpl, console: { warn() {}, error() {}, log() {} } });
+  // The browser script reads window, document and fetch as globals; they stay
+  // in place until the test ends because the live read resolves later.
+  Object.assign(globalThis, { window, document, fetch: fetchImpl });
+  delete require.cache[require.resolve(scriptPath)];
+  require(scriptPath);
   return { item: data['Totale kosten:'][0], renders };
 }
+
+const originalGlobals = { window: globalThis.window, document: globalThis.document, fetch: globalThis.fetch };
+test.afterEach(() => {
+  for (const [name, value] of Object.entries(originalGlobals)) {
+    if (value === undefined) delete globalThis[name]; else globalThis[name] = value;
+  }
+});
 
 const livePayload = { ok: true, summary: { costEur: 46.18, exact: false, addons: 1, baseCostLinked: true } };
 
