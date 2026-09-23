@@ -9,14 +9,25 @@ const scriptSource = fs.readFileSync(path.join(repoRoot, 'assets/premium-samenva
 const styleSource = fs.readFileSync(path.join(repoRoot, 'assets/premium-samenvatten.css'), 'utf8');
 
 test('Samenvatten toont de complete audio-upload en lege resultaatinterface', () => {
-  assert.match(pageSource, /<h1>Samenvatten<\/h1>/);
+  assert.match(pageSource, /<h1 class="page-title">Samenvatten<\/h1>/);
+  assert.match(pageSource, /<p class="page-subtitle">Zet een lang audiogesprek/);
+  assert.match(pageSource, /assets\/fonts\.css/);
   assert.match(pageSource, /id="audioFileInput"[\s\S]*accept="audio\/\*,\.mp3,\.m4a,\.wav,\.aac,\.ogg"/);
   assert.match(pageSource, /Sleep je audiobestand hierheen/);
   assert.match(pageSource, /id="summarizeButton"[^>]*disabled/);
   assert.match(pageSource, /Nog geen samenvatting/);
   assert.match(pageSource, /je bestand verlaat de browser niet/);
-  assert.match(pageSource, /assets\/premium-samenvatten\.css\?v=20260820a/);
+  assert.match(pageSource, /assets\/premium-samenvatten\.css\?v=20260923a/);
   assert.match(pageSource, /assets\/premium-samenvatten\.js\?v=20260820a/);
+});
+
+test('Samenvatten gebruikt de gedeelde titel, lettertypen en achtergrond van personeelspagina’s', () => {
+  const themeSource = fs.readFileSync(path.join(repoRoot, 'assets/personnel-theme.css'), 'utf8');
+  assert.match(themeSource, /--sidebar-page-title-size:\s*2rem/);
+  assert.match(themeSource, /\.dashboard-layout\[data-sidebar-shell="canonical"\][^\{]*:is\(\.page-title,[^\{]*\{[^}]*font-size:\s*var\(--sidebar-page-title-size\)/s);
+  assert.match(styleSource, /body\[data-summarize-page\]\s*\{[^}]*background:\s*var\(--bg-primary\)/s);
+  assert.match(styleSource, /\.summarize-shell\s*\{[^}]*width:\s*min\(var\(--sidebar-shell-max-width\), 100%\)/s);
+  assert.doesNotMatch(styleSource, /\.summarize-header\s+h1\s*\{|summarize-eyebrow|radial-gradient/);
 });
 
 test('Samenvatten ondersteunt lokale bestandsselectie zonder upload of AI-aanroep', () => {
