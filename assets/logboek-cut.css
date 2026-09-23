@@ -33,6 +33,7 @@ nav { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin: 8px
 h2 { font-size: clamp(26px, 3vw, 38px); line-height: 1.08; letter-spacing: -.05em; margin: 0 0 4px; }
 .exercise { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, .8fr); column-gap: 32px; align-items: center; margin-inline: calc(-1 * var(--row-gutter)); padding: 22px var(--row-gutter); }
 .exercise::before { content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%); border-top: 1px solid var(--line); pointer-events: none; }
+.exercise:last-child::before { border-bottom: 1px solid var(--line); }
 .exercise-top { display: flex; gap: 11px; align-items: center; min-width: 0; grid-column: 1; grid-row: 1; }
 .number { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 5px; background: var(--soft); color: var(--accent); font-size: 8px; font-weight: 650; flex-shrink: 0; }
 .exercise h3 { font-size: 14px; letter-spacing: .1px; margin: 0; flex: 1; min-width: 0; }

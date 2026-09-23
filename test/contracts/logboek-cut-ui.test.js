@@ -51,6 +51,7 @@ test('completed exercise fill and separators reach the full screen width', () =>
   assert.ok(row);
   assert.match(row, /width:\s*100vw/);
   assert.match(row, /border-top:\s*1px solid var\(--line\)/);
+  assert.match(css, /\.exercise:last-child::before\s*\{[^}]*border-bottom:\s*1px solid var\(--line\)/);
   assert.match(css, /\.app\s*\{[^}]*overflow-x:\s*clip/);
   assert.ok(complete);
   assert.match(complete, /background:\s*#edf8ef/);
