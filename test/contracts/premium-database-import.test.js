@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { gunzipSync } = require('node:zlib');
 
 const {
   createPremiumDatabaseImportCoordinator,
@@ -15,6 +16,7 @@ const {
   parseSpreadsheetUpload,
 } = require('../../server/services/premium-database-import');
 const { createPremiumDatabaseCustomersPageCoordinator } = require('../../server/services/premium-database-customers-page');
+const { createPremiumDatabaseCustomersArchiveResponder } = require('../../server/services/premium-database-customers-archive');
 const { registerPremiumDatabaseImportRoutes } = require('../../server/routes/premium-database-import');
 
 function createStoredZip(files) {
@@ -88,6 +90,10 @@ function createMockResponse() {
       this.body = payload;
       return this;
     },
+    end(payload) {
+      this.body = payload;
+      return this;
+    },
   };
 }
 
@@ -95,8 +101,9 @@ test('premium database archive requires the premium access guard before serving 
   const routes = new Map();
   const app = { post() {}, get(path, ...handlers) { routes.set(path, handlers); } };
   let archiveReads = 0;
+  let customerArchiveReads = 0;
   registerPremiumDatabaseImportRoutes(app, {
-    coordinator: {}, customersPageCoordinator: {},
+    coordinator: {}, customersPageCoordinator: { sendCustomersArchiveResponse() { customerArchiveReads += 1; } },
     mailReadySnapshotService: { sendMailReadySnapshotArchiveResponse() { archiveReads += 1; } },
     requirePremiumApiAccess(_req, res, next) {
       if (!res.allowed) return res.status(401).json({ ok: false });
@@ -113,6 +120,11 @@ test('premium database archive requires the premium access guard before serving 
   allowed.allowed = true;
   guard({}, allowed, () => handler({}, allowed));
   assert.equal(archiveReads, 1);
+  const [customerGuard, customerHandler] = routes.get('/api/premium-database/customers/archive');
+  customerGuard({}, denied, () => customerHandler({}, denied));
+  assert.equal(customerArchiveReads, 0);
+  customerGuard({}, allowed, () => customerHandler({}, allowed));
+  assert.equal(customerArchiveReads, 1);
 });
 
 function escapeXml(value) {
@@ -419,6 +431,52 @@ test('premium database customer route returns a bounded structured page', async 
   assert.equal(calls[0].limit, '750');
   assert.equal(calls[0].metaOnly, false);
   assert.equal(calls[0].suppressTransientReadFailureLog, false);
+});
+
+test('premium database customer archive transfers every verified row in one private response', async () => {
+  const customers = Array.from({ length: 2001 }, (_row, index) => ({ id: `customer-${index}`, bedrijf: `Bedrijf ${index}` }));
+  const calls = [];
+  const responder = createPremiumDatabaseCustomersArchiveResponder({
+    dataOpsStore: { async listCustomersPage(options) {
+      calls.push(options);
+      return { customers: options.metaOnly ? [] : customers.slice(options.offset, options.offset + options.limit),
+        total: customers.length, snapshotVersion: '2001:v1' };
+    } },
+    logger: { info() {}, warn() {} },
+  });
+  const response = createMockResponse();
+
+  await responder({}, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['Cache-Control'], 'private, no-store, max-age=0');
+  assert.equal(response.headers['Content-Encoding'], 'gzip');
+  assert.equal(Number(response.headers['Content-Length']), response.body.length);
+  const payload = JSON.parse(gunzipSync(response.body).toString('utf8'));
+  assert.equal(payload.completeDataset, true);
+  assert.equal(payload.total, 2001);
+  assert.equal(payload.customers.length, 2001);
+  assert.deepEqual(payload.customers.map((customer) => customer.id), customers.map((customer) => customer.id));
+  assert.deepEqual(calls.map((call) => call.metaOnly ? 'meta' : call.offset).sort(), [0, 1000, 2000, 'meta'].sort());
+});
+
+test('premium database customer archive refuses stale or incomplete data', async () => {
+  for (const variant of ['stale', 'duplicate']) {
+    const responder = createPremiumDatabaseCustomersArchiveResponder({
+      dataOpsStore: { async listCustomersPage(options) {
+        if (options.metaOnly) return { customers: [], total: 2,
+          snapshotVersion: variant === 'stale' ? '2:v2' : '2:v1' };
+        return { customers: variant === 'duplicate' ? [{ id: 'same' }, { id: 'same' }] : [{ id: 'one' }, { id: 'two' }],
+          total: 2, snapshotVersion: '2:v1' };
+      } },
+      logger: { info() {}, warn() {} },
+    });
+    const response = createMockResponse();
+    await responder({}, response);
+    assert.equal(response.statusCode, 503);
+    assert.equal(response.body.ok, false);
+    assert.equal(response.headers['Content-Encoding'], undefined);
+  }
 });
 
 test('premium database customer route returns the complete canonical client view', async () => {
@@ -1675,6 +1733,7 @@ test('premium database import route is registered behind the premium api surface
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/delete-lead'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/remove-webdesign-assets', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/customers', requirePremiumApiAccess/);
+  assert.match(routeSource, /app\.get\('\/api\/premium-database\/customers\/archive', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/mail-ready-snapshot\/archive', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/mail-ready-snapshot'/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/deep-search-estimate'/);
