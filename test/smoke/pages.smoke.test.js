@@ -49,10 +49,10 @@ const unlockedPublicSeoPaths = [
   '/over-softora',
 ];
 
-const unbuiltHomepageServicePaths = ['/voicesoftware', '/chatbot'];
+const unmappedServiceShortPaths = ['/voicesoftware', '/chatbot'];
 
-for (const pathName of unbuiltHomepageServicePaths) {
-  test(`page smoke: ${pathName} blijft een losse, nog ongebouwde pagina`, async () => {
+for (const pathName of unmappedServiceShortPaths) {
+  test(`page smoke: ${pathName} is geen publieke dienstenroute`, async () => {
     const response = await fetch(`${serverRef.baseUrl}${pathName}`, { cache: 'no-store', redirect: 'manual' });
     const body = await response.text();
 
