@@ -21,7 +21,7 @@ const pageSmokeTargets = Object.freeze([
   { path: '/chatbot-laten-maken', marker: 'Chatbot op maat' },
   { path: '/website-laten-maken', marker: 'Website laten maken' },
   { path: '/blog', marker: 'Artikelen over websites, software en AI groei' },
-  { path: '/logboek-cut', marker: 'Training voltooid:' },
+  { path: '/logboek-cut', marker: 'id="day-title"' },
   { path: '/kennisbank', marker: 'Heldere uitleg voor betere digitale keuzes' },
   { path: '/premium-personeel-login', marker: 'Softora | Personeel Login' },
   { path: '/premium-personeel-dashboard', marker: 'Softora | Dashboard', allowLoginFallback: true },
