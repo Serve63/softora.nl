@@ -3,6 +3,7 @@ const DEFAULT_RESERVATION_TTL_MS = 2 * 60 * 60 * 1000;
 const SUPPRESSION_READ_TIMEOUT_MS = 8000;
 const SUPPRESSION_READ_MAX_ATTEMPTS = 2;
 const MAX_EXACT_RECIPIENT_EMAIL_FILTERS = 100;
+const COMPLETE_READ_CONCURRENCY = 3;
 const HISTORICAL_MAILBOX_LEDGER_GUARD_KEY = 'system:mailbox-outbound-ledger-v1';
 const PERSONAL_MAILBOX_DOMAINS = new Set([
   'gmail.com',
@@ -457,19 +458,50 @@ function createOutboundRecipientGuardStore(deps = {}) {
     const pageSize = Math.min(1000, maxRows);
     const firstQuery = buildQuery();
     if (firstQuery && typeof firstQuery.range === 'function') {
-      for (let from = 0; from < maxRows; from += pageSize) {
-        const to = Math.min(maxRows - 1, from + pageSize - 1);
-        const { data, error, count } = await buildQuery().range(from, to);
-        if (error) throw error;
-        if (hasRecipientEmailFilter || options.requireComplete) {
-          const parsedCount = count === null || count === undefined ? Number.NaN : Number(count);
-          if (!Number.isFinite(parsedCount)
-            || (exactResultCount !== null && exactResultCount !== parsedCount)) return null;
-          exactResultCount = parsedCount;
+      if (status === 'sent' && options.requireComplete && !hasRecipientEmailFilter) {
+        const readPage = async (from) => {
+          const to = Math.min(maxRows - 1, from + pageSize - 1);
+          const { data, error, count } = await buildQuery().range(from, to);
+          if (error) throw error;
+          const total = count === null || count === undefined ? Number.NaN : Number(count);
+          if (!Number.isInteger(total) || total < 0 || total >= maxRows || !Array.isArray(data)
+            || data.length !== Math.min(pageSize, Math.max(0, total - from))) {
+            throw new Error('Central recipient read incomplete');
+          }
+          return { rows: data, total };
+        };
+        const first = await readPage(0);
+        exactResultCount = first.total;
+        rows.push(...first.rows);
+        const offsets = [];
+        for (let from = pageSize; from < exactResultCount; from += pageSize) offsets.push(from);
+        const pages = new Map();
+        let cursor = 0;
+        async function worker() {
+          while (cursor < offsets.length) {
+            const from = offsets[cursor++];
+            const page = await readPage(from);
+            if (page.total !== exactResultCount) throw new Error('Central recipient read changed during pagination');
+            pages.set(from, page.rows);
+          }
         }
-        const pageRows = Array.isArray(data) ? data : [];
-        rows.push(...pageRows);
-        if (pageRows.length < pageSize) break;
+        await Promise.all(Array.from({ length: Math.min(COMPLETE_READ_CONCURRENCY, offsets.length) }, worker));
+        for (const from of offsets) rows.push(...pages.get(from));
+      } else {
+        for (let from = 0; from < maxRows; from += pageSize) {
+          const to = Math.min(maxRows - 1, from + pageSize - 1);
+          const { data, error, count } = await buildQuery().range(from, to);
+          if (error) throw error;
+          if (hasRecipientEmailFilter || options.requireComplete) {
+            const parsedCount = count === null || count === undefined ? Number.NaN : Number(count);
+            if (!Number.isFinite(parsedCount)
+              || (exactResultCount !== null && exactResultCount !== parsedCount)) return null;
+            exactResultCount = parsedCount;
+          }
+          const pageRows = Array.isArray(data) ? data : [];
+          rows.push(...pageRows);
+          if (pageRows.length < pageSize) break;
+        }
       }
     } else {
       const query = firstQuery && typeof firstQuery.limit === 'function' ? firstQuery.limit(maxRows) : firstQuery;

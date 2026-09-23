@@ -613,6 +613,48 @@ test('outbound recipient guard store paginates sent guard rows beyond Supabase s
   );
 });
 
+test('complete sent-register pages load with bounded concurrency and reject changing totals', async () => {
+  const sentRows = Array.from({ length: 4001 }, (_, index) => ({
+    reservation_id: `reservation-${index}`,
+    guard_key: `email:lead-${String(index).padStart(4, '0')}@example.test`,
+    key_type: 'email', key_value: `lead-${index}@example.test`,
+    recipient_email: `lead-${index}@example.test`, sender_email: 'sender@softora.nl',
+    provider: 'softora', channel: 'coldmail', status: 'sent', permanent: true,
+  }));
+  let active = 0;
+  let maxActive = 0;
+  let changingTotal = false;
+  const calls = [];
+  const client = { from() { return { select() {
+    const query = {
+      eq() { return query; }, order() { return query; },
+      async range(from, to) {
+        calls.push(from);
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setImmediate(resolve));
+        active -= 1;
+        return { data: sentRows.slice(from, to + 1),
+          count: changingTotal && from === 2000 ? sentRows.length + 1 : sentRows.length, error: null };
+      },
+    };
+    return query;
+  } }; } };
+  const store = createStore(client);
+  const groups = await store.listSentRecipientGroups({
+    provider: 'softora', channel: 'coldmail', keyType: 'email', maxRows: 5000, requireComplete: true,
+  });
+  assert.equal(groups.length, sentRows.length);
+  assert.equal(groups[0].recipient_email, 'lead-0@example.test');
+  assert.equal(groups.at(-1).recipient_email, 'lead-4000@example.test');
+  assert.equal(maxActive, 3);
+  assert.deepEqual(calls, [0, 1000, 2000, 3000, 4000]);
+  changingTotal = true;
+  await assert.rejects(store.listSentRecipientGroups({
+    provider: 'softora', channel: 'coldmail', keyType: 'email', maxRows: 5000, requireComplete: true,
+  }), /changed during pagination/);
+});
+
 test('outbound recipient guard store normalizes company legal suffix punctuation like coldmail', async () => {
   const { client, calls } = createMockSupabaseClient();
   const store = createStore(client);
