@@ -46,6 +46,13 @@ test('platform architecture registry and CI gate are protected quality code', ()
   assert.match(readRepoFile('docs/quality-protocol.md'), /check:platform-architecture/);
 });
 
+test('nieuwe personeelspagina’s volgen de gedeelde kop en kleurvariabelen', () => {
+  const instructions = readRepoFile('AGENTS.md');
+  assert.match(instructions, /Nieuwe personeelspagina's gebruiken `assets\/personnel-theme\.css`, `assets\/fonts\.css`/);
+  assert.match(instructions, /`page-title`\/`page-subtitle` klassen/);
+  assert.match(instructions, /`--bg-primary`, `--text-primary`, `--sidebar-page-title-size` en `--sidebar-shell-max-width`/);
+});
+
 test('platform performance plan distinguishes lifecycle core from a migrated browser module', () => {
   const runtime = readRepoFile('assets/premium-application-runtime.js');
   const navigation = readRepoFile('assets/premium-application-navigation.js');
