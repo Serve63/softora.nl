@@ -46,7 +46,7 @@ test('fast stats refresh wins; yesterday and unproven totals never become today 
   }
 });
 
-test('complete snapshot hydrates while screen readiness waits for canonical details and photos', async () => {
+test('compact snapshot waits for canonical details and defers the boot render', async () => {
   const page = fs.readFileSync(path.join(root, 'premium-database.html'), 'utf8');
   const snapshot = deferred(), customers = deferred(), ready = deferred();
   const state = {
@@ -75,32 +75,46 @@ test('complete snapshot hydrates while screen readiness waits for canonical deta
     providerDeliverySync: Promise.resolve({ ok: true }),
   };
   assert.match(page, /window\.SoftoraDatabaseBoot\.run\(/);
-  assert.match(page, /SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(\{ renderPage: renderPage/);
-  sandbox.loadMailReadySnapshot = () => snapshotClient.loadAndPublish({
+  assert.match(page, /compactAvailableDuringBoot: options\.boot === true, deferRenderDuringBoot: options\.boot === true/);
+  sandbox.loadMailReadySnapshot = (options) => snapshotClient.loadAndPublish({
     state, renderPage: sandbox.renderPage, normalizeCustomer: (row) => row,
     applyCustomerList: (rows) => { state.klanten = rows; },
-    fetchJsonWithTimeout: () => snapshot.promise,
+    compactAvailableDuringBoot: options.boot, deferRenderDuringBoot: options.boot,
+    fetchJsonWithTimeout: (url) => { assert.match(url, /\/archive\?compact=1$/); return snapshot.promise; },
   });
   const boot = bootClient.run(sandbox);
-  snapshot.resolve({ ok: true, json: async () => ({ ok: true, total: 0, customers: [],
-    availableTotal: 1, availableCustomers: state.availableSnapshotCustomers,
+  snapshot.resolve({ ok: true, json: async () => ({ ok: true, compactAvailable: true, total: 0, customers: [],
+    availableTotal: 1, availableCustomers: [{ id: 'available-1', availableSnapshot: true }],
+    instantlyReadyTotal: 0, instantlyReadyCustomers: [], snapshotVersion: 'v1',
     foundTotal: 0, foundCustomerIds: [], generatedAt: '2026-09-08T19:00:00.000Z',
   }) });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(state.remoteCustomersLoaded, false);
   assert.equal(state.canonicalInventoryReady, true);
-  assert.ok(readyRenders > 0);
+  assert.equal(readyRenders, 0);
   assert.equal(photoReads, 0);
   assert.equal(releases, 0);
   customers.resolve(true);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(readinessCalls, 1);
+  assert.ok(readyRenders > 0);
   assert.equal(releases, 0);
   ready.resolve(true);
   await boot;
   assert.ok(releases > 0);
   assert.equal(finished, true);
   assert.equal(photoReads, 0);
+});
+
+test('compact available rows inherit canonical details and reject missing canonical rows', () => {
+  const canonical = { id: 'available-1', bedrijf: 'Bekende klant', email: 'info@example.nl', website: 'https://example.nl' };
+  const available = { id: 'available-1', availableSnapshot: true, compactAvailable: true };
+  const merged = snapshotClient.mergeWithCanonicalSnapshots([canonical], [], [available], []);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].bedrijf, canonical.bedrijf);
+  assert.equal(merged[0].email, canonical.email);
+  assert.equal(merged[0].availableSnapshot, true);
+  assert.throws(() => snapshotClient.mergeWithCanonicalSnapshots([], [], [available], []), /officiële klantdatabase/);
 });
 
 test('a valid design website is independent of email eligibility while mail readiness stays blocked', () => {

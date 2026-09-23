@@ -251,7 +251,7 @@ test('premium database consistency assets stay outside the static sidebar', () =
   assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260716a') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20260923-phase-timing') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-table-helpers.js?v=20260923-owner') > asideEnd);
-  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260923-once') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260923-compact-boot') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui') > asideEnd);
   assert.match(source, /assets\/premium-database-mail-ready-menu\.css\?v=20260914-provider/);
   assert.ok(source.indexOf('assets/premium-database-webdesign-variant-picker.js?v=20260726a') > asideEnd);
@@ -1351,10 +1351,10 @@ test('SEO uses the shared black heading and outer frame without changing the sid
 test('database loading repair keeps its premium shell and serves matching design eligibility assets', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
   assert.ok(extractSidebarLinkTargets(source).database);
-  assert.match(source, /premium-database-boot\.js\?v=20260923-ready-sync/);
+  assert.match(source, /premium-database-boot\.js\?v=20260923-compact-boot/);
   assert.match(source, /premium-database-readiness\.js\?v=20260923-ready-sync/);
   assert.match(source, /premium-database-system-mail-count\.js\?v=20260923-fresh-stats/);
-  assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260923-once/);
+  assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260923-compact-boot/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(source, /premium-database-webdesign-action\.js\?v=20260921-mailready-parity/);
   assert.match(source, /premium-database-table-helpers\.js\?v=20260923-owner/);
