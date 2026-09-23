@@ -3144,7 +3144,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const databaseHasExactSnapshotCountBootstrap = [\s\S]*databaseHasFastSnapshotBootstrap = [\s\S]*initialBootstrapCustomers = resolveBootstrapCustomers\(\), databaseBootStartedAt = Date\.now\(\), databaseHadBootstrapCustomers = initialBootstrapCustomers\.length > 0, releaseDatabaseBootShell =/);
   assert.doesNotMatch(pageSource, /renderPage\(\); releaseDatabaseBootShell\(\);/);
   assert.match(pageSource, /softoraDatabaseActionsBound = 'true';[\s\S]*databaseReadiness: window\.SoftoraDatabaseReadiness/);
-  assert.match(pageSource, /premium-screen-readiness\.js\?v=20260922b/);
+  assert.match(pageSource, /premium-screen-readiness\.js\?v=20260923a/);
   assert.match(pageSource, /premium-database-readiness\.js\?v=20260923-provider-readmodel/);
   assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 0\)/);
   assert.match(webdesignActionScriptSource, /async function preloadPhotoImages\(customers, limit, timeoutMs\)/);
