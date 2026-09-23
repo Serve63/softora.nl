@@ -117,6 +117,34 @@ test('compact available rows inherit canonical details and reject missing canoni
   assert.throws(() => snapshotClient.mergeWithCanonicalSnapshots([], [], [available], []), /officiële klantdatabase/);
 });
 
+test('one photo merge preserves canonical, stored and previous media precedence', () => {
+  const customers = [
+    { id: 'stored', websitePhoto: 'https://example.nl/canonical.jpg' },
+    { id: 'previous', websitePhoto: '' },
+    { id: 'hidden', websitePhoto: 'https://example.nl/hidden.jpg' },
+  ];
+  const previous = [
+    { id: 'stored', websitePhoto: 'https://example.nl/old.jpg' },
+    { id: 'previous', websitePhoto: 'https://example.nl/previous.jpg' },
+  ];
+  const stored = {
+    stored: { websitePhoto: 'https://example.nl/stored.jpg', websiteMockup: 'https://example.nl/mockup.jpg' },
+  };
+  const helpers = {
+    normalizeCustomer: (customer) => ({ ...customer }),
+    sortCustomers: (rows) => rows,
+    shouldShowWebsitePhoto: (customer) => customer.id !== 'hidden',
+    buildCustomerIdentityKey: (customer) => customer.id,
+  };
+  const oldTwoPass = assetClient.mergeCustomersWithPhotos(customers, stored,
+    assetClient.mergeCustomersWithPhotos(customers, {}, previous, helpers), helpers);
+  const onePass = assetClient.mergeCustomersWithPhotos(customers, stored, previous, helpers);
+  assert.deepEqual(onePass, oldTwoPass);
+  assert.equal(onePass[0].websitePhoto, stored.stored.websitePhoto);
+  assert.equal(onePass[1].websitePhoto, previous[1].websitePhoto);
+  assert.equal(onePass[2].websitePhoto, '');
+});
+
 test('a valid design website is independent of email eligibility while mail readiness stays blocked', () => {
   const build = assetClient.buildWebdesignAssetState;
   const helpers = { isMailLeadEligible: () => false };
