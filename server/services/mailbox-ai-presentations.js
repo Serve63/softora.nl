@@ -49,17 +49,23 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
   async function processQueue() {
     if (!enabled() || !getOpenAiApiKey?.()) return { skipped: true, processed: 0 };
     let stage = 'recover';
+    let processed = 0;
     try {
       await repository.recover();
       stage = 'candidates';
-      const candidates = await repository.candidates();
-      stage = 'enqueue';
-      await repository.enqueue((candidates || []).map((row) => sourceFor({ body: row.body_text,
-        accountEmail: row.account_email, id: row.provider_id, messageKey: row.message_key,
-        messageId: row.message_id, from: row.sender_name || row.sender_email || 'Onbekend', email: row.sender_email,
-        folder: row.folder, direction: row.payload?.direction, sourceHtml: row.payload?.sourceHtml,
-        bodyTruncated: row.body_truncated })).filter(Boolean));
-      let processed = 0;
+      let candidatesUnavailable = false;
+      try {
+        const candidates = await repository.candidates();
+        stage = 'enqueue';
+        await repository.enqueue((candidates || []).map((row) => sourceFor({ body: row.body_text,
+          accountEmail: row.account_email, id: row.provider_id, messageKey: row.message_key,
+          messageId: row.message_id, from: row.sender_name || row.sender_email || 'Onbekend', email: row.sender_email,
+          folder: row.folder, direction: row.payload?.direction, sourceHtml: row.payload?.sourceHtml,
+          bodyTruncated: row.body_truncated })).filter(Boolean));
+      } catch (_) {
+        candidatesUnavailable = true;
+        logger.warn?.('[MailboxAI] Candidate discovery unavailable; queued jobs will continue.', { stage });
+      }
       // One wave of two: two 180s model calls remain below the 800s runtime.
       // SQL enforces the global cap across overlapping cron invocations.
       for (let wave = 0; wave < 1; wave += 1) {
@@ -87,10 +93,10 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
         }));
         if (outcomes.some((item) => item.status === 'rejected')) throw new Error('MAILBOX_AI_STORAGE_UNAVAILABLE');
       }
-      return { processed };
+      return candidatesUnavailable ? { processed, unavailable: true } : { processed };
     } catch (_) {
       logger.warn?.('[MailboxAI] Background storage unavailable; original body retained.', { stage });
-      return { processed: 0, unavailable: true };
+      return { processed, unavailable: true };
     }
   }
   return { enrich, enrichTree, enrichPayload, processQueue };
