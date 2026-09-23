@@ -564,7 +564,15 @@
 
         function resumePendingJobs() {
             const restoreFactory = global.SoftoraDatabaseWebdesignJobRestore && global.SoftoraDatabaseWebdesignJobRestore.createController;
-            if (!jobRestoreController && typeof restoreFactory === "function") jobRestoreController = restoreFactory({ load: loadRunningJobs });
+            if (!jobRestoreController && typeof restoreFactory === "function") jobRestoreController = restoreFactory({
+                load: loadRunningJobs,
+                onSuccess: function () {
+                    state.pendingJobsRestored = true;
+                    if (state.canonicalInventoryReady === true && state.photoRestorePending === false) {
+                        void global.SoftoraDatabaseReadiness?.publish({ state: state });
+                    }
+                }
+            });
             const firstLoad = jobRestoreController ? jobRestoreController.run() : loadRunningJobs().catch(function () { return null; });
             void resumeBulkBatch();
             return firstLoad;

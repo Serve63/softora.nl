@@ -5,6 +5,7 @@
 
     function createController(options) {
         const load = options && typeof options.load === "function" ? options.load : async function () {};
+        const onSuccess = options && typeof options.onSuccess === "function" ? options.onSuccess : function () {};
         const setTimeoutImpl = options && typeof options.setTimeout === "function" ? options.setTimeout : global.setTimeout;
         const clearTimeoutImpl = options && typeof options.clearTimeout === "function" ? options.clearTimeout : global.clearTimeout;
         let retryTimer = null;
@@ -34,6 +35,7 @@
                 .then(load)
                 .then(function (result) {
                     clearRetry();
+                    onSuccess(result);
                     return result;
                 })
                 .catch(function () {

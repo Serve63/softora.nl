@@ -227,7 +227,8 @@ function loadDatabaseWebdesignActionClient(options = {}) {
   const windowObject = {
     document,
     SoftoraDatabasePhotoBatch: require('../../assets/premium-database-photo-batch'),
-    SoftoraDatabaseWebdesignJobRestore: require('../../assets/premium-database-webdesign-job-restore'),
+    SoftoraDatabaseWebdesignJobRestore: options.SoftoraDatabaseWebdesignJobRestore || require('../../assets/premium-database-webdesign-job-restore'),
+    SoftoraDatabaseReadiness: options.SoftoraDatabaseReadiness,
     SoftoraDatabaseWebdesignVariantPicker: Object.prototype.hasOwnProperty.call(options, 'SoftoraDatabaseWebdesignVariantPicker')
       ? options.SoftoraDatabaseWebdesignVariantPicker
       : { choose: async () => 'v2-visual-dna' },
@@ -2665,7 +2666,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260726a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923b/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /return Promise\.resolve\(V2_VARIANT\)/);
@@ -2925,7 +2926,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   );
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260917-source/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923b/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260914-provider/);
@@ -3084,7 +3085,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260817a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923b/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeVariant\(variant\) !== "v2-visual-dna"/);
@@ -3117,7 +3118,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /fetch\(JOB_ENDPOINT,/);
   assert.doesNotMatch(webdesignActionScriptSource, /localStorage/);
   assert.doesNotMatch(webdesignActionScriptSource, /sessionStorage/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-job-restore\.js\?v=20260723a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-job-restore\.js\?v=20260923a/);
   assert.match(webdesignActionScriptSource, /queueFinishedPhotoRefresh\(pendingJob\.customerId\)/);
   assert.match(pageSource, /window\.SoftoraDatabaseWebdesignMockup\.createController\(\{/);
   assert.match(pageSource, /ensureMockupForCustomer: function \(customerId, ensureOptions\)/);
@@ -3125,7 +3126,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
   assert.match(pageSource, /assets\/premium-database-instantly-status\.js\?v=20260923-current-campaigns/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923b/);
   assert.doesNotMatch(webdesignActionScriptSource, /webdesigns klaar en naar Mailklaar verplaatst|Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(webdesignActionScriptSource, /costReporter\.consume\(customerIds\)/);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \}; const databaseSortedLists = window\.SoftoraDatabaseSortedLists\.create/);
@@ -4066,8 +4067,10 @@ test('premium database webdesign action restores large running job lists without
 test('premium database webdesign job restore retries a temporary status failure without parallel requests', async () => {
   const timers = [];
   let attempts = 0;
+  const recovered = [];
   const restoreClient = loadDatabaseWebdesignJobRestoreClient();
   const controller = restoreClient.createController({
+    onSuccess(value) { recovered.push(value); },
     setTimeout(callback, delay) {
       const timer = { callback, delay };
       timers.push(timer);
@@ -4088,6 +4091,7 @@ test('premium database webdesign job restore retries a temporary status failure 
   assert.equal(controller.run(), first, 'concurrent restore calls should share one request');
   assert.equal(await first, null);
   assert.equal(attempts, 1);
+  assert.deepEqual(recovered, []);
   assert.equal(timers.length, 1);
   assert.equal(timers[0].delay, 2000);
 
@@ -4096,6 +4100,43 @@ test('premium database webdesign job restore retries a temporary status failure 
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(attempts, 2);
   assert.equal(timers.length, 0);
+  assert.deepEqual(recovered, [['hersteld']]);
+});
+
+test('a recovered photo-job read republishes full database readiness after boot', async () => {
+  let notifySuccess;
+  let published = 0;
+  const state = { klanten: [], canonicalInventoryReady: true, photoRestorePending: false, pendingJobsRestored: false };
+  const action = loadDatabaseWebdesignActionClient({
+    SoftoraDatabaseWebdesignJobRestore: {
+      createController(options) {
+        notifySuccess = options.onSuccess;
+        return { run: async () => null };
+      },
+    },
+    SoftoraDatabaseReadiness: { publish: async ({ state: current }) => {
+      assert.equal(current, state);
+      published += 1;
+    } },
+  });
+  const controller = action.createController({
+    state,
+    escapeHtml: String,
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: () => false,
+    resolveCustomerWebsiteUrl: () => '',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage() {},
+    renderPage() {},
+    refreshPhotos: async () => {},
+  });
+  await controller.resumePendingJobs();
+  assert.equal(state.pendingJobsRestored, false);
+  notifySuccess();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(state.pendingJobsRestored, true);
+  assert.equal(published, 1);
 });
 
 test('premium database webdesign bulk restores the progress bar from the running server batch list', async () => {
