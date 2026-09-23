@@ -409,6 +409,14 @@ function createPremiumAuthStateManager(options = {}) {
         return true;
       }
       if (
+        (requestPath === '/api/kvk-database/api-workers/poll' ||
+          requestPath === '/api/kvk-database/api-workers/report' ||
+          requestPath === '/api/kvk-database/api-workers/research') &&
+        method === 'POST'
+      ) {
+        return true;
+      }
+      if (
         requestPath === '/api/twilio/voice' &&
         (method === 'GET' || method === 'POST')
       ) {

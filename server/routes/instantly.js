@@ -15,7 +15,9 @@ function registerInstantlyRoutes(app, deps = {}) {
       headers: { Authorization: `Bearer ${secret}`, Origin: 'https://www.softora.nl', 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'auto' }),
       redirect: 'error',
-      signal: AbortSignal.timeout(120_000),
+      // The canonical POST processes a bounded batch and may finish a final
+      // in-flight lead after its 90-second loop budget.
+      signal: AbortSignal.timeout(180_000),
     }),
   } = deps;
 

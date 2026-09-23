@@ -3,6 +3,7 @@
 
     const BATCH_ENDPOINT = "/api/premium-database/webdesign-photo-batches";
     const RUN_ENDPOINT = "/api/premium-database/webdesign-photo-batches/run";
+    const INSTANTLY_UPLOAD_ENDPOINT = "/api/outreach/provider-upload";
     const BULK_POLL_INTERVAL_MS = 1200;
     const WORKER_KICK_INTERVAL_MS = 8000;
     const BULK_UPLOAD_CHUNK_SIZE = 100;
@@ -55,7 +56,46 @@
         let activeBatchId = "", visibleBatchId = "", visibleBatchStatus = "", pollTimer = null, pollInFlight = false, latestMade = 0, refreshQueued = false, workerKickInFlight = false, lastWorkerKickAt = 0, cancelInFlight = false, restoreRetryTimer = null, restoreRetryAttempt = 0, restoreInFlight = false;
         const cancelledBatchIds = new Set();
         const dismissedBatchIds = new Set();
+        const uploadTriggeredBatchIds = new Set();
+        let uploadKickRunning = false, uploadKickPending = false;
         ensureStyles();
+
+        async function drainInstantlyUpload() {
+            if (uploadKickRunning || typeof fetch !== "function") return;
+            uploadKickRunning = true;
+            try {
+                while (uploadKickPending) {
+                    uploadKickPending = false;
+                    let hasMore = true;
+                    while (hasMore) {
+                        const response = await fetch(INSTANTLY_UPLOAD_ENDPOINT, {
+                            method: "POST", credentials: "same-origin", cache: "no-store",
+                            headers: { "Content-Type": "application/json", Accept: "application/json" },
+                            body: JSON.stringify({ mode: "auto" })
+                        });
+                        const payload = await readJson(response);
+                        // On failure or an ambiguous provider result, let the
+                        // existing cron reconcile; never blindly retry here.
+                        if (!response.ok || !payload || payload.ok !== true) return;
+                        hasMore = payload.hasMore === true;
+                    }
+                }
+            } catch (_) {
+                // The authenticated cron is the durable fallback if the tab
+                // closes or the browser request fails.
+            } finally {
+                uploadKickRunning = false;
+            }
+        }
+
+        function kickInstantlyUpload(batch) {
+            const id = normalizeString(batch && batch.id);
+            const made = Math.max(0, Number(batch && (batch.made || batch.done)) || 0);
+            if (!id || !made || uploadTriggeredBatchIds.has(id)) return;
+            uploadTriggeredBatchIds.add(id);
+            uploadKickPending = true;
+            void drainInstantlyUpload();
+        }
 
         function ensureStatusNode() {
             if (!global.document) return null;
@@ -306,6 +346,7 @@
             if (!batch || !batch.id) return;
             const batchId = normalizeString(batch.id);
             const status = normalizeString(batch.status).toLowerCase();
+            if (isTerminalBatchStatus(status) && status !== "cancelled") kickInstantlyUpload(batch);
             if (isCancelledBatch(batchId) || isDismissedBatch(batchId)) {
                 queuePhotoRefresh(batch);
                 hideStatus();
