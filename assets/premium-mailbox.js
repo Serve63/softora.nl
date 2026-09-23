@@ -22,50 +22,10 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
-function countCharacter(value, character) { return String(value || '').split(character).length - 1; }
-function splitUrlTrailingPunctuation(value) {
-  let url = String(value || '');
-  let suffix = '';
-  while (url) {
-    const last = url.slice(-1);
-    if (!/[.,!?;:)\]]/.test(last)) break;
-    if (last === ')' && countCharacter(url, ')') <= countCharacter(url, '(')) break;
-    if (last === ']' && countCharacter(url, ']') <= countCharacter(url, '[')) break;
-    suffix = last + suffix;
-    url = url.slice(0, -1);
-  }
-  return { url, suffix };
-}
-function isSafeMailBodyUrl(value) {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch (_) {
-    return false;
-  }
-}
-function renderMailboxUrls(value) {
-  const text = String(value == null ? '' : value);
-  let html = '';
-  let lastIndex = 0;
-  text.replace(MAIL_BODY_URL_PATTERN, (match, offset) => {
-    const { url, suffix } = splitUrlTrailingPunctuation(match);
-    html += escapeHtml(text.slice(lastIndex, offset));
-    if (url && isSafeMailBodyUrl(url)) {
-      html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>${escapeHtml(suffix)}`;
-    } else {
-      html += escapeHtml(match);
-    }
-    lastIndex = offset + match.length;
-    return match;
-  });
-  html += escapeHtml(text.slice(lastIndex));
-  return html;
-}
 function renderLinkedMailboxText(value, options) {
   return window.SoftoraMailboxDisplay.renderLinkedMailboxText(value, options, {
-    escapeHtml, isSafeUrl: isSafeMailBodyUrl, renderUrls: renderMailboxUrls,
+    escapeHtml, isSafeUrl: window.SoftoraMailboxDisplay.isSafeMailBodyUrl,
+    renderUrls: (text) => window.SoftoraMailboxDisplay.renderMailboxUrls(text, escapeHtml),
   });
 }
 function normalizeMailboxEmail(value) { return String(value || '').trim().toLowerCase(); }
@@ -1163,10 +1123,9 @@ window.addEventListener('keydown', (event) => {
     if (intent.account) activeMailboxAccount = intent.account;
     const initialFolder = String(intent.folder || 'outreach').trim().toLowerCase() || 'outreach';
     if (initialFolder === 'outreach') {
-      activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder); const accountLoad = loadMailboxAccounts();
+      activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder); const accountsReady = await loadMailboxAccounts();
       setMailboxAccountUi(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT); resetDetailEmpty();
       const messagesReady = await loadMailboxMessages({ openLatest: !(intent.message || intent.email || intent.query), waitForDetail: true });
-      const accountsReady = await accountLoad;
       bootReady = messagesReady === true && accountsReady === true;
       return;
     }
@@ -1185,10 +1144,12 @@ window.addEventListener('keydown', (event) => {
   } finally {
     const readiness = window.SoftoraScreenReadiness;
     if (bootReady) {
-      const ready = await readiness?.markReady?.({
-        page: 'premium-mailbox', requiredData: { mailbox: true, accounts: true }, actionsBound: true,
-        requiredActions: ['#mail-items', '#mail-detail', '#mailbox-account-switcher'],
-        requiredImages: document.querySelectorAll('#mail-detail img'),
+      const ready = await window.SoftoraMailboxBootReadiness?.publish?.({
+        folder: activeFolder, selectedId: activeMail, mail: findMailById(activeMail), detail: document.getElementById('mail-detail'),
+        contactDossierActive: window.SoftoraMailboxDiscovery?.getContactDossier?.(findMailById(activeMail), {
+          activeFolder, accountEmails: getMailboxAccountEmails(),
+        })?.active === true,
+        readiness, document,
       });
       if (ready !== true) readiness?.markDegraded?.({ page: 'premium-mailbox', reason: 'mailbox-readiness-incomplete' });
     } else readiness?.markDegraded?.({ page: 'premium-mailbox', reason: 'mailbox-data-incomplete' });

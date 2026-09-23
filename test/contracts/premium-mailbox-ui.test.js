@@ -64,6 +64,7 @@ const uiStateModule = require('../../assets/premium-mailbox-ui-state.js');
 const bodySectionModule = require('../../assets/premium-mailbox-body-section.js');
 const detailStateModule = require('../../assets/premium-mailbox-detail-state.js');
 const detailStabilityModule = require('../../assets/premium-mailbox-detail-stability.js');
+const mailboxBootReadiness = require('../../assets/premium-mailbox-boot-readiness.js');
 const discoveryModule = require('../../assets/premium-mailbox-discovery.js');
 
 function readPage() {
@@ -201,7 +202,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
-  assert.match(page, /assets\/premium-mailbox\.js\?v=20260923b/);
+  assert.match(page, /assets\/premium-mailbox\.js\?v=20260923c/);
   assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260907b/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260826a/);
@@ -332,6 +333,7 @@ test('mailbox toont de gekozen eigenaar zwart in de topbar', () => {
 test('mailbox initialiseert met de opgeslagen eigenaar en toont geen verkeerde scope tijdens boot', () => {
   const pageSource = readPage();
   const scriptSource = readScript();
+  const readinessSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-boot-readiness.js'), 'utf8');
   const stabilitySource = readDetailStabilityScript();
   const campaignSource = readCampaignInboxScript();
   assert.match(campaignSource, /SoftoraMailboxOwnerPreference/);
@@ -339,9 +341,12 @@ test('mailbox initialiseert met de opgeslagen eigenaar en toont geen verkeerde s
   assert.match(scriptSource, /SoftoraMailboxBoot\?\.markReady\?\.\(\);/);
   assert.doesNotMatch(scriptSource, /mailboxBootDetailPromise|await firstDetail/);
   assert.match(pageSource, /assets\/premium-screen-readiness\.js\?v=20260922b/);
+  assert.match(pageSource, /assets\/premium-mailbox-boot-readiness\.js\?v=20260923a/);
   assert.match(scriptSource, /const messagesReady = await loadMailboxMessages\(\{ openLatest: !\(intent\.message \|\| intent\.email \|\| intent\.query\), waitForDetail: true \}\);/);
-  assert.match(scriptSource, /const accountsReady = await accountLoad;\s*bootReady = messagesReady === true && accountsReady === true;/);
-  assert.match(scriptSource, /requiredImages: document\.querySelectorAll\('#mail-detail img'\)/);
+  assert.match(scriptSource, /const accountsReady = await loadMailboxAccounts\(\);[\s\S]*const messagesReady = await loadMailboxMessages\([\s\S]*bootReady = messagesReady === true && accountsReady === true;/);
+  assert.match(readinessSource, /requiredImages: document\?\.querySelectorAll\?\.\('#mail-detail img'\)/);
+  assert.match(readinessSource, /mailbox: true, accounts: true, \.\.\.assess\(/);
+  assert.match(scriptSource, /SoftoraMailboxBootReadiness\?\.publish\?\.\(/);
   assert.match(scriptSource, /if \(ready !== true\) readiness\?\.markDegraded\?/);
   assert.match(scriptSource, /loadMailboxMessages\(\{ openLatest: !\(intent\.message \|\| intent\.email \|\| intent\.query\), waitForDetail: true \}\)/);
   assert.match(stabilitySource, /setAttribute\?\.\('inert', ''\)/);
@@ -350,6 +355,45 @@ test('mailbox initialiseert met de opgeslagen eigenaar en toont geen verkeerde s
   assert.match(scriptSource, /deferPostBootstrapRead: true/);
   assert.match(fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-boot.js'), 'utf8'), /if \(!ready\) return;/);
   assert.match(pageSource, /main\.is-premium-boot-host > \.premium-boot-shell\.is-booting \{ visibility: hidden; \}/);
+});
+
+test('mailbox boot readiness waits for the selected body and contact dossier', async () => {
+  const mail = { id: 'm1', bodyLoaded: true, contactTimelineLoaded: true,
+    contactTimelineTotal: 2, externalContactEmail: 'contact@example.nl' };
+  let summaryComplete = true;
+  const detail = { dataset: { mailboxCommittedId: 'm1' }, querySelector: () => summaryComplete ? {} : null };
+  const assess = (folder = 'outreach') => mailboxBootReadiness.assess({ folder, selectedId: 'm1', mail, detail, contactDossierActive: true });
+  assert.deepEqual(assess(), { selectedDetail: true, contactTimeline: true });
+  summaryComplete = false;
+  assert.equal(assess().contactTimeline, false);
+  summaryComplete = true;
+  mail.contactTimelineLoaded = false;
+  assert.equal(assess().contactTimeline, false);
+  mail.contactTimelineLoaded = true;
+  mail.contactTimelineNeedsRefresh = true;
+  assert.equal(assess().contactTimeline, false);
+  mail.contactTimelineNeedsRefresh = false;
+  mail.bodyLoaded = false;
+  assert.equal(assess().selectedDetail, false);
+  mail.bodyLoaded = true;
+  detail.dataset.mailboxCommittedId = 'older-selection';
+  assert.equal(assess().selectedDetail, false);
+  assert.equal(assess('inbox').contactTimeline, true);
+  assert.equal(mailboxBootReadiness.assess({ folder: 'outreach', selectedId: 'm1', mail, detail, contactDossierActive: false }).contactTimeline, true);
+  assert.deepEqual(mailboxBootReadiness.assess({ selectedId: '' }), { selectedDetail: true, contactTimeline: true });
+  detail.dataset.mailboxCommittedId = 'm1';
+  const image = { src: '/attachment.png' };
+  let payload;
+  const readiness = { markReady: async (input) => {
+    payload = input;
+    return Object.values(input.requiredData).every(Boolean);
+  } };
+  const document = { querySelectorAll: () => [image] };
+  assert.equal(await mailboxBootReadiness.publish({ folder: 'outreach', selectedId: 'm1', mail, detail, contactDossierActive: true, readiness, document }), true);
+  assert.deepEqual(payload.requiredImages, [image]);
+  mail.contactTimelineNeedsRefresh = true;
+  assert.equal(await mailboxBootReadiness.publish({ folder: 'outreach', selectedId: 'm1', mail, detail, contactDossierActive: true, readiness, document }), false);
+  assert.equal(payload.requiredData.contactTimeline, false);
 });
 
 test('detailstabiliteit hergebruikt dezelfde loader-run en commit pas na hydrate en prepare', async () => {
@@ -4667,7 +4711,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260923b/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260923c/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260910a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260923a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260921c/);
@@ -4768,7 +4812,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260923a/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260923b/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260923c/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -10040,7 +10084,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
   assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260907b/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20260923b/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20260923c/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);
@@ -10262,12 +10306,12 @@ test('premium mailbox maakt veilige links in mailtekst klikbaar', () => {
     '<script>alert("xss")</script>',
   ].join('\n'));
 
-  assert.match(scriptSource, /const MAIL_BODY_URL_PATTERN = \/https\?:\\\/\\\/\[\^\\s<>"'\]\+\/gi;/);
+  assert.match(readDisplayScript(), /const MAIL_BODY_URL_PATTERN = \/https\?:\\\/\\\/\[\^\\s<>"'\]\+\/gi;/);
   assert.match(readDisplayScript(), /const SENDER_CTA_LINKS = Object\.freeze\(\{\}\);/);
   assert.match(readDisplayScript(), /function getSenderCtaLink\(options\)/);
-  assert.match(scriptSource, /function isSafeMailBodyUrl\(value\)/);
-  assert.match(scriptSource, /const parsed = new URL\(value\);/);
-  assert.match(scriptSource, /parsed\.protocol === 'http:' \|\| parsed\.protocol === 'https:';/);
+  assert.match(readDisplayScript(), /function isSafeMailBodyUrl\(value\)/);
+  assert.match(readDisplayScript(), /const parsed = new URL\(value\);/);
+  assert.match(readDisplayScript(), /parsed\.protocol === 'http:' \|\| parsed\.protocol === 'https:';/);
   assert.match(html, /<a href="https:\/\/dashboard\.render\.com\/email-reset\/confirm\?token=fake-token-123" target="_blank" rel="noopener noreferrer">https:\/\/dashboard\.render\.com\/email-reset\/confirm\?token=fake-token-123<\/a>\./);
   assert.match(html, /&lt;script&gt;alert\(&quot;xss&quot;\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script>/);

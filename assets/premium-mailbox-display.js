@@ -351,6 +351,48 @@
     return /^deze link$/i.test(normalizedLabel) ? `deze ${anchor}` : anchor;
   }
 
+const MAIL_BODY_URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
+function countCharacter(value, character) { return String(value || '').split(character).length - 1; }
+function splitUrlTrailingPunctuation(value) {
+  let url = String(value || '');
+  let suffix = '';
+  while (url) {
+    const last = url.slice(-1);
+    if (!/[.,!?;:)\]]/.test(last)) break;
+    if (last === ')' && countCharacter(url, ')') <= countCharacter(url, '(')) break;
+    if (last === ']' && countCharacter(url, ']') <= countCharacter(url, '[')) break;
+    suffix = last + suffix;
+    url = url.slice(0, -1);
+  }
+  return { url, suffix };
+}
+function isSafeMailBodyUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch (_) {
+    return false;
+  }
+}
+function renderMailboxUrls(value, escapeHtml) {
+  const text = String(value == null ? '' : value);
+  let html = '';
+  let lastIndex = 0;
+  text.replace(MAIL_BODY_URL_PATTERN, (match, offset) => {
+    const { url, suffix } = splitUrlTrailingPunctuation(match);
+    html += escapeHtml(text.slice(lastIndex, offset));
+    if (url && isSafeMailBodyUrl(url)) {
+      html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>${escapeHtml(suffix)}`;
+    } else {
+      html += escapeHtml(match);
+    }
+    lastIndex = offset + match.length;
+    return match;
+  });
+  html += escapeHtml(text.slice(lastIndex));
+  return html;
+}
+
 const MAIL_BODY_LABELLED_URL_PATTERN = /\b(deze link|hier|(?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}(?:\/[^\s\[\]<>"']*)?)\s*\[\s*(?:\[(https?:\/\/[^\]\s<>"']+)\]\((https?:\/\/[^\)\s<>"']+)\)|(https?:\/\/[^\]\s<>"']+))\s*\]/gi;
 function renderAnnotatedMailboxText(value, options, { escapeHtml, isSafeUrl: isSafeMailBodyUrl, renderUrls: renderMailboxUrls }) {
   const text = String(value == null ? '' : value);
@@ -459,6 +501,8 @@ function renderAnnotatedMailboxText(value, options, { escapeHtml, isSafeUrl: isS
     renderLabelledUrlAnchor,
     renderDetailBody,
     renderLinkedMailboxText,
+    isSafeMailBodyUrl,
+    renderMailboxUrls,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SoftoraMailboxDisplay;
 })(typeof window !== 'undefined' ? window : globalThis);
