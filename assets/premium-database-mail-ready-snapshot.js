@@ -254,6 +254,7 @@
             return mergeInstantlySnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer);
         })).concat(availableRows.map(function (snapshotCustomer) {
             const remoteMatch = findSnapshotMatch(remoteMap, snapshotCustomer);
+            if (snapshotCustomer.compactAvailable === true && !remoteMatch) throw new Error("Een beschikbare snapshotklant ontbreekt in de officiële klantdatabase.");
             if (remoteMatch) consumed.add(remoteMatch);
             return mergeSnapshotMedia(Object.assign({}, snapshotCustomer, remoteMatch || {}), snapshotCustomer, false);
         }));
@@ -366,7 +367,8 @@
     }
 
     async function fetchSnapshotArchive(config) {
-        const response = await config.fetchJsonWithTimeout(ARCHIVE_ENDPOINT, { method: "GET", cache: "no-store" }, ARCHIVE_TIMEOUT_MS);
+        const url = ARCHIVE_ENDPOINT + (config.compactAvailableDuringBoot === true ? "?compact=1" : "");
+        const response = await config.fetchJsonWithTimeout(url, { method: "GET", cache: "no-store" }, ARCHIVE_TIMEOUT_MS);
         if (!response.ok) throw new Error("Mailklare archiefrespons niet beschikbaar (" + response.status + ")");
         const payload = await response.json().catch(function () { return {}; });
         const rows = Array.isArray(payload.customers) ? payload.customers : [];
@@ -418,12 +420,13 @@
         }
         state.dataUnavailable = false;
         clearRetry(state);
-        if (typeof config.applyCustomerList === "function") {
+        const deferBootRender = config.deferRenderDuringBoot === true && state.photoRestorePending === true;
+        if (typeof config.applyCustomerList === "function" && (!deferBootRender || state.remoteCustomersLoaded === true)) {
             const currentCustomers = Array.isArray(state.klanten) ? state.klanten : [];
             const currentIsSnapshotOnly = currentCustomers.length && currentCustomers.every(function (customer) { return isSnapshotMailReadyCustomer(customer) || isSnapshotAvailableCustomer(customer) || isSnapshotInstantlyReadyCustomer(customer); });
             const hasCanonicalCustomers = currentCustomers.length > 0 && !currentIsSnapshotOnly;
             const combinedSnapshotCustomers = dedupeCustomers(snapshotCustomers.concat(availableCustomers, instantlyReadyCustomers));
-            config.applyCustomerList(hasCanonicalCustomers ? mergeWithCanonicalSnapshots(currentCustomers, snapshotCustomers, availableCustomers, instantlyReadyCustomers) : combinedSnapshotCustomers, false, hasCanonicalCustomers);
+            config.applyCustomerList(hasCanonicalCustomers ? mergeWithCanonicalSnapshots(currentCustomers, snapshotCustomers, availableCustomers, instantlyReadyCustomers) : combinedSnapshotCustomers, false, hasCanonicalCustomers, deferBootRender);
             state.canonicalSnapshotApplied = true;
             state.canonicalCountReady = true;
         }
@@ -476,7 +479,11 @@
             }
             if (!firstPage) firstPage = await fetchSnapshotPage(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS);
             let snapshotCustomers = normalizeSnapshotRows(firstPage.rows, 0, config.normalizeCustomer);
-            let availableCustomers = normalizeAvailableSnapshotRows(firstPage.availableRows, 0, config.normalizeCustomer);
+            let availableCustomers = firstPage.payload.compactAvailable === true
+                ? dedupeCustomers(firstPage.availableRows.map(function (row) {
+                    return { id: String(row && row.id || "").trim(), availableSnapshot: true, compactAvailable: true, mailReady: false, hasPhoto: false, hasMockup: false };
+                }))
+                : normalizeAvailableSnapshotRows(firstPage.availableRows, 0, config.normalizeCustomer);
             let instantlyReadyCustomers = normalizeInstantlyReadySnapshotRows(firstPage.instantlyReadyRows, 0, config.normalizeCustomer);
             const hasRemainingPages = firstPage.total > firstPage.rows.length || firstPage.availableTotal > firstPage.availableRows.length || firstPage.instantlyReadyTotal > firstPage.instantlyReadyRows.length;
             if (hasRemainingPages) {
@@ -507,7 +514,7 @@
         const loaded = await load(options);
         if (loaded) {
             markCanonicalInventoryReady(options.state);
-            if (typeof options.renderPage === "function") options.renderPage();
+            if (!(options.deferRenderDuringBoot === true && options.state?.photoRestorePending === true) && typeof options.renderPage === "function") options.renderPage();
         }
         return loaded;
     }

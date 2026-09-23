@@ -404,6 +404,17 @@ test('premium database archive serves every category in one bounded compressed r
   assert.equal(payload.availableCustomers.length, 5001);
   assert.equal(payload.availableCustomers.some((row) => row.id === 'available-5000'), true);
   assert.deepEqual(payload.foundCustomerIds, ['ready-1']);
+
+  const compactResponse = { ...response, headers: {}, statusCode: 0, body: null };
+  await service.sendMailReadySnapshotArchiveResponse({ query: { compact: '1' } }, compactResponse);
+  assert.equal(compactResponse.statusCode, 200);
+  const compact = JSON.parse(gunzipSync(compactResponse.body).toString('utf8'));
+  assert.equal(compact.compactAvailable, true);
+  assert.equal(compact.availableTotal, payload.availableTotal);
+  assert.deepEqual(compact.availableCustomers.find((row) => row.id === 'available-5000'), { id: 'available-5000', availableSnapshot: true });
+  assert.deepEqual(compact.customers, payload.customers);
+  assert.deepEqual(compact.foundCustomerIds, payload.foundCustomerIds);
+  assert.ok(compactResponse.body.length < response.body.length);
 });
 
 test('premium database archive rejects payloads above its response cap', async () => {

@@ -16,15 +16,24 @@ async function encodePremiumDatabaseSnapshotArchive(payload, maxBytes = MAX_ARCH
 }
 
 function createPremiumDatabaseSnapshotArchiveResponder({ buildSnapshot, nowMs, logger, source }) {
-  return async function sendMailReadySnapshotArchiveResponse(_req, res) {
+  return async function sendMailReadySnapshotArchiveResponse(req, res) {
     const startedAt = nowMs();
     try {
-      const payload = await buildSnapshot({
+      const fullPayload = await buildSnapshot({
         allRows: true,
         includeFoundSnapshot: true,
         allowStaleWhileRefreshing: true,
       });
       const loadedAt = nowMs();
+      const compactAvailable = req?.query?.compact === '1';
+      const payload = compactAvailable ? {
+        ...fullPayload,
+        compactAvailable: true,
+        availableCustomers: fullPayload.availableCustomers.map((customer) => ({
+          id: customer.id,
+          availableSnapshot: true,
+        })),
+      } : fullPayload;
       const archive = await encodePremiumDatabaseSnapshotArchive(payload);
       const encodedAt = nowMs();
       res.setHeader('Cache-Control', 'private, no-store, max-age=0');
