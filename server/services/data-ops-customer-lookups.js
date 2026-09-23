@@ -1,3 +1,5 @@
+const { createTableVersionRepository } = require('../repositories/table-versions');
+
 const CUSTOMER_COLUMNS = 'customer_id,company,email,database_status,lifecycle_status,payload,updated_at';
 const UNIQUE_CUSTOMER_EMAIL_LOOKUP_MAX_VALUES = 200;
 
@@ -203,6 +205,7 @@ function createDataOpsCustomerLookups(deps = {}) {
   }
 
   return {
+    ...createTableVersionRepository({ run, readQueryTimeoutMs }),
     listCustomersPage,
     listCustomersArchiveChunk,
     listCustomersChangedSince,

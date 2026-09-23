@@ -1,7 +1,10 @@
 // Returns only the customers that changed after the browser's cursor. The
 // browser keeps the last verified archive and merges this delta, so a normal
 // opening reads a few rows instead of the full 20k-row archive.
+const { buildReadModelVersion, readRequestedReadModelVersion } = require('./readmodel-version-response');
+
 const DELTA_LIMIT = 5000;
+const CUSTOMERS_TABLE = 'softora_customers';
 // updated_at comes from application clocks; the overlap re-sends recent rows so
 // a write that committed slightly after its timestamp can never be skipped.
 const CURSOR_OVERLAP_MS = 10 * 60 * 1000;
@@ -23,6 +26,13 @@ function createPremiumDatabaseCustomersDeltaResponder({ dataOpsStore, nowMs = Da
       throw new Error('Klantdatabase heeft geen veilige volledige telling.');
     }
     return { total, version };
+  }
+
+  async function readCustomersVersion() {
+    if (typeof dataOpsStore.readTableVersions !== 'function') return '';
+    const versions = await Promise.resolve(dataOpsStore.readTableVersions([CUSTOMERS_TABLE])).catch(() => null);
+    const tableVersion = versions && versions[CUSTOMERS_TABLE];
+    return tableVersion ? buildReadModelVersion(['premium-database-customers', tableVersion]) : '';
   }
 
   function splitChanges(changes) {
@@ -57,6 +67,16 @@ function createPremiumDatabaseCustomersDeltaResponder({ dataOpsStore, nowMs = Da
       return res.status(200).json({ ok: true, resync: true, reason: 'cursor-expired' });
     }
     try {
+      // The trigger-maintained counter is read before any row, so a copy is never
+      // labelled with a version newer than the rows it contains.
+      const readModelVersion = await readCustomersVersion();
+      if (readModelVersion && readRequestedReadModelVersion(req) === readModelVersion) {
+        const loadMs = nowMs() - startedAt;
+        res.setHeader('Server-Timing', `customers-delta;dur=${loadMs}, readmodel;desc=unchanged`);
+        logger?.info?.(JSON.stringify({ event: 'premium-customers-delta', loadMs, unchanged: true }));
+        return res.status(200).json({ ok: true, source: 'canonical-customers-delta', completeDelta: true,
+          unchanged: true, readModelVersion });
+      }
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const before = await readMeta();
         const changes = await dataOpsStore.listCustomersChangedSince({
@@ -76,7 +96,8 @@ function createPremiumDatabaseCustomersDeltaResponder({ dataOpsStore, nowMs = Da
         logger?.info?.(JSON.stringify({ event: 'premium-customers-delta', loadMs,
           upserts: upserts.length, deletes: deletedIds.length, total: after.total, attempt }));
         return res.status(200).json({ ok: true, source: 'canonical-customers-delta', completeDelta: true,
-          total: after.total, snapshotVersion: after.version, upserts, deletedIds });
+          total: after.total, snapshotVersion: after.version, upserts, deletedIds,
+          ...(readModelVersion ? { readModelVersion } : {}) });
       }
       throw new Error('Klantdatabase wijzigde tijdens het bijwerken.');
     } catch (error) {

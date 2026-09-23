@@ -582,6 +582,25 @@
         renderRoiCalculator(stableCount, false);
     }
 
+    // The sent register is a versioned read model: an unchanged register is
+    // completed from the local copy instead of rebuilt and downloaded again.
+    function fetchColdmailStats(fetchImpl) {
+        const init = { credentials: "same-origin", headers: { Accept: "application/json" }, cache: "no-store" };
+        const readModelClient = window.SoftoraReadModelClient;
+        if (readModelClient && typeof readModelClient.fetchJson === "function") {
+            return readModelClient.fetchJson(COLDMAIL_STATS_URL, init, {
+                key: "premium-database-coldmail-sent-register:v1", path: "stats", fetchImpl: fetchImpl
+            });
+        }
+        return fetchImpl(COLDMAIL_STATS_URL, init).then(function (response) {
+            return response.json().then(function (payload) {
+                return { response: response, payload: payload };
+            }).catch(function () {
+                return { response: response, payload: null };
+            });
+        });
+    }
+
     function refreshTodaySentCount() {
         const rootDocument = getRootDocument();
         if (rootDocument && rootDocument.hidden) return Promise.resolve(lastTodaySentCount);
@@ -591,17 +610,7 @@
             return Promise.resolve(lastTodaySentCount);
         }
         if (todaySentRefreshPromise) return todaySentRefreshPromise;
-        todaySentRefreshPromise = fetchImpl(COLDMAIL_STATS_URL, {
-            credentials: "same-origin",
-            headers: { Accept: "application/json" },
-            cache: "no-store"
-        }).then(function (response) {
-            return response.json().then(function (payload) {
-                return { response: response, payload: payload };
-            }).catch(function () {
-                return { response: response, payload: null };
-            });
-        }).then(function (result) {
+        todaySentRefreshPromise = fetchColdmailStats(fetchImpl).then(function (result) {
             const payload = result.payload;
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
             const stats = payload.stats || {};

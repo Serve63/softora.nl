@@ -16,6 +16,7 @@
     // The delta path is exact, but a full re-verification once a day bounds the
     // lifetime of any local copy even if a write ever bypassed updated_at.
     const FULL_VERIFY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+    const READ_MODEL_VERSION_PATTERN = /^rm1-[a-f0-9]{40}$/;
 
     function readModelScope(config) {
         const store = config.readModelStore === undefined ? global.SoftoraReadModelStore : config.readModelStore;
@@ -52,18 +53,27 @@
         if (!scope || !snapshotCursor(result.snapshotVersion)) return;
         whenIdle(function () {
             scope.store.write(READ_MODEL_KEY, scope.identity, { customers: result.customers, total: result.total,
-                snapshotVersion: result.snapshotVersion, fullSyncedAt: fullSyncedAt }).catch(function () { return false; });
+                snapshotVersion: result.snapshotVersion, readModelVersion: result.readModelVersion || "",
+                fullSyncedAt: fullSyncedAt }).catch(function () { return false; });
         });
     }
 
     async function fetchDelta(config, local) {
+        const requestOptions = { method: "GET", cache: "no-store", credentials: "same-origin" };
+        const localVersion = READ_MODEL_VERSION_PATTERN.test(String(local.readModelVersion || "")) ? local.readModelVersion : "";
+        if (localVersion) requestOptions.headers = { "X-Softora-Readmodel-Version": localVersion };
         const response = await config.fetchJsonWithTimeout(DELTA_ENDPOINT + "?since=" +
-            encodeURIComponent(snapshotCursor(local.snapshotVersion)), {
-            method: "GET", cache: "no-store", credentials: "same-origin"
-        }, REQUEST_TIMEOUT_MS);
+            encodeURIComponent(snapshotCursor(local.snapshotVersion)), requestOptions, REQUEST_TIMEOUT_MS);
         const payload = await response.json().catch(function () { return {}; });
         if (!response.ok || payload.ok !== true) throw new Error("Klantdatabase-wijzigingen niet beschikbaar.");
         if (payload.resync === true) return null;
+        if (payload.unchanged === true) {
+            // The database change counter proves no customer row changed since this copy.
+            if (!localVersion || payload.readModelVersion !== localVersion) throw new Error("Onverwachte ongewijzigd-melding.");
+            global.performance?.mark?.("softora:database:delta-validated");
+            return { changed: true, customers: local.customers, total: local.total, snapshotVersion: local.snapshotVersion,
+                readModelVersion: localVersion, source: "unchanged", deltaSize: 0 };
+        }
         const total = Number(payload.total);
         const version = String(payload.snapshotVersion || "").trim();
         const upserts = Array.isArray(payload.upserts) ? payload.upserts : null;
@@ -83,6 +93,7 @@
         }
         global.performance?.mark?.("softora:database:delta-validated");
         return { changed: true, customers: customers, total: total, snapshotVersion: version,
+            readModelVersion: READ_MODEL_VERSION_PATTERN.test(String(payload.readModelVersion || "")) ? payload.readModelVersion : "",
             source: "delta", deltaSize: upserts.length + deletedIds.length };
     }
 
@@ -252,7 +263,7 @@
             try {
                 const synced = await fetchDelta(options, local);
                 if (synced) {
-                    persistLocalCopy(scope, synced, local.fullSyncedAt);
+                    if (synced.source !== "unchanged") persistLocalCopy(scope, synced, local.fullSyncedAt);
                     scheduleFullVerify(options, scope, synced, local.fullSyncedAt);
                     return synced;
                 }

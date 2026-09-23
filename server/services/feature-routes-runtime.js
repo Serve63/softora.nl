@@ -275,6 +275,7 @@ function registerFeatureRoutes(app, deps = {}) {
   });
   registerColdmailingRoutes(app, {
     ...coldmailing,
+    readTableVersions: deps.dataOpsStore?.readTableVersions,
     requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
