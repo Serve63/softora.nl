@@ -4,9 +4,11 @@ const { createHash } = require('node:crypto');
 
 const gzipAsync = promisify(gzip);
 const PAGE_LIMIT = 1000;
-const CHUNK_LIMIT = 5000;
+// A 5,000-row JSON RPC can exceed the six-second upstream read budget even
+// though the indexed SQL scan itself is fast. Keep transfer sizes bounded.
+const CHUNK_LIMIT = 2000;
 const PAGE_CONCURRENCY = 4;
-const CHUNK_CONCURRENCY = 3;
+const CHUNK_CONCURRENCY = 4;
 const MAX_CUSTOMERS = 25000;
 const MAX_ARCHIVE_BYTES = 3500000;
 const ARCHIVE_CACHE_CONTROL = 'private, no-cache, max-age=0, must-revalidate';

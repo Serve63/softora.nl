@@ -10,6 +10,27 @@ function sortMessagesNewestFirst(messages = []) {
     });
 }
 
+function readMailboxCampaignSeedSentMessages({
+  mailboxIndexStore,
+  campaignMailboxAccounts = [],
+  campaignSubjectTerms = [],
+  sentLimit = 2000,
+} = {}) {
+  if (typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function') {
+    return mailboxIndexStore.listMatchingMessagesForAccounts({
+      accountEmails: campaignMailboxAccounts, folder: 'sent',
+      subjectTerms: campaignSubjectTerms, limit: sentLimit, priorityRead: true,
+    });
+  }
+  const method = typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
+    ? mailboxIndexStore.listAllMessagesForAccounts
+    : mailboxIndexStore.listMessagesForAccounts;
+  return method.call(mailboxIndexStore, {
+    accountEmails: campaignMailboxAccounts, folder: 'sent',
+    limit: sentLimit, priorityRead: true,
+  });
+}
+
 async function loadMailboxCampaignContactHistory({
   mailboxIndexStore,
   campaignMailboxAccounts = [],
@@ -18,39 +39,22 @@ async function loadMailboxCampaignContactHistory({
   incomingFolders = ['coldmail', 'inbox'],
   incomingLimit = 250,
   sentLimit = 2000,
+  preloadedSeedSentMessages,
   participantPriorityMessages = [],
   dedupeCampaignMessages,
   collectCampaignThreadParticipantEmails,
 } = {}) {
-  const seedSentMessagesResult = await (
-    typeof mailboxIndexStore.listMatchingMessagesForAccounts === 'function'
-      ? mailboxIndexStore.listMatchingMessagesForAccounts({
-          accountEmails: campaignMailboxAccounts,
-          folder: 'sent',
-          subjectTerms: campaignSubjectTerms,
-          limit: sentLimit,
-          priorityRead: true,
-        })
-      : typeof mailboxIndexStore.listAllMessagesForAccounts === 'function'
-        ? mailboxIndexStore.listAllMessagesForAccounts({
-            accountEmails: campaignMailboxAccounts,
-            folder: 'sent',
-            limit: sentLimit,
-            priorityRead: true,
-          })
-        : mailboxIndexStore.listMessagesForAccounts({
-            accountEmails: campaignMailboxAccounts,
-            folder: 'sent',
-            limit: sentLimit,
-            priorityRead: true,
-          })
-  );
-  if (!Array.isArray(seedSentMessagesResult)) {
+  const seedSentMessages = preloadedSeedSentMessages
+    ? await preloadedSeedSentMessages.result
+    : await readMailboxCampaignSeedSentMessages({
+        mailboxIndexStore, campaignMailboxAccounts, campaignSubjectTerms, sentLimit,
+      });
+  if (!Array.isArray(seedSentMessages)) {
     const error = new Error('Mailbox-index voor campagne-uitgaande berichten kon niet worden gelezen.');
     error.status = 503;
     throw error;
   }
-  const seedSentMessages = dedupeCampaignMessages(seedSentMessagesResult);
+  const dedupedSeedSentMessages = dedupeCampaignMessages(seedSentMessages);
   // The incoming folders are fetched in batches (coldmail first, inbox
   // second), and the unfiltered recent scan can contain unrelated mail. Keep
   // subject-matched campaign messages first so a real historical reply is not
@@ -58,7 +62,7 @@ async function loadMailboxCampaignContactHistory({
   const campaignParticipantEmails = collectCampaignThreadParticipantEmails([
     ...sortMessagesNewestFirst(participantPriorityMessages),
     ...sortMessagesNewestFirst(messages),
-    ...sortMessagesNewestFirst(seedSentMessages),
+    ...sortMessagesNewestFirst(dedupedSeedSentMessages),
   ]);
   const [incomingBatches, targetedSentMessages] = await Promise.all([
     campaignParticipantEmails.length && typeof mailboxIndexStore.listMessagesBySenderEmailsForAccounts === 'function'
@@ -88,10 +92,10 @@ async function loadMailboxCampaignContactHistory({
       ...targetedIncomingMessages,
     ]),
     sentMessages: dedupeCampaignMessages([
-      ...seedSentMessages,
+      ...dedupedSeedSentMessages,
       ...targetedSentMessages,
     ]),
   };
 }
 
-module.exports = { loadMailboxCampaignContactHistory };
+module.exports = { loadMailboxCampaignContactHistory, readMailboxCampaignSeedSentMessages };

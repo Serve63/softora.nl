@@ -18,6 +18,7 @@ function fixture(overrides = {}) {
     storageRetrySleep: async () => {},
     aiToolsCoordinator: { runWebsitePreviewGeneratePipeline: async () => { calls += 1; return { image }; } },
     dataOpsStore: {
+      assignWebdesignOwner: async () => 'serve@softora.nl',
       upsertWebdesignJob: async (job) => { saved = structuredClone(job); return { ok: true }; },
       uploadDesignPhoto: async () => { uploads += 1; return { ok: false, error: new Error('storage timeout') }; },
     },
@@ -141,6 +142,7 @@ test('completed job exposes the measured cost and stores the same provenance wit
   const f = fixture({
     aiToolsCoordinator: { runWebsitePreviewGeneratePipeline: async () => generation },
     dataOpsStore: {
+      assignWebdesignOwner: async () => 'serve@softora.nl',
       upsertWebdesignJob: async () => ({ ok: true }),
       uploadDesignPhoto: async (photo) => { storedPhoto = photo; return { ok: true }; },
     },

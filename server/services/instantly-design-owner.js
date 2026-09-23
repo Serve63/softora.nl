@@ -39,7 +39,17 @@ function ownerFromValue(value) {
 }
 
 function resolveInstantlyDesignOwner(row, photo) {
-  const signals = new Set();
+  const assignedValues = [row, photo].flatMap((source) => [
+    source && source.designOwnerEmail,
+    source && source.legacyMeta && source.legacyMeta.designOwnerEmail,
+    source && source.legacy_meta && source.legacy_meta.designOwnerEmail,
+  ]).map((value) => String(value || '').trim()).filter(Boolean);
+  const assignedOwners = new Set(assignedValues.map(ownerFromValue));
+  if (assignedValues.length && (assignedOwners.has('') || assignedOwners.size !== 1)) {
+    return { owner: '', reason: 'conflicting_sender' };
+  }
+  const senderSignals = new Set();
+  const ownerSignals = new Set();
   const seen = new Set();
   let unknownSender = false;
   const visit = (source) => {
@@ -49,17 +59,25 @@ function resolveInstantlyDesignOwner(row, photo) {
       const value = String(source[field] || '').trim();
       if (!value) continue;
       const owner = ownerFromValue(value);
-      if (owner) signals.add(owner);
+      if (owner) senderSignals.add(owner);
       else unknownSender = true;
     }
     for (const field of OWNER_FIELDS) {
       const owner = ownerFromValue(source[field]);
-      if (owner) signals.add(owner);
+      if (owner) ownerSignals.add(owner);
     }
     for (const field of NESTED_FIELDS) visit(source[field]);
   };
   visit(row);
   visit(photo);
+  if (assignedValues.length) {
+    const assignedOwner = [...assignedOwners][0];
+    if (unknownSender || [...senderSignals].some((owner) => owner !== assignedOwner)) {
+      return { owner: '', reason: 'conflicting_sender' };
+    }
+    return { owner: assignedOwner, reason: '' };
+  }
+  const signals = new Set([...senderSignals, ...ownerSignals]);
   if (signals.size > 1) return { owner: '', reason: 'conflicting_sender' };
   if (unknownSender) return { owner: '', reason: 'unrecognized_sender' };
   if (signals.size !== 1) return { owner: '', reason: 'missing_sender' };

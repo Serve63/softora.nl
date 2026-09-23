@@ -1683,6 +1683,8 @@ test('Instantly status separates designs to upload, current campaign queue, fail
   assert.equal(status.isCurrentCampaignPrepared(design, normalize), false);
   assert.equal(status.isCurrentCampaignPrepared(queued, normalize), true);
   assert.equal(status.getCurrentCampaignOwner(queued), 'serve');
+  assert.equal(status.getCurrentCampaignOwner({ instantlyCampaignId: '79b1f8c0-35de-4687-95ea-8384c4c491bd' }), 'martijn');
+  assert.equal(status.getCurrentCampaignOwner({ instantlyCampaignId: '9a603e82-7a50-46e2-855a-5a2990a9304b' }), 'martijn');
   assert.equal(status.isReadyForUpload(queued, normalize), false);
   assert.equal(status.isReadyForUpload(failed, normalize), false);
   assert.equal(status.isCurrentCampaignPrepared(sent, normalize), false);
@@ -2211,7 +2213,7 @@ test('premium database applies remote customers once after guard and photo enric
   assert.match(pageSource, /const \[customerResult, orderResult\] = await Promise\.all\(\[window\.SoftoraPremiumDatabaseCustomers\.load\(/);
   assert.match(pageSource, /const remoteCustomers = parseCustomers\(customerResult && customerResult\.customers \|\| \[\]\);/);
   assert.match(pageSource, /const enrichedCustomers = mergeCustomersWithResponsible\(remoteCustomers, state\.orders\);/);
-  assert.match(pageSource, /const customersWithFallbackMedia = mergeCustomersWithPhotos\(enrichedCustomers, \{\}, state\.klanten, true\);/);
+  assert.match(pageSource, /const customersWithPhotos = mergeCustomersWithPhotos\(enrichedCustomers, photoMap, state\.klanten, true\);/);
   assert.match(pageSource, /const canonicalCustomers = window\.SoftoraDatabaseMailReadySnapshot\.mergeWithCanonicalSnapshots\(customersWithPhotos, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers, state\.instantlyReadySnapshotCustomers\);/);
   assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\);/);
   assert.match(pageSource, /state\.remoteCustomersLoaded = true;[\s\S]*applyCustomerList\(sortedCustomers, false, true, deferRender\);/);
@@ -2222,7 +2224,7 @@ test('premium database replaces a compatibility bootstrap with the complete cano
   const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
 
   assert.match(pageSource, /async function bootstrapCustomers\(bootstrapOptions\) \{ const skipPhotoRestore = Boolean\(bootstrapOptions && bootstrapOptions\.skipPhotoRestore\), deferRender = Boolean\(bootstrapOptions && bootstrapOptions\.deferRender\);/);
-  assert.match(pageSource, /let customersWithPhotos = customersWithFallbackMedia; if \(!skipPhotoRestore && !\(state\.mailReadySnapshotLoaded && state\.availableSnapshotLoaded\)\)/);
+  assert.match(pageSource, /let photoMap = \{\}; if \(!skipPhotoRestore && !\(state\.mailReadySnapshotLoaded && state\.availableSnapshotLoaded\)\)/);
   assert.match(databaseBootSource, /if \(databaseHadBootstrapCustomers && state\.klanten\.length && !databaseHasFastSnapshotBootstrap\) \{ const canonicalCustomersPromise = bootstrapCustomers\(\{ skipPhotoRestore: true, deferRender: true \}\); await mailReadySnapshotPromise; await canonicalCustomersPromise; if \(!\(state\.canonicalInventoryReady && state\.mailReadySnapshotLoaded && state\.availableSnapshotLoaded\)\) try \{ const photoMap = await loadCustomerPhotoMap/);
   assert.match(databaseBootSource, /await canonicalCustomersPromise; if \(!\(state\.canonicalInventoryReady && state\.mailReadySnapshotLoaded && state\.availableSnapshotLoaded\)\) try \{ const photoMap = await loadCustomerPhotoMap\(state\.klanten/);
 });
@@ -2882,8 +2884,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignAssetStateScriptSource, /fallbackPhotosById/);
   assert.match(webdesignAssetStateScriptSource, /websiteMockup: websiteMockup/);
   assert.match(webdesignAssetStateScriptSource, /firstValidSource\(photo && photo\.websiteMockup, fallbackPhoto && fallbackPhoto\.websiteMockup, normalized\.websiteMockup\)/);
-  assert.match(pageSource, /customersWithFallbackMedia = mergeCustomersWithPhotos\(enrichedCustomers, \{\}, state\.klanten, true\)/);
-  assert.match(pageSource, /mergeCustomersWithPhotos\(enrichedCustomers, photoMap, customersWithFallbackMedia, true\)/);
+  assert.match(pageSource, /const customersWithPhotos = mergeCustomersWithPhotos\(enrichedCustomers, photoMap, state\.klanten, true\)/);
+  assert.doesNotMatch(pageSource, /customersWithFallbackMedia/);
   assert.match(pageSource, /function loadCustomerPhotoMap\(customers, options\)/);
   assert.doesNotMatch(pageSource, /function serializeWebsitePhotoForDiff\(value\)/);
   assert.doesNotMatch(pageSource, /serializeWebsitePhotoForDiff\(normalized\.(websitePhoto|websiteMockup)\)/);
@@ -3163,7 +3165,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(databaseBootSource, /if \(databaseHadBootstrapCustomers && state\.klanten\.length && !databaseHasFastSnapshotBootstrap\) \{/);
   assert.match(databaseBootSource, /const photoMap = await loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\);/);
   assert.match(databaseBootSource, /loadCustomerPhotoMap\(state\.klanten, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\)/);
-  assert.match(pageSource, /const photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\);/);
+  assert.match(pageSource, /photoMap = await loadCustomerPhotoMap\(enrichedCustomers, \{ force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true \}\);/);
   assert.match(pageSource, /if \(!skipPhotoRestore && !\(state\.mailReadySnapshotLoaded && state\.availableSnapshotLoaded\)\) \{[\s\S]*loadCustomerPhotoMap\(enrichedCustomers/);
   assert.match(pageSource, /state\.photoRestoreFailed = true;[\s\S]*console\.warn\("Databasefoto's laden via Supabase tijdelijk overgeslagen:", error\);/);
   assert.match(databaseBootSource, /state\.photoRestoreFailed = true; applyCustomerList\(snapshotClient\.mergeAssetFlags\(state\.klanten, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers\), false, false, true\); console\.warn\("Databasefoto's laden voor boot tijdelijk overgeslagen:", error\);/);

@@ -18,6 +18,7 @@ test('logboek-cut keeps the set details below the title and aligned with the exe
   assert.equal(horizontal, '0', 'The detail line must share the card’s left edge.');
   assert.ok(parseFloat(bottom) > 0, 'The set buttons need space below the detail line.');
   assert.match(rule, /text-align:\s*left\b/);
+  assert.match(rule, /font-weight:\s*700\b/);
 });
 
 test('logboek-cut fills the page without an outer card on desktop and mobile', () => {
@@ -25,6 +26,7 @@ test('logboek-cut fills the page without an outer card on desktop and mobile', (
   assert.match(css, /\.app\s*\{[^}]*width:\s*100%/);
   assert.match(css, /\.workout\s*\{[^}]*width:\s*100%[^}]*border:\s*0/);
   assert.match(css, /@media\s*\(max-width:\s*700px\)/);
+  assert.match(css, /\.exercise\s*\{[^}]*margin-inline:\s*calc\(-1 \* var\(--row-gutter\)\)/);
 });
 
 test('logboek-cut has no training progress badge or progress bar', () => {
@@ -34,11 +36,24 @@ test('logboek-cut has no training progress badge or progress bar', () => {
   assert.doesNotMatch(script, /\$\('training-completion'\)|\$\('progress-label'\)|\$\('percent'\)|\$\('progress'\)/);
 });
 
-test('completed exercise fill ends at the exercise separators', () => {
+test('logboek-cut hides successful sync status and omits the schema and timezone footer', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../../logboek-cut.html'), 'utf8');
+  const script = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.js'), 'utf8');
+  assert.doesNotMatch(html, /id="schema-updated"|Gewichten aanpassen|Automatisch de juiste dag|<footer\b/);
+  assert.doesNotMatch(script, /Sets en notities opgeslagen|Schema bijgewerkt|schema-updated/);
+  assert.match(script, /\$\('status'\)\.hidden=!statusMessage/);
+});
+
+test('completed exercise fill and separators reach the full screen width', () => {
   const css = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.css'), 'utf8');
-  const complete = css.match(/\.exercise\.complete\s*\{([^}]+)\}/)?.[1];
+  const row = css.match(/\.exercise::before\s*\{([^}]+)\}/)?.[1];
+  const complete = css.match(/\.exercise\.complete::before\s*\{([^}]+)\}/)?.[1];
+  assert.ok(row);
+  assert.match(row, /width:\s*100vw/);
+  assert.match(row, /border-top:\s*1px solid var\(--line\)/);
+  assert.match(css, /\.exercise:last-child::before\s*\{[^}]*border-bottom:\s*1px solid var\(--line\)/);
+  assert.match(css, /\.app\s*\{[^}]*overflow-x:\s*clip/);
   assert.ok(complete);
   assert.match(complete, /background:\s*#edf8ef/);
-  assert.match(complete, /border-radius:\s*0/);
-  assert.match(complete, /box-shadow:\s*none/);
+  assert.match(complete, /border-color:\s*#b9d9c0/);
 });
