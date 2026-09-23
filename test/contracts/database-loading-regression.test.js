@@ -68,7 +68,11 @@ test('complete snapshot hydrates while screen readiness waits for canonical deta
     getSortedCustomers: (rows) => rows, getFilteredCustomers: () => state.klanten,
     databaseReadiness: { publish: () => { readinessCalls += 1; return ready.promise; } },
     releaseDatabaseBootShell() { releases += 1; }, databasePendingJobsPromise: Promise.resolve(),
-    databaseImportController: { startAutoSync() { finished = true; } },
+    databaseImportController: {
+      prepareAutoSync: async () => ({}),
+      startAutoSync() { finished = true; return { ok: true, configured: false }; },
+    },
+    providerDeliverySync: Promise.resolve({ ok: true }),
   };
   assert.match(page, /window\.SoftoraDatabaseBoot\.run\(/);
   assert.match(page, /SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(\{ renderPage: renderPage/);

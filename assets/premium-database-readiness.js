@@ -40,9 +40,15 @@
             return value && value !== '--';
         });
         const complete = state.canonicalInventoryReady === true && state.remoteCustomersLoaded === true &&
-            state.photoRestorePending === false && state.photoRestoreFailed !== true && state.dataLoading === false;
+            state.photoRestorePending === false && state.photoRestoreFailed !== true && state.dataLoading === false &&
+            state.linkedSpreadsheetSyncReady === true && state.pendingJobsRestored === true &&
+            state.providerDeliverySyncReady === true;
         if (!complete || !metricsReady) {
-            readiness.markDegraded({ page: 'premium-database', reason: complete ? 'mail-metrics-unavailable' : 'database-inventory-incomplete' });
+            const reason = !state.linkedSpreadsheetSyncReady ? 'linked-spreadsheet-sync-incomplete'
+                : !state.pendingJobsRestored ? 'pending-photo-jobs-incomplete'
+                    : !state.providerDeliverySyncReady ? 'provider-delivery-sync-incomplete'
+                    : complete ? 'mail-metrics-unavailable' : 'database-inventory-incomplete';
+            readiness.markDegraded({ page: 'premium-database', reason });
             if (complete && !metricsReady && metricRetryTimer === null && metricRetryCount < MAX_METRIC_RETRIES && typeof root.setTimeout === 'function') {
                 metricRetryCount += 1;
                 metricRetryTimer = root.setTimeout(() => {

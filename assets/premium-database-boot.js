@@ -6,9 +6,23 @@
         const snapshotClient = options.snapshotClient || global.SoftoraDatabaseMailReadySnapshot;
         return (async function () {
             try {
+                const autoSyncConfigPromise = databaseImportController.prepareAutoSync();
+                const pendingJobsOutcome = Promise.resolve(databasePendingJobsPromise).then((result) => result !== null, function (error) {
+                    console.error("Websitefoto jobs hervatten mislukt:", error);
+                    return false;
+                });
                 state.photoRestorePending = true; const mailReadySnapshotPromise = loadMailReadySnapshot(); if (databaseHadBootstrapCustomers && state.klanten.length && !databaseHasFastSnapshotBootstrap) { const canonicalCustomersPromise = bootstrapCustomers({ skipPhotoRestore: true, deferRender: true }); await mailReadySnapshotPromise; await canonicalCustomersPromise; if (!(state.canonicalInventoryReady && state.mailReadySnapshotLoaded && state.availableSnapshotLoaded)) try { const photoMap = await loadCustomerPhotoMap(state.klanten, { force: true, failOnError: true, requireStateKey: true, failOnIncomplete: true }); applyCustomerList(snapshotClient.mergeAssetFlags(mergeCustomersWithPhotos(state.klanten, photoMap, state.klanten), state.mailReadySnapshotCustomers, state.availableSnapshotCustomers), false, false, true); } catch (error) { state.photoRestoreFailed = true; applyCustomerList(snapshotClient.mergeAssetFlags(state.klanten, state.mailReadySnapshotCustomers, state.availableSnapshotCustomers), false, false, true); console.warn("Databasefoto's laden voor boot tijdelijk overgeslagen:", error); } } else { const canonicalCustomersPromise = bootstrapCustomers({ skipPhotoRestore: true, deferRender: true }); await mailReadySnapshotPromise; await canonicalCustomersPromise; }
-                global.performance?.mark?.("softora:database:payloads-ready"); if (!snapshotClient.markCanonicalInventoryReady(state)) throw new Error("Volledige databasevoorraad is niet geladen."); await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); global.performance?.mark?.("softora:database:photos-preloaded"); state.photoRestorePending = false; renderPage(); global.performance?.mark?.("softora:database:final-render"); if (options.databaseReadiness) await options.databaseReadiness.publish({ state }); releaseDatabaseBootShell(); void databasePendingJobsPromise.catch(function (error) { console.error("Websitefoto jobs hervatten mislukt:", error); });
-                void databaseImportController.startAutoSync();
+                global.performance?.mark?.("softora:database:payloads-ready"); if (!snapshotClient.markCanonicalInventoryReady(state)) throw new Error("Volledige databasevoorraad is niet geladen.");
+                const linkedSync = await databaseImportController.startAutoSync(autoSyncConfigPromise);
+                state.linkedSpreadsheetSyncReady = linkedSync?.ok === true;
+                global.performance?.mark?.("softora:database:linked-sync-checked");
+                state.pendingJobsRestored = await pendingJobsOutcome;
+                global.performance?.mark?.("softora:database:pending-jobs-checked");
+                await webdesignActionController.preloadPhotoImages(getSortedCustomers(getFilteredCustomers()), 16, 1200); global.performance?.mark?.("softora:database:photos-preloaded"); state.photoRestorePending = false; renderPage(); global.performance?.mark?.("softora:database:final-render");
+                const deliveryStatus = await (options.providerDeliverySync || global.SoftoraDatabaseInstantlySync?.ready || Promise.resolve({ ok: false }));
+                state.providerDeliverySyncReady = deliveryStatus?.ok === true;
+                global.performance?.mark?.("softora:database:provider-checked");
+                if (options.databaseReadiness) await options.databaseReadiness.publish({ state }); releaseDatabaseBootShell();
             } catch (error) { console.error("Database bootstrap mislukt:", error); state.photoRestoreFailed = true; state.photoRestorePending = false; if (!state.canonicalInventoryReady) { state.dataLoading = false; state.dataUnavailable = true; } renderPage(); global.SoftoraScreenReadiness?.markDegraded({ page: 'premium-database', reason: 'database-boot-failed' }); } finally { releaseDatabaseBootShell(); }
         })();
     }

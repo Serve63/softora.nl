@@ -481,12 +481,14 @@
             });
         }
 
-        function startAutoSync() {
-            return loadSyncConfig().then(function (config) {
+        function startAutoSync(preparedConfig) {
+            return Promise.resolve(preparedConfig || loadSyncConfig()).then(function (config) {
                 syncSourceUrl = normalizeString(config && config.sourceUrl);
-                if (!syncSourceUrl) return false;
+                if (!syncSourceUrl) return { ok: true, configured: false };
                 scheduleAutoSync();
-                return syncFromSource(syncSourceUrl, { silent: true });
+                return syncFromSource(syncSourceUrl, { silent: true }).then(function (result) {
+                    return { ok: result !== false, configured: true };
+                });
             });
         }
 
@@ -495,6 +497,7 @@
             handleRealBusinessAdd: handleRealBusinessAdd,
             handleSyncConnect: handleSyncConnect,
             importFile: importFile,
+            prepareAutoSync: loadSyncConfig,
             startAutoSync: startAutoSync
         };
     }
