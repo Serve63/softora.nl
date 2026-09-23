@@ -480,7 +480,9 @@ test('premium database archive revalidates a complete browser copy before rebuil
   assert.equal(chunkReads, 1);
 
   const unchanged = createMockResponse();
-  await responder({ headers: { 'if-none-match': first.headers.ETag } }, unchanged);
+  await responder({ headers: {}, get(name) {
+    return name.toLowerCase() === 'if-none-match' ? first.headers.ETag : undefined;
+  } }, unchanged);
   assert.equal(unchanged.statusCode, 304);
   assert.equal(unchanged.body, undefined);
   assert.equal(chunkReads, 1);

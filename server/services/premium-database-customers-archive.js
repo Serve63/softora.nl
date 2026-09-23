@@ -142,7 +142,8 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
     try {
       let archive = cachedArchive;
       let cacheHit = false;
-      const requestedTag = String(req?.headers?.['if-none-match'] || '').trim();
+      const requestedTag = String(req?.get?.('If-None-Match')
+        || req?.headers?.['if-none-match'] || req?.headers?.['If-None-Match'] || '').trim();
       if (archive || requestedTag) {
         const meta = await readPage(0, 1, true);
         const total = validatedTotal(meta);
@@ -154,6 +155,8 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
           res.setHeader('Vary', 'Cookie, Accept-Encoding');
           res.setHeader('ETag', archiveEtag(total, version));
           res.setHeader('Server-Timing', `customers;dur=${nowMs() - startedAt}, cache;desc=revalidated`);
+          logger?.info?.(JSON.stringify({ event: 'premium-customers-archive-revalidated',
+            total, loadMs: nowMs() - startedAt }));
           return res.status(304).end();
         }
       }
@@ -173,7 +176,9 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       res.setHeader('Server-Timing', `customers;dur=${loadMs}, encode;dur=${encodeMs}, cache;desc=${cacheHit ? 'hit' : 'miss'}`);
       logger?.info?.(JSON.stringify({ event: 'premium-customers-archive', loadMs,
         encodeMs, compressedBytes: archive.buffer.length, total: archive.total, cacheHit,
-        method: archive.method }));
+        method: archive.method, validatorReceived: Boolean(requestedTag),
+        validatorMatchedFinal: Boolean(requestedTag && requestedTag.split(',')
+          .some((tag) => tag.trim() === archiveEtag(archive.total, archive.version))) }));
       return res.status(200).end(archive.buffer);
     } catch (error) {
       logger?.warn?.('[PremiumDatabaseCustomers][archive-response]', error?.message || error);
