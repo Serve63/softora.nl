@@ -287,7 +287,7 @@ function formatMoneyEUR(amount) {
 	    }
 
     const PREMIUM_DASHBOARD_UI_STATE_TIMEOUT_MS = 6000;
-    const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 3500;
+    const PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS = 10000;
     const PREMIUM_DASHBOARD_BOOT_MINIMUM_MS = 0;
     let premiumDashboardBootWatchdog = null;
     let premiumDashboardBootReleased = false;
@@ -372,10 +372,16 @@ function formatMoneyEUR(amount) {
         }
     }
 
+    function isPremiumDashboardScreenReadyForRelease() {
+        const readiness = root?.SoftoraScreenReadiness?.getState?.();
+        return !readiness || readiness.status === 'ready' || readiness.status === 'degraded';
+    }
+
     function releasePremiumDashboardBootShell() {
+        if (!isPremiumDashboardScreenReadyForRelease()) return false;
         if (premiumDashboardBootReleased) {
             forcePremiumDashboardBootShellVisible();
-            return;
+            return true;
         }
         premiumDashboardBootReleased = true;
         const timerRoot = getDashboardTimerRoot();
@@ -391,6 +397,7 @@ function formatMoneyEUR(amount) {
             /* The direct DOM fallback below still releases the dashboard. */
         }
         forcePremiumDashboardBootShellVisible();
+        return true;
     }
 
     function showPremiumDashboardBootShellForMinimum(minimumMs = PREMIUM_DASHBOARD_BOOT_MINIMUM_MS) {
@@ -421,10 +428,14 @@ function formatMoneyEUR(amount) {
         if (premiumDashboardBootWatchdog || premiumDashboardBootReleased) return;
         const timerRoot = getDashboardTimerRoot();
         if (typeof timerRoot.setTimeout !== 'function') return;
-        premiumDashboardBootWatchdog = timerRoot.setTimeout(
-            releasePremiumDashboardBootShell,
-            PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS
-        );
+        premiumDashboardBootWatchdog = timerRoot.setTimeout(() => {
+            premiumDashboardBootWatchdog = null;
+            const readiness = root?.SoftoraScreenReadiness;
+            if (readiness?.getState?.().status === 'loading') {
+                readiness.markDegraded({ page: 'premium-personeel-dashboard', reason: 'screen-readiness-watchdog-expired' });
+            }
+            releasePremiumDashboardBootShell();
+        }, PREMIUM_DASHBOARD_BOOT_WATCHDOG_MS);
     }
 
     function installPremiumDashboardBootFailSafe() {
@@ -502,6 +513,7 @@ function formatMoneyEUR(amount) {
 
     function releasePremiumDashboardBootShellAfterMinimum(startedAt, minimumMs = PREMIUM_DASHBOARD_BOOT_MINIMUM_MS) {
         const finishRelease = () => {
+            if (!isPremiumDashboardScreenReadyForRelease()) return;
             const timerRoot = getDashboardTimerRoot();
             const visibleSince = premiumDashboardFirstPaintAt || Number(startedAt) || getDashboardNow();
             const elapsed = getDashboardNow() - visibleSince;

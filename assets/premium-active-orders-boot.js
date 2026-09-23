@@ -6,7 +6,8 @@
 
     const ACTIVE_ORDERS_BOOTSTRAP_SCRIPT_ID = 'softoraActiveOrdersBootstrap';
     const ACTIVE_ORDERS_BOOT_MIN_MS = 0;
-    const ACTIVE_ORDERS_BOOT_WATCHDOG_MS = 3500;
+    const ACTIVE_ORDERS_BOOT_WATCHDOG_MS = 10000;
+    let readinessWatchdogTimer = null;
 
     function getStateChunkMetaKey(baseKey) {
         return `${String(baseKey || '').trim()}_chunks_v1`;
@@ -140,30 +141,47 @@
     }
 
     function releaseBootShell() {
+        const readiness = root.SoftoraScreenReadiness?.getState?.();
+        if (readiness && readiness.status === 'loading') return false;
+        if (readinessWatchdogTimer !== null) root.clearTimeout(readinessWatchdogTimer);
+        readinessWatchdogTimer = null;
         if (root.SoftoraPremiumBoot && typeof root.SoftoraPremiumBoot.setShellBooting === 'function') {
             root.SoftoraPremiumBoot.setShellBooting(false);
         }
+        return true;
     }
 
-    function releaseAfterMinimum(startedAt) {
-        const dashboardCore = root.SoftoraPremiumDashboardCore;
-        if (dashboardCore && typeof dashboardCore.releasePremiumDashboardBootShellAfterMinimum === 'function') {
-            dashboardCore.releasePremiumDashboardBootShellAfterMinimum(startedAt, ACTIVE_ORDERS_BOOT_MIN_MS);
-            return;
-        }
+    function releaseAfterMinimum(startedAt, dataComplete) {
+        const release = () => {
+            const dashboardCore = root.SoftoraPremiumDashboardCore;
+            if (dashboardCore && typeof dashboardCore.releasePremiumDashboardBootShellAfterMinimum === 'function') {
+                dashboardCore.releasePremiumDashboardBootShellAfterMinimum(startedAt, ACTIVE_ORDERS_BOOT_MIN_MS);
+                return;
+            }
 
-        const elapsed = Date.now() - (Number(startedAt) || Date.now());
-        const remainingMs = Math.max(0, ACTIVE_ORDERS_BOOT_MIN_MS - elapsed);
-        root.setTimeout(releaseBootShell, remainingMs);
+            const elapsed = Date.now() - (Number(startedAt) || Date.now());
+            const remainingMs = Math.max(0, ACTIVE_ORDERS_BOOT_MIN_MS - elapsed);
+            root.setTimeout(releaseBootShell, remainingMs);
+        };
+        const readiness = root.SoftoraActiveOrdersReadiness;
+        if (!readiness?.publish) return release();
+        return Promise.resolve().then(() => readiness.publish({ dataComplete: dataComplete === true })).catch(() => {}).finally(release);
     }
 
     function startWatchdog() {
+        if (readinessWatchdogTimer !== null) return;
         const dashboardCore = root.SoftoraPremiumDashboardCore;
         if (dashboardCore && typeof dashboardCore.startPremiumDashboardBootWatchdog === 'function') {
             dashboardCore.startPremiumDashboardBootWatchdog();
             return;
         }
-        root.setTimeout(releaseBootShell, ACTIVE_ORDERS_BOOT_WATCHDOG_MS);
+        readinessWatchdogTimer = root.setTimeout(() => {
+            readinessWatchdogTimer = null;
+            if (root.SoftoraScreenReadiness?.getState?.().status === 'loading') {
+                root.SoftoraScreenReadiness.markDegraded({ page: 'premium-actieve-opdrachten', reason: 'screen-readiness-watchdog-expired' });
+            }
+            releaseBootShell();
+        }, ACTIVE_ORDERS_BOOT_WATCHDOG_MS);
     }
 
     root.SoftoraActiveOrdersBoot = Object.freeze({

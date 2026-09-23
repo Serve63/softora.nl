@@ -46,6 +46,31 @@ test('platform architecture registry and CI gate are protected quality code', ()
   assert.match(readRepoFile('docs/quality-protocol.md'), /check:platform-architecture/);
 });
 
+test('platform performance plan distinguishes lifecycle core from a migrated browser module', () => {
+  const runtime = readRepoFile('assets/premium-application-runtime.js');
+  const navigation = readRepoFile('assets/premium-application-navigation.js');
+  const performancePlan = readRepoFile('docs/platform-performance.md');
+  assert.match(runtime, /function createPremiumApplicationRuntime/);
+  assert.match(runtime, /\['prepare', 'mount', 'update', 'dispose'\]/);
+  assert.match(runtime, /prepareBudget\.maxBytes/);
+  assert.match(runtime, /dataClient\.clearSession/);
+  assert.match(navigation, /function createPremiumApplicationNavigation/);
+  assert.match(navigation, /popstate/);
+  assert.match(performancePlan, /nog niet door Dashboard of Opdrachten geladen/);
+  assert.match(performancePlan, /routes blijven\s+`legacy-document`/);
+});
+
+test('screen readiness behavior stays covered by the critical contract suite', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  const readinessContract = readRepoFile('test/contracts/premium-screen-readiness.test.js');
+  const readinessRuntime = readRepoFile('assets/premium-screen-readiness.js');
+  assert.equal(packageJson.scripts['test:contracts'], 'node --test test/contracts/*.test.js');
+  assert.match(readinessContract, /Dashboard keeps its boot shell during recoverable partial data/);
+  assert.match(readinessContract, /assert\.equal\(releases, 0\)/);
+  assert.match(readinessContract, /assert\.equal\(status, 'ready'\)/);
+  assert.match(readinessRuntime, /performanceApi\.mark\('softora:screen-ready'\)/);
+});
+
 function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
