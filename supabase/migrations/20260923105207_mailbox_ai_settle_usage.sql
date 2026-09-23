@@ -55,13 +55,13 @@ begin
       select m.created_at,m.date from public.softora_mailbox_messages m
       where m.account_email=p.account_email and m.message_key=p.message_key
         and m.deleted_at is null and m.generation_superseded_at is null
-        and m.folder in ('inbox','instantly','allmail') and lower(m.sender_email)<>lower(m.account_email)
+        and m.folder in ('inbox','instantly','allmail','coldmail') and lower(m.sender_email)<>lower(m.account_email)
         and (budget.include_history or budget.incoming_after is null or m.created_at>=budget.incoming_after)
       union all
       select m.created_at,m.date from public.softora_mailbox_messages m
       where m.account_email=p.account_email and m.message_id=p.source->>'identity'
         and m.deleted_at is null and m.generation_superseded_at is null
-        and m.folder in ('inbox','instantly','allmail') and lower(m.sender_email)<>lower(m.account_email)
+        and m.folder in ('inbox','instantly','allmail','coldmail') and lower(m.sender_email)<>lower(m.account_email)
         and (budget.include_history or budget.incoming_after is null or m.created_at>=budget.incoming_after)
         and not exists (select 1 from public.softora_mailbox_messages exact
           where exact.message_key=p.message_key and exact.account_email=p.account_email
@@ -85,7 +85,7 @@ language sql stable security invoker set search_path = '' as $$
   where exists (select 1 from public.softora_mailbox_ai_budget b where b.id = 'mailbox-luna-v1'
       and b.approved_micro_usd - b.reserved_micro_usd >= 300000
       and (b.include_history or b.incoming_after is null or m.created_at >= b.incoming_after))
-    and m.folder in ('inbox','instantly','allmail') and m.has_body and not m.body_truncated
+    and m.folder in ('inbox','instantly','allmail','coldmail') and m.has_body and not m.body_truncated
     and m.deleted_at is null and m.generation_superseded_at is null
     and length(trim(m.body_text)) between 1 and 240000
     and cardinality(string_to_array(m.body_text, E'\n')) <= 2400 and lower(m.sender_email) <> lower(m.account_email)
@@ -121,3 +121,5 @@ language sql stable security invoker set search_path = '' as $$
 $$;
 revoke all on function public.softora_mailbox_ai_states(text[]) from public, anon, authenticated;
 grant execute on function public.softora_mailbox_ai_states(text[]) to service_role;
+
+create index softora_mailbox_ai_received_date_idx on public.softora_mailbox_messages(date desc,message_key) where folder in ('inbox','instantly','allmail','coldmail') and has_body and not body_truncated and deleted_at is null and generation_superseded_at is null;

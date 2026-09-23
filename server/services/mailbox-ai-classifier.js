@@ -1,5 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
+const { restoreMailboxParagraphs } = require('./mailbox-provider-rich-body');
 const { readUsage, mergeUsage } = require('./mailbox-ai-usage');
 const contract = require('../../assets/premium-mailbox-ai-presentation');
 const { buildRemovalReview, applyRemovalReview } = require('./mailbox-ai-removal-review');
@@ -90,7 +91,8 @@ function createMailboxAiClassifier({ getApiKey, fetchImpl = globalThis.fetch, ti
     const value = JSON.parse(content.filter((item) => item.type === 'output_text').map((item) => item.text).join(''));
     return { value, usage: readUsage(result) };
   }
-  async function classify(source) {
+  async function classify(originalSource) {
+    const source = { ...originalSource, body: restoreMailboxParagraphs(originalSource.body, originalSource.html) };
     const request = buildRequest(source), first = await requestJson(request);
     const lines = contract.linesOf(source.body), selected = first.value?.signatureLines;
     if (!Array.isArray(selected) || new Set(selected).size !== selected.length || selected.some((i) =>
@@ -103,7 +105,7 @@ function createMailboxAiClassifier({ getApiKey, fetchImpl = globalThis.fetch, ti
       decision = applyRemovalReview(decision, review.value);
       first.usage = mergeUsage(first.usage, review.usage);
     }
-    return { decision, usage: first.usage };
+    return { decision: source.body === originalSource.body ? decision : { ...decision, displayBody: source.body }, usage: first.usage };
   }
   return { classify };
 }

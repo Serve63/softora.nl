@@ -60,7 +60,7 @@ test('SQL prioritizes incoming, admits approved history, caps global concurrency
     await db.exec(migration);
     await db.exec(`update softora_mailbox_ai_budget set approved_micro_usd=3000000,incoming_after=now()-interval '1 hour';
       insert into softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,body_text,has_body,body_truncated,payload)
-        select 'm'||i,'a',case when i=1 then now() else now()-interval '1 day' end,now(), 'inbox','sender','Hello',true,false,'{}' from generate_series(1,10) i;
+        select 'm'||i,'a',case when i=1 then now() else now()-interval '1 day' end,now(), case when i=2 then 'coldmail' else 'inbox' end,'sender','Hello',true,false,'{}' from generate_series(1,10) i;
       insert into softora_mailbox_ai_presentations(id,version,account_email,message_key,source)
         select message_key,'mailbox-luna-v1','a',message_key,'{}' from softora_mailbox_messages;`);
     await db.exec(`update softora_mailbox_messages set message_id='stable-id' where message_key='m2';
@@ -84,4 +84,24 @@ test('worker processes eight jobs in bounded waves and settles only after classi
     repository:{candidates:async()=>[],enqueue:async()=>[],claim:async()=>({id:++next,source:{}}),finish:async()=>{finished++;}},
     classifier:{classify:async()=>{active++;max=Math.max(max,active);await new Promise(r=>setTimeout(r,5));active--;return {decision:{},usage:{}};}}});
   assert.deepEqual(await service.processQueue(),{processed:8});assert.equal(finished,8);assert.equal(max,4);
+});
+
+test('collapsed HTML paragraphs are classified with source-safe layout and tampering retains original', async () => {
+  const { createMailboxAiClassifier }=require('../../server/services/mailbox-ai-classifier');
+  const contract=require('../../assets/premium-mailbox-ai-presentation');
+  const body='GoedendagIk wil graag dinsdag afspreken.Groet,Sam';
+  const html='<div>Goedendag</div><div>Ik wil graag dinsdag afspreken.</div><div>Groet,</div><div>Sam</div>';
+  let calls=0;
+  const classifier=createMailboxAiClassifier({getApiKey:()=> 'test',fetchImpl:async(_url,init)=>{
+    const request=JSON.parse(init.body), input=JSON.parse(request.input[1].content);calls++;
+    assert.equal(input.lines[1].text,'Ik wil graag dinsdag afspreken.');
+    const remove=input.lines.filter(r=>['Groet,','Sam'].includes(r.text)).map(r=>r.line);
+    return {ok:true,json:async()=>({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(calls===1?{signatureLines:remove,contacts:[]}:{safeToRemove:remove})}]}]})};
+  }});
+  const result=await classifier.classify({body,html});
+  const message={body,aiPresentation:{version:contract.VERSION,model:contract.MODEL,reasoningEffort:'max',status:'ready',sourceBody:body,decision:result.decision}};
+  assert.equal(contract.read(message).body.trim(),'Goedendag\n\nIk wil graag dinsdag afspreken.');
+  assert.equal(message.body,body);assert.equal(calls,2);
+  message.aiPresentation.decision.displayBody+=' Herschreven tekst';
+  assert.equal(contract.read(message).body,body);
 });

@@ -101,7 +101,7 @@ stops at the exhausted cap, avoiding an ever-growing historical queue.
 
 The owner requested GPT-6 Luna max, all existing received mail and future incoming mail,
 and removal of the premature reservation stop within the existing EUR 20 authorization.
-The approved lifetime USD ceiling is unchanged. This supersedes the no-refund/180-job
+The migration never increases the approved ceiling. Activation lowers the runtime ceiling to USD 18 to retain exchange/tax headroom within EUR 20, conservatively counting earlier pilot spend inside that amount. This supersedes the no-refund/180-job
 and incoming-only restrictions described above; it does not authorize automatic top-ups.
 
 `20260923105207_mailbox_ai_settle_usage.sql` adds idempotent settlement: only complete
@@ -132,3 +132,5 @@ fallback is introduced. A failed/uncertain attempt must be investigated; any del
 retry retains its old hold in `prior_uncertain_micro_usd` and claims a fresh hold.
 
 Explicit prompt caching stores only the unchanged developer rubric, never the changing mail body. This preserves prompt text and max reasoning while avoiding cache-write premiums on unique email content. Missing cache-write details retain the maximum input premium for budget safety.
+
+The received-mail selector includes `coldmail` as well as inbox/allmail/Instantly; the earlier selector omitted campaign reply folders. Paragraph restoration happens inside classification only when HTML contains exactly the same non-whitespace characters. A derived `decision.displayBody` carries that whitespace-only layout; the renderer revalidates equality before applying line indices. Original bodies and source identities remain untouched.
