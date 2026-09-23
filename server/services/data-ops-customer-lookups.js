@@ -174,9 +174,38 @@ function createDataOpsCustomerLookups(deps = {}) {
     return rows.map(normalizeCustomerRow);
   }
 
+  // Delta reads include soft-deleted rows: deletes bump updated_at, so a cursor
+  // on updated_at sees inserts, updates and deletes alike.
+  async function listCustomersChangedSince(options = {}) {
+    const since = normalizeString(options.since);
+    const limit = Number(options.limit);
+    if (!since || !Number.isFinite(Date.parse(since))
+      || !Number.isInteger(limit) || limit < 1 || limit > 5001) return null;
+    const result = await run('list-customers-changed-since', (client) => client
+      .from(tableName)
+      .select('customer_id,payload,updated_at,deleted_at')
+      .gte('updated_at', since)
+      .order('updated_at', { ascending: false })
+      .order('customer_id', { ascending: true })
+      .limit(limit), {
+      timeoutMs: readQueryTimeoutMs,
+      bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+      suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+      suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+    });
+    if (!result.ok || !Array.isArray(result.data)) return null;
+    return result.data.map((row) => ({
+      id: normalizeString(row && row.customer_id),
+      deleted: Boolean(row && row.deleted_at),
+      updatedAt: normalizeString(row && row.updated_at),
+      customer: row && row.deleted_at ? null : normalizeCustomerRow(row),
+    }));
+  }
+
   return {
     listCustomersPage,
     listCustomersArchiveChunk,
+    listCustomersChangedSince,
     listCustomersByEmails: createListByField({
       inputKey: 'emails', column: 'email', cachePrefix: 'customers-by-email',
       operation: 'list-customers-by-emails', lowercase: true,
