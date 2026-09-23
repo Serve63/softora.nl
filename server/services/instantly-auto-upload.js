@@ -3,7 +3,7 @@ const { isRemoteLeadConfirmedSent } = require('./instantly-campaign-replacement'
 
 const APPROVED_CAMPAIGNS = Object.freeze({
   serve: { id: '6ba410c6-d97a-4186-a414-83ba95022b1a', name: 'Servé Creusen Softora.nl' },
-  martijn: { id: '9a603e82-7a50-46e2-855a-5a2990a9304b', name: 'Martijn van de Ven Softora.nl' },
+  martijn: { id: '79b1f8c0-35de-4687-95ea-8384c4c491bd', name: 'Martijn van de Ven Softora.nl - nieuwe leads' },
 });
 
 function text(value) {

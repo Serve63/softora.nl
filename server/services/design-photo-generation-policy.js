@@ -37,6 +37,18 @@ function buildWebdesignGenerationProvenance(job = {}) {
   };
 }
 
+function isAssignedWebdesignSenderAllowed(row, photo, senderEmail) {
+  const sender = String(senderEmail || '').trim().toLowerCase();
+  if (!sender) return true;
+  const owners = [row && row.designOwnerEmail, photo && photo.designOwnerEmail,
+    photo && photo.legacyMeta && photo.legacyMeta.designOwnerEmail,
+    photo && photo.legacy_meta && photo.legacy_meta.designOwnerEmail]
+    .map((value) => String(value || '').trim().toLowerCase()).filter(Boolean);
+  if (!owners.length) return true; // Existing designs retain their prior sender selection.
+  const senderProfile = OUTBOUND_SENDER_PROFILE_KEYS[sender];
+  return Boolean(senderProfile) && owners.every((owner) => OUTBOUND_SENDER_PROFILE_KEYS[owner] === senderProfile);
+}
+
 function isDesignPhotoIncidentQuarantined(row) {
   const legacyMeta = row && row.legacy_meta && typeof row.legacy_meta === 'object' ? row.legacy_meta : {};
   const quarantine = legacyMeta.incidentQuarantine;
@@ -79,6 +91,7 @@ module.exports = {
   WEBDESIGN_VARIANT_V1,
   WEBDESIGN_VARIANT_V2,
   buildWebdesignGenerationProvenance,
+  isAssignedWebdesignSenderAllowed,
   buildWebdesignPipelineOptions,
   filterDesignPhotoRowsForServing,
   isDesignPhotoIncidentQuarantined,

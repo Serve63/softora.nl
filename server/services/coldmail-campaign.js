@@ -25,7 +25,7 @@ const { createColdmailProviderSentStats } = require('./coldmail-provider-sent-st
 const { createColdmailHistoricalOutboundGuard } = require('./coldmail-historical-outbound-guard'); const { hasPendingInstantlyQueue } = require('./instantly-queue-status');
 const { assertOutboundRecipientsNotSuppressed } = require('../security/outbound-mail-suppression');
 const previewImageCache = require('./coldmail-preview-image-cache');
-const { markIncidentQuarantinedDesignPhotosAuthoritative, markMissingDesignPhotosAuthoritative } = require('./design-photo-generation-policy');
+const { isAssignedWebdesignSenderAllowed, markIncidentQuarantinedDesignPhotosAuthoritative, markMissingDesignPhotosAuthoritative } = require('./design-photo-generation-policy');
 const {
   normalizePinnedRecipientLocationLines,
   resolveRecipientPlace,
@@ -5829,7 +5829,6 @@ function createColdmailCampaignService(deps = {}) {
       : null;
     const candidateRows = [];
     const selectedRows = [];
-
     for (const item of precheckedRows) {
       if (readyWebdesignMatcher && !readyWebdesignMatcher.hasRow(item.row, item.index)) {
         failed.push({
@@ -5841,6 +5840,7 @@ function createColdmailCampaignService(deps = {}) {
         });
         continue;
       }
+      if (readyWebdesignMatcher && !isAssignedWebdesignSenderAllowed(item.row, customerPhotoMap[getExplicitRowId(item.row)], input.senderEmail)) continue;
       candidateRows.push(item);
       selectedRows.push(item);
       if (selectedRows.length >= count) break;
@@ -7268,7 +7268,7 @@ function createColdmailCampaignService(deps = {}) {
         const websitePhoto = normalizeString(signed.websitePhotoUrl || signed.websitePhoto);
         const websiteMockup = normalizeString(signed.websiteMockupUrl || signed.websiteMockup);
         photoMap[exactMatch.customerId] = {
-          ...existing,
+          ...existing, legacyMeta: signed.legacyMeta || existing.legacyMeta,
           id: exactMatch.customerId,
           customerId: exactMatch.customerId,
           identityKey: buildRowIdentityKey(exactMatch.row),

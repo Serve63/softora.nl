@@ -9552,6 +9552,37 @@ test('coldmail preview for webdesign action fills from ready row-level website-d
   assert.equal(result.failedItems[0].id, 'missing-1');
 });
 
+test('new Softora webdesigns are selected only for the assigned sender while legacy designs stay available', async () => {
+  const rows = [
+    { id: 'serve-design', bedrijf: 'Serve Design BV', email: 'serve-design@example.test', status: 'prospect', mail: true },
+    { id: 'martijn-design', bedrijf: 'Martijn Design BV', email: 'martijn-design@example.test', status: 'prospect', mail: true },
+    { id: 'legacy-design', bedrijf: 'Legacy Design BV', email: 'legacy-design@example.test', status: 'prospect', mail: true },
+  ];
+  const { service } = createService({
+    rows,
+    dataOpsStore: {
+      async listDesignPhotosWithSignedUrls() {
+        return rows.map((row) => ({
+          customerId: row.id,
+          websitePhotoUrl: TINY_PNG_DATA_URL,
+          websiteMockupUrl: TINY_PNG_DATA_URL,
+          legacyMeta: row.id === 'legacy-design' ? {} : {
+            designOwnerEmail: row.id === 'serve-design' ? 'serve@softora.nl' : 'martijn@softora.nl',
+          },
+        }));
+      },
+    },
+  });
+  const serve = await service.getColdmailCampaignRecipients({
+    count: 3, service: "Website's", specialAction: 'webdesign', senderEmail: 'servec321@gmail.com',
+  });
+  const martijn = await service.getColdmailCampaignRecipients({
+    count: 3, service: "Website's", specialAction: 'webdesign', senderEmail: 'martijnven123@gmail.com',
+  });
+  assert.deepEqual(serve.recipients.map((recipient) => recipient.id).sort(), ['legacy-design', 'serve-design']);
+  assert.deepEqual(martijn.recipients.map((recipient) => recipient.id).sort(), ['legacy-design', 'martijn-design']);
+});
+
 test('coldmail webdesign selection cannot revive a quarantined structured asset from stale row URLs or photo state', async () => {
   const requestedCustomerIds = [];
   const quarantinedRows = [];

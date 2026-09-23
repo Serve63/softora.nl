@@ -2566,7 +2566,7 @@ test('instantly webhook rejects invalid secrets before changing data', async () 
 test('automatic upload selects only a designed Instantly lead and guards before API and activation', async () => {
   const campaigns = {
     serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
-    martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b',
+    martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd',
   };
   let harness;
   harness = createService({
@@ -2612,7 +2612,7 @@ test('automatic upload selects only a designed Instantly lead and guards before 
 test('automatic upload accepts a paused approved campaign without activating it', async () => {
   const campaigns = {
     serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
-    martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b',
+    martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd',
   };
   const harness = createService({
     now: '2026-09-17T09:00:00.000Z',
@@ -2639,7 +2639,7 @@ test('automatic upload accepts a paused approved campaign without activating it'
 test('automatic upload uses targeted design-photo reads instead of the heavy photo UI state', async () => {
   const campaigns = {
     serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
-    martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b',
+    martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd',
   };
   const photoReads = [];
   const harness = createService({
@@ -2700,17 +2700,17 @@ test('automatic upload uses targeted design-photo reads instead of the heavy pho
 });
 
 test('automatic upload routes the design owner to Martijn even when daily rotation would choose Servé', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const harness = createService({
     autoUploadEnabled: true, replacementCampaigns: campaigns,
-    rows: [{ id: 'martijn-design', bedrijf: 'Martijn ontwerp', email: 'info@martijn-design.test', website: 'https://martijn-design.test', mail: true, verantwoordelijk: 'Team' }],
-    photoMap: { 'martijn-design': { id: 'martijn-design', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly', senderName: 'Martijn van de Ven' } },
+    rows: [{ id: 'martijn-design', bedrijf: 'Martijn ontwerp', email: 'info@martijn-design.test', website: 'https://martijn-design.test', mail: true, verantwoordelijk: 'Servé Creusen' }],
+    photoMap: { 'martijn-design': { id: 'martijn-design', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly', legacyMeta: { designOwnerEmail: 'martijn@softora.nl', senderEmail: 'martijn@softora.nl' } } },
     coldmailingSettings: { senderEmail: 'serve@softora.nl', senders: {
       'serve@softora.nl': { subject: 'Design', body: 'Goedendag,\n\nMet vriendelijke groet,\nServé Creusen' },
       'martijn@softora.nl': { subject: 'Design', body: 'Goedendag,\n\nMet vriendelijke groet,\nMartijn van de Ven' },
     } },
     fetchJsonWithTimeout: async (url, options) => {
-      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Martijn van de Ven Softora.nl', status: 3 } };
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Martijn van de Ven Softora.nl - nieuwe leads', status: 2 } };
       if (url.endsWith('/leads/add')) {
         const lead = JSON.parse(options.body).leads[0];
         assert.equal(lead.custom_variables.softora_sender_name, 'Martijn van de Ven');
@@ -2724,12 +2724,14 @@ test('automatic upload routes the design owner to Martijn even when daily rotati
   assert.equal(result.owner, 'martijn');
   assert.equal(result.campaignId, campaigns.martijn);
   assert.equal(result.uploaded, 1);
+  assert.equal(result.activated, false);
+  assert.equal(harness.fetchCalls.some((call) => call.url.includes('/activate')), false);
   assert.equal(harness.getRows()[0].instantlyStatus, 'synced');
   assert.equal(harness.outboundGuardCalls[0].options.payload.senderProfileKey, 'martijn');
 });
 
 test('automatic upload stops before reservation and provider API for missing or conflicting design senders', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   for (const ownerFields of [{ verantwoordelijk: 'Team' }, { verantwoordelijk: 'Serve', senderProfileKey: 'martijn' }]) {
     const harness = createService({
       autoUploadEnabled: true, replacementCampaigns: campaigns,
@@ -2742,12 +2744,27 @@ test('automatic upload stops before reservation and provider API for missing or 
     assert.equal(harness.writes.length, 0);
   }
   assert.deepEqual(resolveInstantlyDesignOwner({ verantwoordelijk: 'Team' }, { senderProfileKey: 'martijn' }), { owner: 'martijn', reason: '' });
+  assert.deepEqual(resolveInstantlyDesignOwner({ verantwoordelijk: 'Serve' }, {
+    legacyMeta: { designOwnerEmail: 'martijn@softora.nl', senderEmail: 'martijn@softora.nl' },
+  }), { owner: 'martijn', reason: '' });
+  assert.deepEqual(resolveInstantlyDesignOwner({ verantwoordelijk: 'Serve' }, {
+    legacyMeta: { designOwnerEmail: 'martijn@softora.nl', senderEmail: 'serve@softora.nl' },
+  }), { owner: '', reason: 'conflicting_sender' });
   assert.deepEqual(resolveInstantlyDesignOwner({ verantwoordelijk: 'Serve' }, { senderEmail: 'martijn@softora.nl' }), { owner: '', reason: 'conflicting_sender' });
   assert.deepEqual(resolveInstantlyDesignOwner({ verantwoordelijk: 'Serve', replyMailboxAccount: 'martijnven123@gmail.com' }), { owner: '', reason: 'conflicting_sender' });
 });
 
 test('automatic Instantly upload cannot send without exact campaign config or central guard', async () => {
-  const disabled = createService({ replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' } });
+  const oldMartijnCampaign = createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: {
+      serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
+      martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b',
+    },
+  });
+  await assert.rejects(() => oldMartijnCampaign.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH' });
+  assert.equal(oldMartijnCampaign.fetchCalls.length, 0);
+  const disabled = createService({ replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' } });
   await assert.rejects(() => disabled.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_DISABLED' });
   const integrationDisabled = createService({ instantlyEnabled: false, autoUploadEnabled: true });
   await assert.rejects(() => integrationDisabled.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_INTEGRATION_DISABLED' });
@@ -2760,7 +2777,7 @@ test('automatic Instantly upload cannot send without exact campaign config or ce
   assert.equal(withoutCampaigns.fetchCalls.length, 0);
   const approved = {
     serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
-    martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b',
+    martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd',
   };
   const separateApproved = createService({
     autoUploadEnabled: true,
@@ -2801,7 +2818,7 @@ test('automatic Instantly upload cannot send without exact campaign config or ce
   assert.equal(malformedApproved.fetchCalls.length, 0);
   const withoutGuard = createService({
     autoUploadEnabled: true,
-    replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' },
+    replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' },
     outboundRecipientGuardStore: null,
     rows: [{ id: 'i', bedrijf: 'Instant', email: 'info@instant.test', website: 'https://instant.test', mail: true, webdesignMailProvider: 'instantly', verantwoordelijk: 'Serve' }],
     photoMap: { i: { id: 'i', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
@@ -2812,7 +2829,7 @@ test('automatic Instantly upload cannot send without exact campaign config or ce
 });
 
 test('automatic upload does not reactivate a completed campaign that still contains leads', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
@@ -2834,7 +2851,7 @@ test('automatic upload does not reactivate a completed campaign that still conta
 });
 
 test('automatic Instantly upload appends without truncating an already large legacy guard', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const originalEntries = Array.from({ length: 1001 }, (_, index) => ({ recipientEmail: `entry${index}@old.test`, recipientId: `old-entry-${index}` }));
   const originalRecipients = Array.from({ length: 3000 }, (_, index) => ({ recipientEmail: `recipient${index}@old.test`, recipientId: `old-recipient-${index}` }));
   const harness = createService({
@@ -2856,7 +2873,7 @@ test('automatic Instantly upload appends without truncating an already large leg
 });
 
 test('automatic Instantly upload resumes an already accepted lead without adding it twice', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
@@ -2873,7 +2890,7 @@ test('automatic Instantly upload resumes an already accepted lead without adding
 });
 
 test('automatic upload never reactivates an accepted lead whose design owner conflicts with the campaign', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const harness = createService({
     autoUploadEnabled: true, replacementCampaigns: campaigns,
     rows: [{ id: 'wrong-owner', email: 'wrong-owner@company.test', verantwoordelijk: 'Martijn',
@@ -2889,7 +2906,7 @@ test('automatic AirMail campaigns do not accept personal mailboxes even if legac
   const harness = createService({
     autoUploadEnabled: true,
     blockPersonalMailboxDomains: false,
-    replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' },
+    replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' },
     rows: [{ id: 'personal', bedrijf: 'Een bedrijf', email: 'bedrijf@gmail.com', website: 'https://bedrijf.test', mail: true }],
     photoMap: { personal: { id: 'personal', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
     fetchJsonWithTimeout: async () => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }),
@@ -2901,7 +2918,7 @@ test('automatic AirMail campaigns do not accept personal mailboxes even if legac
 });
 
 test('automatic upload releases the provisional guard and writes no permanent guard when the local queue persist fails', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
@@ -2922,7 +2939,7 @@ test('automatic upload releases the provisional guard and writes no permanent gu
 });
 
 test('automatic upload rolls back the local queue mark and releases when the legacy guard write fails', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
@@ -2940,7 +2957,7 @@ test('automatic upload rolls back the local queue mark and releases when the leg
 });
 
 test('automatic upload persists the local queue as a single-row upsert instead of a full replace', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
@@ -2969,7 +2986,7 @@ test('automatic upload persists the local queue as a single-row upsert instead o
 });
 
 test('automatic upload links the accepted provider lead without rereading every DataOps page', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const removed = [];
   const harness = createService({
     autoUploadEnabled: true,
@@ -2995,7 +3012,7 @@ test('automatic upload links the accepted provider lead without rereading every 
 });
 
 test('automatic upload recovers an accepted queued lead by exact remote identity without adding it twice', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const uploadId = 'instantly-auto-20260921T083006-serve';
   const removed = [];
   const harness = createService({
@@ -3027,7 +3044,7 @@ test('automatic upload recovers an accepted queued lead by exact remote identity
 });
 
 test('automatic upload clears a stranded local queue mark when the exact lead is absent at Instantly', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const uploadId = 'instantly-auto-20260921T090006-serve';
   const harness = createService({
     autoUploadEnabled: true,
@@ -3059,7 +3076,7 @@ test('automatic upload clears a stranded local queue mark when the exact lead is
 });
 
 test('exact Instantly capacity uses upload safety gates and design-owner campaign routing', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b' };
+  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
   const rows = [
     { id: 'serve-ready', bedrijf: 'Serve Klaar', email: 'info@serve-klaar.test', website: 'https://serve-klaar.test', mail: true, verantwoordelijk: 'Serve' },
     { id: 'martijn-ready', bedrijf: 'Martijn Klaar', email: 'info@martijn-klaar.test', website: 'https://martijn-klaar.test', mail: true, verantwoordelijk: 'Martijn' },
@@ -3088,7 +3105,7 @@ test('exact Instantly capacity uses upload safety gates and design-owner campaig
     fetchJsonWithTimeout: async (url) => ({
       response: { ok: true, status: 200 },
       data: {
-        name: url.includes(campaigns.martijn) ? 'Martijn van de Ven Softora.nl' : 'Servé Creusen Softora.nl',
+        name: url.includes(campaigns.martijn) ? 'Martijn van de Ven Softora.nl - nieuwe leads' : 'Servé Creusen Softora.nl',
         status: 2,
       },
     }),
