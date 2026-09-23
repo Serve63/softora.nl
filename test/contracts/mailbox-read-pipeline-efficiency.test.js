@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { createMailboxReadLimiter } = require('../../server/repositories/mailbox-read-evidence');
 const { createMailboxMessageReferenceLookup } = require('../../server/repositories/mailbox-message-reference-lookup');
 const { loadMailboxCampaignContactHistory } = require('../../server/services/mailbox-campaign-contact-history');
+const { createMailboxCampaignRepliesService } = require('../../server/services/mailbox-campaign-replies');
 const session = require('../../assets/premium-mailbox-owner-session');
 
 test('full fresh server body replaces an older loaded body without losing independent attachment evidence', () => {
@@ -75,4 +76,43 @@ test('incoming and sent contact reads run together and incomplete data cannot be
   args.mailboxIndexStore.listMessagesBySenderEmailsForAccounts = async () => [];
   args.mailboxIndexStore.listMessagesByRecipientEmailsForAccounts = async () => null;
   await assert.rejects(loadMailboxCampaignContactHistory(args), { status: 503 });
+});
+
+test('campaign Sent seed starts alongside incoming scans without losing incomplete-read errors', async () => {
+  const started = [];
+  const releases = [];
+  let seedResult = [];
+  const service = createMailboxCampaignRepliesService({
+    mailboxIndexStore: {
+      listMessagesForAccounts: ({ folder }) => {
+        started.push(`recent:${folder}`);
+        return new Promise((resolve) => releases.push(resolve));
+      },
+      listMatchingMessagesForAccounts: ({ folder }) => {
+        started.push(`matching:${folder}`);
+        return folder === 'sent'
+          ? Promise.resolve(seedResult)
+          : new Promise((resolve) => releases.push(resolve));
+      },
+    },
+    dataOpsStore: { listCustomersByEmails: async () => [] },
+  });
+
+  const first = service.listRepliesWithSnapshot({ owner: 'serve' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(started.filter((name) => name.startsWith('recent:')).length, 3);
+  assert.equal(started.filter((name) => name.startsWith('matching:') && name !== 'matching:sent').length, 3);
+  assert.equal(started.includes('matching:sent'), true);
+  releases.splice(0).forEach((resolve) => resolve([]));
+  assert.deepEqual(await first, { messages: [], snapshotMessages: [] });
+
+  for (const invalidSeed of [null, undefined]) {
+    seedResult = invalidSeed;
+    started.length = 0;
+    const second = service.listRepliesWithSnapshot({ owner: 'serve' });
+    await new Promise((resolve) => setImmediate(resolve));
+    releases.splice(0).forEach((resolve) => resolve([]));
+    await assert.rejects(second, { status: 503 });
+    assert.equal(started.filter((name) => name === 'matching:sent').length, 1);
+  }
 });

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createMailboxCampaignRepliesService, listExactSentDescendants } = require('../../server/services/mailbox-campaign-replies');
 
-test('recente en historische inboxscans starten onafhankelijk en behouden alle mappen', async () => {
+test('recente en historische inboxscans plus Sent-seed starten onafhankelijk en behouden alle mappen', async () => {
   let releaseRecent;
   const recent = new Promise((resolve) => { releaseRecent = resolve; });
   const matchingFolders = [];
@@ -15,7 +15,7 @@ test('recente en historische inboxscans starten onafhankelijk en behouden alle m
     logger: { info() {} },
   });
   const pending = service.listReplies({ owner: 'serve', hydrateBodies: false });
-  assert.deepEqual(matchingFolders, ['coldmail', 'inbox', 'allmail']);
+  assert.deepEqual(matchingFolders, ['coldmail', 'inbox', 'allmail', 'sent']);
   releaseRecent([]);
   assert.deepEqual(await pending, []);
   assert.deepEqual(matchingFolders, ['coldmail', 'inbox', 'allmail', 'sent']);
