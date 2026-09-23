@@ -1375,7 +1375,7 @@
         </div>
     </div><script src="assets/premium-database-photo-batch.js?v=20260917-source"></script><script src="assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui"></script>
     <script src="assets/premium-database-webdesign-asset-state.js?v=20260914-provider"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20260817a"></script><script src="assets/premium-database-webdesign-job-restore.js?v=20260723a"></script><script src="assets/premium-database-webdesign-variant-picker.js?v=20260726a"></script><script src="assets/premium-database-instantly-status.js?v=20260921-counts"></script><script src="assets/premium-database-webdesign-action.js?v=20260921-mailready-parity"></script><script src="assets/premium-database-webdesign-preview.js?v=20260909-mailsysteem"></script><script src="assets/premium-database-lead-delete.js?v=20260716a"></script>
-    <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-boot.js?v=20260923-phase-timing"></script><script src="assets/premium-database-sent-register.js?v=20260915-haaren-order-1"></script><script src="assets/premium-database-system-mail-count.js?v=20260923-fresh-stats"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
+    <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-boot.js?v=20260923-single-final-render"></script><script src="assets/premium-database-sent-register.js?v=20260915-haaren-order-1"></script><script src="assets/premium-database-system-mail-count.js?v=20260923-fresh-stats"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260914-provider"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
@@ -1874,7 +1874,7 @@
         }
         async function loadMailReadySnapshot() { return window.SoftoraDatabaseMailReadySnapshot.loadAndPublish({ renderPage: renderPage, databaseHadBootstrapCustomers: databaseHadBootstrapCustomers, state: state, normalizeCustomer: normalizeCustomer, applyCustomerList: applyCustomerList, fetchJsonWithTimeout: window.SoftoraDatabaseResilience.fetchJsonWithTimeout, logger: console }); }
         function customerListsDiffer(nextCustomers) { return state.klanten !== nextCustomers; }
-        function applyCustomerList(nextCustomers, forceRender, alreadyCanonical) { const reconciledCustomers = alreadyCanonical ? nextCustomers : window.SoftoraDatabaseMailReadySnapshot.reconcileCustomerList(state, nextCustomers); const changed = Boolean(forceRender) || customerListsDiffer(reconciledCustomers); logDatabaseMediaDebug("apply-customer-list", { currentCount: state.klanten.length, nextCount: reconciledCustomers.length, forceRender: Boolean(forceRender), changed: changed }); databaseRenderRuntime.searchHaystackCache = new WeakMap(); state.klanten = reconciledCustomers; if (changed) renderPage(); }
+        function applyCustomerList(nextCustomers, forceRender, alreadyCanonical, deferRender) { const reconciledCustomers = alreadyCanonical ? nextCustomers : window.SoftoraDatabaseMailReadySnapshot.reconcileCustomerList(state, nextCustomers); const changed = Boolean(forceRender) || customerListsDiffer(reconciledCustomers); logDatabaseMediaDebug("apply-customer-list", { currentCount: state.klanten.length, nextCount: reconciledCustomers.length, forceRender: Boolean(forceRender), changed: changed }); databaseRenderRuntime.searchHaystackCache = new WeakMap(); state.klanten = reconciledCustomers; if (changed && !deferRender) renderPage(); }
         function persistCustomerList(customers) {
             const normalizedCustomers = sortCustomers(customers).filter(function (item) {
                 return !isDerivedOrderPlaceholderCustomer(item);
@@ -2745,7 +2745,7 @@
             toast("✓ CSV gedownload");
         }
 
-        async function bootstrapCustomers(bootstrapOptions) { const skipPhotoRestore = Boolean(bootstrapOptions && bootstrapOptions.skipPhotoRestore);
+        async function bootstrapCustomers(bootstrapOptions) { const skipPhotoRestore = Boolean(bootstrapOptions && bootstrapOptions.skipPhotoRestore), deferRender = Boolean(bootstrapOptions && bootstrapOptions.deferRender);
             const hadBootstrapCustomers = state.klanten.length > 0;
             if (!hadBootstrapCustomers) { state.dataLoading = true; state.dataUnavailable = false; renderPage(); }
             try {
@@ -2768,7 +2768,7 @@
                 const outreachAutomation = outreachController.applyAutomation(canonicalCustomers);
                 const sortedCustomers = getSortedCustomers(outreachAutomation.customers); window.performance?.mark?.("softora:database:sorted");
                 state.dataLoading = false; state.dataUnavailable = false; state.remoteCustomersLoaded = true; lastCustomerRefreshAtMs = Date.now();
-                applyCustomerList(sortedCustomers, false, true); window.performance?.mark?.("softora:database:applied");
+                applyCustomerList(sortedCustomers, false, true, deferRender); window.performance?.mark?.("softora:database:applied");
                 if (outreachAutomation.changed) void persistCustomerList(sortedCustomers);
                 if (coldmailGuardLoadError && !coldmailGuardReady) setStatusMessage("Verzendbeveiliging tijdelijk niet geladen; mailklare teller is geblokkeerd.", "error", true);
                 else if (!coldmailGuardLoadError) setStatusMessage("");
