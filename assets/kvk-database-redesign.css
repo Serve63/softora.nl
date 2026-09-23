@@ -103,8 +103,8 @@ button,input,select,textarea{font-family:inherit}
 .latest-treated-panel th{font-size:9px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase}
 .latest-treated-panel td{font-size:13px}
 .latest-treated-panel td strong{font-size:13px;font-weight:600}
-@media(min-width:701px){.app-shell{grid-template-rows:60px 100px 74px minmax(90px,.8fr) minmax(120px,1.2fr)}}
-@media(max-width:700px){.app-shell{grid-template-rows:82px 145px 130px minmax(110px,1fr) minmax(130px,1fr)}}
+@media(min-width:701px){.app-shell{grid-template-rows:60px 100px 74px repeat(2,minmax(100px,1fr))}}
+@media(max-width:700px){.app-shell{grid-template-rows:82px 145px 130px repeat(2,minmax(110px,1fr))}}
 
 /* Contextual legend, opened by the help button. Native popover supports Escape and outside click. */
 .planning-title-row{justify-content:flex-start;gap:8px}

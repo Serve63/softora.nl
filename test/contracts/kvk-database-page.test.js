@@ -115,7 +115,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijvendatabase<\/h1>/);
-  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260923q/);
+  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260923r/);
   assert.match(pageSource, /<button class="transfer-button" type="button" disabled>Upload naar mailsysteem/);
   assert.match(pageSource, /id="companies-treated"/);
   assert.match(pageSource, /id="companies-total-card" class="stat-card stat-card-directory kvk-stat-card-enhanced"/);
@@ -474,6 +474,7 @@ test('kvk database hides the page scrollbar without disabling scrolling', () => 
 test('kvk database balances activity and planning equally inside one desktop viewport', () => {
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const compactStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-compact.css'), 'utf8');
+  const redesignStyleSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-redesign.css'), 'utf8');
 
   assert.match(pageSource, /kvk-database-planning\.css[^>]*>[\s\S]*kvk-database-compact\.css\?v=20260909e/);
   assert.match(compactStyleSource, /\.database-fill-toggle,\s*\.stat-card,\s*\.panel\s*\{[^}]*box-shadow:\s*none/);
@@ -489,6 +490,8 @@ test('kvk database balances activity and planning equally inside one desktop vie
   assert.match(compactStyleSource, /\.latest-treated-panel \.table-frame,[\s\S]*max-height:\s*none/);
   assert.match(compactStyleSource, /\.workspace-grid\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0/);
   assert.match(compactStyleSource, /\.planning-panel\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0/);
+  assert.match(redesignStyleSource, /@media\(min-width:701px\)\{\.app-shell\{grid-template-rows:60px 100px 74px repeat\(2,minmax\(100px,1fr\)\)/);
+  assert.match(redesignStyleSource, /@media\(max-width:700px\)\{\.app-shell\{grid-template-rows:82px 145px 130px repeat\(2,minmax\(110px,1fr\)\)/);
 });
 
 test('kvk database page loads its protected live snapshot with an empty embedded bootstrap', () => {
