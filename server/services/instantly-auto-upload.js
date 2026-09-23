@@ -1,5 +1,10 @@
+const { createHash } = require('node:crypto');
 const { resolveInstantlyDesignOwner } = require('./instantly-design-owner');
 const { isRemoteLeadConfirmedSent } = require('./instantly-campaign-replacement');
+
+const MAX_AUTO_UPLOAD_BATCH = 500;
+// Leave time for the canonical POST to respond before the cron's HTTP timeout.
+const AUTO_UPLOAD_RUN_BUDGET_MS = 90 * 1000;
 
 const APPROVED_CAMPAIGNS = Object.freeze({
   serve: { id: '7a94c361-d83c-4857-9395-e9c5ba603f90', name: 'Servé Creusen Softora.nl - frisse start' },
@@ -338,7 +343,6 @@ function createInstantlyAutoUpload(deps = {}) {
     const syncedToday = rows.filter((row) =>
       formatDateKeyForTimeZone(row && row.instantlySyncedAt, config.dailyCapTimeZone) === today
     ).length;
-    const remainingToday = Math.max(0, Number(config.dailyCap || 0) - syncedToday);
     const total = availableByOwner.serve + availableByOwner.martijn;
     return {
       ok: true,
@@ -346,8 +350,11 @@ function createInstantlyAutoUpload(deps = {}) {
       total,
       syncedToday,
       dailyCap: Number(config.dailyCap || 0),
-      remainingToday,
-      uploadableToday: Math.min(total, remainingToday),
+      remainingToday: Math.max(0, Number(config.dailyCap || 0) - syncedToday),
+      // The daily cap still applies to legacy sync, not to preparing leads
+      // in the approved campaigns. Instantly controls the actual send pace.
+      uploadableToday: total,
+      automaticUploadUncapped: true,
       unresolvedSender,
       campaigns: Object.fromEntries(['serve', 'martijn'].map((owner, index) => [owner, {
         id: APPROVED_CAMPAIGNS[owner].id,
@@ -363,7 +370,7 @@ function createInstantlyAutoUpload(deps = {}) {
     };
   }
 
-  async function run(input = {}) {
+  async function runOne(input = {}) {
     assertAutoReady();
     // Never use the destructive campaign-replacement operation or an unchecked CSV import.
     assertApprovedCampaign('serve');
@@ -384,15 +391,10 @@ function createInstantlyAutoUpload(deps = {}) {
     // failed. Resume only an exact approved Completed campaign, never a paused one.
     const recovered = await recoverAcceptedLeadCampaign(rows);
     if (recovered) return { ok: true, skipped: true, reason: 'accepted_campaign_reactivated', ...recovered, finishedAt: at };
-    const today = formatDateKeyForTimeZone(at, config.dailyCapTimeZone);
-    const syncedToday = rows.filter((row) =>
-      formatDateKeyForTimeZone(row && row.instantlySyncedAt, config.dailyCapTimeZone) === today
-    ).length;
-    if (syncedToday >= config.dailyCap) {
-      return { ok: true, skipped: true, reason: 'daily_cap', syncedToday, cap: config.dailyCap, finishedAt: at };
-    }
     const screeningContext = await loadContext(rows, null, { autoMailReadyOnly: true });
-    const selected = await collectEligibleRows(rows, 1, screeningContext);
+    // Look one lead ahead so a single-lead batch can finish without a second
+    // full DataOps read after the provider has accepted that lead.
+    const selected = await collectEligibleRows(rows, 2, screeningContext);
     const item = selected && selected.selectedRows && selected.selectedRows[0];
     if (!item) {
       return { ok: true, skipped: true, reason: 'no_mailready_instantly_leads', finishedAt: at };
@@ -429,7 +431,10 @@ function createInstantlyAutoUpload(deps = {}) {
         'INSTANTLY_AUTO_DESIGN_SENDER_SELECTION_CHANGED', 503);
     }
     const lead = await buildLead(item, context);
-    const uploadId = `instantly-auto-${at.replace(/[^0-9a-z]+/gi, '').slice(0, 15)}-${owner}`;
+    // Several leads can now be prepared within one second; the customer hash
+    // keeps each durable reservation and recovery link unambiguous.
+    const customerHash = createHash('sha256').update(text(item.id)).digest('hex').slice(0, 12);
+    const uploadId = `instantly-auto-${at.replace(/[^0-9a-z]+/gi, '').slice(0, 15)}-${owner}-${customerHash}`;
     lead.custom_variables = { ...(lead.custom_variables || {}), softora_instantly_upload_id: uploadId };
     const reservation = await reserveRows([item], { actor, uploadId, campaignId: approved.id, sender, provisional: true });
     if (!reservation || reservation.ok !== true || Number(reservation.count) < 1 ||
@@ -513,7 +518,65 @@ function createInstantlyAutoUpload(deps = {}) {
         { campaignId: approved.id, customerId: item.id, uploadId, email: lead.email, leadId: text(createdLead.id) });
     }
 
-    return { ok: true, uploaded: 1, activated, owner, campaignId: approved.id, finishedAt: at };
+    return { ok: true, uploaded: 1, activated, owner, campaignId: approved.id,
+      moreAvailable: selected.selectedRows.length > 1, finishedAt: at };
+  }
+
+  async function run(input = {}) {
+    const requested = Number(input.limit);
+    const limit = Number.isFinite(requested) && requested > 0
+      ? Math.min(Math.floor(requested), MAX_AUTO_UPLOAD_BATCH)
+      : MAX_AUTO_UPLOAD_BATCH;
+    const started = Date.now();
+    const distribution = { serve: 0, martijn: 0 };
+    let uploaded = 0;
+    let recovered = 0;
+    let lastUpload = null;
+    let lastRecovery = null;
+
+    // Reuse the proven per-recipient guard -> local queue -> permanent guard
+    // -> Instantly acceptance -> local link sequence. A response is never
+    // retried after an ambiguous provider effect; the next run reconciles it.
+    for (let attempts = 0; attempts < limit + 20 && Date.now() - started < AUTO_UPLOAD_RUN_BUDGET_MS; attempts += 1) {
+      let result;
+      try {
+        result = await runOne(input);
+      } catch (error) {
+        if (!uploaded) throw error;
+        // Stop after any ambiguous provider effect. The next invocation first
+        // reconciles queued rows; permanent guards prevent a duplicate send.
+        return {
+          ok: false, code: text(error && error.code) || 'INSTANTLY_AUTO_BATCH_INTERRUPTED',
+          uploaded, distribution, recovered, hasMore: true,
+          finishedAt: now().toISOString(),
+        };
+      }
+      if (Number(result && result.uploaded) === 1) {
+        uploaded += 1;
+        distribution[result.owner] += 1;
+        lastUpload = result;
+        if (!result.moreAvailable) {
+          return { ...lastUpload, uploaded, distribution, recovered, hasMore: false, finishedAt: now().toISOString() };
+        }
+        if (uploaded >= limit) break;
+        continue;
+      }
+      if (result && ['moved_leads_linked', 'accepted_lead_linked', 'accepted_campaign_reactivated'].includes(result.reason)) {
+        recovered += 1;
+        lastRecovery = result;
+        continue;
+      }
+      if (!uploaded) return { ...(lastRecovery || result), recovered, hasMore: false };
+      return { ...lastUpload, uploaded, distribution, recovered, hasMore: false, finishedAt: now().toISOString() };
+    }
+    return {
+      ...(lastUpload || lastRecovery || { ok: true }),
+      uploaded,
+      distribution,
+      recovered,
+      hasMore: true,
+      finishedAt: now().toISOString(),
+    };
   }
 
   return { getCapacity, run };

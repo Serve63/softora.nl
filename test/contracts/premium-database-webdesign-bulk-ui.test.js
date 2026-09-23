@@ -301,6 +301,22 @@ test('webdesign bulk hides a running bar after its final successful photo refres
   assert.equal(photoRefreshes, 1);
 });
 
+test('completed batch starts the canonical Instantly upload immediately', async () => {
+  const uploads = [];
+  const { context } = createHarness(async (url, options = {}) => {
+    if (String(url) === '/api/outreach/provider-upload') {
+      uploads.push(JSON.parse(options.body));
+      return { ok: true, json: async () => ({ ok: true, hasMore: uploads.length === 1 }) };
+    }
+    return { ok: true, json: async () => ({ batches: [{ id: 'done-upload', status: 'done', total: 2, made: 2, failed: 0, finishedAt: Date.now() }] }) };
+  });
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+  await controller.loadLatestBatch();
+  await new Promise((resolve) => setImmediate(resolve));
+  await controller.loadLatestBatch();
+  assert.deepEqual(uploads.map((entry) => entry.mode), ['auto', 'auto']);
+});
+
 test('webdesign bulk close button stays visible for a completed restored batch', async () => {
   const fetchCalls = [];
   const { context, document } = createHarness(async (url) => {
