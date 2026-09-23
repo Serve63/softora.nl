@@ -418,6 +418,7 @@ test('premium database customer route returns a bounded structured page', async 
   assert.equal(calls[0].offset, '750');
   assert.equal(calls[0].limit, '750');
   assert.equal(calls[0].metaOnly, false);
+  assert.equal(calls[0].suppressTransientReadFailureLog, false);
 });
 
 test('premium database customer route returns the complete canonical client view', async () => {

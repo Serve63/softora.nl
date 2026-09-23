@@ -1821,6 +1821,37 @@ test('premium database customer loader fetches every structured page and skips u
   assert.deepEqual(requests, ['/api/premium-database/customers?meta=1']);
 });
 
+test('premium database customer loader retries one transient 503 and still requires a complete snapshot', async () => {
+  const client = loadPremiumDatabaseCustomersClient();
+  const requests = [];
+  const fetchJsonWithTimeout = async (url) => {
+    requests.push(url);
+    if (requests.length === 1) {
+      return { ok: false, status: 503, json: async () => ({ ok: false, error: 'Tijdelijk niet beschikbaar' }) };
+    }
+    return { ok: true, status: 200, json: async () => ({
+      ok: true, customers: url.includes('meta=1') ? [] : [{ id: 'customer-1' }],
+      total: 1, snapshotVersion: '1:v1',
+    }) };
+  };
+
+  const loaded = await client.load({ fetchJsonWithTimeout });
+  assert.equal(loaded.total, 1);
+  assert.deepEqual(loaded.customers.map((customer) => customer.id), ['customer-1']);
+  assert.deepEqual(requests, [
+    '/api/premium-database/customers?offset=0&limit=1000',
+    '/api/premium-database/customers?offset=0&limit=1000',
+    '/api/premium-database/customers?meta=1',
+  ]);
+
+  let failedRequests = 0;
+  await assert.rejects(client.load({ fetchJsonWithTimeout: async () => {
+    failedRequests += 1;
+    return { ok: false, status: 503, json: async () => ({ ok: false }) };
+  } }), /Klantdatabase laden mislukt/);
+  assert.equal(failedRequests, 2, 'the shared retry budget must stay bounded');
+});
+
 test('mail-ready snapshot client preserves valid rows when a response has a count without category rows', async () => {
   const warnings = [];
   const client = loadDatabaseMailReadySnapshotClient({ console: { warn: (...args) => warnings.push(args) } });
@@ -2080,7 +2111,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260923-pages/);
+  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260923-retry/);
   assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260923-archive/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);

@@ -6,6 +6,7 @@
     const PAGE_CONCURRENCY = 4;
     const MAX_CUSTOMERS = 25000;
     const REQUEST_TIMEOUT_MS = 12000;
+    const TRANSIENT_RETRY_DELAY_MS = 250;
 
     function buildUrl(offset, limit, metaOnly) {
         if (metaOnly) return ENDPOINT + "?meta=1";
@@ -15,22 +16,29 @@
     async function fetchPage(config, offset, limit, metaOnly) {
         const fetchJsonWithTimeout = config.fetchJsonWithTimeout;
         if (typeof fetchJsonWithTimeout !== "function") throw new Error("Database-ophaalroute ontbreekt.");
-        const response = await fetchJsonWithTimeout(buildUrl(offset, limit, metaOnly), {
-            method: "GET",
-            cache: "no-store",
-            credentials: "same-origin"
-        }, REQUEST_TIMEOUT_MS);
-        const payload = await response.json().catch(function () { return {}; });
-        if (!response.ok || !payload || payload.ok !== true) {
-            throw new Error(String(payload && payload.error || "Klantdatabase laden mislukt (" + response.status + ")"));
+        while (true) {
+            const response = await fetchJsonWithTimeout(buildUrl(offset, limit, metaOnly), {
+                method: "GET",
+                cache: "no-store",
+                credentials: "same-origin"
+            }, REQUEST_TIMEOUT_MS);
+            const payload = await response.json().catch(function () { return {}; });
+            if (!response.ok || !payload || payload.ok !== true) {
+                if ([502, 503, 504].includes(Number(response.status)) && config.transientRetriesRemaining > 0) {
+                    config.transientRetriesRemaining -= 1;
+                    await new Promise(function (resolve) { setTimeout(resolve, TRANSIENT_RETRY_DELAY_MS); });
+                    continue;
+                }
+                throw new Error(String(payload && payload.error || "Klantdatabase laden mislukt (" + response.status + ")"));
+            }
+            const total = Math.max(0, Number(payload.total) || 0);
+            if (total > MAX_CUSTOMERS) throw new Error("Klantdatabase is groter dan de veilige paginagrens.");
+            return {
+                customers: Array.isArray(payload.customers) ? payload.customers : [],
+                total: total,
+                snapshotVersion: String(payload.snapshotVersion || "").trim()
+            };
         }
-        const total = Math.max(0, Number(payload.total) || 0);
-        if (total > MAX_CUSTOMERS) throw new Error("Klantdatabase is groter dan de veilige paginagrens.");
-        return {
-            customers: Array.isArray(payload.customers) ? payload.customers : [],
-            total: total,
-            snapshotVersion: String(payload.snapshotVersion || "").trim()
-        };
     }
 
     function dedupeCustomers(customers) {
@@ -83,7 +91,7 @@
     }
 
     async function load(config) {
-        const options = config || {};
+        const options = { ...(config || {}), transientRetriesRemaining: 1 };
         const previousSnapshotVersion = String(options.previousSnapshotVersion || "").trim();
         if (previousSnapshotVersion) {
             const meta = await fetchPage(options, 0, 1, true);
