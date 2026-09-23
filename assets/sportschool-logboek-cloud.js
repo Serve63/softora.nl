@@ -95,7 +95,8 @@
         // Persist the draft before any request; a failed login/network call must never discard it.
         apply(merged); remember(remote);
         status('saving');
-        const result = await request('POST', { snapshot: { ...merged, updatedAt: now() },
+        // Use the server's clock for freshness; a device clock must not block later saves.
+        const result = await request('POST', { snapshot: { ...merged, updatedAt: remote.updatedAt },
           baseUpdatedAt: remote.updatedAt, source: 'sportschool-logboek-cloud' });
         if (result.conflict) {
           if (++conflictCount <= 1) { rerun = true; return; }

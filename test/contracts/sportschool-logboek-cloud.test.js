@@ -52,6 +52,7 @@ test('a newer device-only weight is identified; reading never overwrites either 
   await client.useLocal();
   assert.equal(app.status.kind, 'synced');
   assert.equal(app.snapshot.exerciseSources['name:PRESS'].kg, '95');
+  assert.equal(app.server.posts[0].snapshot.updatedAt, app.server.posts[0].baseUpdatedAt);
   assert.equal(projectExercises(app.snapshot, '2026-09-23')[0].kg, '95');
   assert.equal(projectExercises(app.snapshot, '2026-09-21')[0].kg, '95');
   const other = setup(null, app.snapshot); await other.client().refresh();
