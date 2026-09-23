@@ -2,10 +2,12 @@
     "use strict";
 
     const ENDPOINT = "/api/premium-database/mail-ready-snapshot";
+    const ARCHIVE_ENDPOINT = ENDPOINT + "/archive";
     const PAGE_LIMIT = 4500;
     const BOOTSTRAP_ROW_LIMIT = 100;
     const MAX_SNAPSHOT_ROWS = 25000;
     const FIRST_PAGE_TIMEOUT_MS = 90000;
+    const ARCHIVE_TIMEOUT_MS = 30000;
     const NEXT_PAGE_TIMEOUT_MS = 90000;
     const PAGE_CONCURRENCY = 3;
     const RESTORE_RETRY_DELAYS_MS = [2000, 6000, 15000, 30000];
@@ -363,6 +365,22 @@
         return { payload: payload, rows: rows, availableRows: availableRows, instantlyReadyRows: instantlyReadyRows, total: total, availableTotal: availableTotal, instantlyReadyTotal: instantlyReadyTotal, generatedAt: String(payload.generatedAt || "").trim(), snapshotVersion: String(payload.snapshotVersion || "").trim() };
     }
 
+    async function fetchSnapshotArchive(config) {
+        const response = await config.fetchJsonWithTimeout(ARCHIVE_ENDPOINT, { method: "GET", cache: "no-store" }, ARCHIVE_TIMEOUT_MS);
+        if (!response.ok) throw new Error("Mailklare archiefrespons niet beschikbaar (" + response.status + ")");
+        const payload = await response.json().catch(function () { return {}; });
+        const rows = Array.isArray(payload.customers) ? payload.customers : [];
+        const availableRows = Array.isArray(payload.availableCustomers) ? payload.availableCustomers : [];
+        const instantlyReadyRows = Array.isArray(payload.instantlyReadyCustomers) ? payload.instantlyReadyCustomers : [];
+        const maxRows = Math.max(rows.length, availableRows.length, instantlyReadyRows.length);
+        if (payload.ok !== true || !String(payload.generatedAt || "").trim() || !String(payload.snapshotVersion || "").trim() ||
+            !isSnapshotPayloadCoherent(payload) || !isFoundSnapshotCategoryCoherent(payload.foundTotal, payload.foundCustomerIds) ||
+            maxRows > MAX_SNAPSHOT_ROWS) throw new Error("Mailklaar archief was onvolledig; laatste geldige tabel blijft actief.");
+        return { payload: payload, rows: rows, availableRows: availableRows, instantlyReadyRows: instantlyReadyRows,
+            total: rows.length, availableTotal: availableRows.length, instantlyReadyTotal: instantlyReadyRows.length,
+            generatedAt: String(payload.generatedAt).trim(), snapshotVersion: String(payload.snapshotVersion).trim() };
+    }
+
     function normalizeSnapshotRows(rows, offset, normalizeCustomer) {
         return dedupeCustomers((Array.isArray(rows) ? rows : []).map(function (row, index) {
             return normalizeSnapshotCustomer(row, offset + index, normalizeCustomer);
@@ -447,7 +465,15 @@
         config.fetchJsonWithTimeout = fetchJsonWithTimeout;
         state.mailReadySnapshotPending = true;
         try {
-            const firstPage = await fetchSnapshotPage(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS);
+            let firstPage = null;
+            if (config.useSnapshotArchive !== false) {
+                try {
+                    firstPage = await fetchSnapshotArchive(config);
+                } catch (_archiveError) {
+                    // Oudere servers en oversized archieven houden de bestaande paginering.
+                }
+            }
+            if (!firstPage) firstPage = await fetchSnapshotPage(config, PAGE_LIMIT, 0, FIRST_PAGE_TIMEOUT_MS);
             let snapshotCustomers = normalizeSnapshotRows(firstPage.rows, 0, config.normalizeCustomer);
             let availableCustomers = normalizeAvailableSnapshotRows(firstPage.availableRows, 0, config.normalizeCustomer);
             let instantlyReadyCustomers = normalizeInstantlyReadySnapshotRows(firstPage.instantlyReadyRows, 0, config.normalizeCustomer);

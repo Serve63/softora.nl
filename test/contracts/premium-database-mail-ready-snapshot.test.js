@@ -1,6 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
+const { gunzipSync } = require('node:zlib');
+const express = require('express');
+const compression = require('compression');
+const { encodePremiumDatabaseSnapshotArchive, MAX_ARCHIVE_BYTES } = require('../../server/services/premium-database-snapshot-archive');
 
 const {
   COLDMAIL_SEND_GUARD_KEY,
@@ -335,6 +339,68 @@ test('premium database mail-ready snapshot honors limit and offset', async () =>
 
   const capped = await service.buildMailReadySnapshot({ limit: 99999 });
   assert.equal(capped.limit, 4500);
+});
+
+test('premium database archive serves every category in one bounded compressed response', async () => {
+  const availableCustomers = Array.from({ length: 5001 }, (_row, index) => ({
+    id: `available-${index}`, bedrijf: `Beschikbaar ${index}`, availableSnapshot: true,
+  }));
+  const { service } = createService({
+    durableUpdatedAt: '2026-06-16T12:00:00.000Z',
+    nowMs: () => Date.parse('2026-06-16T12:00:10.000Z'),
+    durableSnapshot: {
+      version: 2, generatedAt: '2026-06-16T12:00:00.000Z',
+      total: 1, customers: [{ id: 'ready-1', mailReady: true, mailReadySnapshot: true }],
+      availableTotal: availableCustomers.length, availableCustomers,
+      instantlyReadyTotal: 0, instantlyReadyCustomers: [], foundCustomerIds: ['ready-1'],
+    },
+  });
+  const response = {
+    headers: {}, statusCode: 0, body: null,
+    setHeader(name, value) { this.headers[name] = value; return this; },
+    status(code) { this.statusCode = code; return this; },
+    end(body) { this.body = body; return this; },
+    json(body) { this.body = body; return this; },
+  };
+
+  await service.sendMailReadySnapshotArchiveResponse({}, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['Content-Encoding'], 'gzip');
+  assert.equal(response.headers['Cache-Control'], 'private, no-store, max-age=0');
+  assert.ok(Number(response.headers['Content-Length']) <= MAX_ARCHIVE_BYTES);
+  assert.match(response.headers['Server-Timing'], /snapshot;dur=\d+, encode;dur=\d+/);
+  const payload = JSON.parse(gunzipSync(response.body).toString('utf8'));
+  assert.equal(payload.limit, 25000);
+  assert.equal(payload.availableTotal, 5001);
+  assert.equal(payload.availableCustomers.length, 5001);
+  assert.equal(payload.availableCustomers.some((row) => row.id === 'available-5000'), true);
+  assert.deepEqual(payload.foundCustomerIds, ['ready-1']);
+});
+
+test('premium database archive rejects payloads above its response cap', async () => {
+  await assert.rejects(encodePremiumDatabaseSnapshotArchive({ rows: ['one', 'two'] }, 12),
+    (error) => error.statusCode === 413);
+});
+
+test('premium database archive remains readable through Express compression middleware', async (t) => {
+  const app = express();
+  app.use(compression());
+  app.get('/archive', async (_req, res) => {
+    const { buffer } = await encodePremiumDatabaseSnapshotArchive({ ok: true, total: 1, customers: [{ id: 'ready-1' }] });
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Encoding', 'gzip');
+    res.status(200).end(buffer);
+  });
+  const server = await new Promise((resolve) => {
+    const listening = app.listen(0, '127.0.0.1', () => resolve(listening));
+  });
+  t.after(() => server.close());
+
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/archive`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-encoding'), 'gzip');
+  assert.deepEqual(await response.json(), { ok: true, total: 1, customers: [{ id: 'ready-1' }] });
 });
 
 test('premium database snapshot deduplicates customer ids and embeds bootstrap photo URLs', async () => {

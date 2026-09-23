@@ -9,6 +9,7 @@ const {
   createPremiumDatabaseSnapshotCacheCodec,
 } = require('./premium-database-snapshot-cache');
 const { createPremiumDatabaseSnapshotDurableReader } = require('./premium-database-snapshot-durable-reader');
+const { createPremiumDatabaseSnapshotArchiveResponder } = require('./premium-database-snapshot-archive');
 const SNAPSHOT_SOURCE = 'structured-mail-ready-snapshot';
 const MAIL_READY_SNAPSHOT_CACHE_SCOPE = 'premium_database_mail_ready_snapshot_cache';
 const MAIL_READY_SNAPSHOT_CACHE_KEY = 'softora_premium_database_mail_ready_snapshot_v1';
@@ -1104,7 +1105,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   }
 
   async function buildMailReadySnapshot(options = {}) {
-    const limit = parsePositiveInt(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT);
+    const limit = options.allRows === true ? SNAPSHOT_STORAGE_MAX_ROWS : parsePositiveInt(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT);
     const offset = parsePositiveInt(options.offset, 0, 0, MAX_OFFSET);
     const snapshotData = await getMailReadySnapshotData({
       requireFoundSnapshot: options.includeFoundSnapshot === true,
@@ -1164,6 +1165,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 
   return {
     buildMailReadySnapshot,
+    sendMailReadySnapshotArchiveResponse: createPremiumDatabaseSnapshotArchiveResponder({ buildSnapshot: buildMailReadySnapshot, nowMs, logger, source: SNAPSHOT_SOURCE }),
     invalidate,
     markCustomersMailReadyAfterAssetUpsert,
     markCustomersAvailableAfterAssetRemoval,

@@ -30,6 +30,12 @@ function registerPremiumDatabaseImportRoutes(app, deps = {}) {
     customersPageCoordinator.sendCustomersPageResponse(req, res)
   );
 
+  app.get('/api/premium-database/mail-ready-snapshot/archive', requirePremiumApiAccess, (req, res) =>
+    mailReadySnapshotService && typeof mailReadySnapshotService.sendMailReadySnapshotArchiveResponse === 'function'
+      ? mailReadySnapshotService.sendMailReadySnapshotArchiveResponse(req, res)
+      : res.status(503).json({ ok: false, error: 'Mailklare snapshot is tijdelijk niet beschikbaar.' })
+  );
+
   app.get('/api/premium-database/mail-ready-snapshot', (req, res) =>
     mailReadySnapshotService && typeof mailReadySnapshotService.sendMailReadySnapshotResponse === 'function'
       ? mailReadySnapshotService.sendMailReadySnapshotResponse(req, res)

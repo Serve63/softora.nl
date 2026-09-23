@@ -15,6 +15,7 @@ const {
   parseSpreadsheetUpload,
 } = require('../../server/services/premium-database-import');
 const { createPremiumDatabaseCustomersPageCoordinator } = require('../../server/services/premium-database-customers-page');
+const { registerPremiumDatabaseImportRoutes } = require('../../server/routes/premium-database-import');
 
 function createStoredZip(files) {
   const localParts = [];
@@ -89,6 +90,30 @@ function createMockResponse() {
     },
   };
 }
+
+test('premium database archive requires the premium access guard before serving data', () => {
+  const routes = new Map();
+  const app = { post() {}, get(path, ...handlers) { routes.set(path, handlers); } };
+  let archiveReads = 0;
+  registerPremiumDatabaseImportRoutes(app, {
+    coordinator: {}, customersPageCoordinator: {},
+    mailReadySnapshotService: { sendMailReadySnapshotArchiveResponse() { archiveReads += 1; } },
+    requirePremiumApiAccess(_req, res, next) {
+      if (!res.allowed) return res.status(401).json({ ok: false });
+      next();
+    },
+  });
+  const [guard, handler] = routes.get('/api/premium-database/mail-ready-snapshot/archive');
+  const denied = createMockResponse();
+  denied.allowed = false;
+  guard({}, denied, () => handler({}, denied));
+  assert.equal(denied.statusCode, 401);
+  assert.equal(archiveReads, 0);
+  const allowed = createMockResponse();
+  allowed.allowed = true;
+  guard({}, allowed, () => handler({}, allowed));
+  assert.equal(archiveReads, 1);
+});
 
 function escapeXml(value) {
   return String(value || '')
@@ -1649,6 +1674,7 @@ test('premium database import route is registered behind the premium api surface
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/delete-lead'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/remove-webdesign-assets', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/customers', requirePremiumApiAccess/);
+  assert.match(routeSource, /app\.get\('\/api\/premium-database\/mail-ready-snapshot\/archive', requirePremiumApiAccess/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/mail-ready-snapshot'/);
   assert.match(routeSource, /app\.get\('\/api\/premium-database\/deep-search-estimate'/);
   assert.match(routeSource, /app\.post\('\/api\/premium-database\/deep-search-businesses'/);
