@@ -8,6 +8,35 @@
     const MAX_CUSTOMERS = 25000;
     const REQUEST_TIMEOUT_MS = 12000;
     const TRANSIENT_RETRY_DELAY_MS = 250;
+    const VALIDATOR_KEY = "premium-database-archive-validator:v1";
+    const VALIDATOR_PATTERN = /^"softora-customers-v1-[a-f0-9]{32}"$/;
+    const VALIDATOR_MAX_AGE_MS = 15 * 60 * 1000;
+
+    function validatorCache(config) {
+        const bootstrap = global.SoftoraPageBootstrapSession;
+        const session = config.validatorSession || bootstrap?.get?.();
+        const cache = config.validatorCache || bootstrap?.cache;
+        const identity = String(session && (session.userId || session.email) || "").trim().toLowerCase();
+        return session?.authenticated && identity && cache
+            ? { cache: cache, key: VALIDATOR_KEY + ":" + identity } : null;
+    }
+
+    function readValidator(config) {
+        try {
+            const scope = validatorCache(config);
+            const value = String(scope?.cache.read?.(scope.key, VALIDATOR_MAX_AGE_MS) || "");
+            return VALIDATOR_PATTERN.test(value) ? value : "";
+        } catch (_error) { return ""; }
+    }
+
+    function rememberValidator(config, response) {
+        const value = String(response.headers?.get?.("ETag") || "");
+        if (!VALIDATOR_PATTERN.test(value)) return;
+        try {
+            const scope = validatorCache(config);
+            scope?.cache.write?.(scope.key, value);
+        } catch (_error) { /* The shared session cache may be unavailable. */ }
+    }
 
     function buildUrl(offset, limit, metaOnly) {
         if (metaOnly) return ENDPOINT + "?meta=1";
@@ -53,9 +82,15 @@
     }
 
     async function fetchArchive(config) {
-        const response = await config.fetchJsonWithTimeout(ARCHIVE_ENDPOINT, {
-            method: "GET", cache: "no-cache", credentials: "same-origin"
-        }, REQUEST_TIMEOUT_MS);
+        const validator = readValidator(config);
+        const requestOptions = { method: "GET", cache: "no-cache", credentials: "same-origin" };
+        if (validator) requestOptions.headers = { "X-Softora-Archive-Validator": validator };
+        let response = await config.fetchJsonWithTimeout(ARCHIVE_ENDPOINT, requestOptions, REQUEST_TIMEOUT_MS);
+        if (response.status === 304) {
+            response = await config.fetchJsonWithTimeout(ARCHIVE_ENDPOINT, {
+                method: "GET", cache: "reload", credentials: "same-origin"
+            }, REQUEST_TIMEOUT_MS);
+        }
         const payload = await response.json().catch(function () { return {}; });
         const total = Number(payload.total);
         const customers = Array.isArray(payload.customers) ? payload.customers : [];
@@ -66,6 +101,7 @@
             throw new Error("Volledig klantdatabase-archief is niet beschikbaar.");
         }
         global.performance?.mark?.("softora:database:archive-validated");
+        rememberValidator(config, response);
         return { changed: true, customers: customers, total: total, snapshotVersion: version };
     }
 

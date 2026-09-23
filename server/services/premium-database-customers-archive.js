@@ -142,7 +142,8 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
     try {
       let archive = cachedArchive;
       let cacheHit = false;
-      const requestedTag = String(req?.get?.('If-None-Match')
+      const requestedTag = String(req?.get?.('X-Softora-Archive-Validator')
+        || req?.headers?.['x-softora-archive-validator'] || req?.get?.('If-None-Match')
         || req?.headers?.['if-none-match'] || req?.headers?.['If-None-Match'] || '').trim();
       if (archive || requestedTag) {
         const meta = await readPage(0, 1, true);
