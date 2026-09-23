@@ -481,7 +481,7 @@ test('premium database archive revalidates a complete browser copy before rebuil
 
   const unchanged = createMockResponse();
   await responder({ headers: {}, get(name) {
-    return name.toLowerCase() === 'if-none-match' ? first.headers.ETag : undefined;
+    return name.toLowerCase() === 'x-softora-archive-validator' ? first.headers.ETag : undefined;
   } }, unchanged);
   assert.equal(unchanged.statusCode, 304);
   assert.equal(unchanged.body, undefined);

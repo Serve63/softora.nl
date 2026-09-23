@@ -1869,11 +1869,15 @@ test('premium database customer loader accepts one complete archive and skips un
   const client = loadPremiumDatabaseCustomersClient();
   const customers = Array.from({ length: 2001 }, (_item, index) => ({ id: `customer-${index + 1}` }));
   const requests = [];
+  const values = new Map();
+  const validatorSession = { authenticated: true, email: 'serve@softora.nl' };
+  const validatorCache = { read: (key) => values.get(key), write: (key, value) => values.set(key, value) };
+  const etag = '"softora-customers-v1-0123456789abcdef0123456789abcdef"';
   const fetchJsonWithTimeout = async (url, options) => {
-    requests.push({ url, cache: options.cache });
+    requests.push({ url, cache: options.cache, validator: options.headers?.['X-Softora-Archive-Validator'] });
     const parsed = new URL(url, 'https://softora.test');
     if (parsed.pathname.endsWith('/archive')) {
-      return { ok: true, json: async () => ({ ok: true, completeDataset: true,
+      return { ok: true, headers: { get: () => etag }, json: async () => ({ ok: true, completeDataset: true,
         total: customers.length, snapshotVersion: '2001:v1', customers }) };
     }
     if (parsed.searchParams.get('meta') === '1') {
@@ -1892,17 +1896,45 @@ test('premium database customer loader accepts one complete archive and skips un
     };
   };
 
-  const loaded = await client.load({ fetchJsonWithTimeout });
+  const loaded = await client.load({ fetchJsonWithTimeout, validatorSession, validatorCache });
   assert.equal(loaded.changed, true);
   assert.equal(loaded.total, 2001);
   assert.equal(loaded.customers.length, 2001);
-  assert.deepEqual(requests, [{ url: '/api/premium-database/customers/archive', cache: 'no-cache' }]);
+  assert.deepEqual(requests, [{ url: '/api/premium-database/customers/archive', cache: 'no-cache', validator: undefined }]);
+  assert.equal(values.get('premium-database-archive-validator:v1:serve@softora.nl'), etag);
 
   requests.length = 0;
-  const unchanged = await client.load({ previousSnapshotVersion: '2001:v1', fetchJsonWithTimeout });
+  const unchanged = await client.load({ previousSnapshotVersion: '2001:v1', fetchJsonWithTimeout, validatorSession, validatorCache });
   assert.equal(unchanged.changed, false);
   assert.equal(unchanged.total, 2001);
-  assert.deepEqual(requests, [{ url: '/api/premium-database/customers?meta=1', cache: 'no-store' }]);
+  assert.deepEqual(requests, [{ url: '/api/premium-database/customers?meta=1', cache: 'no-store', validator: undefined }]);
+
+  requests.length = 0;
+  const reloaded = await client.load({ fetchJsonWithTimeout, validatorSession, validatorCache });
+  assert.equal(reloaded.customers.length, 2001);
+  assert.deepEqual(requests, [{ url: '/api/premium-database/customers/archive', cache: 'no-cache', validator: etag }]);
+});
+
+test('premium database customer loader fetches the full archive if a 304 has no browser copy', async () => {
+  const client = loadPremiumDatabaseCustomersClient();
+  const etag = '"softora-customers-v1-0123456789abcdef0123456789abcdef"';
+  const requests = [];
+  const result = await client.load({
+    validatorSession: { authenticated: true, email: 'serve@softora.nl' },
+    validatorCache: { read: () => etag, write() {} },
+    fetchJsonWithTimeout: async (_url, options) => {
+      requests.push({ cache: options.cache, validator: options.headers?.['X-Softora-Archive-Validator'] });
+      if (requests.length === 1) return { ok: false, status: 304, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => ({ ok: true, completeDataset: true,
+        total: 1, snapshotVersion: '1:v1', customers: [{ id: 'one' }] }) };
+    },
+  });
+  assert.equal(result.total, 1);
+  assert.deepEqual(result.customers.map((customer) => customer.id), ['one']);
+  assert.deepEqual(requests, [
+    { cache: 'no-cache', validator: etag },
+    { cache: 'reload', validator: undefined },
+  ]);
 });
 
 test('premium database customer loader falls back to verified pages when the archive is incomplete', async () => {
