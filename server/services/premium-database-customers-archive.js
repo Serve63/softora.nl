@@ -6,7 +6,7 @@ const gzipAsync = promisify(gzip);
 const PAGE_LIMIT = 1000;
 const CHUNK_LIMIT = 5000;
 const PAGE_CONCURRENCY = 4;
-const CHUNK_CONCURRENCY = 5;
+const CHUNK_CONCURRENCY = 3;
 const MAX_CUSTOMERS = 25000;
 const MAX_ARCHIVE_BYTES = 3500000;
 const ARCHIVE_CACHE_CONTROL = 'private, no-cache, max-age=0, must-revalidate';
