@@ -26,8 +26,6 @@
     for(const op of pending)if(draft?.training_date===op.date)draft.checks[state.setKey(op.order,op.set)]={done:op.done};
     const progress=state.progress(draft);
     $('training-completion').textContent=`Training voltooid: ${progress.percent}%`;
-    $('progress-label').textContent=`${progress.completed} van ${progress.total} sets gehaald`;
-    $('percent').textContent=`${progress.percent}%`;$('progress').value=progress.percent;
     $('exercises').innerHTML=!draft ? '<p class="empty">Training laden…</p>' : draft.exercises.map(row=>{
       const done=Array.from({length:row.sets},(_,i)=>state.done(draft,row.order,i));
       const slug=row.title.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-');
