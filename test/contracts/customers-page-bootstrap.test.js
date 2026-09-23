@@ -403,6 +403,28 @@ test('premium database bootstrap reads the compact snapshot and lightweight metr
   assert.equal(seenReads.some((read) => read.scope === 'premium_customers_database'), false);
 });
 
+test('premium database can bootstrap metrics without embedding provisional customer rows', async () => {
+  const seenScopes = [];
+  const service = createCustomersPageBootstrapService({
+    getUiStateValues: async (scope) => { seenScopes.push(scope); return { values: {} }; },
+  });
+
+  const payload = await service.buildMailReadySnapshotBootstrapPayload({ includeSnapshotRows: false });
+
+  assert.deepEqual(seenScopes, [
+    'premium_coldmail_stats_cache',
+    'premium_database_mail_roi',
+    'premium_coldmail_autopilot',
+  ]);
+  assert.equal(payload.source, 'deferred');
+  assert.deepEqual(payload.customers, []);
+  assert.deepEqual(payload.foundCustomerIds, []);
+  assert.equal(payload.foundTotal, null);
+  assert.equal(payload.mailReadySnapshotTotal, null);
+  assert.equal(payload.availableSnapshotTotal, null);
+  assert.equal(payload.mailStats.sentToday, null);
+});
+
 test('premium database bootstrap hides an unreliable or stale cached day count', async () => {
   const snapshot = {
     version: 1,

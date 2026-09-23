@@ -50,7 +50,7 @@ test('agenda runtime injecteert klanten-bootstrap ook op het premium dashboard',
   assert.match(source, /const isPremiumDatabase = fileName === 'premium-database\.html';/);
   assert.match(source, /const isPremiumCustomers = fileName === 'premium-klanten\.html';/);
   assert.doesNotMatch(source, /isPremiumDashboard \? getUiStateValues\(premiumActiveOrdersScope\) : Promise\.resolve\(null\)/);
-  assert.match(source, /isPremiumDatabase\s*\? customersPageBootstrapService\.buildMailReadySnapshotBootstrapPayload\(\)/);
+  assert.match(source, /isPremiumDatabase\s*\? customersPageBootstrapService\.buildMailReadySnapshotBootstrapPayload\(\{ includeSnapshotRows: false \}\)/);
   assert.match(source, /const \[dashboardPayloadRaw, pageState\] = await Promise\.all\(\[/);
   assert.match(source, /const dashboardPayload = mergePageState\(dashboardPayloadRaw, pageState\);/);
   assert.match(
