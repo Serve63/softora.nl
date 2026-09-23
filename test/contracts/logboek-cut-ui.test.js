@@ -30,11 +30,11 @@ test('logboek-cut fills the page without an outer card on desktop and mobile', (
   assert.doesNotMatch(css, /\.app::before\s*\{/, 'The day heading must not have a colored top stripe.');
 });
 
-test('mobile note textareas use a font size that does not trigger iOS focus zoom', () => {
+test('mobile notes look compact while keeping an iOS safe input font size', () => {
   const css = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.css'), 'utf8');
   const mobileRules = css.split('@media(max-width:700px) {')[1];
   assert.ok(mobileRules, 'Expected mobile styles for the logbook.');
-  assert.match(mobileRules, /\.note-editor textarea\s*\{\s*font-size:\s*16px\s*;/);
+  assert.match(mobileRules, /\.note-editor textarea\s*\{[^}]*font-size:\s*16px\s*;[^}]*transform:\s*scale\(\.75\)/);
 });
 
 test('logboek-cut has no training progress badge or progress bar', () => {
@@ -49,6 +49,8 @@ test('logboek-cut hides successful sync status and omits the schema and timezone
   const script = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.js'), 'utf8');
   assert.doesNotMatch(html, /id="schema-updated"|Gewichten aanpassen|Automatisch de juiste dag|<footer\b/);
   assert.doesNotMatch(script, /Sets en notities opgeslagen|Schema bijgewerkt|schema-updated/);
+  assert.doesNotMatch(script, /Notitie wordt automatisch opgeslagen|Wordt automatisch opgeslagen|Opslaan…/);
+  assert.match(script, /if\(!editingNote\)\s*\{\s*\$\('exercises'\)\.innerHTML=/);
   assert.match(script, /\$\('status'\)\.hidden=!statusMessage/);
 });
 
