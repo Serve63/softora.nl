@@ -27,11 +27,18 @@ test('logboek-cut fills the page without an outer card on desktop and mobile', (
   assert.match(css, /@media\s*\(max-width:\s*700px\)/);
 });
 
-test('logboek-cut shows completion in the heading without a separate progress bar', () => {
+test('logboek-cut has no training progress badge or progress bar', () => {
   const html = fs.readFileSync(path.join(__dirname, '../../logboek-cut.html'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.js'), 'utf8');
-  assert.match(html, /id="training-completion"/);
-  assert.match(script, /\$\('training-completion'\)\.textContent/);
-  assert.doesNotMatch(html, /class="progress-head"|<progress\b|id="progress-label"|id="percent"/);
-  assert.doesNotMatch(script, /\$\('progress-label'\)|\$\('percent'\)|\$\('progress'\)/);
+  assert.doesNotMatch(html, /id="training-completion"|class="progress-head"|<progress\b|id="progress-label"|id="percent"/);
+  assert.doesNotMatch(script, /\$\('training-completion'\)|\$\('progress-label'\)|\$\('percent'\)|\$\('progress'\)/);
+});
+
+test('completed exercise fill ends at the exercise separators', () => {
+  const css = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.css'), 'utf8');
+  const complete = css.match(/\.exercise\.complete\s*\{([^}]+)\}/)?.[1];
+  assert.ok(complete);
+  assert.match(complete, /background:\s*#edf8ef/);
+  assert.match(complete, /border-radius:\s*0/);
+  assert.match(complete, /box-shadow:\s*none/);
 });

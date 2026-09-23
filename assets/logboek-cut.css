@@ -31,7 +31,6 @@ nav { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin: 8px
 .day[aria-pressed=true] { background: var(--accent); color: #fff; }
 .training-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 28px 0 24px; }
 h2 { font-size: clamp(26px, 3vw, 38px); line-height: 1.08; letter-spacing: -.05em; margin: 0 0 4px; }
-.lock { flex-shrink: 0; padding: 8px 12px; border-radius: 999px; background: var(--soft); color: var(--accent); font-size: 11px; font-weight: 650; }
 .exercise { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, .8fr); column-gap: 32px; align-items: center; padding: 22px 0; border-top: 1px solid var(--line); }
 .exercise-top { display: flex; gap: 11px; align-items: center; min-width: 0; grid-column: 1; grid-row: 1; }
 .number { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 5px; background: var(--soft); color: var(--accent); font-size: 8px; font-weight: 650; flex-shrink: 0; }
@@ -61,7 +60,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 /* Completion is green; the full exercise changes only after every set. */
 .set[aria-pressed=true] { background: #eaf7ed; border-color: #9bcba6; color: #216b36; }
 .set[aria-pressed=true] .tick { background: #278342; border-color: #278342; color: #fff; }
-.exercise.complete { background: #edf8ef; border-color: #b9d9c0; border-radius: 9px; box-shadow: 0 0 0 6px #edf8ef; }
+.exercise.complete { background: #edf8ef; border-color: #b9d9c0; border-radius: 0; box-shadow: none; }
 .exercise.complete h3, .exercise.complete .weight { color: #216b36; }
 .exercise.complete .exercise-photo { border-color: #9bcba6; }
 
@@ -81,7 +80,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .schema-updated a { color:var(--accent); text-decoration:none; }
 @media(max-width:700px) {
   .training-head { padding: 24px 0 20px; }
-  .lock { padding: 7px 9px; font-size: 9px; }
   .exercise { display: block; padding: 19px 0; }
   .exercise h3 { font-size: 12px; }
   .weight { font-size: 21px; }

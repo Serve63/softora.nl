@@ -24,8 +24,6 @@
     $('training-date').textContent=new Date(`${today}T12:00:00Z`).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric',timeZone:'Europe/Amsterdam'});
     const draft=session?.training_date===today ? {...session,checks:{...session.checks}} : null;
     for(const op of pending)if(draft?.training_date===op.date)draft.checks[state.setKey(op.order,op.set)]={done:op.done};
-    const progress=state.progress(draft);
-    $('training-completion').textContent=`Training voltooid: ${progress.percent}%`;
     $('exercises').innerHTML=!draft ? '<p class="empty">Training laden…</p>' : draft.exercises.map(row=>{
       const done=Array.from({length:row.sets},(_,i)=>state.done(draft,row.order,i));
       const slug=row.title.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-');
