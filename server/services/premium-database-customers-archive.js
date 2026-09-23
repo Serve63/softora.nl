@@ -3,6 +3,7 @@ const { promisify } = require('node:util');
 
 const gzipAsync = promisify(gzip);
 const PAGE_LIMIT = 1000;
+const CHUNK_LIMIT = 5000;
 const PAGE_CONCURRENCY = 4;
 const MAX_CUSTOMERS = 25000;
 const MAX_ARCHIVE_BYTES = 3500000;
@@ -22,29 +23,20 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
     return page;
   }
 
-  async function buildArchive(startedAt) {
-    const first = await readPage(0, PAGE_LIMIT);
-    const total = Number(first.total);
+  function validatedTotal(page) {
+    const total = Number(page.total);
     if (!Number.isInteger(total) || total < 0 || total > MAX_CUSTOMERS) {
       throw new Error('Klantdatabase heeft geen veilige volledige telling.');
     }
-    const pages = new Map([[0, first.customers]]);
-    const offsets = [];
-    for (let offset = PAGE_LIMIT; offset < total; offset += PAGE_LIMIT) offsets.push(offset);
-    let cursor = 0;
-    async function worker() {
-      while (cursor < offsets.length) {
-        const offset = offsets[cursor++];
-        const page = await readPage(offset, PAGE_LIMIT);
-        pages.set(offset, page.customers);
-      }
-    }
-    await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker));
+    return total;
+  }
+
+  function assemblePages(pages, total, pageLimit) {
     const customers = [];
     const seen = new Set();
-    for (let offset = 0; offset < total; offset += PAGE_LIMIT) {
+    for (let offset = 0; offset < total; offset += pageLimit) {
       const rows = pages.get(offset);
-      if (!Array.isArray(rows) || rows.length !== Math.min(PAGE_LIMIT, total - offset)) {
+      if (!Array.isArray(rows) || rows.length !== Math.min(pageLimit, total - offset)) {
         throw new Error('Klantdatabase-archief bevat een onvolledige pagina.');
       }
       for (const customer of rows) {
@@ -54,8 +46,11 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
         customers.push(customer);
       }
     }
+    return customers;
+  }
+
+  async function encodeArchive(customers, total, version, startedAt, method) {
     const finalMeta = await readPage(0, 1, true);
-    const version = String(first.snapshotVersion || '').trim();
     if (!version || finalMeta.total !== total || String(finalMeta.snapshotVersion || '').trim() !== version) {
       throw new Error('Klantdatabase wijzigde tijdens het archiveren.');
     }
@@ -69,7 +64,67 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       throw error;
     }
     const encodedAt = nowMs();
-    return { buffer, total, version, loadMs: loadedAt - startedAt, encodeMs: encodedAt - loadedAt };
+    return { buffer, total, version, method, loadMs: loadedAt - startedAt, encodeMs: encodedAt - loadedAt };
+  }
+
+  async function buildArchiveWithPages(startedAt) {
+    const first = await readPage(0, PAGE_LIMIT);
+    const total = validatedTotal(first);
+    const pages = new Map([[0, first.customers]]);
+    const offsets = [];
+    for (let offset = PAGE_LIMIT; offset < total; offset += PAGE_LIMIT) offsets.push(offset);
+    let cursor = 0;
+    async function worker() {
+      while (cursor < offsets.length) {
+        const offset = offsets[cursor++];
+        const page = await readPage(offset, PAGE_LIMIT);
+        pages.set(offset, page.customers);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker));
+    const version = String(first.snapshotVersion || '').trim();
+    return encodeArchive(assemblePages(pages, total, PAGE_LIMIT), total, version, startedAt, 'pages');
+  }
+
+  async function buildArchiveWithChunks(startedAt) {
+    const firstMeta = await readPage(0, 1, true);
+    const total = validatedTotal(firstMeta);
+    const version = String(firstMeta.snapshotVersion || '').trim();
+    if (!version) throw new Error('Klantdatabase heeft geen veilige versie.');
+    const readChunk = async (offset) => {
+      const customers = await dataOpsStore.listCustomersArchiveChunk({
+        offset, limit: CHUNK_LIMIT,
+        bypassReadFailureCooldown: true,
+        suppressReadFailureCooldown: true,
+        suppressTransientReadFailureLog: false,
+      });
+      if (!Array.isArray(customers)) throw new Error('Klantdatabase-chunk kon niet worden gelezen.');
+      return customers;
+    };
+    const pages = new Map();
+    if (total) pages.set(0, await readChunk(0));
+    const offsets = [];
+    for (let offset = CHUNK_LIMIT; offset < total; offset += CHUNK_LIMIT) offsets.push(offset);
+    let cursor = 0;
+    async function worker() {
+      while (cursor < offsets.length) {
+        const offset = offsets[cursor++];
+        pages.set(offset, await readChunk(offset));
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker));
+    return encodeArchive(assemblePages(pages, total, CHUNK_LIMIT), total, version, startedAt, 'chunks');
+  }
+
+  async function buildArchive(startedAt) {
+    if (typeof dataOpsStore.listCustomersArchiveChunk === 'function') {
+      try {
+        return await buildArchiveWithChunks(startedAt);
+      } catch (error) {
+        logger?.warn?.('[PremiumDatabaseCustomers][chunk-fallback]', error?.message || error);
+      }
+    }
+    return buildArchiveWithPages(startedAt);
   }
 
   return async function sendCustomersArchiveResponse(_req, res) {
@@ -98,7 +153,8 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       res.setHeader('Content-Length', String(archive.buffer.length));
       res.setHeader('Server-Timing', `customers;dur=${loadMs}, encode;dur=${encodeMs}, cache;desc=${cacheHit ? 'hit' : 'miss'}`);
       logger?.info?.(JSON.stringify({ event: 'premium-customers-archive', loadMs,
-        encodeMs, compressedBytes: archive.buffer.length, total: archive.total, cacheHit }));
+        encodeMs, compressedBytes: archive.buffer.length, total: archive.total, cacheHit,
+        method: archive.method }));
       return res.status(200).end(archive.buffer);
     } catch (error) {
       logger?.warn?.('[PremiumDatabaseCustomers][archive-response]', error?.message || error);

@@ -157,8 +157,26 @@ function createDataOpsCustomerLookups(deps = {}) {
     };
   }
 
+  async function listCustomersArchiveChunk(options = {}) {
+    const offset = Number(options.offset);
+    const limit = Number(options.limit);
+    if (!Number.isInteger(offset) || offset < 0 || offset > 25000
+      || !Number.isInteger(limit) || limit < 1 || limit > 5000) return null;
+    const result = await run(`list-customers-archive-chunk-${offset}`, (client) => client
+      .rpc('softora_customer_archive_chunk', { p_offset: offset, p_limit: limit }), {
+      timeoutMs: readQueryTimeoutMs,
+      bypassReadFailureCooldown: options.bypassReadFailureCooldown,
+      suppressReadFailureCooldown: options.suppressReadFailureCooldown,
+      suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
+    });
+    const rows = result.data && result.data.rows;
+    if (!result.ok || !Array.isArray(rows) || rows.length > limit) return null;
+    return rows.map(normalizeCustomerRow);
+  }
+
   return {
     listCustomersPage,
+    listCustomersArchiveChunk,
     listCustomersByEmails: createListByField({
       inputKey: 'emails', column: 'email', cachePrefix: 'customers-by-email',
       operation: 'list-customers-by-emails', lowercase: true,
