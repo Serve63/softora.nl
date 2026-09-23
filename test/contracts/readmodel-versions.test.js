@@ -306,10 +306,9 @@ test('ui-state reads are versioned by content for allow-listed scopes only', () 
   assert.match(runtimeOps, /if \(!isPasswordRegisterScope\(scope\)\) \{\n\s+\/\/ Only non-vault scopes can reach read-model versioning\./);
   for (const scope of ['premium_password_register', 'premium_customers_database', 'premium_active_orders', 'premium_database_photos']) {
     assert.equal(uiStateReadModelVersion(scope, state), '', scope);
-    const body = buildUiStateGetBody({ headers: { 'x-softora-readmodel-version': version } }, scope, state, { revision: 3 });
+    const body = buildUiStateGetBody({ headers: { 'x-softora-readmodel-version': version } }, scope, state);
     assert.equal(body.readModel, undefined);
     assert.deepEqual(body.values, state.values);
-    assert.equal(body.revision, 3);
   }
 });
 
@@ -353,4 +352,86 @@ test('read model client completes whole-response read models and acts like a fet
   const payload = await response.json();
   assert.deepEqual(payload.values, { a: 1 });
   assert.equal(payload.ok, true);
+});
+
+test('versioned ui-state reader proves unchanged from change_seq without reading the payload', async () => {
+  const { createVersionedUiStateReader, uiStateReadModelVersion } = require('../../server/services/ui-state-readmodel');
+  const reads = [];
+  let row = { values: { guard: 'x' }, source: 'supabase', updatedAt: '2026-09-24T08:00:00Z', changeSeq: '812' };
+  const getUiStateValues = async (scope, options) => {
+    reads.push(options.metadataOnly ? 'meta' : 'full');
+    assert.equal(options.includeChangeSeq, true);
+    return options.metadataOnly ? { values: {}, source: 'supabase', exists: true, changeSeq: row.changeSeq } : row;
+  };
+  const reader = createVersionedUiStateReader({ getUiStateValues });
+  const version = uiStateReadModelVersion('premium_coldmail_send_guard', row);
+  assert.match(version, /^rm1-/);
+
+  const first = await reader.read({ headers: {} }, 'premium_coldmail_send_guard');
+  assert.deepEqual(reads, ['full']);
+  assert.equal(first.readModel.version, version);
+  assert.deepEqual(first.values, row.values);
+
+  reads.length = 0;
+  const unchanged = await reader.read({ headers: { 'x-softora-readmodel-version': version } }, 'premium_coldmail_send_guard');
+  assert.deepEqual(reads, ['meta'], 'an unchanged row is proven without reading its payload');
+  assert.equal(unchanged.readModel.unchanged, true);
+
+  reads.length = 0;
+  row = { ...row, values: { guard: 'y' }, changeSeq: '813' };
+  const changed = await reader.read({ headers: { 'x-softora-readmodel-version': version } }, 'premium_coldmail_send_guard');
+  assert.deepEqual(reads, ['meta', 'full']);
+  assert.equal(changed.readModel.unchanged, false);
+  assert.deepEqual(changed.values, { guard: 'y' });
+
+  assert.equal(await reader.read({ headers: {} }, 'premium_password_register'), null);
+  assert.equal(await reader.read({ headers: {} }, 'premium_customers_database'), null);
+});
+
+test('versioned ui-state reader falls back without change_seq and pauses after a failed read', async () => {
+  const { createVersionedUiStateReader } = require('../../server/services/ui-state-readmodel');
+  let now = 1000;
+  let calls = 0;
+  const reader = createVersionedUiStateReader({ nowMs: () => now, getUiStateValues: async () => {
+    calls += 1;
+    return calls === 1 ? { values: { a: 1 }, source: 'supabase', updatedAt: null } : null;
+  } });
+  const hashed = await reader.read({ headers: {} }, 'premium_database_mail_roi');
+  assert.match(hashed.readModel.version, /^rm1-/, 'without the column the content hash still versions the row');
+  assert.equal(await reader.read({ headers: {} }, 'premium_database_mail_roi'), null);
+  assert.equal(await reader.read({ headers: {} }, 'premium_database_mail_roi'), null);
+  assert.equal(calls, 2, 'after a failed read the normal route is used for a while');
+  now += 5 * 60 * 1000 + 1;
+  await reader.read({ headers: {} }, 'premium_database_mail_roi');
+  assert.equal(calls, 3);
+
+  const memoryReader = createVersionedUiStateReader({ getUiStateValues: async () => ({ values: { a: 1 }, source: 'memory', changeSeq: '5' }) });
+  const memory = await memoryReader.read({ headers: {} }, 'premium_database_mail_roi');
+  assert.equal(memory.readModel, undefined, 'an in-memory fallback never becomes a versioned copy');
+});
+
+test('ui-state store reads change_seq only for read-model callers', async () => {
+  const { createUiStateStore } = require('../../server/services/ui-state');
+  const selects = [];
+  const client = { from() { return { select(columns) { selects.push(columns); return { eq() { return {
+    async maybeSingle() { return { data: { payload: { values: { a: '1' } }, updated_at: '2026-09-24T08:00:00Z', revision: 4, change_seq: 99 }, error: null }; },
+  }; } }; } }; } };
+  const store = createUiStateStore({ uiStateScopePrefix: 'ui_state:', inMemoryUiStateByScope: new Map(),
+    isSupabaseConfigured: () => true, getSupabaseClient: () => client, supabaseStateTable: 'app_state',
+    fetchSupabaseRowByKeyViaRest: async () => ({ ok: false }), logger: { error() {}, info() {}, warn() {} } });
+  const plain = await store.getUiStateValues('premium_database_mail_roi');
+  assert.equal(plain.changeSeq, undefined);
+  const versioned = await store.getUiStateValues('premium_database_mail_roi', { includeChangeSeq: true });
+  assert.equal(versioned.changeSeq, '99');
+  const meta = await store.getUiStateValues('premium_database_mail_roi', { metadataOnly: true, includeChangeSeq: true });
+  assert.equal(meta.changeSeq, '99');
+  assert.deepEqual(selects, ['payload, updated_at', 'payload, updated_at,change_seq', 'updated_at, revision,change_seq']);
+});
+
+test('runtime state migration numbers every write from one global sequence', () => {
+  const sql = fs.readFileSync(path.join(repoRoot, 'supabase/migrations/20260923232424_runtime_state_change_seq.sql'), 'utf8');
+  assert.match(sql, /before insert or update on public\.softora_runtime_state\s+for each row/);
+  assert.match(sql, /new\.change_seq := nextval\('public\.softora_runtime_state_change_seq'\)/);
+  assert.doesNotMatch(sql, /revision\s*:=|updated_at\s*:=/, 'compare-and-swap columns stay untouched');
+  assert.match(sql, /-- Rollback:/);
 });
