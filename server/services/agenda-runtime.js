@@ -528,7 +528,7 @@ function createAgendaRuntime(deps = {}) {
       const isPremiumCustomers = fileName === 'premium-klanten.html';
       const [dashboardPayloadRaw, pageState] = await Promise.all([
         isPremiumDatabase
-          ? customersPageBootstrapService.buildMailReadySnapshotBootstrapPayload()
+          ? customersPageBootstrapService.buildMailReadySnapshotBootstrapPayload({ includeSnapshotRows: false })
           : customersPageBootstrapService.buildCustomersBootstrapPayload({
               includeCustomers: true,
               preferDashboardCustomers: isPremiumDashboard || isPremiumCustomers,

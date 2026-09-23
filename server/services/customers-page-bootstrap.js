@@ -963,16 +963,17 @@ function createCustomersPageBootstrapService(deps = {}) {
     };
     const timeoutMs = Math.max(150, Math.min(1800, Number(options.timeoutMs) || 1400));
     const [state, statsState, roiState, autopilotState] = await Promise.all([
-      MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
+      options.includeSnapshotRows === false ? null : MAIL_READY_BOOTSTRAP_CACHE_SCOPE,
       DATABASE_MAIL_STATS_CACHE_SCOPE,
       DATABASE_MAIL_ROI_SCOPE,
       DATABASE_AUTOPILOT_SCOPE,
-    ].map((scope) => resolveBootstrapReadWithTimeout(
+    ].map((scope) => scope === null ? Promise.resolve(null) : resolveBootstrapReadWithTimeout(
       readBootstrapUiState(scope, { ...readOptions, readFailureCooldownScope: scope }),
       timeoutMs,
       buildUnavailableBootstrapState(new Error(`${scope} bootstrapcache timeout`))
     )));
     const databaseBootstrapState = buildPremiumDatabaseBootstrapState(statsState, roiState, autopilotState);
+    if (options.includeSnapshotRows === false) return { ...unavailable, ...databaseBootstrapState };
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     let snapshot = parseMailReadySnapshotCacheValue(values[MAIL_READY_BOOTSTRAP_CACHE_KEY]);
     let usedFullSnapshotFallback = false;
