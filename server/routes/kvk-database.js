@@ -7,6 +7,7 @@ function registerKvkDatabaseRoutes(app, deps = {}) {
     coordinator,
     controlCoordinator,
     directoryCoordinator,
+    apiWorkersCoordinator,
     requirePremiumAdminApiAccess = passThrough,
   } = deps;
 
@@ -82,6 +83,22 @@ function registerKvkDatabaseRoutes(app, deps = {}) {
     controlCoordinator && typeof controlCoordinator.sendReportWorkerResponse === 'function'
       ? controlCoordinator.sendReportWorkerResponse(req, res)
       : res.status(503).json({ ok: false, error: 'Databasevulling-workerstatus is tijdelijk niet beschikbaar.' })
+  );
+
+  app.get('/api/kvk-database/api-workers', requirePremiumAdminApiAccess, (req, res) =>
+    apiWorkersCoordinator.getStatus(req, res)
+  );
+  app.post('/api/kvk-database/api-workers', requirePremiumAdminApiAccess, (req, res) =>
+    apiWorkersCoordinator.setEnabled(req, res)
+  );
+  app.post('/api/kvk-database/api-workers/poll', (req, res) =>
+    apiWorkersCoordinator.poll(req, res)
+  );
+  app.post('/api/kvk-database/api-workers/report', (req, res) =>
+    apiWorkersCoordinator.report(req, res)
+  );
+  app.post('/api/kvk-database/api-workers/research', (req, res) =>
+    apiWorkersCoordinator.research(req, res)
   );
 }
 
