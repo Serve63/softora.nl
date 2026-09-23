@@ -391,6 +391,8 @@ function createRuntimeOpsCoordinator(deps = {}) {
     );
   }
 
+  const versionedUiStateReader = require('./ui-state-readmodel').createVersionedUiStateReader({ getUiStateValues });
+
   async function getUiStateValuesForScope(scope) {
     if (
       dataOpsUiStateBridge &&
@@ -661,6 +663,8 @@ function createRuntimeOpsCoordinator(deps = {}) {
     });
     if (!isPasswordRegisterScope(scope)) {
       // Only non-vault scopes can reach read-model versioning.
+      const versioned = await versionedUiStateReader.read(req, scope);
+      if (versioned) return res.status(200).json(versioned);
       const uiState = await getUiStateValuesForScope(scope);
       if (!uiState) return unavailable();
       return res.status(200).json(require('./ui-state-readmodel').buildUiStateGetBody(req, scope, uiState));

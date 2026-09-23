@@ -336,12 +336,19 @@ function createUiStateStore(deps = {}) {
     if (!shouldSuppressReadFailureLog(options)) logReadFailure(label, message, ...extra);
   }
 
+  function readChangeSeq(row) {
+    const value = row && row.change_seq;
+    return value !== null && value !== undefined && /^\d+$/.test(String(value)) ? String(value) : null;
+  }
+
   async function getUiStateValues(scope, options = {}) {
     const normalizedScope = normalizeUiStateScope(scope);
     if (!normalizedScope) return null;
     const readOptions = getEffectiveUiStateReadOptions(normalizedScope, options);
     const metadataOnly = readOptions.metadataOnly === true;
     const includeRevision = Boolean(readOptions.includeRevision || metadataOnly);
+    // change_seq is trigger-maintained; only read-model callers ask for it.
+    const changeSeqColumn = readOptions.includeChangeSeq === true ? ',change_seq' : '';
     const readFailureCooldownScope = normalizeReadFailureCooldownScope(normalizedScope, readOptions);
 
     if (!isSupabaseConfigured()) {
@@ -371,7 +378,7 @@ function createUiStateStore(deps = {}) {
         };
         const fallback = await fetchSupabaseRowByKeyViaRest(
           rowKey,
-          metadataOnly ? 'updated_at,revision' : includeRevision ? 'payload,updated_at,revision' : 'payload,updated_at',
+          (metadataOnly ? 'updated_at,revision' : includeRevision ? 'payload,updated_at,revision' : 'payload,updated_at') + changeSeqColumn,
           restRequestOptions
         );
         if (!fallback.ok) {
@@ -402,7 +409,7 @@ function createUiStateStore(deps = {}) {
         try {
           const { data, error } = await client
             .from(supabaseStateTable)
-            .select(metadataOnly ? 'updated_at, revision' : includeRevision ? 'payload, updated_at, revision' : 'payload, updated_at')
+            .select((metadataOnly ? 'updated_at, revision' : includeRevision ? 'payload, updated_at, revision' : 'payload, updated_at') + changeSeqColumn)
             .eq('state_key', rowKey)
             .maybeSingle();
 
@@ -431,6 +438,7 @@ function createUiStateStore(deps = {}) {
           revision: Number.isSafeInteger(Number(row?.revision)) && Number(row?.revision) >= 0
             ? Number(row.revision) : 0,
           exists: Boolean(row),
+          ...(changeSeqColumn ? { changeSeq: readChangeSeq(row) } : {}),
         };
       }
 
@@ -467,6 +475,7 @@ function createUiStateStore(deps = {}) {
         values: { ...values },
         updatedAt: normalizeString(row?.updated_at || '') || null,
         source: row?.source || 'supabase',
+        ...(changeSeqColumn && row?.source !== 'memory' ? { changeSeq: readChangeSeq(row) } : {}),
         ...(includeRevision
           ? {
               revision: Number.isSafeInteger(Number(row?.revision)) && Number(row?.revision) >= 0
