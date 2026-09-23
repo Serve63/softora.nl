@@ -1026,23 +1026,35 @@ test('seo content bewaakt unieke slugs, clusters en interne links', () => {
 
 test('interne-linkgids gebruikt native quality v2 zonder generieke opvulling', () => {
   const item = getSeoContentItem('kennisbank', 'wat-is-interne-linkstructuur', {
-    now: new Date('2026-07-26T12:00:00.000Z'),
+    now: new Date('2026-09-23T12:00:00.000Z'),
   });
   const html = buildSeoContentArticleHtml(item, {
     siteOrigin: 'https://www.softora.nl',
   });
 
   assert.equal(item.qualityVersion, 2);
-  assert.equal(item.updatedAt, '2026-07-26');
+  assert.equal(item.updatedAt, '2026-09-23');
+  assert.equal(item.publishedAt, '2026-06-01');
+  assert.equal(item.growthEventKind, 'other_growth_action');
   assert.ok(item.wordCount >= 850);
   assert.equal(item.faq.length, 0);
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-interne-linkstructuur">/);
-  assert.match(html, /"dateModified":"2026-07-26"/);
+  assert.match(html, /"dateModified":"2026-09-23"/);
+  assert.match(html, /Er is geen vast ideaal aantal links/);
+  assert.match(html, /Voorbeeld, geen klantresultaat/);
+  assert.match(html, /Test daarna met Tab en Enter/);
+  assert.doesNotMatch(html, /minimaal twee inhoudelijk passende uitgaande links|minimaal twee bestaande pagina’s/);
   assert.match(html, /href="\/bedrijfssoftware-op-maat">bedrijfssoftware op maat<\/a>/);
   assert.match(html, /href="\/crm-systeem-op-maat">CRM op maat<\/a>/);
   assert.match(html, /href="\/ai-automatisering">AI-automatisering voor een controleerbare workflow<\/a>/);
   assert.doesNotMatch(html, /<section class="artikel-faq"/);
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
+  const supportingHtml = buildSeoContentArticleHtml(
+    getSeoContentItem('blog', 'website-laten-maken-mkb-paginas', { now: new Date('2026-09-23T12:00:00.000Z') }),
+    { siteOrigin: 'https://www.softora.nl' }
+  );
+  assert.match(supportingHtml, /Noteer bij iedere pagina welke vervolgvraag de bezoeker heeft/);
+  assert.match(supportingHtml, /href="\/kennisbank\/wat-is-interne-linkstructuur">een kleine linkkaart voor je interne linkstructuur<\/a>/);
 });
 
 test('CRM-integratiegids gebruikt een toetsbaar contract en twee verschillende beelden', () => {

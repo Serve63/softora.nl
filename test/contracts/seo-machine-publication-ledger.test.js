@@ -122,9 +122,9 @@ test('content growth actions have an explicit machine-readable event plan', () =
     [
       [
         '/kennisbank/wat-is-interne-linkstructuur',
-        '2026-07-26',
-        'substantial_refresh',
-        'live',
+        '2026-09-23',
+        'other_growth_action',
+        'scheduled',
       ],
       [
         '/blog/bedrijfssoftware-laten-maken-kosten',
