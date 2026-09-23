@@ -15,6 +15,7 @@ function buildWebdesignJobPayload(job = {}) {
   const retry = normalizeWebdesignJobRetryPayload(job.retry);
   const payload = { customer: job.customer && typeof job.customer === 'object' ? job.customer : {} };
   if (job.variant) payload.variant = normalizeString(job.variant).slice(0, 80);
+  if (job.assignedDesignOwnerEmail) payload.assignedDesignOwnerEmail = normalizeString(job.assignedDesignOwnerEmail).toLowerCase().slice(0, 240);
   if (job.batchId) payload.batchId = normalizeString(job.batchId).slice(0, 120);
   if (Number.isFinite(Number(job.batchTargetIndex))) {
     payload.batchTargetIndex = Math.max(0, Math.floor(Number(job.batchTargetIndex)));
