@@ -39,9 +39,7 @@ summary{list-style:none;display:flex;align-items:center;justify-content:space-be
 .latest-treated-panel:has(#show-contact-columns:checked) td:nth-child(4),.latest-treated-panel:has(#show-contact-columns:checked) th:nth-child(4),.latest-treated-panel:has(#show-contact-columns:checked) td:nth-child(5),.latest-treated-panel:has(#show-contact-columns:checked) th:nth-child(5),.latest-treated-panel:has(#show-contact-columns:checked) td:nth-child(6),.latest-treated-panel:has(#show-contact-columns:checked) th:nth-child(6){display:table-cell}
 .latest-treated-panel:has(#show-contact-columns:checked) table{min-width:1250px}
 .kvk-worker-status__group strong::before{display:none}
-.research-grid .stat-card-directory__open{display:block!important;inset:0!important;width:100%!important;height:100%!important;opacity:0;cursor:pointer}
-.stat-card:focus-within{outline:2px solid #b86c91!important;outline-offset:-2px}
-@media(max-width:700px){.inventory-grid .stat-card-directory__open{display:block!important;inset:0!important;width:100%!important;height:100%!important;opacity:0;cursor:pointer}.latest-treated-panel .heading-actions{gap:10px}.contact-toggle{font-size:9px}}
+@media(max-width:700px){.latest-treated-panel .heading-actions{gap:10px}.contact-toggle{font-size:9px}}
 
 /* Contact details are always visible. */
 .latest-treated-panel td:nth-child(4),.latest-treated-panel th:nth-child(4),.latest-treated-panel td:nth-child(5),.latest-treated-panel th:nth-child(5),.latest-treated-panel td:nth-child(6),.latest-treated-panel th:nth-child(6){display:table-cell}
@@ -169,7 +167,12 @@ button,input,select,textarea{font-family:inherit}
 .research-grid .stat-delta-flow.is-zero .stat-delta-added,.research-grid .stat-delta-flow.is-zero .stat-delta-removed{color:var(--muted)!important}
 .research-grid #companies-total-card .stat-delta{display:none!important}
 
-/* Keep the upload affordance visibly substantial while it is still disabled. */
-.header-controls .transfer-button{min-height:37px;padding:9px 15px;border-color:rgba(142,47,95,.27);background:linear-gradient(180deg,#fffafd,#f5eaf0);box-shadow:0 2px 5px rgba(77,35,57,.09),inset 0 1px 0 #fff;font-size:11px;font-weight:650;gap:10px}
+/* Only the visible open icon navigates; the statistic card itself stays static. */
+.inventory-grid .stat-card-directory__open,.research-grid .stat-card-directory__open{display:inline-flex!important;top:8px!important;right:10px!important;left:auto!important;bottom:auto!important;width:24px!important;height:24px!important;opacity:1;cursor:pointer}
+.research-grid .stat-card{padding-right:39px!important}
+.research-grid{height:100%;align-items:center}
+
+/* Keep the shorter upload affordance visibly substantial while it is still disabled. */
+.header-controls .transfer-button{min-height:37px;padding:9px 12px;border-color:rgba(142,47,95,.27);background:linear-gradient(180deg,#fffafd,#f5eaf0);box-shadow:0 2px 5px rgba(77,35,57,.09),inset 0 1px 0 #fff;font-size:11px;font-weight:650;gap:8px}
 .header-controls .transfer-button span{font-size:14px}
 @media(max-width:700px){.inventory-grid .stat-delta,.research-grid .stat-delta{font-size:7px;gap:2px}.header-controls .transfer-button{min-height:34px;padding:7px 10px;font-size:10px}}
