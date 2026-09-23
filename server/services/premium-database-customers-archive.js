@@ -1,12 +1,20 @@
 const { gzip } = require('node:zlib');
 const { promisify } = require('node:util');
+const { createHash } = require('node:crypto');
 
 const gzipAsync = promisify(gzip);
 const PAGE_LIMIT = 1000;
 const CHUNK_LIMIT = 5000;
 const PAGE_CONCURRENCY = 4;
+const CHUNK_CONCURRENCY = 5;
 const MAX_CUSTOMERS = 25000;
 const MAX_ARCHIVE_BYTES = 3500000;
+const ARCHIVE_CACHE_CONTROL = 'private, no-cache, max-age=0, must-revalidate';
+
+function archiveEtag(total, version) {
+  const digest = createHash('sha256').update(`${total}:${version}`).digest('hex').slice(0, 32);
+  return `"softora-customers-v1-${digest}"`;
+}
 
 function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = Date.now, logger = console }) {
   let cachedArchive = null;
@@ -102,9 +110,8 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       return customers;
     };
     const pages = new Map();
-    if (total) pages.set(0, await readChunk(0));
     const offsets = [];
-    for (let offset = CHUNK_LIMIT; offset < total; offset += CHUNK_LIMIT) offsets.push(offset);
+    for (let offset = 0; offset < total; offset += CHUNK_LIMIT) offsets.push(offset);
     let cursor = 0;
     async function worker() {
       while (cursor < offsets.length) {
@@ -112,7 +119,7 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
         pages.set(offset, await readChunk(offset));
       }
     }
-    await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker));
+    await Promise.all(Array.from({ length: Math.min(CHUNK_CONCURRENCY, offsets.length) }, worker));
     return encodeArchive(assemblePages(pages, total, CHUNK_LIMIT), total, version, startedAt, 'chunks');
   }
 
@@ -127,7 +134,7 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
     return buildArchiveWithPages(startedAt);
   }
 
-  return async function sendCustomersArchiveResponse(_req, res) {
+  return async function sendCustomersArchiveResponse(req, res) {
     if (!dataOpsStore || typeof dataOpsStore.listCustomersPage !== 'function') {
       return res.status(503).json({ ok: false, error: 'De officiële klantdatabase is tijdelijk niet beschikbaar.' });
     }
@@ -135,10 +142,20 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
     try {
       let archive = cachedArchive;
       let cacheHit = false;
-      if (archive) {
+      const requestedTag = String(req?.headers?.['if-none-match'] || '').trim();
+      if (archive || requestedTag) {
         const meta = await readPage(0, 1, true);
-        cacheHit = Number(meta.total) === archive.total && String(meta.snapshotVersion || '').trim() === archive.version;
-        if (!cacheHit) { cachedArchive = null; archive = null; }
+        const total = validatedTotal(meta);
+        const version = String(meta.snapshotVersion || '').trim();
+        cacheHit = Boolean(archive && total === archive.total && version === archive.version);
+        if (archive && !cacheHit) { cachedArchive = null; archive = null; }
+        if (version && requestedTag.split(',').some((tag) => tag.trim() === archiveEtag(total, version))) {
+          res.setHeader('Cache-Control', ARCHIVE_CACHE_CONTROL);
+          res.setHeader('Vary', 'Cookie, Accept-Encoding');
+          res.setHeader('ETag', archiveEtag(total, version));
+          res.setHeader('Server-Timing', `customers;dur=${nowMs() - startedAt}, cache;desc=revalidated`);
+          return res.status(304).end();
+        }
       }
       if (!archive) {
         const buildId = ++buildSequence;
@@ -147,7 +164,9 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       }
       const loadMs = cacheHit ? nowMs() - startedAt : archive.loadMs;
       const encodeMs = cacheHit ? 0 : archive.encodeMs;
-      res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+      res.setHeader('Cache-Control', ARCHIVE_CACHE_CONTROL);
+      res.setHeader('Vary', 'Cookie, Accept-Encoding');
+      res.setHeader('ETag', archiveEtag(archive.total, archive.version));
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Content-Encoding', 'gzip');
       res.setHeader('Content-Length', String(archive.buffer.length));
