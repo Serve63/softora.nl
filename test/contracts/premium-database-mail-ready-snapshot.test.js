@@ -288,6 +288,8 @@ test('premium database durable snapshot compresses and restores more than the ol
     adres: `Straat ${index + 1}, Oisterwijk`,
     availableSnapshot: true,
   }));
+  availableCustomers[0].adres = 'Maastricht';
+  availableCustomers[availableCustomers.length - 1].adres = 'Haaren';
   const serialized = codec.serializeMailReadySnapshotCache({
     generatedAt: '2026-08-05T12:00:00.000Z',
     total: 0,
@@ -300,9 +302,14 @@ test('premium database durable snapshot compresses and restores more than the ol
   assert.equal(JSON.parse(serialized).encoding, 'gzip-base64');
   assert.ok(serialized.length < 950000);
   const restored = codec.parseMailReadySnapshotCacheValue(serialized);
+  assert.equal(codec.isDistanceSortedSnapshot(restored), true);
+  assert.equal(codec.isDistanceSortedSnapshot({ ...restored }), false);
+  assert.equal(codec.selectDistanceOrderedCategories(restored)[1], restored.availableCustomers);
   assert.equal(codec.isMailReadySnapshotCoherent(restored), true);
   assert.equal(restored.availableTotal, 6008);
   assert.equal(restored.availableCustomers.length, 6008);
+  assert.equal(restored.availableCustomers[0].id, 'available-6008');
+  assert.equal(restored.availableCustomers.at(-1).id, 'available-1');
   assert.equal(restored.foundCustomerIds.length, 6008);
   assert.equal(parseMailReadySnapshotCacheValue(serialized).availableCustomers.length, 6008);
 });
@@ -319,6 +326,8 @@ test('durable snapshot restores the complete distance order for every category',
   });
 
   const restored = codec.parseMailReadySnapshotCacheValue(raw);
+  assert.equal(codec.isDistanceSortedSnapshot(restored), false);
+  assert.notEqual(codec.selectDistanceOrderedCategories(restored)[0], restored.customers);
 
   for (const category of ['customers', 'availableCustomers', 'instantlyReadyCustomers']) {
     assert.deepEqual(restored[category].map((row) => row.id), ['near', 'far']);
@@ -1000,7 +1009,9 @@ test('premium database mail-ready snapshot persists the complete current-scale d
   assert.ok(fullWrite);
   const serialized = fullWrite[2][MAIL_READY_SNAPSHOT_CACHE_KEY];
   assert.ok(serialized.length > 950000);
+  const parseStartedAt = Date.now();
   const restored = parseMailReadySnapshotCacheValue(serialized);
+  assert.ok(Date.now() - parseStartedAt < 2000, 'stored current-scale snapshot hydrates without another distance sort');
   assert.equal(restored.availableTotal, 13957);
   assert.equal(restored.availableCustomers.length, 13957);
 });

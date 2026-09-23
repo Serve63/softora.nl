@@ -15,6 +15,7 @@ function normalizeFoundCustomerIds(value) {
 function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
   const maxLimit = Math.max(1, Number(options.maxLimit) || 3000);
   const formatVersion = Math.max(1, Number(options.formatVersion) || 1);
+  const orderedSnapshot = Symbol('premium-database-distance-order');
 
   function decodeSnapshotValue(raw) {
     const parsed = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
@@ -24,22 +25,31 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
       parsed.encoding === 'gzip-base64' &&
       normalizeString(parsed.data)
     ) {
-      return JSON.parse(gunzipSync(Buffer.from(parsed.data, 'base64')).toString('utf8'));
+      const data = JSON.parse(gunzipSync(Buffer.from(parsed.data, 'base64')).toString('utf8'));
+      // This compressed format is written only after all categories have been
+      // sorted. Legacy plain JSON has no such guarantee and is sorted below.
+      return { data, ordered: Number(parsed.version) >= 2 &&
+        Number(parsed.version) === Number(data && data.version) };
     }
-    return parsed;
+    return { data: parsed, ordered: false };
   }
 
   function parseMailReadySnapshotCacheValue(raw) {
     try {
-      const parsed = decodeSnapshotValue(raw);
+      const decoded = decodeSnapshotValue(raw);
+      const parsed = decoded.data;
       if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.customers)) return null;
       const validRows = (rows) => (Array.isArray(rows) ? rows : [])
         .filter((customer) => customer && typeof customer === 'object' && normalizeString(customer.id));
-      const customers = sortCustomersByDistance(validRows(parsed.customers)).slice(0, maxLimit);
-      const availableCustomers = sortCustomersByDistance(validRows(parsed.availableCustomers)).slice(0, maxLimit);
-      const instantlyReadyCustomers = sortCustomersByDistance(validRows(parsed.instantlyReadyCustomers)).slice(0, maxLimit);
+      const orderedRows = (rows) => {
+        const valid = validRows(rows);
+        return (decoded.ordered ? valid : sortCustomersByDistance(valid)).slice(0, maxLimit);
+      };
+      const customers = orderedRows(parsed.customers);
+      const availableCustomers = orderedRows(parsed.availableCustomers);
+      const instantlyReadyCustomers = orderedRows(parsed.instantlyReadyCustomers);
       if (!customers.length && !availableCustomers.length && !instantlyReadyCustomers.length) return null;
-      return {
+      const snapshot = {
         version: Math.max(1, Number(parsed.version) || 1),
         generatedAt: normalizeString(parsed.generatedAt),
         total: Math.max(customers.length, Number(parsed.total) || 0),
@@ -53,6 +63,8 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
           : null,
         timings: parsed.timings && typeof parsed.timings === 'object' ? parsed.timings : {},
       };
+      if (decoded.ordered) Object.defineProperty(snapshot, orderedSnapshot, { value: true });
+      return snapshot;
     } catch (_error) {
       return null;
     }
@@ -86,6 +98,12 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
     );
   }
 
+  function selectDistanceOrderedCategories(snapshot = {}) {
+    const ordered = snapshot[orderedSnapshot] === true;
+    const rows = (category) => ordered ? category : sortCustomersByDistance(category);
+    return [rows(snapshot.customers), rows(snapshot.availableCustomers), rows(snapshot.instantlyReadyCustomers)];
+  }
+
   function serializeMailReadySnapshotCache(data = {}, rowLimit = maxLimit, serializeOptions = {}) {
     const limit = Math.max(1, Math.min(maxLimit, Number(rowLimit) || maxLimit));
     const customers = sortCustomersByDistance(data.customers).slice(0, limit);
@@ -117,6 +135,8 @@ function createPremiumDatabaseSnapshotCacheCodec(options = {}) {
   return {
     isMailReadySnapshotCoherent,
     isMailReadySnapshotBootstrapCoherent,
+    isDistanceSortedSnapshot: (snapshot) => Boolean(snapshot && snapshot[orderedSnapshot] === true),
+    selectDistanceOrderedCategories,
     parseMailReadySnapshotCacheValue,
     serializeMailReadySnapshotCache,
   };
