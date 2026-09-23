@@ -341,7 +341,8 @@ test('mailbox initialiseert met de opgeslagen eigenaar en toont geen verkeerde s
   assert.match(scriptSource, /finally \{\s*window\.SoftoraMailboxBoot\?\.markReady\?\.\(\);\s*mailboxRefreshController\?\.start\?\.\(\);/);
   assert.match(stabilitySource, /setAttribute\?\.\('inert', ''\)/);
   assert.match(pageSource, /\.mail-detail\.is-detail-pending::after \{ content: 'E-mail laden…';/);
-  assert.match(readOwnerSessionScript(), /if \(campaignResult\.fromBootstrap && canApply\(candidate\)\) \{\s*void load\(\{/);
+  assert.match(readOwnerSessionScript(), /if \(campaignResult\.fromBootstrap && canApply\(candidate\) && options\.deferPostBootstrapRead !== true\) \{\s*void load\(\{/);
+  assert.match(scriptSource, /deferPostBootstrapRead: true/);
   assert.match(fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-boot.js'), 'utf8'), /if \(!ready\) return;/);
   assert.match(pageSource, /main\.is-premium-boot-host > \.premium-boot-shell\.is-booting \{ visibility: hidden; \}/);
 });
@@ -8738,6 +8739,40 @@ test('geaborteerde same-mail bodyflight blokkeert de directe actuele vervanger n
   await staleLoad;
   assert.equal(mail.body, 'Actuele volledige inhoud.');
   assert.equal(mail.bodyLoadState, 'ready');
+});
+
+test('mailboxbootstrap wacht op de providercontrole voor de ene canonieke lijstlezing', async () => {
+  let calls = 0;
+  let messages = [];
+  const view = ownerSessionModule.createView({
+    deferPostBootstrapRead: true,
+    getScope: () => ({ owner: 'serve', folder: 'outreach' }),
+    campaignInbox: {
+      async load() {
+        calls += 1;
+        return {
+          fromBootstrap: calls === 1,
+          messages: [{ id: 'serve-thread' }],
+          sync: {},
+        };
+      },
+      filterMessages(value) { return value; },
+    },
+    filterDeleted: (value) => value,
+    getMessages: () => messages,
+    setMessages: (value) => { messages = value; },
+    getActiveMail: () => null,
+    renderList() {},
+    setStatus() {},
+    getListElement: () => ({ setAttribute() {} }),
+  });
+
+  assert.equal(await view.load(), true);
+  await Promise.resolve();
+  assert.equal(calls, 1);
+  assert.deepEqual(messages.map((message) => message.id), ['serve-thread']);
+  assert.equal(await view.load({ skipPageBootstrap: true, skipProviderRefresh: true }), true);
+  assert.equal(calls, 2);
 });
 
 test('bootstrapachtergrondrefresh annuleert een direct gestarte bodyhydratie niet', async () => {

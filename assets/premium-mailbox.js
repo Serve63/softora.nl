@@ -725,7 +725,7 @@ mailboxOwnerView = window.SoftoraMailboxOwnerSession.createView({
   getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, openMail,
   getListElement: () => document.getElementById('mail-results-scroll'), renderList, prewarm: (messages) => window.SoftoraMailboxImages?.prewarm?.(messages),
   getSync: () => mailboxSyncState, setSync: (value) => { mailboxSyncState = value; }, setStatus: (value) => window.SoftoraMailboxIndex?.setStatus(value),
-  syncInBackground: syncMailboxInBackground, syncInboxBadge: syncInboxBadgeFromCurrentFolder,
+  syncInBackground: syncMailboxInBackground, deferPostBootstrapRead: true, syncInboxBadge: syncInboxBadgeFromCurrentFolder,
   closeCompose: mailboxComposeController.close, closeMenu: closeMailboxAccountMenu, updateAccountUi: () => setMailboxAccountUi(activeMailboxAccount),
   resetDetail: resetDetailEmpty, toast, escapeHtml, shouldApplyMessages: () => !mailboxDiscoveryController?.isSearchActive?.(),
 });
