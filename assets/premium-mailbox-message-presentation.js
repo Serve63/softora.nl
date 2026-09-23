@@ -334,7 +334,20 @@
       ) {
         return { body: cleanClientFooter(getSentAuthoredBody(body)), contact: emptyContact(), signatureMatched: false };
       }
-      const classified = ai?.read({ ...message, body });
+      const canMatch = typeof options.getMessageTimestamp === 'function' &&
+        typeof options.getProvenOutboundThreadMessages === 'function' && typeof options.getDirectParentMessageIds === 'function';
+      const layout = aiView?.decision?.displayBody ?? body;
+      let provenQuoteLines = [];
+      if (canMatch && aiView?.status === 'ready' && typeof layout === 'string') {
+        const parsed = quotedThread?.findQuotedSegments?.(layout);
+        const lines = layout.split(/\r?\n/);
+        // Normalization may insert header lines: never apply shifted proof indices.
+        if (parsed?.lines?.length === lines.length && parsed.lines.every((line, i) => line === lines[i])) {
+          const proof = getProvenQuotedOutboundResult(layout, mail, message);
+          provenQuoteLines = lines.flatMap((_, i) => proof.removed.some((range) => i >= range.start && i < range.end) ? [i] : []);
+        }
+      }
+      const classified = ai?.read({ ...message, body }, provenQuoteLines);
       if (classified?.fallback) {
         // Pending history keeps its established layout while the background queue drains.
         const legacy = getSourceSafeMessagePresentation({ ...message, aiPresentation: null }, mail, body, presentationOptions);
@@ -343,8 +356,6 @@
       if (classified) {
         // AI handles footer selection; exact, same-mailbox sent-copy evidence still
         // owns conversation deduplication. Never hide an unknown forwarded message.
-        const canMatch = typeof options.getMessageTimestamp === 'function' &&
-          typeof options.getProvenOutboundThreadMessages === 'function' && typeof options.getDirectParentMessageIds === 'function';
         return canMatch && message.aiPresentation?.status === 'ready'
           ? { ...classified, body: getProvenQuotedOutboundResult(classified.body, mail, message).body } : classified;
       }

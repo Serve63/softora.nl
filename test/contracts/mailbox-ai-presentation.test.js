@@ -430,3 +430,19 @@ test('ready AI mail still deduplicates a proven sent copy while preserving unkno
   assert.equal(campaign.getRootMessagePresentation(body,incoming).body,'Dankjewel, wij bespreken het.');
   assert.match(campaign.getRootMessagePresentation(body,{...incoming,threadMessages:[]}).body,/eerdere concrete voorstel/);
 });
+
+test('sent-copy proof survives AI removing signature lines inside that quote', () => {
+  const campaign = require('../../assets/premium-mailbox-campaign-inbox');
+  const parent = { id:'sent:parent', messageId:'<parent@example.nl>', folder:'sent', direction:'sent',
+    accountEmail:'owner@example.nl', date:'2026-09-22T12:00:00Z',
+    body:'Hier staat mijn eerdere concrete voorstel voor jullie website.\nMet vriendelijke groet,\nServé\nTel: 0612345678' };
+  const body = `Dankjewel, wij bespreken het.\n\nOn Tuesday, September 22, 2026, Servé <owner@example.nl> wrote:\n${parent.body.split('\n').map(line=>'> '+line).join('\n')}`;
+  const labels = body.split('\n').map((_,i)=> i >= 4 ? 'signature' : 'authored');
+  const incoming = { ...message, body, inReplyTo:parent.messageId, date:'2026-09-22T13:00:00Z', threadMessages:[parent],
+    aiPresentation:{...ready.aiPresentation, sourceBody:body, decision:{labels,contacts:[{line:6,kind:'phone',text:'0612345678'}]}} };
+  const view = campaign.getRootMessagePresentation(body,incoming);
+  assert.equal(view.body,'Dankjewel, wij bespreken het.');
+  assert.deepEqual(view.contact.beforeLines,[]);
+  assert.match(campaign.getRootMessagePresentation(body,{...incoming,threadMessages:[]}).body,/eerdere concrete voorstel/);
+  assert.equal(incoming.body,body);
+});
