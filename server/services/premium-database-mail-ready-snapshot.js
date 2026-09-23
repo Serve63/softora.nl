@@ -31,6 +31,7 @@ const {
   isMailReadySnapshotBootstrapCoherent,
   isMailReadySnapshotCoherent,
   parseMailReadySnapshotCacheValue,
+  selectDistanceOrderedCategories,
   serializeMailReadySnapshotCache,
 } = createPremiumDatabaseSnapshotCacheCodec({ maxLimit: SNAPSHOT_STORAGE_MAX_ROWS, formatVersion: SNAPSHOT_FORMAT_VERSION });
 const EXCLUDED_STATUSES = new Set([
@@ -1111,9 +1112,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
       requireFoundSnapshot: options.includeFoundSnapshot === true,
       allowStaleWhileRefreshing: options.allowStaleWhileRefreshing === true,
     });
-    const allCustomers = sortCustomersByDistance(snapshotData.customers);
-    const allAvailableCustomers = sortCustomersByDistance(snapshotData.availableCustomers);
-    const allInstantlyReadyCustomers = sortCustomersByDistance(snapshotData.instantlyReadyCustomers);
+    const [allCustomers, allAvailableCustomers, allInstantlyReadyCustomers] = selectDistanceOrderedCategories(snapshotData);
     return {
       ok: true,
       source: SNAPSHOT_SOURCE,
