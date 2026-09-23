@@ -289,6 +289,40 @@ test('stalled and timed-out campaign claims retry once without refunding uncerta
   } finally { await db.close(); }
 });
 
+test('claim uses a proven copy of the same message when its queued inbox copy lacks campaign proof', async () => {
+  const db = await database();
+  try {
+    await db.exec(migration);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923112643_mailbox_ai_failed_usage_settlement.sql'),'utf8'));
+    await db.exec(`alter table public.softora_mailbox_messages add column in_reply_to text;
+      alter table public.softora_mailbox_messages add column references_text text;
+      alter table public.softora_mailbox_messages add column recipients_text text;
+      alter table public.softora_mailbox_messages add column subject text;
+      create table public.softora_mailbox_campaign_lineage_members(message_key text,account_email text);
+      create table public.softora_mailbox_campaign_lineage_roots(message_key text,account_email text);
+      create function public.softora_mailbox_message_has_campaign_proof(text,text,text,text,text,text,text,text,text,text,jsonb,text,text default null)
+        returns boolean language sql immutable as $$select $3='coldmail'$$;`);
+    for (const file of ['20260923122053_mailbox_ai_campaign_only.sql',
+      '20260923122633_mailbox_ai_campaign_hint.sql',
+      '20260923125807_mailbox_ai_recover_stalled_claims.sql'])
+      await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/'+file),'utf8'));
+    await db.exec(`update public.softora_mailbox_ai_budget set approved_micro_usd=600000,include_history=true;
+      insert into public.softora_mailbox_messages(message_key,message_id,account_email,created_at,date,folder,
+        sender_email,body_text,has_body,body_truncated,payload,in_reply_to) values
+        ('unproven-inbox','stable-id','owner',now(),now(),'inbox','sender@example.nl','Reply',true,false,'{}','<sent@example.nl>'),
+        ('proven-coldmail','stable-id','owner',now(),now(),'coldmail','sender@example.nl','Reply',true,false,'{}','<sent@example.nl>');
+      insert into public.softora_mailbox_ai_presentations(id,version,account_email,message_key,source)
+        values ('job','mailbox-luna-v1','owner','unproven-inbox',
+          '{"identity":"stable-id","body":"Reply","from":"sender@example.nl","email":"sender@example.nl"}');`);
+    const claim = "select id from softora_claim_mailbox_ai('00000000-0000-0000-0000-000000000001')";
+    assert.equal((await db.query(claim)).rows.length, 0);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923182811_mailbox_ai_claim_proven_identity.sql'),'utf8'));
+    assert.equal((await db.query(claim)).rows[0].id, 'job');
+    assert.equal((await db.query(claim)).rows.length, 0);
+    assert.equal(Number((await db.query('select reserved_micro_usd from softora_mailbox_ai_budget')).rows[0].reserved_micro_usd), 300000);
+  } finally { await db.close(); }
+});
+
 test('stale claims outside campaign scope close without refunding uncertain reservations', async () => {
   const db = await database();
   try {
