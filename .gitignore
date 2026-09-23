@@ -27,3 +27,4 @@ xcuserdata/
 
 # Cursor local debug output
 .cursor/*.log
+.env.local
