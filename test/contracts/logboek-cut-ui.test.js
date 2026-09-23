@@ -18,6 +18,7 @@ test('logboek-cut keeps the set details below the title and aligned with the exe
   assert.equal(horizontal, '0', 'The detail line must share the card’s left edge.');
   assert.ok(parseFloat(bottom) > 0, 'The set buttons need space below the detail line.');
   assert.match(rule, /text-align:\s*left\b/);
+  assert.match(rule, /font-weight:\s*700\b/);
 });
 
 test('logboek-cut fills the page without an outer card on desktop and mobile', () => {
@@ -25,6 +26,7 @@ test('logboek-cut fills the page without an outer card on desktop and mobile', (
   assert.match(css, /\.app\s*\{[^}]*width:\s*100%/);
   assert.match(css, /\.workout\s*\{[^}]*width:\s*100%[^}]*border:\s*0/);
   assert.match(css, /@media\s*\(max-width:\s*700px\)/);
+  assert.match(css, /\.exercise\s*\{[^}]*margin-inline:\s*calc\(-1 \* var\(--row-gutter\)\)/);
 });
 
 test('logboek-cut has no training progress badge or progress bar', () => {
