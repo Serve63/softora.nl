@@ -68,7 +68,7 @@
         let autoMockupRunning = false;
         let pollPumpTimer = null, pollPumpDueAt = 0, activePollRequests = 0;
         let finishedPhotoRefreshTimer = null, finishedPhotoRefreshRunning = false, finishedPhotoRefreshPromise = null, resolveFinishedPhotoRefresh = null;
-        const finishedPhotoRefreshIds = new Set(), finishedPhotoSuccessIds = new Set();
+        const finishedPhotoRefreshIds = new Set();
         ensureStyles();
 
         function getSharedLoadedPhotoKeys() {
@@ -418,9 +418,8 @@
         async function startBulkBatchForCustomers(customers){const controller=getBulkController();if(!controller)throw new Error("Webdesign-bulk script is niet geladen.");return controller.startBulkBatchForCustomers(customers);}
         function resumeBulkBatch(){const controller=getBulkController();if(controller&&typeof controller.loadLatestBatch==="function")void controller.loadLatestBatch();}
 
-        function queueFinishedPhotoRefresh(customerId, announceSuccess) {
+        function queueFinishedPhotoRefresh(customerId) {
             const id = normalizeString(customerId); if (id) finishedPhotoRefreshIds.add(id);
-            if (id && announceSuccess === true) finishedPhotoSuccessIds.add(id);
             if (!finishedPhotoRefreshPromise) finishedPhotoRefreshPromise = new Promise(function (resolve) { resolveFinishedPhotoRefresh = resolve; });
             if (!finishedPhotoRefreshTimer && typeof global.setTimeout === "function") finishedPhotoRefreshTimer = global.setTimeout(flushFinishedPhotoRefresh, FINISHED_PHOTO_REFRESH_DELAY_MS);
             else if (!finishedPhotoRefreshTimer) void flushFinishedPhotoRefresh();
@@ -430,10 +429,10 @@
         async function flushFinishedPhotoRefresh() {
             if (finishedPhotoRefreshRunning) return finishedPhotoRefreshPromise;
             finishedPhotoRefreshRunning = true; if (finishedPhotoRefreshTimer && typeof global.clearTimeout === "function") global.clearTimeout(finishedPhotoRefreshTimer); finishedPhotoRefreshTimer = null;
-            const customerIds = Array.from(finishedPhotoRefreshIds), successCount = customerIds.filter(function (id) { return finishedPhotoSuccessIds.has(id); }).length; finishedPhotoRefreshIds.clear(); finishedPhotoSuccessIds.clear();
-            const costText = costReporter.consume(customerIds);
-            try { if (typeof refreshPhotos === "function") await refreshPhotos({ customerId: customerIds[0] || "", customerIds: customerIds, batch: customerIds.length > 1 }); else if (typeof renderPage === "function") renderPage(); customerIds.forEach(scheduleMissingMockupPair); if (successCount && typeof setStatusMessage === "function") setStatusMessage((successCount === 1 ? "Webdesign klaar. De lead staat nu bij Mailklaar." : successCount + " webdesigns klaar en naar Mailklaar verplaatst.") + (costText ? " " + costText : ""), "success", true); }
-            finally { const resolve = resolveFinishedPhotoRefresh; finishedPhotoRefreshRunning = false; finishedPhotoRefreshPromise = null; resolveFinishedPhotoRefresh = null; if (typeof resolve === "function") resolve(true); if (finishedPhotoRefreshIds.size) queueFinishedPhotoRefresh("", false); }
+            const customerIds = Array.from(finishedPhotoRefreshIds); finishedPhotoRefreshIds.clear();
+            costReporter.consume(customerIds);
+            try { if (typeof refreshPhotos === "function") await refreshPhotos({ customerId: customerIds[0] || "", customerIds: customerIds, batch: customerIds.length > 1 }); else if (typeof renderPage === "function") renderPage(); customerIds.forEach(scheduleMissingMockupPair); }
+            finally { const resolve = resolveFinishedPhotoRefresh; finishedPhotoRefreshRunning = false; finishedPhotoRefreshPromise = null; resolveFinishedPhotoRefresh = null; if (typeof resolve === "function") resolve(true); if (finishedPhotoRefreshIds.size) queueFinishedPhotoRefresh(""); }
         }
 
         function clearPollTimer(jobId) {
@@ -482,7 +481,7 @@
         async function finishPendingJob(job, message, outcome) {
             clearPollTimer(job.jobId);
             removePendingJob(job.customerId);
-            if (outcome === "success" || outcome === "reconcile") queueFinishedPhotoRefresh(job.customerId, outcome === "success");
+            if (outcome === "success" || outcome === "reconcile") queueFinishedPhotoRefresh(job.customerId);
             if (message) setStatusMessage(message, "error");
             if (typeof renderPage === "function") renderPage();
         }

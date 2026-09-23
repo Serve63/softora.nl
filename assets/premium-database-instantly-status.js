@@ -10,9 +10,8 @@
     const BLOCKED = new Set(["bounced", "unsubscribed", "blocked", "interested", "provider_not_found"]);
     const FINISHED_DATABASE = new Set(["klant", "interesse", "afspraak", "afgehaakt", "geblokkeerd", "buiten"]);
     const CURRENT_CAMPAIGNS = new Map([
-        ["6ba410c6-d97a-4186-a414-83ba95022b1a", "serve"],
-        ["9a603e82-7a50-46e2-855a-5a2990a9304b", "martijn"],
-        ["79b1f8c0-35de-4687-95ea-8384c4c491bd", "martijn"]
+        ["7a94c361-d83c-4857-9395-e9c5ba603f90", "serve"],
+        ["e4f7df3a-6c53-4c03-911c-beb758d9231c", "martijn"]
     ]);
 
     function text(value) { return String(value || "").trim(); }
