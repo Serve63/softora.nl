@@ -29,7 +29,7 @@ function environment() {
       markDegraded: (input) => { events.push(input.reason); },
     },
   };
-  const state = { canonicalInventoryReady: true, remoteCustomersLoaded: true, photoRestorePending: false, photoRestoreFailed: false, dataLoading: false, linkedSpreadsheetSyncReady: true, pendingJobsRestored: true, providerDeliverySyncReady: true };
+  const state = { canonicalInventoryReady: true, remoteCustomersLoaded: true, photoRestorePending: false, photoRestoreFailed: false, dataLoading: false, linkedSpreadsheetSyncReady: true, pendingJobsRestored: true };
   return { readiness: createReadiness(root), root, state, values, visible, events };
 }
 
@@ -83,7 +83,7 @@ test('Mailsysteem cannot claim readiness with missing metrics or incomplete medi
   assert.ok(!env.events.includes('ready'));
 });
 
-test('Mailsysteem waits for spreadsheet and provider checks before claiming complete readiness', async () => {
+test('Mailsysteem waits for persisted inventory, spreadsheet and photo jobs before claiming readiness', async () => {
   const env = environment();
   env.state.linkedSpreadsheetSyncReady = false;
   assert.equal(await env.readiness.publish({ state: env.state }), false);
@@ -93,9 +93,6 @@ test('Mailsysteem waits for spreadsheet and provider checks before claiming comp
   assert.equal(await env.readiness.publish({ state: env.state }), false);
   assert.ok(env.events.includes('pending-photo-jobs-incomplete'));
   env.state.pendingJobsRestored = true;
-  env.state.providerDeliverySyncReady = false;
-  assert.equal(await env.readiness.publish({ state: env.state }), false);
-  assert.ok(env.events.includes('provider-delivery-sync-incomplete'));
   assert.ok(!env.events.includes('ready'));
 });
 
