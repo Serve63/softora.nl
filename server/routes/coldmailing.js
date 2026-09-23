@@ -116,6 +116,7 @@ function registerColdmailingRoutes(app, deps = {}) {
     cronSecret = process.env.CRON_SECRET || '',
     supabaseOutageCronPause = process.env.SUPABASE_OUTAGE_CRON_PAUSE || '',
     isSupabaseOutageCronPaused,
+    readTableVersions = null,
   } = deps;
   const coldmailingCronSecret = normalizeString(cronSecret || process.env.CRON_SECRET || '');
 
@@ -371,9 +372,11 @@ function registerColdmailingRoutes(app, deps = {}) {
       }
       const includeRecipients = _req.query && _req.query.includeRecipients === '1';
       const timings = includeRecipients ? {} : null;
-      const payload = await require('../services/coldmail-sent-register-response').getColdmailStatsResponse(coldmailCampaignService, includeRecipients, timings);
+      const payload = await require('../services/coldmail-sent-register-response').getColdmailStatsResponse(coldmailCampaignService, includeRecipients, timings, {
+        readTableVersions, requestedVersion: require('../services/readmodel-version-response').readRequestedReadModelVersion(_req),
+      });
       if (timings && typeof res.setHeader === 'function') {
-        res.setHeader('Server-Timing', `live;dur=${timings.live}, register;dur=${timings.register}`);
+        res.setHeader('Server-Timing', `live;dur=${timings.live}, version;dur=${timings.version || 0}, register;dur=${timings.register || 0}`);
       }
       res.json(payload);
     } catch (error) {

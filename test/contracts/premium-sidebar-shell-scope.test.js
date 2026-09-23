@@ -249,7 +249,7 @@ test('premium database consistency assets stay outside the static sidebar', () =
   const asideEnd = source.indexOf('</aside>');
   assert.ok(asideEnd > 0);
   assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260716a') > asideEnd);
-  assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20260923-readmodel-delta') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20260924-readmodel-version') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-table-helpers.js?v=20260923-owner') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260923-id-match') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui') > asideEnd);
@@ -1355,7 +1355,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.ok(extractSidebarLinkTargets(source).database);
   assert.match(source, /premium-database-boot\.js\?v=20260923-provider-readmodel/);
   assert.match(source, /premium-database-readiness\.js\?v=20260923-provider-readmodel/);
-  assert.match(source, /premium-database-system-mail-count\.js\?v=20260923-fresh-stats/);
+  assert.match(source, /premium-database-system-mail-count\.js\?v=20260924-readmodel/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260923-id-match/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(source, /premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);

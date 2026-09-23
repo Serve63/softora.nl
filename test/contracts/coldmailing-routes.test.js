@@ -668,7 +668,7 @@ test('coldmailing stats route reports separate live and register timings without
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.stats.hardBounces, 4);
   assert.equal(res.body.stats.sentRegister.total, 1);
-  assert.match(res.headers['server-timing'], /^live;dur=\d+, register;dur=\d+$/);
+  assert.match(res.headers['server-timing'], /^live;dur=\d+, version;dur=\d+, register;dur=\d+$/);
   assert.equal(res.headers['cache-control'], 'no-store, private');
 });
 
