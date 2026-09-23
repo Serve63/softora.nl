@@ -1196,7 +1196,7 @@
     <script src="assets/premium-customers-renderers.js?v=20260911a"></script>
     <script src="assets/premium-customers-core.js?v=20260911b"></script>
     <script src="assets/premium-customers-store.js?v=20260824a"></script>
-    <script src="assets/premium-customers-load-state.js?v=20260824a"></script>
+    <script src="assets/premium-customers-load-state.js?v=20260924a"></script><script src="assets/premium-readmodel-store.js?v=20260924b"></script><script src="assets/premium-screen-snapshot.js?v=20260924a"></script><script src="assets/premium-customers-screen-snapshot.js?v=20260924a"></script>
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
@@ -1775,7 +1775,7 @@
         }
 
         async function persistCustomerList(customers) {
-            if (!state.fullCustomerRowsLoaded) {
+            if (!state.fullCustomerRowsLoaded && state.fullCustomerRowsPending) await state.fullCustomerRowsPending; if (!state.fullCustomerRowsLoaded) {
                 return {
                     ok: false,
                     error: new Error("De volledige klantdatabase is nog niet veilig geladen. Probeer opnieuw.")
@@ -1831,7 +1831,7 @@
         function renderTable() {
             const filtered = getFilteredCustomers(), isLoading = state.loadState === "loading";
 
-            document.getElementById("customerTableRegion").setAttribute("aria-busy", String(isLoading)); document.getElementById("customerLoadingOverlay").hidden = !isLoading; nodes.empty.hidden = !customerLoadState.shouldShowEmpty(state.loadState, filtered.length);
+            if (isLoading && window.SoftoraCustomersScreenSnapshot?.isShowing()) return; window.SoftoraCustomersScreenSnapshot?.release(); if (!isLoading && state.loadState === "ready") window.SoftoraCustomersScreenSnapshot?.capture(state); document.getElementById("customerTableRegion").setAttribute("aria-busy", String(isLoading)); document.getElementById("customerLoadingOverlay").hidden = !isLoading; nodes.empty.hidden = !customerLoadState.shouldShowEmpty(state.loadState, filtered.length);
             nodes.body.replaceChildren();
 
             if (!filtered.length) {
@@ -2080,7 +2080,7 @@
             setStatusMessage: setStatusMessage,
             setCustomerLoadFailure: setCustomerLoadFailure,
             setRetryHidden: function (hidden) { nodes.retryCustomersButton.hidden = Boolean(hidden); },
-            logError: function (message, error) { console.error(message, error); }
+            logError: function (message, error) { console.error(message, error); }, isSnapshotShowing: function () { return Boolean(window.SoftoraCustomersScreenSnapshot?.isShowing()); }
         });
 
         function runCustomersBootstrap() { return customerLoadCoordinator.run(); }
@@ -2089,7 +2089,7 @@
         if (initialBootstrapCustomers.length) {
             state.klanten = initialBootstrapCustomers;
         }
-        renderPage();
+        if (!initialBootstrapCustomers.length) window.SoftoraCustomersScreenSnapshot?.restore(state); renderPage();
         const customersBootStartedAt = Date.now(), customersHadBootstrap = initialBootstrapCustomers.length > 0, releaseCustomersBootShell = () => window.SoftoraPremiumBootTiming?.release(customersBootStartedAt, 0) || window.SoftoraPremiumBoot?.setShellBooting?.(false);
 
         nodes.search.addEventListener("input", function (event) {

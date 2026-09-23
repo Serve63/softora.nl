@@ -218,3 +218,58 @@ test('klantenpagina heeft retry, single-flight en blokkeert writes zonder volled
   assert.match(loadSource, /state\.loadState = 'loading';/);
   assert.doesNotMatch(source, /if \(!hadBootstrapCustomers\) \{ const shouldRerender = customerListsDiffer\(\[\]\)/);
 });
+
+test('klantenloader toont formele klanten zonder op de legacy-kopie te wachten; opslaan wacht er wel op', async () => {
+  let releaseLegacy;
+  const fixture = createCoordinatorFixture({
+    fetchCanonicalCustomers: async () => [{ id: 'formeel-1' }],
+    fetchUiState: (scope) => scope === 'orders'
+      ? Promise.resolve({ values: { 'order-key': '[]' } })
+      : new Promise((resolve) => { releaseLegacy = resolve; }),
+  });
+  assert.equal(await fixture.coordinator.run(), 'canonical');
+  assert.deepEqual(fixture.state.klanten.map((row) => row.id), ['formeel-1']);
+  assert.equal(fixture.state.loadState, 'ready');
+  assert.equal(fixture.state.fullCustomerRowsLoaded, false, 'saves stay blocked until the legacy copy is in');
+  assert.ok(fixture.state.fullCustomerRowsPending, 'saves can wait for the pending legacy copy');
+  releaseLegacy({ values: { 'customer-key': JSON.stringify([{ id: 'db-1', databaseStatus: 'lead' }]) } });
+  await fixture.state.fullCustomerRowsPending;
+  assert.equal(fixture.state.fullCustomerRowsLoaded, true);
+  assert.deepEqual(fixture.state.sharedCustomerRows.map((row) => row.id), ['db-1']);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fixture.state.fullCustomerRowsPending, null);
+
+  const source = fs.readFileSync(path.join(__dirname, '../../premium-klanten.html'), 'utf8');
+  assert.match(source, /if \(!state\.fullCustomerRowsLoaded && state\.fullCustomerRowsPending\) await state\.fullCustomerRowsPending; if \(!state\.fullCustomerRowsLoaded\) \{/);
+});
+
+test('klantenloader valt terug op de legacy-kopie als de formele read faalt', async () => {
+  const fixture = createCoordinatorFixture({
+    fetchCanonicalCustomers: async () => { throw new Error('504'); },
+    fetchUiState: async (scope) => ({
+      values: scope === 'customers'
+        ? { 'customer-key': JSON.stringify([{ id: 'legacy-1', databaseStatus: 'klant' }]) }
+        : { 'order-key': '[]' },
+    }),
+  });
+  assert.equal(await fixture.coordinator.run(), 'canonical');
+  assert.deepEqual(fixture.state.klanten.map((row) => row.id), ['legacy-1']);
+  assert.equal(fixture.state.fullCustomerRowsLoaded, true);
+});
+
+test('klantenloader toont geen laadmelding zolang een schermopname zichtbaar is', async () => {
+  const statuses = [];
+  const loadState = require('../../assets/premium-customers-load-state');
+  const state = { klanten: [], orders: [], sharedCustomerRows: [], fullCustomerRowsLoaded: false, loadState: 'loading', loadPromise: null };
+  const coordinator = loadState.createLoadCoordinator({
+    state, customerScope: 'customers', customerKey: 'customer-key', orderScope: 'orders', orderKey: 'order-key',
+    fetchCanonicalCustomers: async () => [{ id: 'k1' }], parseCanonicalCustomers: (rows) => rows,
+    fetchUiState: async () => ({ values: {} }), parseCustomerStorageRows: () => [], readChunkedStateValue: () => '[]',
+    parseCustomersFromRows: () => [], parseOrders: () => [], deriveCustomersFromOrders: () => [],
+    mergeCustomersWithResponsible: (customers) => customers, customerListsDiffer: () => true,
+    renderTable() {}, renderPage() {}, setRetryHidden() {}, setStatusMessage: (...args) => statuses.push(args[0]),
+    setCustomerLoadFailure() {}, logError() {}, isSnapshotShowing: () => true,
+  });
+  await coordinator.run();
+  assert.ok(!statuses.includes('Klantenbestand laden...'));
+});

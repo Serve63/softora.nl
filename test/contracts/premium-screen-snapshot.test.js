@@ -127,3 +127,15 @@ test('Mailsysteem shows its snapshot instead of the loading row and replaces it 
   assert.notEqual(adapter.viewOf({ activeStatus: 'beschikbaar', query: '' }), adapter.viewOf({ activeStatus: 'mailklaar', query: '' }));
   assert.notEqual(adapter.viewOf({ activeStatus: 'beschikbaar', query: '' }), adapter.viewOf({ activeStatus: 'beschikbaar', query: 'haaren' }));
 });
+
+test('Klanten shows its snapshot instead of the loading overlay and releases it on the first real render', () => {
+  const page = fs.readFileSync(path.join(repoRoot, 'premium-klanten.html'), 'utf8');
+  assert.match(page, /if \(!initialBootstrapCustomers\.length\) window\.SoftoraCustomersScreenSnapshot\?\.restore\(state\); renderPage\(\);/);
+  assert.match(page, /if \(isLoading && window\.SoftoraCustomersScreenSnapshot\?\.isShowing\(\)\) return; window\.SoftoraCustomersScreenSnapshot\?\.release\(\); if \(!isLoading && state\.loadState === "ready"\) window\.SoftoraCustomersScreenSnapshot\?\.capture\(state\);/);
+  assert.match(page, /isSnapshotShowing: function \(\) \{ return Boolean\(window\.SoftoraCustomersScreenSnapshot\?\.isShowing\(\)\); \}/);
+  const adapterScript = page.indexOf('assets/premium-customers-screen-snapshot.js?v=20260924a');
+  assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924b') < adapterScript);
+  assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924a') < adapterScript);
+  assert.ok(page.indexOf('<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->') < adapterScript, 'the signed-in identity is known before restore');
+  assert.ok(adapterScript < page.indexOf('const state = {'));
+});

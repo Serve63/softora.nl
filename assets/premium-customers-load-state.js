@@ -77,40 +77,73 @@
       state.loadState = 'loading';
       deps.setRetryHidden(true);
       deps.renderTable();
-      if (!hadBootstrapCustomers) deps.setStatusMessage('Klantenbestand laden...', 'info');
+      const snapshotShowing = typeof deps.isSnapshotShowing === 'function' && deps.isSnapshotShowing() === true;
+      if (!hadBootstrapCustomers && !snapshotShowing) deps.setStatusMessage('Klantenbestand laden...', 'info');
 
-      try {
-        const canonicalRows = await deps.fetchCanonicalCustomers();
-        canonicalCustomers = deps.parseCanonicalCustomers(canonicalRows);
-        canonicalReadSucceeded = true;
-      } catch (error) {
-        deps.logError('Formele klanten laden mislukt:', error);
+      // All three reads start together. The formal customers and the orders are
+      // all the table needs; the legacy ui-state copy of the whole customer
+      // database (~825 kB) only guards full-list saves, so it completes in the
+      // background and saves wait for it (state.fullCustomerRowsPending).
+      const settle = (read) => Promise.resolve().then(read).then(
+        (value) => ({ ok: true, value }),
+        (error) => ({ ok: false, error })
+      );
+      const canonicalRead = settle(() => deps.fetchCanonicalCustomers());
+      const legacyRead = settle(() => deps.fetchUiState(customerScope));
+      const orderRead = settle(() => deps.fetchUiState(orderScope));
+      const legacyApplied = legacyRead.then((result) => {
+        if (!result.ok) {
+          deps.logError('Klanten laden via Supabase mislukt:', result.error);
+          return;
+        }
+        try {
+          const remoteState = result.value;
+          remoteRows = deps.parseCustomerStorageRows(
+            deps.readChunkedStateValue(remoteState.values, customerKey)
+          );
+          remoteCustomers = deps.parseCustomersFromRows(remoteRows);
+          state.sharedCustomerRows = remoteRows;
+          // Alleen een werkelijk aanwezige legacydataset is veilig genoeg voor de
+          // bestaande full-list write. Een lege gemigreerde UI-state mag nooit de
+          // formele klantentabel overschrijven.
+          state.fullCustomerRowsLoaded = remoteRows.length > 0;
+          customerReadSucceeded = true;
+        } catch (error) {
+          deps.logError('Klanten laden via Supabase mislukt:', error);
+        }
+      });
+      state.fullCustomerRowsPending = legacyApplied;
+      void legacyApplied.then(() => {
+        if (state.fullCustomerRowsPending === legacyApplied) state.fullCustomerRowsPending = null;
+      });
+
+      const [canonicalResult, orderResult] = await Promise.all([canonicalRead, orderRead]);
+      if (canonicalResult.ok) {
+        try {
+          canonicalCustomers = deps.parseCanonicalCustomers(canonicalResult.value);
+          canonicalReadSucceeded = true;
+        } catch (error) {
+          deps.logError('Formele klanten laden mislukt:', error);
+        }
+      } else {
+        deps.logError('Formele klanten laden mislukt:', canonicalResult.error);
       }
 
-      try {
-        const remoteState = await deps.fetchUiState(customerScope);
-        remoteRows = deps.parseCustomerStorageRows(
-          deps.readChunkedStateValue(remoteState.values, customerKey)
-        );
-        remoteCustomers = deps.parseCustomersFromRows(remoteRows);
-        state.sharedCustomerRows = remoteRows;
-        // Alleen een werkelijk aanwezige legacydataset is veilig genoeg voor de
-        // bestaande full-list write. Een lege gemigreerde UI-state mag nooit de
-        // formele klantentabel overschrijven.
-        state.fullCustomerRowsLoaded = remoteRows.length > 0;
-        customerReadSucceeded = true;
-      } catch (error) {
-        deps.logError('Klanten laden via Supabase mislukt:', error);
+      if (orderResult.ok) {
+        try {
+          const orderState = orderResult.value;
+          orders = deps.parseOrders(orderState.values && orderState.values[orderKey]);
+          state.orders = Array.isArray(orders) ? orders : [];
+          orderReadSucceeded = true;
+        } catch (error) {
+          deps.logError('Actieve opdrachten voor klanten laden mislukt:', error);
+        }
+      } else {
+        deps.logError('Actieve opdrachten voor klanten laden mislukt:', orderResult.error);
       }
 
-      try {
-        const orderState = await deps.fetchUiState(orderScope);
-        orders = deps.parseOrders(orderState.values && orderState.values[orderKey]);
-        state.orders = Array.isArray(orders) ? orders : [];
-        orderReadSucceeded = true;
-      } catch (error) {
-        deps.logError('Actieve opdrachten voor klanten laden mislukt:', error);
-      }
+      // Without the formal table the legacy copy is the fallback, as before.
+      if (!canonicalReadSucceeded) await legacyApplied;
 
       const importedCustomers = orderReadSucceeded ? deps.deriveCustomersFromOrders(orders) : [];
       const loadOutcome = classifyLoadOutcome({
