@@ -340,7 +340,8 @@ function createUiStateStore(deps = {}) {
     const normalizedScope = normalizeUiStateScope(scope);
     if (!normalizedScope) return null;
     const readOptions = getEffectiveUiStateReadOptions(normalizedScope, options);
-    const includeRevision = Boolean(readOptions.includeRevision);
+    const metadataOnly = readOptions.metadataOnly === true;
+    const includeRevision = Boolean(readOptions.includeRevision || metadataOnly);
     const readFailureCooldownScope = normalizeReadFailureCooldownScope(normalizedScope, readOptions);
 
     if (!isSupabaseConfigured()) {
@@ -370,7 +371,7 @@ function createUiStateStore(deps = {}) {
         };
         const fallback = await fetchSupabaseRowByKeyViaRest(
           rowKey,
-          includeRevision ? 'payload,updated_at,revision' : 'payload,updated_at',
+          metadataOnly ? 'updated_at,revision' : includeRevision ? 'payload,updated_at,revision' : 'payload,updated_at',
           restRequestOptions
         );
         if (!fallback.ok) {
@@ -401,7 +402,7 @@ function createUiStateStore(deps = {}) {
         try {
           const { data, error } = await client
             .from(supabaseStateTable)
-            .select(includeRevision ? 'payload, updated_at, revision' : 'payload, updated_at')
+            .select(metadataOnly ? 'updated_at, revision' : includeRevision ? 'payload, updated_at, revision' : 'payload, updated_at')
             .eq('state_key', rowKey)
             .maybeSingle();
 
@@ -419,6 +420,18 @@ function createUiStateStore(deps = {}) {
       } else {
         row = await readRowViaRest(new Error('Supabase client ontbreekt.'));
         if (row === null) return null;
+      }
+
+      if (metadataOnly) {
+        if (row?.source === 'memory') return null;
+        return {
+          values: {},
+          updatedAt: normalizeString(row?.updated_at || '') || null,
+          source: 'supabase',
+          revision: Number.isSafeInteger(Number(row?.revision)) && Number(row?.revision) >= 0
+            ? Number(row.revision) : 0,
+          exists: Boolean(row),
+        };
       }
 
       if (row?.source === 'memory' && row.values && typeof row.values === 'object') {

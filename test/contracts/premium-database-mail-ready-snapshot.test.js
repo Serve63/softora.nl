@@ -43,14 +43,18 @@ function createService(overrides = {}) {
       return overrides.signedPhotos || [];
     },
   };
-  const getUiStateValues = async (scope) => {
+  const getUiStateValues = async (scope, options = {}) => {
     if (scope === MAIL_READY_SNAPSHOT_CACHE_SCOPE) {
-      calls.push(['durable-snapshot-read', scope]);
+      calls.push(['durable-snapshot-read', scope, options.metadataOnly === true ? 'metadata' : 'full']);
+      const updatedAt = typeof overrides.getDurableUpdatedAt === 'function'
+        ? overrides.getDurableUpdatedAt() : overrides.durableUpdatedAt;
+      if (options.metadataOnly) return { source: 'supabase', updatedAt, exists: true, revision: 0, values: {} };
       const durableSnapshot = typeof overrides.getDurableSnapshot === 'function'
         ? overrides.getDurableSnapshot()
         : overrides.durableSnapshot;
       return {
         source: 'supabase',
+        updatedAt,
         values: durableSnapshot
           ? { [MAIL_READY_SNAPSHOT_CACHE_KEY]: JSON.stringify(durableSnapshot) }
           : {},
@@ -411,6 +415,57 @@ test('premium database mail-ready snapshot reuses a fresh durable snapshot witho
   assert.equal(calls.includes('photo-flags'), false);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'guard-keys'), false);
   assert.equal(calls.some((call) => Array.isArray(call) && call[0] === 'legacy-guard'), false);
+});
+
+test('snapshot pages check a small durable version and reload when another instance updates it', async () => {
+  const generatedAt = '2026-06-16T12:00:00.000Z';
+  let updatedAt = '2026-06-16T12:00:01.000Z';
+  let durableSnapshot = {
+    version: 2, generatedAt, total: 1,
+    customers: [{ id: 'ready-before', mailReady: true, mailReadySnapshot: true }],
+    availableTotal: 0, availableCustomers: [], foundCustomerIds: [],
+  };
+  const { service, calls } = createService({
+    getDurableSnapshot: () => durableSnapshot,
+    getDurableUpdatedAt: () => updatedAt,
+    nowMs: () => Date.parse('2026-06-16T12:00:30.000Z'),
+  });
+
+  await service.buildMailReadySnapshot({ limit: 1 });
+  await service.buildMailReadySnapshot({ limit: 1 });
+  assert.deepEqual(calls.filter((call) => call[0] === 'durable-snapshot-read').map((call) => call[2]), ['full', 'metadata']);
+
+  updatedAt = '2026-06-16T12:00:02.000Z';
+  durableSnapshot = {
+    ...durableSnapshot,
+    customers: [{ id: 'ready-after', mailReady: true, mailReadySnapshot: true }],
+  };
+  const latest = await service.buildMailReadySnapshot({ limit: 1 });
+  assert.deepEqual(latest.customers.map((customer) => customer.id), ['ready-after']);
+  assert.deepEqual(calls.filter((call) => call[0] === 'durable-snapshot-read').map((call) => call[2]), ['full', 'metadata', 'metadata', 'full']);
+});
+
+test('an invalid newer durable version cannot publish the previously cached snapshot', async () => {
+  let updatedAt = '2026-06-16T12:00:01.000Z';
+  let durableSnapshot = {
+    version: 2, generatedAt: '2026-06-16T12:00:00.000Z', total: 1,
+    customers: [{ id: 'old-ready', mailReady: true, mailReadySnapshot: true }],
+    availableTotal: 0, availableCustomers: [], foundCustomerIds: [],
+  };
+  const { service, calls } = createService({
+    getDurableSnapshot: () => durableSnapshot,
+    getDurableUpdatedAt: () => updatedAt,
+    customers: [{ customer_id: 'new-ready', company: 'New BV', email: 'info@new.test', website: 'new.test', database_status: 'prospect' }],
+    photoFlags: [{ customerId: 'new-ready', hasPhoto: true, hasMockup: true }],
+    nowMs: () => Date.parse('2026-06-16T12:00:30.000Z'),
+  });
+  assert.deepEqual((await service.buildMailReadySnapshot({ limit: 1 })).customers.map((row) => row.id), ['old-ready']);
+
+  updatedAt = '2026-06-16T12:00:02.000Z';
+  durableSnapshot = { ...durableSnapshot, total: 2 };
+  const refreshed = await service.buildMailReadySnapshot({ limit: 1 });
+  assert.deepEqual(refreshed.customers.map((row) => row.id), ['new-ready']);
+  assert.equal(calls.includes('customers-snapshot'), true);
 });
 
 test('premium database mail-ready snapshot rejects a truncated durable cache and recomputes all rows', async () => {

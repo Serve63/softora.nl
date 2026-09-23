@@ -274,6 +274,31 @@ test('ui-state store returns authoritative revision metadata only when requested
   assert.equal(state.updatedAt, '2026-08-04T12:00:00.000Z');
 });
 
+test('ui-state metadata reads exclude the large payload and do not replace cached values', async () => {
+  const { inMemoryUiStateByScope, restReads, store } = createFixture({
+    fetchResult: {
+      ok: true,
+      body: { updated_at: '2026-09-22T22:44:53.365Z', revision: 7 },
+    },
+  });
+  inMemoryUiStateByScope.set('premium_database_mail_ready_snapshot_cache', { preserved: 'yes' });
+
+  const state = await store.getUiStateValues('premium_database_mail_ready_snapshot_cache', {
+    metadataOnly: true,
+    preferSupabaseRestRead: true,
+  });
+
+  assert.equal(restReads[0].columns, 'updated_at,revision');
+  assert.deepEqual(state, {
+    values: {},
+    updatedAt: '2026-09-22T22:44:53.365Z',
+    source: 'supabase',
+    revision: 7,
+    exists: true,
+  });
+  assert.deepEqual(inMemoryUiStateByScope.get('premium_database_mail_ready_snapshot_cache'), { preserved: 'yes' });
+});
+
 test('ui-state store performs an atomic revision-and-timestamp CAS update', async () => {
   let updatedRow = null;
   const query = {

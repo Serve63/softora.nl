@@ -8,6 +8,7 @@ const {
 const {
   createPremiumDatabaseSnapshotCacheCodec,
 } = require('./premium-database-snapshot-cache');
+const { createPremiumDatabaseSnapshotDurableReader } = require('./premium-database-snapshot-durable-reader');
 const SNAPSHOT_SOURCE = 'structured-mail-ready-snapshot';
 const MAIL_READY_SNAPSHOT_CACHE_SCOPE = 'premium_database_mail_ready_snapshot_cache';
 const MAIL_READY_SNAPSHOT_CACHE_KEY = 'softora_premium_database_mail_ready_snapshot_v1';
@@ -485,6 +486,10 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   let durableSnapshotReadPromise = null;
   let snapshotInvalidated = false;
   let snapshotMutationPromise = Promise.resolve();
+  const durableReader = createPremiumDatabaseSnapshotDurableReader({
+    getUiStateValues, scope: MAIL_READY_SNAPSHOT_CACHE_SCOPE, key: MAIL_READY_SNAPSHOT_CACHE_KEY,
+    parse: parseMailReadySnapshotCacheValue, isCoherent: isMailReadySnapshotCoherent, logger,
+  });
 
   function wait(delayMs) {
     return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(delayMs) || 0)));
@@ -670,26 +675,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   }
 
   async function readDurableSnapshotData() {
-    if (typeof getUiStateValues !== 'function') return null;
-    try {
-      const state = await getUiStateValues(MAIL_READY_SNAPSHOT_CACHE_SCOPE, {
-        uiStateReadTimeoutMs: 8000,
-        bypassReadFailureCooldown: true,
-        suppressReadFailureCooldown: true,
-        suppressReadFailureLog: true,
-        ignoreSupabaseRestFailureCooldown: true,
-        suppressSupabaseRestFailureCooldown: true,
-        readFailureCooldownScope: MAIL_READY_SNAPSHOT_CACHE_SCOPE,
-      });
-      const values = state && state.values && typeof state.values === 'object' ? state.values : {};
-      const snapshot = parseMailReadySnapshotCacheValue(values[MAIL_READY_SNAPSHOT_CACHE_KEY]);
-      return snapshot && isMailReadySnapshotCoherent(snapshot) ? snapshot : null;
-    } catch (error) {
-      if (logger && typeof logger.warn === 'function') {
-        logger.warn('[PremiumDatabaseMailReadySnapshot][durable-read]', error?.message || error);
-      }
-      return null;
-    }
+    return (await durableReader.readFull()).data;
   }
 
   async function persistDurableSnapshotData(data) {
@@ -848,18 +834,29 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   async function hydrateDurableSnapshotData(options = {}) {
     const force = options.force === true;
     if (snapshotDataCache && !force) return snapshotDataCache.data;
+    let versionChanged = false;
+    if (snapshotDataCache && force) {
+      const version = await durableReader.readVersion();
+      if (version && version === snapshotDataCache.durableVersion) return snapshotDataCache.data;
+      versionChanged = Boolean(version && snapshotDataCache.durableVersion && version !== snapshotDataCache.durableVersion);
+    }
     if (!durableSnapshotReadPromise) {
-      durableSnapshotReadPromise = readDurableSnapshotData().finally(() => {
+      durableSnapshotReadPromise = durableReader.readFull().finally(() => {
         durableSnapshotReadPromise = null;
       });
     }
-    const data = await durableSnapshotReadPromise;
-    if (!data) return snapshotDataCache ? snapshotDataCache.data : null;
+    const { data, version } = await durableSnapshotReadPromise;
+    if (!data) {
+      if (versionChanged) snapshotDataCache = null;
+      return snapshotDataCache ? snapshotDataCache.data : null;
+    }
     const generatedAtMs = getSnapshotGeneratedAtMs(data);
     const currentGeneratedAtMs = getSnapshotGeneratedAtMs(snapshotDataCache && snapshotDataCache.data);
-    if (!snapshotDataCache || generatedAtMs > currentGeneratedAtMs) {
+    if (!snapshotDataCache || generatedAtMs > currentGeneratedAtMs ||
+      (generatedAtMs === currentGeneratedAtMs && version && version !== snapshotDataCache.durableVersion)) {
       snapshotDataCache = {
         cachedAtMs: generatedAtMs || nowMs(),
+        durableVersion: version,
         data,
       };
     }
