@@ -3984,7 +3984,7 @@ test('mailbox campaign replies response joins indexed inbox mail to targeted web
   await service.listCampaignReplies({ limit: 100, includeSnapshotMessages: true });
   assert.equal(snapshotWrite.scope, 'premium_mailbox_campaign_snapshot');
   assert.equal(snapshotWrite.meta.source, 'mailbox-campaign-replies');
-  const persistedSnapshot = JSON.parse(
+  const persistedSnapshot = parseMailboxCampaignSnapshot(
     snapshotWrite.values.softora_mailbox_campaign_snapshot_v2
   );
   assert.equal(persistedSnapshot.messages[0].from, 'Marie-José');

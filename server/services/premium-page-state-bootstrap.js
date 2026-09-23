@@ -149,6 +149,7 @@ function createPremiumPageStateBootstrapService(deps = {}) {
       const compactSnapshot = snapshot.messages.length
         ? parseMailboxCampaignSnapshot(serializeMailboxCampaignSnapshot(snapshot))
         : snapshot;
+      if (!compactSnapshot?.complete) return null;
       mailboxCache = { snapshot: compactSnapshot, cachedAt: Date.now() };
       return compactSnapshot;
     } catch (_error) {
@@ -170,7 +171,7 @@ function createPremiumPageStateBootstrapService(deps = {}) {
       const snapshot = parseMailboxCampaignSnapshot(
         result && result.values && result.values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY]
       );
-      if (!snapshot) return null;
+      if (!snapshot?.complete) return null;
       mailboxCache = { snapshot, cachedAt: Date.now() };
       return snapshot;
     } catch (_error) {

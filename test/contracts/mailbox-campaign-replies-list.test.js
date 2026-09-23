@@ -79,6 +79,7 @@ test('ontbrekende, verouderde of oncontroleerbare snapshots vallen terug op de c
     { getUiStateValues: async () => null },
     { getUiStateValues: async () => { throw new Error('read timeout'); } },
     { getUiStateValues: async () => ({ values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: stale } }) },
+    { getUiStateValues: async () => ({ values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: JSON.stringify({ ...JSON.parse(raw), complete: false }) } }) },
     { mailboxIndexStore: { listMessageStatesByKeys: async () => null } },
     { mailboxIndexStore: { listMessageStatesByKeys: async () => { throw new Error('index unavailable'); } } },
   ]) {
@@ -210,4 +211,26 @@ test('campaign replies coordinator behoudt response en durable snapshot contract
     source: 'mailbox-campaign-replies',
     actor: 'Mailbox index',
   });
+});
+
+test('een gedeelde rebuild overschrijft de duurzame lijst niet met een afgekapt resultaat', async () => {
+  let writes = 0;
+  const messages = Array.from({ length: 401 }, (_, index) => ({
+    id: `inbox:${index}`,
+    messageKey: `serve@softora.nl|inbox|${index}`,
+    accountEmail: 'serve@softora.nl',
+    receivedAt: '2026-09-23T00:00:00.000Z',
+  }));
+  const listCampaignReplies = createMailboxCampaignRepliesList({
+    mailboxCampaignRepliesService: { listReplies: async () => messages },
+    instantlyMailboxService: { isConfigured: () => false },
+    filterVisibleMailboxMessages: (value) => value,
+    setUiStateValues: async () => { writes += 1; },
+    logger: { info() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength) => String(value || '').slice(0, maxLength),
+  });
+  const result = await listCampaignReplies({ includeSnapshotMessages: true });
+  assert.equal(result.snapshotMessages.length, 401);
+  assert.equal(writes, 0);
 });

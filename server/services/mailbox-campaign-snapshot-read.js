@@ -31,7 +31,7 @@ function createMailboxCampaignSnapshotRead({ getUiStateValues, mailboxIndexStore
       });
       const snapshot = parseMailboxCampaignSnapshot(stored?.values?.[MAILBOX_CAMPAIGN_SNAPSHOT_KEY]);
       const ageMs = Date.now() - Date.parse(snapshot?.savedAt || '');
-      if (!snapshot?.ok || !Number.isFinite(ageMs) || ageMs > SNAPSHOT_MAX_AGE_MS
+      if (!snapshot?.ok || snapshot.complete !== true || !Number.isFinite(ageMs) || ageMs > SNAPSHOT_MAX_AGE_MS
         || ageMs < -60_000 || Date.now() >= deadlineAtMs) return null;
       const candidates = snapshot.messages.filter((message) => (
         selectedOwner ? getMailboxMessageOwner(message) === selectedOwner : Boolean(getMailboxMessageOwner(message))

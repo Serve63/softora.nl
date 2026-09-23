@@ -6,7 +6,7 @@
     Object.freeze({ key: 'martijn', label: 'Martijn van de Ven' }),
     Object.freeze({ key: 'both', label: 'Martijn & Servé' }),
   ]);
-  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v18';
+  const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v19';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
   const ACCOUNT_OWNERS = Object.freeze({
@@ -845,7 +845,7 @@
     if (pageBootstrapConsumedOwners.has(requestedOwner)) return null;
     const payload = readPageBootstrapPayload();
     const mailbox = payload?.mailbox;
-    if (!mailbox || mailbox.ok === false || !Array.isArray(mailbox.messages)) return null;
+    if (!mailbox || mailbox.ok === false || mailbox.complete !== true || !Array.isArray(mailbox.messages)) return null;
     const snapshotOwner = isOwner(mailbox.owner) ? normalizeOwner(mailbox.owner) : '';
     if (snapshotOwner && snapshotOwner !== requestedOwner) return null;
     return {
@@ -866,7 +866,7 @@
     const cache = global.SoftoraPageBootstrapSession?.cache;
     const cacheKey = getMailboxTabCacheKey(value);
     const mailbox = cache?.read?.(cacheKey, MAILBOX_SESSION_CACHE_MAX_AGE_MS);
-    return mailbox && Array.isArray(mailbox.messages) ? mailbox : null;
+    return mailbox?.complete === true && Array.isArray(mailbox.messages) ? mailbox : null;
   }
 
   function writeSessionMailboxSnapshot(data, value) {
@@ -905,6 +905,7 @@
     });
     return cache.write(cacheKey, {
       ok: data.ok !== false,
+      complete: data.complete !== false,
       savedAt: Number.isFinite(Date.parse(String(data.savedAt || '')))
         ? new Date(data.savedAt).toISOString()
         : new Date().toISOString(),

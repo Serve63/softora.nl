@@ -200,6 +200,7 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
 
   assert.ok(serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS);
   assert.equal(parsed.messages.length, 100);
+  assert.equal(parsed.complete, true);
   assert.match(parsed.messages[0].body, /^Volledige inhoud 0/);
   assert.equal(parsed.messages[0].campaign.company, 'Bedrijf 0');
   assert.deepEqual(parsed.messages[0].threadMessages, [{
@@ -258,6 +259,70 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
   assert.deepEqual(parsed.messages.at(-1).bodyImages, []);
   assert.equal(parsed.messages.at(-1).bodyImagesTruncated, true);
   assert.equal(parsed.sync.source, 'campaign-replies-snapshot');
+});
+
+test('een grote snapshot comprimeert alle gesprekken binnen de opslaglimiet', () => {
+  const messages = Array.from({ length: 200 }, (_, index) => ({
+    id: `inbox:${index}`,
+    messageKey: `serve@softora.nl|inbox|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|${index}`,
+    folder: 'inbox',
+    accountEmail: 'serve@softora.nl',
+    date: new Date(Date.UTC(2026, 8, 23, 8, 0) - index * 60_000).toISOString(),
+    threadMessages: Array.from({ length: 5 }, (_, threadIndex) => ({
+      id: `sent:${index}:${threadIndex}`,
+      messageKey: `serve@softora.nl|sent|gen:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa|${index}:${threadIndex}`,
+      folder: 'sent',
+      accountEmail: 'serve@softora.nl',
+      subject: `Gesprek ${index} ${'x'.repeat(700)}`,
+      date: new Date(Date.UTC(2026, 8, 23, 8, 0) - index * 60_000).toISOString(),
+    })),
+  }));
+  const serialized = serializeMailboxCampaignSnapshot({ ok: true, messages });
+  const parsed = parseMailboxCampaignSnapshot(serialized);
+  assert.ok(serialized.length <= MAILBOX_CAMPAIGN_SNAPSHOT_MAX_CHARS);
+  assert.equal(JSON.parse(serialized).encoding, 'gzip-base64-v1');
+  assert.equal(parsed.expectedMessages, 200);
+  assert.equal(parsed.complete, true);
+  assert.equal(parsed.messages.length, parsed.expectedMessages);
+});
+
+test('een oncompressibele snapshot bewaart geen afgekapt of te groot beginbestand', () => {
+  let seed = 17;
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  function randomText(length) {
+    let value = '';
+    for (let index = 0; index < length; index += 1) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      value += alphabet[seed >>> 26];
+    }
+    return value;
+  }
+  const messages = Array.from({ length: 200 }, (_, index) => ({
+    id: `inbox:${index}`,
+    accountEmail: 'serve@softora.nl',
+    threadMessages: Array.from({ length: 10 }, (_, threadIndex) => ({
+      id: `sent:${index}:${threadIndex}`,
+      accountEmail: 'serve@softora.nl',
+      subject: randomText(1000),
+    })),
+  }));
+  assert.equal(serializeMailboxCampaignSnapshot({ ok: true, messages }), '');
+});
+
+test('gelezenstatus maakt een onvolledige historische snapshot nooit compleet', () => {
+  const raw = serializeMailboxCampaignSnapshot({
+    ok: true, complete: false, expectedMessages: 2,
+    messages: [{ id: 'inbox:1', messageKey: 'serve|inbox|1',
+      accountEmail: 'serve@softora.nl', unread: true }],
+  });
+  const result = markMailboxCampaignSnapshotRead(raw,
+    { accountEmail: 'serve@softora.nl', messageKey: 'serve|inbox|1' },
+    { readAt: '2026-09-23T00:00:00.000Z' });
+  const parsed = parseMailboxCampaignSnapshot(result.serialized);
+  assert.equal(result.changed, true);
+  assert.equal(parsed.complete, false);
+  assert.equal(parsed.expectedMessages, 2);
+  assert.equal(parsed.messages[0].unread, false);
 });
 
 test('mailbox campaign snapshot bewaart bekend bijlagebewijs voor root en thread', () => {
@@ -584,6 +649,7 @@ test('mailbox campaign snapshot herstelt laatste activiteit uit geldige threadda
     },
   });
   const [message] = parseMailboxCampaignSnapshot(legacySnapshot).messages;
+  assert.equal(parseMailboxCampaignSnapshot(legacySnapshot).complete, false);
 
   assert.equal(message.receivedAt, '2026-06-15T13:58:18.000Z');
   assert.equal(message.activityAt, '2026-06-15T13:58:18.000Z');
