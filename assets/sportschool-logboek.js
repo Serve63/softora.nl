@@ -63,6 +63,7 @@
   let cleanedLegacyNotesDuringLoad = false;
   let shouldPersistLoadedSnapshot = false;
   let lastRenderedDateKey = currentDateKey();
+  let cloud = null;
 
   addButton.disabled = true;
 
@@ -587,6 +588,7 @@
     return {
       snapshot,
       hasExercises: snapshotHasExercises(snapshot),
+      remoteBootstrapVersion,
     };
   }
 
@@ -629,6 +631,7 @@
       window.localStorage?.setItem(LOCAL_STORAGE_KEY, snapshotJson);
       lastSavedRevision = revisionAtStart;
       pendingLocalSave = false;
+      cloud?.changed();
     } catch (_error) {
       pendingLocalSave = false;
     }
@@ -1128,6 +1131,17 @@
       markStateChanged({ silent: true });
       persistLocalState({ force: true });
     }
+    cloud = window.SoftoraLogbookCloud?.mount({
+      editor: true,
+      readLocal: buildSnapshotFromState,
+      onSnapshot(snapshot) {
+        applyStoredSnapshot(snapshot);
+        lastSavedRevision = stateRevision;
+        pendingLocalSave = false;
+        logbookLoadStatus = 'ready';
+        render();
+      },
+    });
   }
 
   boot().catch(() => {

@@ -60,13 +60,15 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.match(bootstrapScriptSource, /mergeRemoteSnapshot/);
   assert.match(bootstrapScriptSource, /localDay\.orders\.length > 0/);
   assert.doesNotMatch(pageSource, /assets\/premium-ui-state-client\.js/);
-  assert.doesNotMatch(pageSource, /sportschool-logboek-sync\.js/);
+  assert.match(pageSource, /sportschool-logboek-sync\.js\?v=20260923a/);
+  assert.match(pageSource, /sportschool-logboek-cloud\.js\?v=20260923a/);
+  assert.match(pageSource, /data-logbook-cloud/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-supabase-config\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek\.js/);
   assert.match(pageSource, /assets\/sportschool-logboek-state\.js\?v=20260825c/);
   assert.match(pageSource, /assets\/sportschool-logboek-input\.js\?v=20260811a/);
   assert.match(pageSource, /assets\/sportschool-logboek-gesture\.js\?v=20260814a/);
-  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260825c/);
+  assert.match(pageSource, /assets\/sportschool-logboek\.js\?v=20260923a/);
   assert.doesNotMatch(pageSource, /assets\/sportschool-program-migration\.js/);
   assert.match(pageSource, /data-day-trigger/);
   assert.match(pageSource, /data-add-exercise/);
