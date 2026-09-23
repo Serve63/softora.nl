@@ -56,6 +56,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 
 ## Wijzigen zonder regressies
 - Nieuwe pagina's en navigatie volgen [docs/platform-performance.md](docs/platform-performance.md); `check:platform-architecture` bewaakt registratie en voorkomt uitbreiding van legacy-documenten.
+- Nieuwe personeelspagina's gebruiken `assets/personnel-theme.css`, `assets/fonts.css`, de canonieke `data-sidebar-shell="canonical"` en `page-title`/`page-subtitle` klassen. Gebruik de gedeelde `--bg-primary`, `--text-primary`, `--sidebar-page-title-size` en `--sidebar-shell-max-width` in plaats van een eigen paginakop, lettertype, achtergrond of contentbreedte.
 - Verander bestaande routes niet zomaar; houd response-shapes stabiel.
 - Voeg nieuwe logica bij voorkeur toe via `server/routes`, `server/services`, `server/repositories`, `server/security`, `server/schemas`.
 - Nieuwe frontendlogica hoort uiteindelijk in losse bestanden, niet in grote inline scripts.
