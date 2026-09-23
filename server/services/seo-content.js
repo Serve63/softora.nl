@@ -414,10 +414,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({
         heading: 'Bouw de site alsof er later veel content bij komt',
         paragraphs: Object.freeze([
-          Object.freeze({
-            text: 'Noteer bij iedere pagina welke vervolgvraag de bezoeker heeft en waar het antwoord staat. Vanuit een kostenpagina kan dat bijvoorbeeld de aanpak of het beheer zijn. Leg bronpagina, bestemming en herkenbare linktekst vast met een kleine linkkaart voor je interne linkstructuur. Zo controleer je vóór publicatie of de bezoeker verder kan, in plaats van alleen losse pagina’s op te leveren.',
-            links: Object.freeze([Object.freeze({ anchor: 'een kleine linkkaart voor je interne linkstructuur', href: '/kennisbank/wat-is-interne-linkstructuur' })]),
-          }),
+          Object.freeze({ text: 'Noteer bij iedere pagina welke vervolgvraag de bezoeker heeft en waar het antwoord staat. Vanuit een kostenpagina kan dat bijvoorbeeld de aanpak of het beheer zijn. Leg bronpagina, bestemming en herkenbare linktekst vast met een kleine linkkaart voor je interne linkstructuur. Zo controleer je vóór publicatie of de bezoeker verder kan, in plaats van alleen losse pagina’s op te leveren.', links: Object.freeze([Object.freeze({ anchor: 'een kleine linkkaart voor je interne linkstructuur', href: '/kennisbank/wat-is-interne-linkstructuur' })]) }),
           'Voor Softora betekent dit dat commerciële pagina’s de hoofdroute blijven, terwijl artikelen en kennisbankstukken helpen om vragen af te vangen en bezoekers richting een aanvraag te sturen.',
         ]),
       }),
