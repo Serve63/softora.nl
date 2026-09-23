@@ -378,9 +378,23 @@
 
     async function fetchSnapshotArchive(config) {
         const url = ARCHIVE_ENDPOINT + (config.compactAvailableDuringBoot === true ? "?compact=1" : "");
-        const response = await config.fetchJsonWithTimeout(url, { method: "GET", cache: "no-store" }, ARCHIVE_TIMEOUT_MS);
+        const init = { method: "GET", cache: "no-store" };
+        const readModelClient = global.SoftoraReadModelClient;
+        let response;
+        let payload;
+        if (readModelClient && typeof readModelClient.fetchJson === "function") {
+            // Versioned read model: an unchanged snapshot is completed from the verified local copy.
+            const result = await readModelClient.fetchJson(url, init, {
+                key: "premium-database-mail-ready-snapshot:" + (config.compactAvailableDuringBoot === true ? "compact" : "full") + ":v1",
+                fetchImpl: function (requestUrl, requestInit) { return config.fetchJsonWithTimeout(requestUrl, requestInit, ARCHIVE_TIMEOUT_MS); }
+            });
+            response = result.response;
+            payload = result.payload || {};
+        } else {
+            response = await config.fetchJsonWithTimeout(url, init, ARCHIVE_TIMEOUT_MS);
+            payload = await response.json().catch(function () { return {}; });
+        }
         if (!response.ok) throw new Error("Mailklare archiefrespons niet beschikbaar (" + response.status + ")");
-        const payload = await response.json().catch(function () { return {}; });
         const rows = Array.isArray(payload.customers) ? payload.customers : [];
         const availableRows = Array.isArray(payload.availableCustomers) ? payload.availableCustomers : [];
         const instantlyReadyRows = Array.isArray(payload.instantlyReadyCustomers) ? payload.instantlyReadyCustomers : [];

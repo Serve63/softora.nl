@@ -1,7 +1,10 @@
 const { gzip } = require('node:zlib');
 const { promisify } = require('node:util');
 
+const { buildReadModelVersion, readRequestedReadModelVersion } = require('./readmodel-version-response');
+
 const gzipAsync = promisify(gzip);
+const READ_MODEL_KEY = 'mail-ready-snapshot';
 const MAX_ARCHIVE_BYTES = 3_500_000;
 
 async function encodePremiumDatabaseSnapshotArchive(payload, maxBytes = MAX_ARCHIVE_BYTES) {
@@ -26,7 +29,16 @@ function createPremiumDatabaseSnapshotArchiveResponder({ buildSnapshot, nowMs, l
       });
       const loadedAt = nowMs();
       const compactAvailable = req?.query?.compact === '1';
-      const payload = compactAvailable ? {
+      // snapshotVersion is a hash of the snapshot content, so an equal version
+      // proves the browser already holds exactly this archive.
+      const version = buildReadModelVersion([READ_MODEL_KEY, fullPayload.snapshotVersion, compactAvailable ? 'compact' : 'full']);
+      if (version && readRequestedReadModelVersion(req) === version) {
+        res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+        res.setHeader('Server-Timing', `snapshot;dur=${loadedAt - startedAt}, readmodel;desc=unchanged`);
+        logger?.info?.(JSON.stringify({ event: 'premium-snapshot-archive', loadMs: loadedAt - startedAt, unchanged: true }));
+        return res.status(200).json({ ok: true, source, readModel: { key: READ_MODEL_KEY, version, unchanged: true } });
+      }
+      const archivePayload = compactAvailable ? {
         ...fullPayload,
         compactAvailable: true,
         availableCustomers: fullPayload.availableCustomers.map((customer) => ({
@@ -34,6 +46,8 @@ function createPremiumDatabaseSnapshotArchiveResponder({ buildSnapshot, nowMs, l
           availableSnapshot: true,
         })),
       } : fullPayload;
+      const payload = version ? { ...archivePayload, readModel: { key: READ_MODEL_KEY, version, unchanged: false,
+        fields: Object.keys(archivePayload).filter((field) => field !== 'ok' && field !== 'timings') } } : archivePayload;
       const archive = await encodePremiumDatabaseSnapshotArchive(payload);
       const encodedAt = nowMs();
       res.setHeader('Cache-Control', 'private, no-store, max-age=0');
