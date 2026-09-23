@@ -18,7 +18,7 @@ Root and timeline rendering bypass legacy cleanup after AI selection. Quote labe
 Apply `20260921093527_mailbox_luna_presentations.sql` only through the approved database release
 procedure. Both tables are service-role only, with RLS and revoked public/authenticated access.
 The migration approves **zero dollars**. `MAILBOX_AI_PRESENTATION_ENABLED` defaults off.
-The feature uses the existing server-side OpenAI key and pins `gpt-5.6-luna`, `max`; the global
+The feature uses the existing server-side OpenAI key and pins `gpt-6-luna`, `max`; the global
 OpenAI model is unchanged. GET `/api/mailbox/presentation/process` requires the cron secret.
 Reads enqueue/cache only; a background worker classifies at most two jobs per invocation.
 No model call occurs without an atomic reservation from the persisted lifetime budget.
