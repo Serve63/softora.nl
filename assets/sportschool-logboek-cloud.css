@@ -1,0 +1,5 @@
+[data-logbook-cloud] { margin: 12px 0 4px; color: #54515e; font: 11px/1.5 Inter, sans-serif; overflow-wrap: anywhere; }
+[data-logbook-cloud][hidden] { display: none; }
+[data-logbook-cloud] p { margin: 5px 0; }
+[data-logbook-cloud] button, [data-logbook-cloud] a { display: inline-block; margin: 5px 8px 0 0; padding: 7px 0; border: 0; background: none; color: #9b2355; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+[data-logbook-cloud] summary { cursor: pointer; padding: 5px 0; }

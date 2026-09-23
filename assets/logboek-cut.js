@@ -41,7 +41,7 @@
       }).join('')}</div><div class="note-editor"><label for="note-${row.order}">Notitie</label><textarea id="note-${row.order}" aria-label="Notitie ${esc(row.title)}" data-note-order="${row.order}" data-note-default="${esc(row.notes || '')}" rows="1" maxlength="1000" placeholder="Notitie toevoegen…">${esc(drafts?.[noteKey] ?? draft.notes?.[String(row.order)]?.text ?? row.notes ?? '')}</textarea><span class="note-status" aria-live="polite">${noteStatus}</span></div></article>`;
     }).join('') || '<p class="empty"><strong>Rustdag</strong>Vandaag staat er geen training gepland.</p>';
     const unsavedNotes=Object.keys(drafts || {}).filter(key=>key.startsWith(`${today}:`)).length;
-    $('status').textContent=message || (pending.length ? `${pending.length} wijziging(en) worden opgeslagen…` : unsavedNotes ? 'Notitie wordt automatisch opgeslagen…' : loading && !session ? 'Training ophalen…' : online ? 'Opgeslagen · gesynchroniseerd met je andere apparaten' : 'Verbinding controleren…');
+    $('status').textContent=message || (pending.length ? `${pending.length} wijziging(en) worden opgeslagen…` : unsavedNotes ? 'Notitie wordt automatisch opgeslagen…' : loading && !session ? 'Training ophalen…' : online ? 'Sets en notities opgeslagen' : 'Verbinding controleren…');
     $('schema-updated').innerHTML=planUpdatedAt ? `Schema bijgewerkt ${esc(new Date(planUpdatedAt).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric',timeZone:'Europe/Amsterdam'}))} · <a href="/logboek">Gewichten aanpassen</a>` : '';
     $('retry').hidden=!message;
     $('login').hidden=!message.includes('Log in');
@@ -76,4 +76,5 @@
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushNoteTimers();});
   $('retry').addEventListener('click',sync.refresh);
   sync.start();
+  window.SoftoraLogbookCloud?.mount({onSaved:()=>sync.refresh()});
 })();
