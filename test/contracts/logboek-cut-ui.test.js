@@ -27,6 +27,7 @@ test('logboek-cut fills the page without an outer card on desktop and mobile', (
   assert.match(css, /\.workout\s*\{[^}]*width:\s*100%[^}]*border:\s*0/);
   assert.match(css, /@media\s*\(max-width:\s*700px\)/);
   assert.match(css, /\.exercise\s*\{[^}]*margin-inline:\s*calc\(-1 \* var\(--row-gutter\)\)/);
+  assert.doesNotMatch(css, /\.app::before\s*\{/, 'The day heading must not have a colored top stripe.');
 });
 
 test('logboek-cut has no training progress badge or progress bar', () => {

@@ -12,7 +12,6 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 .app { width: 100%; min-height: 100dvh; overflow-x: clip; }
-.app::before { content: ""; display: block; height: 5px; background: linear-gradient(90deg, #9b2355, #cf5c88 65%, #f0b5cb); }
 header { height: 52px; display: flex; align-items: center; gap: 9px; }
 .brand { font-size: 24px; font-weight: 850; letter-spacing: -3px; text-decoration: none; color: var(--ink); }
 .brand span { font-size: 9px; color: var(--accent); letter-spacing: 0; }
