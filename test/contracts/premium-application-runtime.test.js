@@ -173,22 +173,49 @@ test('a superseded module mount is aborted and never replaces the newer view', a
   assert.deepEqual(harness.log.filter((entry) => entry.startsWith('activate:')), ['activate:fast']);
 });
 
-test('same-module navigation updates in place and dirty modules can block leaving', async () => {
+test('same-module navigation stages a replacement and dirty modules can block leaving', async () => {
   let allowLeave = true;
   const modules = {
-    dashboard: moduleDefinition('dashboard', { canLeave: async () => allowLeave }),
+    dashboard: moduleDefinition('dashboard', {
+      canLeave: async () => allowLeave,
+      update: async ({ root, previousRoot, route }) => {
+        assert.notEqual(root, previousRoot);
+        root.route = route;
+      },
+    }),
     orders: moduleDefinition('orders'),
   };
   const harness = createHarness({ modules });
   assert.equal((await harness.runtime.navigate('dashboard', { path: '/dashboard' })).status, 'mounted');
   const root = harness.visible.root;
   assert.equal((await harness.runtime.navigate('dashboard', { path: '/dashboard?tab=agenda' })).status, 'updated');
-  assert.equal(harness.visible.root, root);
-  assert.deepEqual(root.route, { path: '/dashboard?tab=agenda' });
+  assert.notEqual(harness.visible.root, root);
+  assert.deepEqual(harness.visible.root.route, { path: '/dashboard?tab=agenda' });
+  assert.deepEqual(root.route, { path: '/dashboard' });
+  assert.ok(harness.log.includes('remove:dashboard'));
   allowLeave = false;
   assert.equal((await harness.runtime.navigate('orders')).status, 'blocked');
   assert.equal(harness.runtime.getState().activeModuleId, 'dashboard');
   assert.ok(!harness.log.includes('create:orders'));
+});
+
+test('same-module update keeps the old screen visible until the new route is complete', async () => {
+  const pending = deferred();
+  const harness = createHarness({ modules: {
+    dashboard: moduleDefinition('dashboard', {
+      ready: ({ route }) => route.path === '/dashboard' ? true : pending.promise,
+      update: async ({ root, route }) => { root.route = route; },
+    }),
+  } });
+  assert.equal((await harness.runtime.navigate('dashboard', { path: '/dashboard' })).status, 'mounted');
+  const previous = harness.visible.root;
+  const navigation = harness.runtime.navigate('dashboard', { path: '/dashboard?tab=agenda' });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(harness.visible.root, previous);
+  pending.resolve(true);
+  assert.equal((await navigation).status, 'updated');
+  assert.notEqual(harness.visible.root, previous);
 });
 
 test('session changes clear the shell and session-scoped data before mounting the next view', async () => {

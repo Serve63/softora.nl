@@ -291,28 +291,20 @@
         return finish({ status: 'session-changed' });
       }
 
-      if (previous && previous.moduleId === moduleId) {
-        try {
-          await module.update({ root: previous.root, route, prepared, session, signal: controller.signal, lifecycleSignal: previous.lifetime.signal });
-          if (!isCurrent(version, controller)) return finish({ status: 'superseded' });
-          previous.route = route;
-          previous.session = session;
-          return finish({ status: 'updated', moduleId });
-        } catch (error) {
-          report(error, moduleId, 'update');
-          return finish({ status: isCurrent(version, controller) ? 'error' : 'superseded', error });
-        }
-      }
-
       let root;
       let lifetime;
-      let stage = 'mount';
+      const updating = Boolean(previous && previous.moduleId === moduleId);
+      let stage = updating ? 'update' : 'mount';
       try {
         root = await host.create({ moduleId, route });
         if (!root) throw new Error(`${moduleId}: shell-host gaf geen mount-root terug.`);
         lifetime = new AbortController();
         operation.lifetime = lifetime;
-        await module.mount({ root, route, prepared, session, signal: lifetime.signal });
+        if (updating) {
+          await module.update({ root, previousRoot: previous.root, route, prepared, session, signal: lifetime.signal });
+        } else {
+          await module.mount({ root, route, prepared, session, signal: lifetime.signal });
+        }
         if (!isCurrent(version, controller)) {
           await release({ moduleId, module, root, route, session, lifetime }, 'superseded');
           return finish({ status: 'superseded' });
@@ -350,7 +342,7 @@
         return finish({ status: isCurrent(version, controller) ? 'error' : 'superseded', error });
       }
 
-      return finish({ status: 'mounted', moduleId });
+      return finish({ status: updating ? 'updated' : 'mounted', moduleId });
     }
 
     async function dispose() {

@@ -23,6 +23,8 @@ repositories blijven de bron van waarheid. Gedeelde browserdata is afgeleide dat
 - De gereedheidscontrole krijgt een begrensd tijdsbudget. De shell toont de nieuwe
   module pas als alle vereiste inhoud en bediening aantoonbaar klaar zijn; een
   onvolledig scherm blijft verborgen en de bestaande module blijft zichtbaar.
+- Ook een routewissel binnen dezelfde module bouwt met `update` een nieuwe verborgen
+  root op. De zichtbare root mag tijdens die voorbereiding niet worden gewijzigd.
 - Prepare voert uitsluitend geregistreerde reads uit, met begrensde bytes, aanvragen
   en geheugen; nooit provider-sync, mails, uploads of betaalde generatie.
 - Expliciete wijzigingen maken alle betrokken leesresultaten ongeldig. Een eerder
