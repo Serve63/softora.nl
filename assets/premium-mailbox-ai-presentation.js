@@ -31,7 +31,7 @@
       !/[\r\n<>]/.test(contact.text) && lines[contact.line].includes(contact.text) &&
       (contact.kind !== 'phone' || isPhone(contact.text)));
   }
-  function read(message) {
+  function read(message, provenQuoteLines = []) {
     const value = message?.aiPresentation;
     if (!value || value.reason === 'outside_scope') return null;
     const body = sourceBody(message);
@@ -58,8 +58,10 @@
       if (labels[index] === 'signature' && before !== undefined && after !== undefined &&
         labels[before] !== 'signature' && labels[after] !== 'signature') visible.add(index);
     });
-    const kept = lines.filter((_, index) => visible.has(index));
-    const contacts = value.decision.contacts.filter((contact) => !visible.has(contact.line)).sort((a, b) => a.line - b.line);
+    // These indices come only from exact sent-copy proof on the unmodified layout.
+    const omitted = new Set(provenQuoteLines);
+    const kept = lines.filter((_, index) => visible.has(index) && !omitted.has(index));
+    const contacts = value.decision.contacts.filter((contact) => !visible.has(contact.line) && !omitted.has(contact.line)).sort((a, b) => a.line - b.line);
     return { body: kept.join('\n').replace(/\n(?:[\t ]*\n){2,}/g, '\n\n').trim(), aiManaged: true, signatureMatched: true,
       contact: { beforeLines: contacts.filter((c) => c.kind === 'phone').map((c) => `Tel: ${c.text}`),
         addressLines: contacts.filter((c) => c.kind === 'address').map((c) => c.text) } };
