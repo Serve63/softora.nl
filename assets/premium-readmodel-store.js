@@ -8,6 +8,8 @@
     const DB_VERSION = 1;
     const STORE = "models";
     const OPEN_TIMEOUT_MS = 1500;
+    const SYNC_PREFIX = "softora-readmodel-sync:";
+    const SYNC_MAX_CHARS = 600000;
 
     function indexedDbFactory(target) {
         try { return target && target.indexedDB ? target.indexedDB : null; } catch (_error) { return null; }
@@ -115,7 +117,64 @@
             return (await withStore("readwrite", function (store) { return requestResult(store.delete(key)); })) !== null;
         }
 
+        // Synchronous copies for what must be on screen before the first paint
+        // (screen snapshots). Small values only; same identity scoping and wipe.
+        function syncStorage() {
+            try { return target && target.localStorage ? target.localStorage : null; } catch (_error) { return null; }
+        }
+
+        function clearSync() {
+            const storage = syncStorage();
+            if (!storage) return false;
+            try {
+                const keys = [];
+                for (let index = 0; index < storage.length; index += 1) {
+                    const key = storage.key(index);
+                    if (key && key.indexOf(SYNC_PREFIX) === 0) keys.push(key);
+                }
+                keys.forEach(function (key) { storage.removeItem(key); });
+                return true;
+            } catch (_error) { return false; }
+        }
+
+        function readSync(model, identity) {
+            const storage = syncStorage();
+            const key = String(model || "").trim();
+            const owner = normalizeIdentity(identity);
+            if (!storage || !key || !owner) return null;
+            try {
+                const record = JSON.parse(storage.getItem(SYNC_PREFIX + key) || "null");
+                if (!record) return null;
+                if (record.identity !== owner) {
+                    clearSync();
+                    return null;
+                }
+                return record.value === undefined ? null : record.value;
+            } catch (_error) { return null; }
+        }
+
+        function writeSync(model, identity, value) {
+            const storage = syncStorage();
+            const key = String(model || "").trim();
+            const owner = normalizeIdentity(identity);
+            if (!storage || !key || !owner || value === undefined) return false;
+            try {
+                const serialized = JSON.stringify({ identity: owner, savedAt: Date.now(), value: value });
+                if (serialized.length > SYNC_MAX_CHARS) return false;
+                storage.setItem(SYNC_PREFIX + key, serialized);
+                return true;
+            } catch (_error) { return false; }
+        }
+
+        function removeSync(model) {
+            const storage = syncStorage();
+            const key = String(model || "").trim();
+            if (!storage || !key) return false;
+            try { storage.removeItem(SYNC_PREFIX + key); return true; } catch (_error) { return false; }
+        }
+
         async function clearAll() {
+            clearSync();
             const factory = indexedDbFactory(target);
             if (!factory) return false;
             const db = dbPromise ? await dbPromise : null;
@@ -133,7 +192,8 @@
             });
         }
 
-        return Object.freeze({ read: read, write: write, remove: remove, clearAll: clearAll });
+        return Object.freeze({ read: read, write: write, remove: remove, clearAll: clearAll,
+            readSync: readSync, writeSync: writeSync, removeSync: removeSync });
     }
 
     const store = createReadModelStore(global);
