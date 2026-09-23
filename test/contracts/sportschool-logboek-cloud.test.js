@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const cloud = require('../../assets/sportschool-logboek-cloud');
+const { createLogbookSyncStorage } = require('../../assets/premium-browser-storage');
 const { projectExercises } = require('../../server/services/logboek-cut');
 const copy = value => JSON.parse(JSON.stringify(value));
 const pause = () => new Promise(resolve => setImmediate(resolve));
@@ -127,9 +128,20 @@ test('both logbooks load shared sync while schema writes retain the existing adm
     const html = read(file);
     assert.match(html, /sportschool-logboek-cloud\.js\?v=20260923a/);
     assert.match(html, /data-logbook-cloud/);
+    assert.match(html, /premium-browser-storage\.js\?v=20260923-logbook/);
   }
   assert.match(read('assets/sportschool-logboek.js'), /cloud\?\.changed\(\)/);
   assert.match(read('assets/logboek-cut.js'), /onSaved:\(\)=>sync\.refresh\(\)/);
   assert.match(read('server/routes/runtime-ops.js'), /app\.post\('\/api\/sportschool-logboek', requirePremiumAdminApiAccess/);
   assert.doesNotMatch(read('assets/sportschool-logboek-cloud.js'), /service_role|SUPABASE_SERVICE_ROLE_KEY/);
+});
+test('migration storage is scoped to the existing logbook and its acknowledged baseline', () => {
+  const values = new Map();
+  const storage = createLogbookSyncStorage({ storage: { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value) } });
+  storage.setItem(cloud.LOCAL_KEY, 'device draft'); storage.setItem(cloud.SYNC_KEY, 'cloud baseline');
+  assert.equal(storage.getItem(cloud.LOCAL_KEY), 'device draft');
+  assert.equal(storage.getItem(cloud.SYNC_KEY), 'cloud baseline');
+  assert.throws(() => storage.getItem('unrelated-storage-key'), /logboekopslagsleutel/);
+  assert.throws(() => storage.setItem('unrelated-storage-key', 'x'), /logboekopslagsleutel/);
+  assert.throws(() => storage.setItem(cloud.SYNC_KEY, 'x'.repeat(600001)), /logboekcache/);
 });

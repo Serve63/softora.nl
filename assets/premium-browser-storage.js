@@ -9,6 +9,26 @@
   const STRICT_STORAGE_PREFIX_PATTERN = /^softora\.[a-z0-9][a-z0-9._-]{2,126}:$/i;
   let mailboxSendRetryMemoryRecords = [];
 
+  // Compatibility adapter for migrating the existing device-only workout log.
+  // The second key holds only the acknowledged cloud baseline and a recovery copy.
+  function createLogbookSyncStorage(options = {}) {
+    const keys = new Set(['softora_sportschool_logboek_v1', 'softora_sportschool_logboek_cloud_v1']);
+    const storage = options.storage || global.localStorage;
+    if (!storage) throw new Error('Logboekopslag is niet beschikbaar.');
+    function check(key) {
+      if (!keys.has(key)) throw new Error('Geen geldige logboekopslagsleutel.');
+      return key;
+    }
+    return Object.freeze({
+      getItem(key) { return storage.getItem(check(key)); },
+      setItem(key, value) {
+        check(key);
+        if (typeof value !== 'string' || value.length > 600000) throw new Error('Ongeldige logboekcache.');
+        storage.setItem(key, value);
+      },
+    });
+  }
+
   function createStrictPrefixedStorage(options = {}) {
     const prefix = String(options.prefix || '');
     if (!STRICT_STORAGE_PREFIX_PATTERN.test(prefix)) {
@@ -310,6 +330,7 @@
     MAILBOX_SEND_RETRY_SCOPE_FIELDS,
     MAILBOX_SEND_RETRY_STORAGE_KEY,
     createLatestRecordStore,
+    createLogbookSyncStorage,
     createMemoryLatestRecordStore,
     createScopedSendRetryStore,
     createScopedSessionRetryStore: createScopedSendRetryStore,

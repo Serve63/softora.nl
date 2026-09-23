@@ -134,12 +134,15 @@
   function mount({ target = window, readLocal, onSnapshot, onSaved, editor = false } = {}) {
     const host = target.document.querySelector('[data-logbook-cloud]');
     if (!host) return null;
+    let storage;
+    try { storage = target.SoftoraPremiumBrowserStorage.createLogbookSyncStorage(); }
+    catch (_) { host.hidden = false; host.textContent = 'Synchroniseren niet beschikbaar: browseropslag is geblokkeerd.'; return null; }
     let timer;
     function action(label, handler) {
       const button = target.document.createElement('button');
       button.type = 'button'; button.textContent = label; button.addEventListener('click', handler); return button;
     }
-    const client = create({ storage: target.localStorage, fetchImpl: target.fetch.bind(target), readLocal, onSnapshot, onSaved,
+    const client = create({ storage, fetchImpl: target.fetch.bind(target), readLocal, onSnapshot, onSaved,
       onStatus({ kind, differences: changes = [] }) {
         host.replaceChildren(); host.hidden = kind === 'synced' && !editor;
         const message = target.document.createElement('p');
@@ -170,7 +173,7 @@
       if (event.key === LOCAL_KEY && readLocal && event.newValue) {
         const next = normalize(sync.mergeConflictSnapshots(normalize(event.oldValue), normalize(readLocal()), normalize(event.newValue)));
         onSnapshot?.(next);
-        if (!equal(next, event.newValue)) target.localStorage.setItem(LOCAL_KEY, JSON.stringify(next));
+        if (!equal(next, event.newValue)) storage.setItem(LOCAL_KEY, JSON.stringify(next));
       }
       if ([LOCAL_KEY, SYNC_KEY].includes(event.key)) changed();
     });
