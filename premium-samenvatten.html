@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="/assets/personnel-page-base.css?v=20260923a">
     <script src="/assets/premium-sidebar-links.js?v=20260818a" defer></script>
     <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
-    <script src="/assets/premium-samenvatten.js?v=20260820a" defer></script>
+    <script src="/assets/premium-samenvatten.js?v=20260923b" defer></script>
 </head>
 <body data-summarize-page data-personnel-page>
     <div class="dashboard-layout" data-sidebar-shell="canonical">
@@ -25,7 +25,7 @@
             <div class="summarize-shell">
                 <header class="summarize-header">
                     <h1 class="page-title">Samenvatten</h1>
-                    <p class="page-subtitle">Zet een lang audiogesprek straks om in een heldere samenvatting met de belangrijkste besluiten en acties.</p>
+                    <p class="page-subtitle">Zet een audiogesprek om in een transcript, samenvatting en actiepunten.</p>
                 </header>
 
                 <div class="summarize-grid">
@@ -42,7 +42,7 @@
                             <input
                                 id="audioFileInput"
                                 type="file"
-                                accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg"
+                                accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.webm"
                                 hidden
                             >
                             <span class="audio-dropzone-icon" aria-hidden="true">
@@ -53,7 +53,7 @@
                             </span>
                             <strong>Sleep je audiobestand hierheen</strong>
                             <span>of klik om een bestand te kiezen</span>
-                            <small>MP3, M4A, WAV, AAC of OGG</small>
+                            <small>MP3, M4A, WAV, AAC, OGG of WebM · maximaal 100 MB en 2 uur</small>
                         </label>
 
                         <div class="selected-audio" id="selectedAudio" hidden>
@@ -81,7 +81,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-5-5 5 5-5 5"></path>
                             </svg>
                         </button>
-                        <p class="summarize-privacy">UI-voorbeeld: je bestand verlaat de browser niet.</p>
+                        <p class="summarize-privacy">De opname gaat via privéopslag naar AssemblyAI. Softora verwijdert de tijdelijke upload na verwerking en wist het resultaat na maximaal 24 uur.</p>
                         <p class="summarize-status" id="summarizeStatus" role="status" aria-live="polite"></p>
                     </section>
 
@@ -90,7 +90,7 @@
                             <span class="summarize-step">02</span>
                             <div>
                                 <h2 id="summary-result-title">Samenvatting</h2>
-                                <p>Het resultaat verschijnt straks hier.</p>
+                                <p>De samenvatting, actiepunten en het transcript verschijnen hier.</p>
                             </div>
                         </div>
 
@@ -103,6 +103,17 @@
                             </span>
                             <h3>Nog geen samenvatting</h3>
                             <p>Upload een gesprek en klik op ‘Vat samen’ om hier de kern, besluiten en actiepunten te zien.</p>
+                        </div>
+                        <div class="summary-result" id="summaryResult" hidden>
+                            <h3>Gesprek in het kort</h3>
+                            <div id="summaryChapters"></div>
+                            <h3>Actiepunten en besluiten</h3>
+                            <ul id="summaryActions"></ul>
+                            <details class="summary-transcript">
+                                <summary>Volledig transcript bekijken</summary>
+                                <button type="button" id="downloadTranscript">Transcript downloaden</button>
+                                <pre id="summaryTranscript"></pre>
+                            </details>
                         </div>
                     </section>
                 </div>
