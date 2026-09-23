@@ -88,6 +88,21 @@ test('worker processes two jobs in a bounded wave and settles only after classif
   assert.deepEqual(await service.processQueue(),{processed:2});assert.equal(finished,2);assert.equal(max,2);
 });
 
+test('worker drains already queued jobs even when candidate discovery fails', async () => {
+  let claims = 0, finished = 0;
+  const warnings = [];
+  const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' },
+    getOpenAiApiKey: () => 'test', logger: { warn: (...args) => warnings.push(args) },
+    repository: { recover: async () => 0, candidates: async () => { throw new Error('private database detail'); },
+      claim: async () => ++claims <= 2 ? { id: claims, source: {} } : null,
+      finish: async () => { finished++; } },
+    classifier: { classify: async () => ({ decision: {}, usage: {} }) } });
+  assert.deepEqual(await service.processQueue(), { processed: 2, unavailable: true });
+  assert.equal(finished, 2);
+  assert.equal(warnings[0][1].stage, 'candidates');
+  assert.doesNotMatch(JSON.stringify(warnings), /private database detail/);
+});
+
 test('collapsed HTML paragraphs are classified with source-safe layout and tampering retains original', async () => {
   const { createMailboxAiClassifier }=require('../../server/services/mailbox-ai-classifier');
   const contract=require('../../assets/premium-mailbox-ai-presentation');
@@ -173,6 +188,49 @@ test('campaign-only SQL excludes queued Gmail and admits proven coldmail across 
     assert.equal((await db.query(claim)).rows[0].id,'campaign-old');
     assert.equal((await db.query(claim)).rows.length,0);
     assert.equal((await db.query("select status from softora_mailbox_ai_presentations where id='gmail-new'")).rows[0].status,'queued');
+  } finally { await db.close(); }
+});
+
+test('paged candidates cross non-campaign history, admit new replies, and respect the budget', async () => {
+  const db = await database();
+  try {
+    await db.exec(migration);
+    await db.exec(`alter table public.softora_mailbox_messages add column in_reply_to text;
+      alter table public.softora_mailbox_messages add column references_text text;
+      alter table public.softora_mailbox_messages add column recipients_text text;
+      alter table public.softora_mailbox_messages add column subject text;
+      create table public.softora_mailbox_campaign_lineage_members(message_key text,account_email text);
+      create table public.softora_mailbox_campaign_lineage_roots(message_key text,account_email text);
+      create function public.softora_mailbox_message_has_campaign_proof(text,text,text,text,text,text,text,text,text,text,jsonb,text,text default null)
+        returns boolean language sql immutable as $$select $1 like 'campaign-%'$$;
+      update public.softora_mailbox_ai_budget set approved_micro_usd=18000000,include_history=true;
+      insert into public.softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,
+        body_text,has_body,body_truncated,payload)
+        select 'private-'||i,'owner',now()-interval '1 day',now()-interval '1 day'+i*interval '1 second',
+          'inbox','personal@example.nl','Personal',true,false,'{}' from generate_series(1,4000) i;
+      insert into public.softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,
+        body_text,has_body,body_truncated,payload,in_reply_to)
+        values ('campaign-old','owner',now()-interval '2 days',now()-interval '2 days',
+          'inbox','reply@example.nl','Old reply',true,false,'{}','<sent@example.nl>');`);
+    for (const file of ['20260923122053_mailbox_ai_campaign_only.sql',
+      '20260923122633_mailbox_ai_campaign_hint.sql',
+      '20260923133902_mailbox_ai_paged_candidates.sql'])
+      await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/'+file),'utf8'));
+    assert.deepEqual((await db.query('select message_key from softora_mailbox_ai_candidates(20)')).rows, []);
+    let cursor = (await db.query('select after_message_key from softora_mailbox_ai_candidate_cursor')).rows[0];
+    assert.ok(cursor.after_message_key.startsWith('private-'));
+    assert.deepEqual((await db.query('select message_key from softora_mailbox_ai_candidates(20)')).rows,
+      [{ message_key: 'campaign-old' }]);
+    await db.exec(`insert into public.softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,
+      body_text,has_body,body_truncated,payload,in_reply_to)
+      values ('campaign-new','owner',now(),now(),'inbox','reply@example.nl','New reply',true,false,'{}','<sent@example.nl>');`);
+    assert.ok((await db.query('select message_key from softora_mailbox_ai_candidates(20)')).rows
+      .some(row => row.message_key === 'campaign-new'));
+    await db.exec('update public.softora_mailbox_ai_budget set approved_micro_usd=reserved_micro_usd+299999');
+    assert.deepEqual((await db.query('select message_key from softora_mailbox_ai_candidates(20)')).rows, []);
+    await db.exec('set role anon');
+    await assert.rejects(db.query('select * from public.softora_mailbox_ai_candidate_cursor'), /permission denied/);
+    await assert.rejects(db.query('select * from public.softora_mailbox_ai_candidates(20)'), /permission denied/);
   } finally { await db.close(); }
 });
 

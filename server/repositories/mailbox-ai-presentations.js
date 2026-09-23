@@ -3,10 +3,10 @@ const { randomUUID } = require('node:crypto');
 const { VERSION } = require('../../assets/premium-mailbox-ai-presentation');
 const TABLE = 'softora_mailbox_ai_presentations';
 function createMailboxAiRepository({ getClient } = {}) {
-  async function run(query, signal = AbortSignal.timeout(5000)) {
+  async function run(query, signal = AbortSignal.timeout(5000), timeoutMs = 5000) {
     // Align the underlying HTTP deadline with this operation's outer deadline.
     // The shared client's default 1.5s is too short for background candidate queries.
-    const client = getClient?.({ timeoutMs: 5000 });
+    const client = getClient?.({ timeoutMs });
     if (!client) throw new Error('MAILBOX_AI_STORAGE_UNAVAILABLE');
     const builder = query(client);
     const result = await (builder.abortSignal ? builder.abortSignal(signal) : builder);
@@ -36,7 +36,8 @@ function createMailboxAiRepository({ getClient } = {}) {
     return rows;
   }
   async function candidates() {
-    return run((client) => client.rpc('softora_mailbox_ai_candidates', { p_limit: 20 }));
+    return run((client) => client.rpc('softora_mailbox_ai_candidates', { p_limit: 20 }),
+      AbortSignal.timeout(10000), 10000);
   }
   async function claim() {
     const rows = await run((client) => client.rpc('softora_claim_mailbox_ai', { p_token: randomUUID() }));
