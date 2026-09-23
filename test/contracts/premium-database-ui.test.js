@@ -35,12 +35,54 @@ test('database boot draws the complete screen once after visible photos are read
     databaseReadiness: { publish: async () => { events.push('ready'); } },
     releaseDatabaseBootShell: () => {},
     databasePendingJobsPromise: Promise.resolve(),
-    databaseImportController: { startAutoSync: () => Promise.resolve() },
+    databaseImportController: {
+      prepareAutoSync: () => Promise.resolve({}),
+      startAutoSync: () => Promise.resolve({ ok: true, configured: false }),
+    },
+    providerDeliverySync: Promise.resolve({ ok: true }),
   });
 
   assert.equal(events.filter((event) => event === 'render').length, 1);
   assert.ok(events.indexOf('preload') < events.indexOf('render'));
   assert.ok(events.indexOf('render') < events.indexOf('ready'));
+  assert.equal(state.linkedSpreadsheetSyncReady, true);
+  assert.equal(state.pendingJobsRestored, true);
+  assert.equal(state.providerDeliverySyncReady, true);
+});
+
+test('database boot waits for the provider result before publishing complete readiness', async () => {
+  const events = [];
+  const state = { klanten: [] };
+  let finishProvider;
+  const providerDeliverySync = new Promise((resolve) => { finishProvider = resolve; });
+  const boot = databaseBoot.run({
+    state,
+    databaseHadBootstrapCustomers: false,
+    databaseHasFastSnapshotBootstrap: false,
+    snapshotClient: { markCanonicalInventoryReady: () => true },
+    loadMailReadySnapshot: async () => {},
+    bootstrapCustomers: async () => { state.klanten = [{ id: 'one' }]; },
+    getFilteredCustomers: () => state.klanten,
+    getSortedCustomers: (customers) => customers,
+    webdesignActionController: { preloadPhotoImages: async () => {} },
+    renderPage: () => { events.push('render'); },
+    databaseReadiness: { publish: async () => { events.push('ready'); } },
+    releaseDatabaseBootShell: () => { events.push('release'); },
+    databasePendingJobsPromise: Promise.resolve(),
+    databaseImportController: {
+      prepareAutoSync: () => Promise.resolve({}),
+      startAutoSync: async () => ({ ok: true, configured: false }),
+    },
+    providerDeliverySync,
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(events.includes('render'));
+  assert.ok(!events.includes('ready'));
+  assert.ok(!events.includes('release'));
+  finishProvider({ ok: true });
+  await boot;
+  assert.equal(state.providerDeliverySyncReady, true);
+  assert.ok(events.indexOf('ready') < events.indexOf('release'));
 });
 
 function loadDatabaseImportClient() {
@@ -2943,7 +2985,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(filterGroupsCssSource, /\.website-open-icon\s*\{[\s\S]*width: 15px;[\s\S]*height: 15px;/);
   assert.match(filterGroupsCssSource, /\.table-load-more\s*\{/);
   assert.match(filterGroupsCssSource, /\.load-more-btn\s*\{/);
-  assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260914-provider/);
+  assert.match(pageSource, /assets\/premium-database-instantly-sync\.js\?v=20260923-ready-sync/);
   assert.doesNotMatch(instantlySyncScriptSource, /provider-upload|replaceWaitingList/);
   assert.match(instantlySyncScriptSource, /\/api\/outreach\/provider-sync/);
   assert.doesNotMatch(instantlySyncScriptSource, /Zet eerst genoeg mail-ready leads klaar/);
@@ -3096,7 +3138,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /renderPage\(\); releaseDatabaseBootShell\(\);/);
   assert.match(pageSource, /softoraDatabaseActionsBound = 'true';[\s\S]*databaseReadiness: window\.SoftoraDatabaseReadiness/);
   assert.match(pageSource, /premium-screen-readiness\.js\?v=20260922b/);
-  assert.match(pageSource, /premium-database-readiness\.js\?v=20260923-single-read/);
+  assert.match(pageSource, /premium-database-readiness\.js\?v=20260923-ready-sync/);
   assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 0\)/);
   assert.match(webdesignActionScriptSource, /async function preloadPhotoImages\(customers, limit, timeoutMs\)/);
   assert.match(webdesignActionScriptSource, /function waitForPhotoImage\(photo, timeoutMs, loadKey\)/);
@@ -3122,7 +3164,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /window\.setTimeout\(function \(\) \{ resolve\(false\); \}, 850\);/);
   assert.doesNotMatch(databaseBootSource, /releaseDatabaseBootShell\(\); void webdesignActionController\.preloadPhotoImages/);
   assert.match(pageSource, /const databasePendingJobsPromise = webdesignActionController\.resumePendingJobs\(\);/);
-  assert.match(databaseBootSource, /void databasePendingJobsPromise\.catch/);
+  assert.match(databaseBootSource, /state\.pendingJobsRestored = await pendingJobsOutcome/);
   assert.doesNotMatch(pageSource, /void bootstrapCustomers\(\)\.catch\(function \(error\) \{ console\.error\("Database sync na snelle boot mislukt:", error\); \}\);/);
   assert.match(pageSource, /function refreshCustomerStateSilently\(\)/);
   assert.match(pageSource, /const CUSTOMER_DB_RECENT_LOAD_MS = 5 \* 1000;/);
@@ -3183,7 +3225,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260922a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260606a"><\/script><script src="assets\/premium-database-boot\.js\?v=20260923-single-final-render"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260915-haaren-order-1"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260923-fresh-stats"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260923-ready-sync"><\/script><script src="assets\/premium-database-boot\.js\?v=20260923-ready-sync"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260915-haaren-order-1"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260923-fresh-stats"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
@@ -3421,7 +3463,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(massResearchScriptSource, /enrichmentConcurrency: parsePositiveInt\(nodes\.concurrency\.value, 50, 1, 100\)/);
   assert.doesNotMatch(pageSource, /nodes\.addRealBusinessesButton\.addEventListener\("click"/);
   assert.doesNotMatch(pageSource, /databaseImportController\.handleRealBusinessAdd\(\)/);
-  assert.match(databaseBootSource, /void databaseImportController\.startAutoSync\(\);/);
+  assert.match(databaseBootSource, /await databaseImportController\.startAutoSync\(autoSyncConfigPromise\);/);
   assert.match(pageSource, /record, \["bedrijf", "bedrijfsnaam", "company", "company name", "organisatie", "naam bedrijf"\]/);
   assert.match(pageSource, /record, \["telefoonnummer", "telefoon", "tel", "phone", "phone number"\]/);
   assert.match(importScriptSource, /function detectDelimitedSeparator\(text, preferredSeparator\)/);
@@ -3432,7 +3474,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(importScriptSource, /fetch\("\/api\/premium-database\/sync-spreadsheet"/);
   assert.match(importScriptSource, /function mergeCustomers\(existingCustomers, importedCustomers, options\)/);
   assert.match(importScriptSource, /function handleSyncConnect\(\)/);
-  assert.match(importScriptSource, /function startAutoSync\(\)/);
+  assert.match(importScriptSource, /function startAutoSync\(preparedConfig\)/);
+  assert.match(pageSource, /const CUSTOMER_DB_SYNC_SCOPE = "premium_customers_database_sync"/);
+  assert.match(pageSource, /syncScope: CUSTOMER_DB_SYNC_SCOPE/);
+  assert.doesNotMatch(pageSource, /syncScope: CUSTOMER_DB_SCOPE/);
   assert.match(importScriptSource, /fetch\("\/api\/premium-database\/import-spreadsheet"/);
   assert.match(importScriptSource, /resolve\(Array\.isArray\(body\.rows\) \? body\.rows : \[\]\)/);
   assert.match(pageSource, /function exportCSV\(\)/);
