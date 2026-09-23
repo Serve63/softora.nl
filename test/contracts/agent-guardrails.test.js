@@ -70,6 +70,9 @@ test('platform performance plan distinguishes lifecycle core from a migrated bro
   assert.match(performancePlan, /volledig bruikbaar binnen 3000 ms/);
   assert.match(performancePlan, /binnen 100–300 ms, zonder zichtbaar laadscherm/);
   assert.match(performancePlan, /gegevens die\s+later nog binnendruppelen/);
+  assert.match(performancePlan, /8\.502 en 9\.556 ms/);
+  assert.match(performancePlan, /24,4 MB uitgepakt/);
+  assert.match(performancePlan, /lokale verbeteringen[\s\S]*nog niet als\s+nieuwe versie in de browser gemeten/);
 });
 
 test('screen readiness behavior stays covered by the critical contract suite', () => {

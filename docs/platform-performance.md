@@ -76,6 +76,23 @@ daarvoor is de blijvende shell nodig. Deze stap bewijst evenmin dat alle routes 
 
 ## Nog te implementeren en te bewijzen
 
+### Gemeten uitgangspunt (23 september 2026)
+
+Op de ingelogde productiepagina `/premium-database` duurden twee volledige
+`softora:screen-ready`-openingen in dezelfde Chrome-sessie 8.502 en 9.556 ms.
+Dat zijn warme browsermetingen, geen bewijs voor een koude opening. Bij de
+tweede opening was het volledige klantenarchief 24,4 MB uitgepakt. Het antwoord
+kwam na 3.189 ms binnen; klantnormalisatie was klaar op 4.436 ms,
+fotokoppeling op 5.556 ms, canonieke samenvoeging op 6.567 ms, sortering op
+8.082 ms en de laatste tabelrender op 9.504 ms. Statistiek- en ROI-reads
+startten al rond 295 ms en waren niet de oorzaak van de laatste vertraging.
+
+Deze metingen zijn van de bestaande productieversie. De lokale verbeteringen
+voor datumopmaak en hergebruik van genormaliseerde klanten zijn nog niet als
+nieuwe versie in de browser gemeten. Het blijvend snel maken van navigatie vraagt
+vooral een gedeelde shell en kleinere, versiegebonden leesmodellen; een
+gereedheidsmarkering of een snellere teller volstaat hiervoor niet.
+
 1. Volledige nulmeting per hoofdmodule en inhoudstype; data, beelden, acties en
    geldigheid concreet benoemen. De registry dekt rootdocumenten en pretty aliases.
    Dynamisch gegenereerde SEO-collecties/artikelen, gepubliceerde klantlinks en
