@@ -88,7 +88,7 @@ test('read model store never blocks without IndexedDB or identity', async () => 
 
 test('login page wipes every local read model before anyone can sign in again', () => {
   const login = fs.readFileSync(path.join(repoRoot, 'premium-personeel-login.html'), 'utf8');
-  const tag = '<script src="assets/premium-readmodel-store.js?v=20260923a" data-softora-readmodel-reset></script>';
+  const tag = '<script src="assets/premium-readmodel-store.js?v=20260924b" data-softora-readmodel-reset></script>';
   assert.ok(login.includes(tag));
   assert.ok(login.indexOf(tag) < login.indexOf("fetchWithTimeout('/api/auth/login'"));
   const store = fs.readFileSync(path.join(repoRoot, 'assets/premium-readmodel-store.js'), 'utf8');
@@ -247,7 +247,7 @@ test('customer loader keeps the network-only path when no signed-in identity is 
 
 test('Mailsysteem loads the read model store before the customer loader', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-database.html'), 'utf8');
-  const storeTag = page.indexOf('<script src="assets/premium-readmodel-store.js?v=20260923a"></script>');
+  const storeTag = page.indexOf('<script src="assets/premium-readmodel-store.js?v=20260924b"></script>');
   const loaderTag = page.indexOf('assets/premium-database-customers-loader.js?v=20260924-readmodel-version');
   assert.ok(storeTag > 0);
   assert.ok(storeTag < loaderTag);

@@ -276,7 +276,7 @@ test('table version migration counts every write on both source tables through a
 
 test('Mailsysteem loads the read model client before the mail metrics', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-database.html'), 'utf8');
-  const store = page.indexOf('assets/premium-readmodel-store.js?v=20260923a');
+  const store = page.indexOf('assets/premium-readmodel-store.js?v=20260924b');
   const client = page.indexOf('assets/premium-readmodel-client.js?v=20260924a');
   const metrics = page.indexOf('assets/premium-database-system-mail-count.js?v=20260924-readmodel');
   assert.ok(store > 0 && store < client && client < metrics);

@@ -27,5 +27,5 @@ test('premium database leest agenda-url en activeert alleen het filter', () => {
   assert.doesNotMatch(pageSource, /\["q", "zoek", "search", "customer", "klant", "naam"\]/);
   assert.match(pageSource, /state\.activeStatus = requestedStatus;/);
   assert.doesNotMatch(pageSource, /nodes\.query\.value = requestedQuery;/);
-  assert.match(pageSource, /applyDatabaseUrlIntent\(\);\s*renderPage\(\);/);
+  assert.match(pageSource, /applyDatabaseUrlIntent\(\); window\.SoftoraDatabaseScreenSnapshot\?\.restore\(state\);\s*renderPage\(\);/);
 });
