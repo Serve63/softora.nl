@@ -2008,8 +2008,11 @@ test('mail-ready snapshot client never lets an older response replace a newer co
 test('premium database applies remote customers once after guard and photo enrichment complete', () => {
   const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
   assert.match(pageSource, /const \[customerResult, orderResult\] = await Promise\.all\(\[window\.SoftoraPremiumDatabaseCustomers\.load\(/);
-  assert.match(pageSource, /const customersWithFallbackMedia = mergeCustomersWithPhotos\(enrichedCustomers, \{\}, state\.klanten\);/);
+  assert.match(pageSource, /const remoteCustomers = parseCustomers\(customerResult && customerResult\.customers \|\| \[\]\);/);
+  assert.match(pageSource, /const enrichedCustomers = mergeCustomersWithResponsible\(remoteCustomers, state\.orders\);/);
+  assert.match(pageSource, /const customersWithFallbackMedia = mergeCustomersWithPhotos\(enrichedCustomers, \{\}, state\.klanten, true\);/);
   assert.match(pageSource, /const canonicalCustomers = window\.SoftoraDatabaseMailReadySnapshot\.mergeWithCanonicalSnapshots\(customersWithPhotos, state\.mailReadySnapshotCustomers, state\.availableSnapshotCustomers, state\.instantlyReadySnapshotCustomers\);/);
+  assert.match(pageSource, /const sortedCustomers = getSortedCustomers\(outreachAutomation\.customers\);/);
   assert.match(pageSource, /state\.remoteCustomersLoaded = true;[\s\S]*applyCustomerList\(sortedCustomers, false\);/);
   assert.doesNotMatch(pageSource, /const initialCustomers = [\s\S]*applyCustomerList\(getSortedCustomers/);
 });
@@ -2674,12 +2677,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(photoStorageScriptSource, /chunkCount: chunks\.length/);
   assert.match(photoStorageScriptSource, /function mergePhotoMaps\(existing, current, removeIds\)/);
   assert.match(pageSource, /function persistCustomerPhotos\(customers, options\)/);
-  assert.match(pageSource, /function mergeCustomersWithPhotos\(customers, photoMap, fallbackCustomers\)/);
+  assert.match(pageSource, /function mergeCustomersWithPhotos\(customers, photoMap, fallbackCustomers, deferSort\)/);
   assert.match(webdesignAssetStateScriptSource, /fallbackPhotosById/);
   assert.match(webdesignAssetStateScriptSource, /websiteMockup: websiteMockup/);
   assert.match(webdesignAssetStateScriptSource, /firstValidSource\(photo && photo\.websiteMockup, fallbackPhoto && fallbackPhoto\.websiteMockup, normalized\.websiteMockup\)/);
-  assert.match(pageSource, /customersWithFallbackMedia = mergeCustomersWithPhotos\(enrichedCustomers, \{\}, state\.klanten\)/);
-  assert.match(pageSource, /mergeCustomersWithPhotos\(enrichedCustomers, photoMap, customersWithFallbackMedia\)/);
+  assert.match(pageSource, /customersWithFallbackMedia = mergeCustomersWithPhotos\(enrichedCustomers, \{\}, state\.klanten, true\)/);
+  assert.match(pageSource, /mergeCustomersWithPhotos\(enrichedCustomers, photoMap, customersWithFallbackMedia, true\)/);
   assert.match(pageSource, /function loadCustomerPhotoMap\(customers, options\)/);
   assert.doesNotMatch(pageSource, /function serializeWebsitePhotoForDiff\(value\)/);
   assert.doesNotMatch(pageSource, /serializeWebsitePhotoForDiff\(normalized\.(websitePhoto|websiteMockup)\)/);
@@ -3054,7 +3057,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(importScriptSource, /\[getChunkMetaKey\(normalizedKey\)\]: JSON\.stringify\(\{/);
   assert.match(importScriptSource, /patch\[prefix \+ index\] = chunk;/);
   assert.match(pageSource, /patch: window\.SoftoraDatabaseImport\.buildChunkedStatePatch\(CUSTOMER_DB_KEY, JSON\.stringify\(normalizedCustomers\)\)/);
-  assert.match(pageSource, /const remoteCustomers = parseCustomers\(JSON\.stringify\(customerResult && customerResult\.customers \|\| \[\]\)\);[\s\S]*if \(!remoteCustomers\.length\) throw new Error\("Geen bruikbare Supabase-klantdata ontvangen\."\);/);
+  assert.match(pageSource, /const remoteCustomers = parseCustomers\(customerResult && customerResult\.customers \|\| \[\]\);[\s\S]*if \(!remoteCustomers\.length\) throw new Error\("Geen bruikbare Supabase-klantdata ontvangen\."\);/);
   assert.doesNotMatch(pageSource, /reconcileCanonicalAvailableSnapshot/);
   assert.match(pageSource, /const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 \* 1000;/);
   assert.match(pageSource, /function normalizeStoredAmount\(value\)/);
