@@ -111,10 +111,19 @@ function createMailboxAiClassifier({ getApiKey, fetchImpl = globalThis.fetch, ti
       const source = { ...originalSource, body: restoreMailboxParagraphs(originalSource.body, originalSource.html) };
       const request = buildRequest(source), first = await trackedRequest(request);
       const lines = contract.linesOf(source.body), selected = first.value?.signatureLines;
-      if (!Array.isArray(selected) || new Set(selected).size !== selected.length || selected.some((i) =>
-        !Number.isInteger(i) || i < 0 || !lines[i]?.trim())) throw new Error('MAILBOX_AI_INVALID_RESULT');
-      const chosen = new Set(selected);
-      let decision = { labels: lines.map((_, i) => chosen.has(i) ? 'signature' : 'authored'), contacts: first.value.contacts };
+      if (!Array.isArray(selected) || !Array.isArray(first.value?.contacts) || first.value.contacts.length > 40)
+        throw new Error('MAILBOX_AI_INVALID_RESULT');
+      // Invalid/duplicate indices carry no source evidence; never hide a blank or unknown line.
+      const chosen = new Set(selected.filter((i) => Number.isInteger(i) && i >= 0 && lines[i]?.trim()));
+      if (selected.length && !chosen.size) throw new Error('MAILBOX_AI_INVALID_RESULT');
+      const labels = () => lines.map((_, i) => chosen.has(i) ? 'signature' : 'authored');
+      if (!contract.validate(source.body, { labels: labels(), contacts: [] })) throw new Error('MAILBOX_AI_INVALID_RESULT');
+      const contacts = first.value.contacts.filter((contact) => {
+        const valid = contract.validate(source.body, { labels: labels(), contacts: [contact] });
+        if (!valid && Number.isInteger(contact?.line)) chosen.delete(contact.line);
+        return valid;
+      }).filter((contact) => chosen.has(contact.line));
+      let decision = { labels: labels(), contacts };
       if (!contract.validate(source.body, decision)) throw new Error('MAILBOX_AI_INVALID_RESULT');
       if (decision.labels.includes('signature')) {
         const review = await trackedRequest(buildRemovalReview(source, decision, request));
