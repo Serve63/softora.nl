@@ -84,7 +84,14 @@
     placeEntries.sort(function (left, right) {
       return right.place.length - left.place.length;
     });
-    cache = { exact: exact, byProvincePlace: byProvincePlace, byPlace: byPlace, placeEntries: placeEntries };
+    const entriesByFirstToken = Object.create(null);
+    placeEntries.forEach(function (entry, index) {
+      const token = entry.place.split(" ")[0];
+      if (!entriesByFirstToken[token]) entriesByFirstToken[token] = [];
+      entriesByFirstToken[token].push(index);
+    });
+    cache = { exact: exact, byProvincePlace: byProvincePlace, byPlace: byPlace,
+      placeEntries: placeEntries, entriesByFirstToken: entriesByFirstToken };
     return cache;
   }
 
@@ -126,25 +133,34 @@
     const maps = getCache();
     const province = normalizeText(hints && hints.province);
     const municipality = normalizeText(hints && hints.municipality);
+    // A matching place must start with a whole word in the normalized text.
+    // Retain the original longest-name order and the three disambiguation passes.
+    const candidateIndices = new Set();
+    text.split(" ").forEach(function (token) {
+      const indices = maps.entriesByFirstToken[token];
+      if (indices) indices.forEach(function (index) { candidateIndices.add(index); });
+    });
+    const candidates = Array.from(candidateIndices).sort(function (left, right) { return left - right; })
+      .map(function (index) { return maps.placeEntries[index]; });
 
-    for (let index = 0; index < maps.placeEntries.length; index += 1) {
-      const entry = maps.placeEntries[index];
+    for (let index = 0; index < candidates.length; index += 1) {
+      const entry = candidates[index];
       if (!matchesNormalizedPhrase(text, entry.placePattern)) continue;
       if (province && entry.province !== province) continue;
       if (municipality && entry.municipality !== municipality) continue;
       if (province || municipality) return entry.coords;
     }
 
-    for (let index = 0; index < maps.placeEntries.length; index += 1) {
-      const entry = maps.placeEntries[index];
+    for (let index = 0; index < candidates.length; index += 1) {
+      const entry = candidates[index];
       if (!matchesNormalizedPhrase(text, entry.placePattern)) continue;
       if (matchesNormalizedPhrase(text, entry.provincePattern) || matchesNormalizedPhrase(text, entry.municipalityPattern)) {
         return entry.coords;
       }
     }
 
-    for (let index = 0; index < maps.placeEntries.length; index += 1) {
-      const entry = maps.placeEntries[index];
+    for (let index = 0; index < candidates.length; index += 1) {
+      const entry = candidates[index];
       if (!matchesNormalizedPhrase(text, entry.placePattern)) continue;
       const uniqueCoords = maps.byPlace[entry.place];
       if (uniqueCoords) return uniqueCoords;

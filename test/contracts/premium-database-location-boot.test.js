@@ -27,3 +27,15 @@ test('initial database boot has nationwide locations before distance sorting', (
   for (const row of rows) assert.ok(Number.isFinite(distance.getDistanceKm(row)), row.stad);
   assert.deepEqual(Array.from(distance.sortCustomersByDistance(rows), row => row.id), ['near', 'middle', 'far']);
 });
+
+test('indexed location lookup keeps complete place matches and disambiguation', () => {
+  const coords = require('../../assets/premium-database-target-coords.js');
+  const expected = coords.getTargetCoords({ province: 'Zeeland', municipality: 'Veere', place: 'Vrouwenpolder' });
+  assert.ok(expected);
+  const matched = coords.resolveTextCoords('Zandbank, Vrouwenpolder, Zeeland', {
+    province: 'Zeeland', municipality: 'Veere',
+  });
+  assert.equal(matched.lat, expected.lat);
+  assert.equal(matched.lng, expected.lng);
+  assert.equal(coords.resolveTextCoords('Vrouwenpolderlaan zonder woonplaats', {}), null);
+});
