@@ -74,6 +74,8 @@ const APPROVED_BROWSER_STORAGE_PATHS = Object.freeze([
   'assets/personnel-theme.js',
   'assets/premium-sidebar-profile-prefill.js',
   'assets/premium-page-bootstrap-session.js',
+  // Central read-model copy (docs/platform-performance.md); pages use it, never IndexedDB directly.
+  'assets/premium-readmodel-store.js',
   'assets/sportschool-logboek.js',
 ]);
 
