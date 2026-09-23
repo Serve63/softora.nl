@@ -40,7 +40,8 @@ function createMailboxAiRepository({ getClient } = {}) {
       AbortSignal.timeout(10000), 10000);
   }
   async function claim() {
-    const rows = await run((client) => client.rpc('softora_claim_mailbox_ai', { p_token: randomUUID() }));
+    const rows = await run((client) => client.rpc('softora_claim_mailbox_ai', { p_token: randomUUID() }),
+      AbortSignal.timeout(10000), 10000);
     return rows?.[0] || null;
   }
   async function recover() {
