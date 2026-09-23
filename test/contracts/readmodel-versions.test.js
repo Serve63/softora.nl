@@ -429,7 +429,7 @@ test('ui-state store reads change_seq only for read-model callers', async () => 
 });
 
 test('runtime state migration numbers every write from one global sequence', () => {
-  const sql = fs.readFileSync(path.join(repoRoot, 'supabase/migrations/20260924090000_runtime_state_change_seq.sql'), 'utf8');
+  const sql = fs.readFileSync(path.join(repoRoot, 'supabase/migrations/20260923232424_runtime_state_change_seq.sql'), 'utf8');
   assert.match(sql, /before insert or update on public\.softora_runtime_state\s+for each row/);
   assert.match(sql, /new\.change_seq := nextval\('public\.softora_runtime_state_change_seq'\)/);
   assert.doesNotMatch(sql, /revision\s*:=|updated_at\s*:=/, 'compare-and-swap columns stay untouched');
