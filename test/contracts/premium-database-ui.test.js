@@ -436,6 +436,27 @@ test('premium database keeps bootstrap rows hidden until the canonical inventory
   assert.match(pageSource, /mailReady: raw && raw\.mailReady === true, mailReadySnapshot: raw && raw\.mailReadySnapshot === true, availableSnapshot: raw && raw\.availableSnapshot === true,/);
 });
 
+test('responsible merge preserves normalized rows and their existing distance order', () => {
+  const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
+  const tableHelpers = require('../../assets/premium-database-table-helpers.js');
+  assert.match(pageSource, /window\.SoftoraDatabaseTableHelpers\.mergeCustomersWithResponsible\(customers, orders, \{/);
+  const customers = [
+    { id: 'first', bedrijf: 'First', verantwoordelijk: '' },
+    { id: 'second', bedrijf: 'Second', verantwoordelijk: 'Mia' },
+  ];
+  const helpers = {
+    buildDerivedCustomerSeedFromOrder: (order) => ({ bedrijf: order.bedrijf, verantwoordelijk: order.claimedBy }),
+    buildCustomerIdentityKey: (customer) => customer.bedrijf,
+    parseResponsibleValue: (value) => value,
+    getResponsibleSourceValue: (customer) => customer.verantwoordelijk,
+  };
+  const result = tableHelpers.mergeCustomersWithResponsible(customers, [{ bedrijf: 'First', claimedBy: 'Servé' }], helpers);
+  assert.equal(result[0].verantwoordelijk, 'Servé');
+  assert.equal(result[0].id, 'first');
+  assert.equal(result[1], customers[1]);
+  assert.equal(tableHelpers.mergeCustomersWithResponsible(customers, [], helpers), customers);
+});
+
 test('canonical inventory gate never publishes compact or capped counts', () => {
   const client = loadDatabaseMailReadySnapshotClient();
   const state = { canonicalInventoryReady: false, remoteCustomersLoaded: false, dataLoading: true, dataUnavailable: false, klanten: [{ id: 'canonical-1' }], mailReadySnapshotLoaded: true, mailReadySnapshotPending: false, mailReadySnapshotTotal: 0, mailReadySnapshotCustomers: [], availableSnapshotLoaded: true, availableSnapshotTotal: 0, availableSnapshotCustomers: [], foundSnapshotLoaded: true, foundSnapshotTotal: 0, foundSnapshotCustomerIdSet: new Set() };
@@ -4989,7 +5010,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /state\.activeStatus === "instantly"/);
   assert.match(pageSource, /if \(isColdcallingStatusFilter\(state\.activeStatus\)\) return matchesColdcallingStatusFilter\(customer, state\.activeStatus\);/);
   assert.match(pageSource, /return outreachController\.matchesStatusFilter\(customer, state\.activeStatus, hasUsedColdCalling, hasUsedColdMailing\);/);
-  assert.match(pageSource, /assets\/premium-database-table-helpers\.js\?v=20260921-mailready-header/);
+  assert.match(pageSource, /assets\/premium-database-table-helpers\.js\?v=20260923-owner/);
   assert.match(pageSource, /function hasUsedColdCalling\(customer\) \{ return databaseTableHelpers\.hasUsedColdCalling\(customer, getTableHelperOptions\(\)\); \}/);
   assert.match(pageSource, /function matchesColdcallingStatusFilter\(customer, activeStatus\) \{ return databaseTableHelpers\.matchesColdcallingStatusFilter\(customer, activeStatus, getTableHelperOptions\(\)\); \}/);
   assert.match(tableHelpersSource, /function mapColdCallingOutcomeText\(text, helpers\)/);

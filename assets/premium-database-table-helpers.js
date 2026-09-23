@@ -71,5 +71,27 @@
     return rows.filter(options.hasPhoto).length;
   }
 
-  return { getPhotoHeaderCount, getLoadMoreState, getNextVisibleLimit, getVisibleRows, hasUsedColdCalling, isColdcallingStatusFilter, mapColdCallingOutcomeText, matchesColdcallingStatusFilter };
+  function mergeCustomersWithResponsible(customers, orders, helpers) {
+    if (!Array.isArray(customers) || !customers.length) return [];
+    if (!Array.isArray(orders) || !orders.length) return customers;
+    const { buildDerivedCustomerSeedFromOrder, buildCustomerIdentityKey, parseResponsibleValue, getResponsibleSourceValue } = helpers || {};
+    if ([buildDerivedCustomerSeedFromOrder, buildCustomerIdentityKey, parseResponsibleValue, getResponsibleSourceValue].some((helper) => typeof helper !== "function")) {
+      throw new Error("Responsible merge helpers ontbreken.");
+    }
+    const responsibleByCustomerKey = new Map();
+    orders.forEach(function (order) {
+      const seed = buildDerivedCustomerSeedFromOrder(order);
+      const key = buildCustomerIdentityKey(seed);
+      const responsible = parseResponsibleValue(seed.verantwoordelijk);
+      if (key && responsible && !responsibleByCustomerKey.has(key)) responsibleByCustomerKey.set(key, responsible);
+    });
+    return customers.map(function (customer) {
+      const explicitResponsible = parseResponsibleValue(getResponsibleSourceValue(customer));
+      const key = buildCustomerIdentityKey(customer);
+      const matchedResponsible = explicitResponsible || responsibleByCustomerKey.get(key) || customer.verantwoordelijk;
+      return matchedResponsible === customer.verantwoordelijk ? customer : { ...customer, verantwoordelijk: matchedResponsible };
+    });
+  }
+
+  return { getPhotoHeaderCount, getLoadMoreState, getNextVisibleLimit, getVisibleRows, hasUsedColdCalling, isColdcallingStatusFilter, mapColdCallingOutcomeText, matchesColdcallingStatusFilter, mergeCustomersWithResponsible };
 });
