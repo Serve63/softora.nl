@@ -11,8 +11,14 @@
     const digits = match ? (match[1].match(/\d/g) || []).length : 0;
     return digits >= 7 && digits <= 15;
   }
+  function decisionBody(body, decision) {
+    if (decision?.displayBody === undefined) return body;
+    return typeof decision.displayBody === 'string' && decision.displayBody.replace(/\s/g, '') === body.replace(/\s/g, '') ? decision.displayBody : null;
+  }
   function validate(body, decision) {
-    const lines = linesOf(body);
+    const display = decisionBody(body, decision);
+    if (display === null) return false;
+    const lines = linesOf(display);
     if (!decision || !Array.isArray(decision.labels) || decision.labels.length !== lines.length ||
       decision.labels.some((label) => !labels.includes(label)) || !Array.isArray(decision.contacts) ||
       decision.contacts.length > 40) return false;
@@ -35,14 +41,14 @@
     }
     const notices = { failed: 'AI-opschoning is niet gelukt. Hieronder staat de originele e-mail.',
       timeout: 'AI-opschoning duurt langer dan verwacht. Hieronder staat de originele e-mail.',
-      budget: 'Het budget voor AI-opschoning is bereikt. Hieronder staat de originele e-mail.',
+      budget: 'AI-opschoning wacht op beschikbare budgetruimte. Hieronder staat de originele e-mail.',
       storage: 'AI-opschoning is tijdelijk niet beschikbaar. Hieronder staat de originele e-mail.' };
     if (value.version !== VERSION || value.status !== 'ready' || value.model !== MODEL || value.reasoningEffort !== 'max' ||
       value.sourceBody !== body || !validate(body, value.decision)) {
       return { body: notices[value.reason] ? `${notices[value.reason]}\n\n${body}` : body, contact: { beforeLines: [], addressLines: [] }, signatureMatched: false, aiManaged: true };
     }
     // Quote ownership is not evidence that content is irrelevant. Only signature labels may hide source lines.
-    const lines = linesOf(body), labels = value.decision.labels;
+    const lines = linesOf(decisionBody(body, value.decision)), labels = value.decision.labels;
     const visible = new Set(labels.flatMap((label, index) => label !== 'signature' ? [index] : []));
     const nonempty = lines.flatMap((line, index) => line.trim() ? [index] : []);
     // A lone supposed signature line between retained content is an ambiguous boundary,

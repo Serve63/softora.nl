@@ -1,6 +1,6 @@
 # Mailbox Luna presentation — activation gate
 
-Status: disabled by default, production budget zero. Real evaluation found that both prompt-only
+Initial rollout status (superseded by the dated sections below): disabled by default, production budget zero. Real evaluation found that both prompt-only
 selection and quote-label deletion can lose meaningful content. Selection now proposes footer
 indices only; a second Luna review can only restore candidate lines, never delete additional
 content. See `luna-evaluation-20260921.md` for the successive failures and evaluations.
@@ -96,3 +96,43 @@ explicit notice. This is a display gate, not deletion or rewriting of canonical 
 Unsupported/oversized mail remains original. No promise of perfect classification.
 The SQL status RPC is read-only and restricted to service_role. Candidate seeding also
 stops at the exhausted cap, avoiding an ever-growing historical queue.
+
+## Usage settlement and full received-mail backlog (23 September)
+
+The owner requested GPT-6 Luna max, all existing received mail and future incoming mail,
+and removal of the premature reservation stop within the existing EUR 20 authorization.
+The migration never increases the approved ceiling. Activation lowers the runtime ceiling to USD 18 to retain exchange/tax headroom within EUR 20, conservatively counting earlier pilot spend inside that amount. This supersedes the no-refund/180-job
+and incoming-only restrictions described above; it does not authorize automatic top-ups.
+
+`20260923105207_mailbox_ai_settle_usage.sql` adds idempotent settlement: only complete
+recorded usage releases the unused part of a claim. `reserved_micro_usd` remains the
+compatibility counter for known spend plus outstanding/uncertain holds; `spent_micro_usd`
+is recorded token-based spend. Legacy successful Luna 5.6 jobs use conservative uncached
+rates of $0.25/$1.20 per million (including the maximum input cache-write premium). Failed/missing usage remains fully reserved.
+New Luna 6 requests explicitly use Standard service and record cached input, cache writes, per-request
+long-context pricing, model, completeness, and rounded-up micro-USD. These estimates
+are usage-derived, not an independently reconciled provider invoice.
+
+Both passes still use max reasoning and unchanged content-preservation prompts.
+Limits are 240,000 source characters, 2,400 lines and 400 KB serialized request bytes;
+a $0.30 pre-request hold bounds both calls including long-context/cache-write premiums.
+The observed backlog maximum was below these limits. Larger future inputs remain original
+rather than being truncated for classification. Missing provider body text cannot be
+classified until normal mailbox hydration retrieves it; no empty substitute is sent to AI.
+
+Worker throughput is two waves of four parallel jobs, globally capped at eight recent
+running jobs by the budget lock. Incoming messages precede historical ones. Unchanged
+source identities reuse existing paid decisions. `include_history=true` is the explicit
+activation switch for historical processing. It is not enabled by schema migration alone.
+
+Validation: SQL-engine tests cover exactly-once settlement, missing usage, authorization,
+ceiling preservation, incoming priority, history activation and global concurrency.
+Usage tests cover cached tokens, long requests and incomplete data. No retry or provider
+fallback is introduced. A failed/uncertain attempt must be investigated; any deliberate
+retry retains its old hold in `prior_uncertain_micro_usd` and claims a fresh hold.
+
+Explicit prompt caching stores only the unchanged developer rubric, never the changing mail body. This preserves prompt text and max reasoning while avoiding cache-write premiums on unique email content. Missing cache-write details retain the maximum input premium for budget safety.
+
+The received-mail selector includes `coldmail` as well as inbox/allmail/Instantly; the earlier selector omitted campaign reply folders. Paragraph restoration happens inside classification only when HTML contains exactly the same non-whitespace characters. A derived `decision.displayBody` carries that whitespace-only layout; the renderer revalidates equality before applying line indices. Original bodies and source identities remain untouched.
+
+Queue performance: `20260923111119_mailbox_ai_queue_lookup_indexes.sql` adds the missing identity-branch index and a received-date index including coldmail. The same read-only candidate selection measured 81.35 seconds before and 0.29 seconds after on production; both indexes are compatible with the old worker. Claim selection uses primary keys first and identity fallback only for stale keys.
