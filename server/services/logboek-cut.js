@@ -19,9 +19,8 @@ function createLogboekCutService({repo = createLogboekCutRepository(), now = () 
   async function get(date = dateKey(now())) {
     const today = dateKey(now());
     if (!validDate(date) || date > today || date < '2020-01-01') throw Object.assign(new Error('Ongeldige trainingsdatum.'),{status:400});
-    const plan=await repo.plan();
+    const [plan,existing]=await Promise.all([repo.plan(),repo.read(date)]);
     const exercises=projectExercises(plan.payload,date);
-    const existing = await repo.read(date);
     let session = existing || await repo.open(date,exercises);
     if(existing && date===today && JSON.stringify(existing.exercises)!==JSON.stringify(exercises)) {
       session=await repo.refreshExercises(date,exercises);

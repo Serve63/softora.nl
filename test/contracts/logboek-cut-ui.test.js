@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-test('logboek-cut keeps the set details below the title and aligned with the card', () => {
+test('logboek-cut keeps the set details below the title and aligned with the exercise', () => {
   const html = fs.readFileSync(path.join(__dirname, '../../logboek-cut.html'), 'utf8');
   const css = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.css'), 'utf8');
   assert.match(html, /href="\/assets\/logboek-cut\.css\?v=[^"]+"/);
@@ -18,4 +18,11 @@ test('logboek-cut keeps the set details below the title and aligned with the car
   assert.equal(horizontal, '0', 'The detail line must share the card’s left edge.');
   assert.ok(parseFloat(bottom) > 0, 'The set buttons need space below the detail line.');
   assert.match(rule, /text-align:\s*left\b/);
+});
+
+test('logboek-cut fills the page without an outer card on desktop and mobile', () => {
+  const css = fs.readFileSync(path.join(__dirname, '../../assets/logboek-cut.css'), 'utf8');
+  assert.match(css, /\.app\s*\{[^}]*width:\s*100%/);
+  assert.match(css, /\.workout\s*\{[^}]*width:\s*100%[^}]*border:\s*0/);
+  assert.match(css, /@media\s*\(max-width:\s*700px\)/);
 });
