@@ -2636,6 +2636,112 @@ test('automatic upload accepts a paused approved campaign without activating it'
   assert.equal(harness.fetchCalls.some((call) => call.url.includes('/activate')), false);
 });
 
+test('automatic upload drains both owners in one run beyond the old daily upload cap without starting drafts', async () => {
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
+  const sentLeads = [];
+  const harness = createService({
+    now: '2026-09-23T20:00:00.000Z', dailyCap: 1, autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    rows: [
+      { id: 'serve-batch', bedrijf: 'Servé Batch', email: 'serve-batch@company.test', website: 'https://serve-batch.test', mail: true, verantwoordelijk: 'Serve' },
+      { id: 'martijn-batch', bedrijf: 'Martijn Batch', email: 'martijn-batch@company.test', website: 'https://martijn-batch.test', mail: true, verantwoordelijk: 'Martijn' },
+    ],
+    photoMap: {
+      'serve-batch': { id: 'serve-batch', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' },
+      'martijn-batch': { id: 'martijn-batch', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly', legacyMeta: { designOwnerEmail: 'martijn@softora.nl', senderEmail: 'martijn@softora.nl' } },
+    },
+    coldmailingSettings: { senderEmail: 'serve@softora.nl', senders: {
+      'serve@softora.nl': { subject: 'Design', body: 'Goedendag,\n\nMet vriendelijke groet,\nServé Creusen' },
+      'martijn@softora.nl': { subject: 'Design', body: 'Goedendag,\n\nMet vriendelijke groet,\nMartijn van de Ven' },
+    } },
+    fetchJsonWithTimeout: async (url, options) => {
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: {
+        name: url.includes(campaigns.martijn) ? 'Martijn van de Ven Softora.nl - frisse start' : 'Servé Creusen Softora.nl - frisse start', status: 0,
+      } };
+      if (url.endsWith('/leads/add')) {
+        const lead = JSON.parse(options.body).leads[0];
+        sentLeads.push(lead);
+        return { response: { ok: true, status: 200 }, data: {
+          leads_uploaded: 1, created_leads: [{ id: `lead-${sentLeads.length}`, email: lead.email, index: 0 }],
+        } };
+      }
+      return { response: { ok: true, status: 200 }, data: {} };
+    },
+  });
+
+  const capacity = await harness.service.getUploadCapacity();
+  assert.equal(capacity.uploadableToday, 2);
+  const result = await harness.service.autoUploadMailReady({ actor: 'cron' });
+  assert.equal(result.ok, true);
+  assert.equal(result.uploaded, 2);
+  assert.deepEqual(result.distribution, { serve: 1, martijn: 1 });
+  assert.equal(result.hasMore, false);
+  assert.equal(new Set(sentLeads.map((lead) => lead.custom_variables.softora_instantly_upload_id)).size, 2);
+  assert.equal(harness.fetchCalls.some((call) => call.url.includes('/activate')), false);
+  assert.equal(harness.getRows().filter((row) => row.instantlyStatus === 'synced').length, 2);
+});
+
+test('automatic batch stops on a partial provider failure and never repeats an accepted lead', async () => {
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
+  let addCalls = 0;
+  const rows = ['first', 'second'].map((id) => ({ id, bedrijf: id, email: `${id}@company.test`, website: `https://${id}.test`, mail: true, verantwoordelijk: 'Serve' }));
+  const photoMap = Object.fromEntries(rows.map((row) => [row.id, {
+    id: row.id, websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly',
+  }]));
+  const harness = createService({
+    autoUploadEnabled: true, replacementCampaigns: campaigns, rows, photoMap,
+    fetchJsonWithTimeout: async (url, options) => {
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 0 } };
+      if (url.endsWith('/leads/add')) {
+        addCalls += 1;
+        if (addCalls === 2) throw Object.assign(new Error('ambiguous provider response'), { code: 'INSTANTLY_API_FAILED' });
+        const lead = JSON.parse(options.body).leads[0];
+        return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'accepted-first', email: lead.email, index: 0 }] } };
+      }
+      return { response: { ok: true, status: 200 }, data: {} };
+    },
+  });
+
+  const result = await harness.service.autoUploadMailReady();
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'INSTANTLY_API_FAILED');
+  assert.equal(result.uploaded, 1);
+  assert.equal(result.hasMore, true);
+  assert.equal(addCalls, 2);
+  assert.equal(harness.getRows().find((row) => row.id === 'first').instantlyStatus, 'synced');
+  assert.equal(harness.getRows().find((row) => row.id === 'second').instantlyStatus, 'queued');
+  await harness.service.autoUploadMailReady();
+  assert.equal(addCalls, 2, 'a queued ambiguous lead must be reconciled, never added again');
+});
+
+test('automatic upload reports remaining work when a bounded request stops after one lead', async () => {
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
+  let created = 0;
+  const rows = ['bounded-one', 'bounded-two'].map((id) => ({ id, bedrijf: id, email: `${id}@company.test`, website: `https://${id}.test`, mail: true, verantwoordelijk: 'Serve' }));
+  const photoMap = Object.fromEntries(rows.map((row) => [row.id, {
+    id: row.id, websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly',
+  }]));
+  const harness = createService({
+    autoUploadEnabled: true, replacementCampaigns: campaigns, rows, photoMap,
+    fetchJsonWithTimeout: async (url, options) => {
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 0 } };
+      if (url.endsWith('/leads/add')) {
+        const email = JSON.parse(options.body).leads[0].email;
+        created += 1;
+        return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: `bounded-lead-${created}`, email, index: 0 }] } };
+      }
+      return { response: { ok: true, status: 200 }, data: {} };
+    },
+  });
+  const first = await harness.service.autoUploadMailReady({ limit: 1 });
+  assert.equal(first.uploaded, 1);
+  assert.equal(first.hasMore, true);
+  const second = await harness.service.autoUploadMailReady({ limit: 1 });
+  assert.equal(second.uploaded, 1);
+  assert.equal(second.hasMore, false);
+  assert.equal(created, 2);
+});
+
 test('automatic upload uses targeted design-photo reads instead of the heavy photo UI state', async () => {
   const campaigns = {
     serve: '7a94c361-d83c-4857-9395-e9c5ba603f90',
