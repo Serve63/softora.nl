@@ -288,3 +288,39 @@ test('stalled and timed-out campaign claims retry once without refunding uncerta
     await assert.rejects(db.query('select softora_recover_mailbox_ai()'),/permission denied/);
   } finally { await db.close(); }
 });
+
+test('stale claims outside campaign scope close without refunding uncertain reservations', async () => {
+  const db = await database();
+  try {
+    await db.exec(migration);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923112643_mailbox_ai_failed_usage_settlement.sql'),'utf8'));
+    await db.exec(`alter table public.softora_mailbox_messages add column in_reply_to text;
+      alter table public.softora_mailbox_messages add column references_text text;
+      alter table public.softora_mailbox_messages add column recipients_text text;
+      alter table public.softora_mailbox_messages add column subject text;
+      create table public.softora_mailbox_campaign_lineage_members(message_key text,account_email text);
+      create table public.softora_mailbox_campaign_lineage_roots(message_key text,account_email text);
+      create function public.softora_mailbox_message_has_campaign_proof(text,text,text,text,text,text,text,text,text,text,jsonb,text,text default null)
+        returns boolean language sql immutable as $$select $1 like 'campaign-%'$$;`);
+    for (const file of ['20260923122053_mailbox_ai_campaign_only.sql',
+      '20260923122633_mailbox_ai_campaign_hint.sql','20260923125807_mailbox_ai_recover_stalled_claims.sql'])
+      await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/'+file),'utf8'));
+    await db.exec(`update public.softora_mailbox_ai_budget set approved_micro_usd=1800000,
+      reserved_micro_usd=600000,include_history=true;
+      insert into public.softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,
+        body_text,has_body,body_truncated,payload,in_reply_to) values
+        ('campaign-reply','a',now(),now(),'inbox','sender@example.nl','Reply',true,false,'{}','<sent@example.nl>'),
+        ('private-mail','a',now(),now(),'inbox','sender@example.nl','Personal',true,false,'{}',null);
+      insert into public.softora_mailbox_ai_presentations(id,version,account_email,message_key,source,status,
+        started_at,claim_reserved_micro_usd,attempt_count) values
+        ('campaign','mailbox-luna-v1','a','campaign-reply','{}','running',now()-interval '20 minutes',300000,1),
+        ('private','mailbox-luna-v1','a','private-mail','{}','running',now()-interval '20 minutes',300000,1);`);
+    await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/20260923135720_mailbox_ai_close_orphaned_claims.sql'),'utf8'));
+    const rows=(await db.query('select id,status,usage,claim_reserved_micro_usd from softora_mailbox_ai_presentations order by id')).rows;
+    assert.equal(rows[0].status,'running');
+    assert.equal(rows[1].status,'failed');
+    assert.equal(rows[1].usage.errorCode,'MAILBOX_AI_ORPHANED_SCOPE');
+    assert.equal(Number(rows[1].claim_reserved_micro_usd),300000);
+    assert.equal(Number((await db.query('select reserved_micro_usd from softora_mailbox_ai_budget')).rows[0].reserved_micro_usd),600000);
+  } finally { await db.close(); }
+});
