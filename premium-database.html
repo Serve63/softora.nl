@@ -1375,17 +1375,17 @@
         </div>
     </div><script src="assets/premium-database-photo-batch.js?v=20260917-source"></script><script src="assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui"></script>
     <script src="assets/premium-database-webdesign-asset-state.js?v=20260914-provider"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20260817a"></script><script src="assets/premium-database-webdesign-job-restore.js?v=20260723a"></script><script src="assets/premium-database-webdesign-variant-picker.js?v=20260726a"></script><script src="assets/premium-database-instantly-status.js?v=20260921-counts"></script><script src="assets/premium-database-webdesign-action.js?v=20260921-mailready-parity"></script><script src="assets/premium-database-webdesign-preview.js?v=20260909-mailsysteem"></script><script src="assets/premium-database-lead-delete.js?v=20260716a"></script>
-    <script src="assets/premium-database-import.js?v=20260606a"></script><script src="assets/premium-database-boot.js?v=20260923-single-final-render"></script><script src="assets/premium-database-sent-register.js?v=20260915-haaren-order-1"></script><script src="assets/premium-database-system-mail-count.js?v=20260923-fresh-stats"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
+    <script src="assets/premium-database-import.js?v=20260923-ready-sync"></script><script src="assets/premium-database-boot.js?v=20260923-ready-sync"></script><script src="assets/premium-database-sent-register.js?v=20260915-haaren-order-1"></script><script src="assets/premium-database-system-mail-count.js?v=20260923-fresh-stats"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
     <script src="assets/premium-database-photo-storage.js?v=20260914-provider"></script>
     <script src="assets/premium-database-webdesign-mockup.js?v=20260529d"></script>
     <script src="assets/premium-database-deep-search-loader.js?v=20260616a"></script>
     <script src="assets/premium-database-mass-research.js?v=20260629a"></script><script src="assets/premium-database-target-coords.js?v=20260923-index"></script><script src="assets/premium-database-distance.js?v=20260923-cache"></script><script src="assets/premium-database-contact-status.js?v=20260519a"></script><script src="assets/premium-database-table-helpers.js?v=20260923-owner"></script>
     <script src="assets/premium-customers-core.js?v=20260428a"></script><script src="assets/premium-database-resilience.js?v=20260604b"></script><script src="assets/premium-database-customers-loader.js?v=20260923-phase-timing"></script><script src="assets/premium-database-mail-ready-snapshot.js?v=20260923-once"></script><script src="assets/premium-database-source-filter.js?v=20260917-source"></script><script src="assets/premium-database-webdesign-source-selection.js?v=20260917-source"></script>
-    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260922a"></script><script src="assets/premium-screen-readiness.js?v=20260922b"></script><script src="assets/premium-database-readiness.js?v=20260923-single-read"></script>
+    <!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets/premium-ui-state-client.js?v=20260922a"></script><script src="assets/premium-screen-readiness.js?v=20260922b"></script><script src="assets/premium-database-readiness.js?v=20260923-ready-sync"></script>
     <script>
         const CUSTOMER_DB_SCOPE = "premium_customers_database";
         const CUSTOMER_DB_KEY = "softora_customers_premium_v1";
-        const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1";
+        const CUSTOMER_DB_SYNC_KEY = "softora_customers_database_sync_v1"; const CUSTOMER_DB_SYNC_SCOPE = "premium_customers_database_sync";
         const CUSTOMER_DB_DEEP_SEARCH_KEY = "softora_customers_deep_search_v1";
         const CUSTOMER_DB_SYNC_INTERVAL_MS = 60 * 1000; const CUSTOMER_DB_RECENT_LOAD_MS = 5 * 1000; const COLDMAIL_SEND_GUARD_SCOPE = "premium_coldmail_send_guard"; const COLDMAIL_SEND_GUARD_KEY = "softora_coldmail_send_guard_v1";
         const API_COST_SCOPE = "premium_api_costs";
@@ -2575,7 +2575,7 @@
                 if (!silent) {
                     setStatusMessage(isSync ? "Google Sheet is al gelijk aan de database." : "Alle bedrijven uit dit bestand stonden al in de database.", "info", true);
                 }
-                return Promise.resolve(false);
+                return Promise.resolve(isSync ? { ok: true, changed: false } : false);
             }
 
             state.klanten = sortCustomers(mergeResult.customers);
@@ -2792,7 +2792,7 @@
             syncRows: syncCustomersFromRows,
             getUiState: fetchUiStateGetWithFallback,
             setUiState: fetchUiStateSetWithFallback,
-            syncScope: CUSTOMER_DB_SCOPE,
+            syncScope: CUSTOMER_DB_SYNC_SCOPE,
             syncKey: CUSTOMER_DB_SYNC_KEY,
             syncIntervalMs: CUSTOMER_DB_SYNC_INTERVAL_MS,
             realBusinessButton: null
@@ -2917,6 +2917,6 @@
         });
 
         document.documentElement.dataset.softoraDatabaseActionsBound = 'true'; void window.SoftoraDatabaseBoot.run({ state, databaseHadBootstrapCustomers, databaseHasFastSnapshotBootstrap, loadMailReadySnapshot, bootstrapCustomers, loadCustomerPhotoMap, applyCustomerList, mergeCustomersWithPhotos, renderPage, webdesignActionController, getSortedCustomers, getFilteredCustomers, releaseDatabaseBootShell, databasePendingJobsPromise, databaseImportController, databaseReadiness: window.SoftoraDatabaseReadiness });
-    </script><script src="assets/premium-database-instantly-sync.js?v=20260914-provider"></script><script src="assets/premium-database-instantly-queue-import.js?v=20260914c"></script>
+    </script><script src="assets/premium-database-instantly-sync.js?v=20260923-ready-sync"></script><script src="assets/premium-database-instantly-queue-import.js?v=20260914c"></script>
 </body>
 </html>
