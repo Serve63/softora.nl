@@ -322,6 +322,15 @@ test('premium database mail-ready snapshot honors limit and offset', async () =>
   assert.equal(payload.limit, 2);
   assert.equal(payload.offset, 2);
   assert.deepEqual(payload.customers.map((customer) => customer.id), ['ready-3', 'ready-4']);
+
+  const continuation = await service.buildMailReadySnapshot({ limit: 2, offset: 2, omitFoundSnapshot: true });
+  assert.equal(continuation.snapshotVersion, payload.snapshotVersion);
+  assert.deepEqual(continuation.customers, payload.customers);
+  assert.equal(Object.hasOwn(continuation, 'foundCustomerIds'), false);
+  assert.equal(Object.hasOwn(continuation, 'foundTotal'), false);
+
+  const capped = await service.buildMailReadySnapshot({ limit: 99999 });
+  assert.equal(capped.limit, 4500);
 });
 
 test('premium database snapshot deduplicates customer ids and embeds bootstrap photo URLs', async () => {
@@ -889,9 +898,15 @@ test('premium database mail-ready snapshot response cannot be replayed from a br
   await service.sendMailReadySnapshotResponse({ query: { limit: '10', offset: '0' } }, res);
 
   assert.equal(res.statusCode, 200);
+  assert.equal(Array.isArray(res.payload.foundCustomerIds), true);
   assert.equal(headers['Cache-Control'], 'private, no-store, max-age=0');
   assert.equal(headers.Pragma, 'no-cache');
   assert.equal(headers.Expires, '0');
+
+  await service.sendMailReadySnapshotResponse({ query: { limit: '10', offset: '1', includeFound: '0' } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(Object.hasOwn(res.payload, 'foundCustomerIds'), false);
+  assert.equal(Object.hasOwn(res.payload, 'foundTotal'), false);
   assert.equal(res.payload.total, 1);
 });
 
