@@ -655,6 +655,23 @@ test('coldmailing stats route exposes live send counts to authenticated staff', 
   assert.equal(adminAccessCalls, 0);
 });
 
+test('coldmailing stats route reports separate live and register timings without changing the payload', async () => {
+  const callStats = createStatsRouteHarness({
+    coldmailCampaignService: {
+      getColdmailLiveStats: async () => ({ ok: true, stats: { hardBounces: 4 } }),
+      getColdmailSentRegister: async () => ({ available: true, recipients: [
+        { key: 'email:sent@example.com', email: 'sent@example.com' },
+      ], todayRecipientCounts: {} }),
+    },
+  });
+  const res = await callStats({ query: { includeRecipients: '1' } });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.stats.hardBounces, 4);
+  assert.equal(res.body.stats.sentRegister.total, 1);
+  assert.match(res.headers['server-timing'], /^live;dur=\d+, register;dur=\d+$/);
+  assert.equal(res.headers['cache-control'], 'no-store, private');
+});
+
 test('coldmailing autopilot settings route stores dashboard configuration through admin access', async () => {
   let received = null;
   const autopilot = createAutopilotRouteHarness({

@@ -1,8 +1,14 @@
 // The list and KPI are one read-only snapshot; never infer delivery from a customer status.
-async function getColdmailStatsResponse(service, includeRecipients = false) {
+async function getColdmailStatsResponse(service, includeRecipients = false, timings = null) {
   if (!includeRecipients) return service.getColdmailLiveStats();
+  const timedRead = async (name, read) => {
+    const startedAt = Date.now();
+    try { return await read(); }
+    finally { if (timings) timings[name] = Math.max(0, Date.now() - startedAt); }
+  };
   const [payload, register] = await Promise.all([
-    service.getColdmailLiveStats(), service.getColdmailSentRegister(),
+    timedRead('live', () => service.getColdmailLiveStats()),
+    timedRead('register', () => service.getColdmailSentRegister()),
   ]);
   if (!register.available || !Array.isArray(register.recipients)) {
     throw new Error('Het verzendregister is tijdelijk niet beschikbaar.');
