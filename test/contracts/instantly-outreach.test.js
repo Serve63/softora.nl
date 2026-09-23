@@ -2565,8 +2565,8 @@ test('instantly webhook rejects invalid secrets before changing data', async () 
 
 test('automatic upload selects only a designed Instantly lead and guards before API and activation', async () => {
   const campaigns = {
-    serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
-    martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd',
+    serve: '7a94c361-d83c-4857-9395-e9c5ba603f90',
+    martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c',
   };
   let harness;
   harness = createService({
@@ -2583,7 +2583,7 @@ test('automatic upload selects only a designed Instantly lead and guards before 
       'instantly-next': { id: 'instantly-next', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' },
     },
     fetchJsonWithTimeout: async (url, options) => {
-      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } };
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 3 } };
       if (url.endsWith('/leads/add')) {
         assert.equal(JSON.parse(options.body).leads[0].email, 'info@instantly-next.test');
         assert.ok(harness.writes.some((write) => write.scope === 'premium_coldmail_send_guard'));
@@ -2611,8 +2611,8 @@ test('automatic upload selects only a designed Instantly lead and guards before 
 
 test('automatic upload accepts a paused approved campaign without activating it', async () => {
   const campaigns = {
-    serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
-    martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd',
+    serve: '7a94c361-d83c-4857-9395-e9c5ba603f90',
+    martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c',
   };
   const harness = createService({
     now: '2026-09-17T09:00:00.000Z',
@@ -2622,7 +2622,7 @@ test('automatic upload accepts a paused approved campaign without activating it'
     rows: [{ id: 'paused-next', bedrijf: 'Pauze Design BV', naam: 'Nina', email: 'info@pauze-design.test', website: 'https://pauze-design.test', status: 'prospect', mail: true, verantwoordelijk: 'Servé Creusen' }],
     photoMap: { 'paused-next': { id: 'paused-next', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
     fetchJsonWithTimeout: async (url) => {
-      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 2 } };
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 2 } };
       if (url.endsWith('/leads/add')) return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'paused-lead', email: 'info@pauze-design.test', index: 0 }] } };
       return { response: { ok: true, status: 200 }, data: {} };
     },
@@ -2638,8 +2638,8 @@ test('automatic upload accepts a paused approved campaign without activating it'
 
 test('automatic upload uses targeted design-photo reads instead of the heavy photo UI state', async () => {
   const campaigns = {
-    serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
-    martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd',
+    serve: '7a94c361-d83c-4857-9395-e9c5ba603f90',
+    martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c',
   };
   const photoReads = [];
   const harness = createService({
@@ -2680,7 +2680,7 @@ test('automatic upload uses targeted design-photo reads instead of the heavy pho
       },
     },
     fetchJsonWithTimeout: async (url, options) => {
-      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 1 } };
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 1 } };
       if (url.endsWith('/leads/add')) {
         const lead = JSON.parse(options.body).leads[0];
         return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'targeted-lead', email: lead.email, index: 0 }] } };
@@ -2700,7 +2700,7 @@ test('automatic upload uses targeted design-photo reads instead of the heavy pho
 });
 
 test('automatic upload routes the design owner to Martijn even when daily rotation would choose Servé', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const harness = createService({
     autoUploadEnabled: true, replacementCampaigns: campaigns,
     rows: [{ id: 'martijn-design', bedrijf: 'Martijn ontwerp', email: 'info@martijn-design.test', website: 'https://martijn-design.test', mail: true, verantwoordelijk: 'Servé Creusen' }],
@@ -2710,7 +2710,7 @@ test('automatic upload routes the design owner to Martijn even when daily rotati
       'martijn@softora.nl': { subject: 'Design', body: 'Goedendag,\n\nMet vriendelijke groet,\nMartijn van de Ven' },
     } },
     fetchJsonWithTimeout: async (url, options) => {
-      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Martijn van de Ven Softora.nl - nieuwe leads', status: 2 } };
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Martijn van de Ven Softora.nl - frisse start', status: 2 } };
       if (url.endsWith('/leads/add')) {
         const lead = JSON.parse(options.body).leads[0];
         assert.equal(lead.custom_variables.softora_sender_name, 'Martijn van de Ven');
@@ -2731,7 +2731,7 @@ test('automatic upload routes the design owner to Martijn even when daily rotati
 });
 
 test('automatic upload stops before reservation and provider API for missing or conflicting design senders', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   for (const ownerFields of [{ verantwoordelijk: 'Team' }, { verantwoordelijk: 'Serve', senderProfileKey: 'martijn' }]) {
     const harness = createService({
       autoUploadEnabled: true, replacementCampaigns: campaigns,
@@ -2758,13 +2758,13 @@ test('automatic Instantly upload cannot send without exact campaign config or ce
   const oldMartijnCampaign = createService({
     autoUploadEnabled: true,
     replacementCampaigns: {
-      serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
+      serve: '7a94c361-d83c-4857-9395-e9c5ba603f90',
       martijn: '9a603e82-7a50-46e2-855a-5a2990a9304b',
     },
   });
   await assert.rejects(() => oldMartijnCampaign.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH' });
   assert.equal(oldMartijnCampaign.fetchCalls.length, 0);
-  const disabled = createService({ replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' } });
+  const disabled = createService({ replacementCampaigns: { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' } });
   await assert.rejects(() => disabled.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_DISABLED' });
   const integrationDisabled = createService({ instantlyEnabled: false, autoUploadEnabled: true });
   await assert.rejects(() => integrationDisabled.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_INTEGRATION_DISABLED' });
@@ -2776,15 +2776,15 @@ test('automatic Instantly upload cannot send without exact campaign config or ce
   await assert.rejects(() => withoutCampaigns.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_CAMPAIGN_CONFIG_MISMATCH' });
   assert.equal(withoutCampaigns.fetchCalls.length, 0);
   const approved = {
-    serve: '6ba410c6-d97a-4186-a414-83ba95022b1a',
-    martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd',
+    serve: '7a94c361-d83c-4857-9395-e9c5ba603f90',
+    martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c',
   };
   const separateApproved = createService({
     autoUploadEnabled: true,
     replacementCampaigns: { serve: 'legacy-serve', martijn: 'legacy-martijn' },
     autoApprovedCampaigns: approved,
     rows: [],
-    fetchJsonWithTimeout: async () => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }),
+    fetchJsonWithTimeout: async () => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 3 } }),
   });
   assert.equal((await separateApproved.service.autoUploadMailReady()).reason, 'no_mailready_instantly_leads');
   const deliveryCampaignCalls = [];
@@ -2818,18 +2818,18 @@ test('automatic Instantly upload cannot send without exact campaign config or ce
   assert.equal(malformedApproved.fetchCalls.length, 0);
   const withoutGuard = createService({
     autoUploadEnabled: true,
-    replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' },
+    replacementCampaigns: { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' },
     outboundRecipientGuardStore: null,
     rows: [{ id: 'i', bedrijf: 'Instant', email: 'info@instant.test', website: 'https://instant.test', mail: true, webdesignMailProvider: 'instantly', verantwoordelijk: 'Serve' }],
     photoMap: { i: { id: 'i', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
-    fetchJsonWithTimeout: async (url) => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }),
+    fetchJsonWithTimeout: async (url) => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 3 } }),
   });
   await assert.rejects(() => withoutGuard.service.autoUploadMailReady(), { code: 'INSTANTLY_OUTBOUND_GUARD_UNAVAILABLE' });
   assert.equal(withoutGuard.fetchCalls.filter((call) => call.url.endsWith('/leads/add')).length, 0);
 });
 
 test('automatic upload does not reactivate a completed campaign that still contains leads', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
@@ -2837,7 +2837,7 @@ test('automatic upload does not reactivate a completed campaign that still conta
     photoMap: { 'new-design': { id: 'new-design', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
     remoteInstantlyLeads: [{ id: 'existing-lead', email: 'already-there@company.test', status: 1 }],
     fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
-      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 3 } }
       : { response: { ok: true, status: 200 }, data: { status: 1 } },
   });
 
@@ -2851,7 +2851,7 @@ test('automatic upload does not reactivate a completed campaign that still conta
 });
 
 test('automatic Instantly upload appends without truncating an already large legacy guard', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const originalEntries = Array.from({ length: 1001 }, (_, index) => ({ recipientEmail: `entry${index}@old.test`, recipientId: `old-entry-${index}` }));
   const originalRecipients = Array.from({ length: 3000 }, (_, index) => ({ recipientEmail: `recipient${index}@old.test`, recipientId: `old-recipient-${index}` }));
   const harness = createService({
@@ -2861,7 +2861,7 @@ test('automatic Instantly upload appends without truncating an already large leg
     photoMap: { 'new-auto': { id: 'new-auto', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
     coldmailSendGuard: { entries: originalEntries, recipientEntries: originalRecipients },
     fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
-      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 1 } }
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 1 } }
       : { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'new-lead', email: 'new@instantly-new.test', index: 0 }] } },
   });
   assert.equal((await harness.service.autoUploadMailReady()).uploaded, 1);
@@ -2873,14 +2873,14 @@ test('automatic Instantly upload appends without truncating an already large leg
 });
 
 test('automatic Instantly upload resumes an already accepted lead without adding it twice', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
     rows: [{ id: 'accepted-auto', bedrijf: 'Al geaccepteerd', email: 'accepted@instantly-old.test', verantwoordelijk: 'Serve', instantlyCampaignId: campaigns.serve,
       instantlyManualUploadId: 'instantly-auto-20260915-serve', instantlyLeadId: 'accepted-lead', instantlyStatus: 'synced', instantlySyncedAt: '2026-09-15T08:00:00Z' }],
     fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
-      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 3 } }
       : { response: { ok: true, status: 200 }, data: { status: 1 } },
   });
   const result = await harness.service.autoUploadMailReady();
@@ -2890,7 +2890,7 @@ test('automatic Instantly upload resumes an already accepted lead without adding
 });
 
 test('automatic upload never reactivates an accepted lead whose design owner conflicts with the campaign', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const harness = createService({
     autoUploadEnabled: true, replacementCampaigns: campaigns,
     rows: [{ id: 'wrong-owner', email: 'wrong-owner@company.test', verantwoordelijk: 'Martijn',
@@ -2906,10 +2906,10 @@ test('automatic AirMail campaigns do not accept personal mailboxes even if legac
   const harness = createService({
     autoUploadEnabled: true,
     blockPersonalMailboxDomains: false,
-    replacementCampaigns: { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' },
+    replacementCampaigns: { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' },
     rows: [{ id: 'personal', bedrijf: 'Een bedrijf', email: 'bedrijf@gmail.com', website: 'https://bedrijf.test', mail: true }],
     photoMap: { personal: { id: 'personal', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
-    fetchJsonWithTimeout: async () => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }),
+    fetchJsonWithTimeout: async () => ({ response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 3 } }),
   });
   const result = await harness.service.autoUploadMailReady();
   assert.equal(result.reason, 'no_mailready_instantly_leads');
@@ -2918,7 +2918,7 @@ test('automatic AirMail campaigns do not accept personal mailboxes even if legac
 });
 
 test('automatic upload releases the provisional guard and writes no permanent guard when the local queue persist fails', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
@@ -2926,7 +2926,7 @@ test('automatic upload releases the provisional guard and writes no permanent gu
     rows: [{ id: 'queue-fail', bedrijf: 'Wachtrij Faal BV', email: 'queue-fail@company.test', website: 'https://queue-fail.test', mail: true, verantwoordelijk: 'Serve' }],
     photoMap: { 'queue-fail': { id: 'queue-fail', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
     fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
-      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 3 } }
       : { response: { ok: true, status: 200 }, data: { status: 1 } },
   });
   await assert.rejects(() => harness.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_LOCAL_RESERVATION_FAILED' });
@@ -2939,7 +2939,7 @@ test('automatic upload releases the provisional guard and writes no permanent gu
 });
 
 test('automatic upload rolls back the local queue mark and releases when the legacy guard write fails', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
@@ -2947,7 +2947,7 @@ test('automatic upload rolls back the local queue mark and releases when the leg
     rows: [{ id: 'guard-fail', bedrijf: 'Guard Faal BV', email: 'guard-fail@company.test', website: 'https://guard-fail.test', mail: true, verantwoordelijk: 'Serve' }],
     photoMap: { 'guard-fail': { id: 'guard-fail', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
     fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
-      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } }
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 3 } }
       : { response: { ok: true, status: 200 }, data: { status: 1 } },
   });
   await assert.rejects(() => harness.service.autoUploadMailReady(), { code: 'INSTANTLY_SAFE_GUARD_WRITE_FAILED' });
@@ -2957,7 +2957,7 @@ test('automatic upload rolls back the local queue mark and releases when the leg
 });
 
 test('automatic upload persists the local queue as a single-row upsert instead of a full replace', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const harness = createService({
     autoUploadEnabled: true,
     replacementCampaigns: campaigns,
@@ -2970,7 +2970,7 @@ test('automatic upload persists the local queue as a single-row upsert instead o
       'instantly-single': { id: 'instantly-single', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' },
     },
     fetchJsonWithTimeout: async (url) => {
-      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 3 } };
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 3 } };
       if (url.endsWith('/leads/add')) return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'single-lead', email: 'single@company.test', index: 0 }] } };
       return { response: { ok: true, status: 200 }, data: { status: 1 } };
     },
@@ -2986,7 +2986,7 @@ test('automatic upload persists the local queue as a single-row upsert instead o
 });
 
 test('automatic upload links the accepted provider lead without rereading every DataOps page', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const removed = [];
   const harness = createService({
     autoUploadEnabled: true,
@@ -2996,7 +2996,7 @@ test('automatic upload links the accepted provider lead without rereading every 
     rows: [{ id: 'no-reread', bedrijf: 'Geen Herlezing BV', email: 'info@geen-herlezing.test', website: 'https://geen-herlezing.test', mail: true, verantwoordelijk: 'Serve' }],
     photoMap: { 'no-reread': { id: 'no-reread', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
     fetchJsonWithTimeout: async (url) => {
-      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 2 } };
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 2 } };
       if (url.endsWith('/leads/add')) return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'accepted-without-reread', email: 'info@geen-herlezing.test', index: 0 }] } };
       return { response: { ok: true, status: 200 }, data: {} };
     },
@@ -3012,7 +3012,7 @@ test('automatic upload links the accepted provider lead without rereading every 
 });
 
 test('automatic upload recovers an accepted queued lead by exact remote identity without adding it twice', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const uploadId = 'instantly-auto-20260921T083006-serve';
   const removed = [];
   const harness = createService({
@@ -3029,7 +3029,7 @@ test('automatic upload recovers an accepted queued lead by exact remote identity
       payload: { softora_customer_id: 'instantly_queue_gitz', softora_instantly_upload_id: uploadId },
     }],
     fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
-      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 2 } }
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 2 } }
       : { response: { ok: true, status: 200 }, data: {} },
   });
 
@@ -3044,7 +3044,7 @@ test('automatic upload recovers an accepted queued lead by exact remote identity
 });
 
 test('automatic upload clears a stranded local queue mark when the exact lead is absent at Instantly', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const uploadId = 'instantly-auto-20260921T090006-serve';
   const harness = createService({
     autoUploadEnabled: true,
@@ -3056,7 +3056,7 @@ test('automatic upload clears a stranded local queue mark when the exact lead is
     }],
     remoteInstantlyLeads: [],
     fetchJsonWithTimeout: async (url) => url.includes('/campaigns/')
-      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl', status: 2 } }
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 2 } }
       : { response: { ok: true, status: 200 }, data: {} },
   });
 
@@ -3076,7 +3076,7 @@ test('automatic upload clears a stranded local queue mark when the exact lead is
 });
 
 test('exact Instantly capacity uses upload safety gates and design-owner campaign routing', async () => {
-  const campaigns = { serve: '6ba410c6-d97a-4186-a414-83ba95022b1a', martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd' };
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const rows = [
     { id: 'serve-ready', bedrijf: 'Serve Klaar', email: 'info@serve-klaar.test', website: 'https://serve-klaar.test', mail: true, verantwoordelijk: 'Serve' },
     { id: 'martijn-ready', bedrijf: 'Martijn Klaar', email: 'info@martijn-klaar.test', website: 'https://martijn-klaar.test', mail: true, verantwoordelijk: 'Martijn' },
@@ -3105,7 +3105,7 @@ test('exact Instantly capacity uses upload safety gates and design-owner campaig
     fetchJsonWithTimeout: async (url) => ({
       response: { ok: true, status: 200 },
       data: {
-        name: url.includes(campaigns.martijn) ? 'Martijn van de Ven Softora.nl - nieuwe leads' : 'Servé Creusen Softora.nl',
+        name: url.includes(campaigns.martijn) ? 'Martijn van de Ven Softora.nl - frisse start' : 'Servé Creusen Softora.nl - frisse start',
         status: 2,
       },
     }),
@@ -3123,4 +3123,46 @@ test('exact Instantly capacity uses upload safety gates and design-owner campaig
   assert.equal(capacity.campaigns.martijn.queued, 1);
   assert.equal(capacity.queuedTotal, 3);
   assert.equal(capacity.rejectedBySafetyChecks, 2);
+});
+
+test('automatic upload accepts exact approved draft campaigns without launching them', async () => {
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
+  const harness = createService({
+    autoUploadEnabled: true, replacementCampaigns: campaigns, rows: [],
+    fetchJsonWithTimeout: async (url) => ({ response: { ok: true, status: 200 }, data: {
+      name: url.includes(campaigns.martijn) ? 'Martijn van de Ven Softora.nl - frisse start' : 'Servé Creusen Softora.nl - frisse start',
+      status: 0,
+    } }),
+  });
+  const capacity = await harness.service.getUploadCapacity();
+  assert.equal(capacity.campaigns.serve.status, 0);
+  assert.equal(capacity.campaigns.martijn.status, 0);
+  const result = await harness.service.autoUploadMailReady();
+  assert.equal(result.reason, 'no_mailready_instantly_leads');
+  assert.equal(harness.fetchCalls.filter((call) => call.url.includes('/activate')).length, 0);
+});
+
+test('automatic upload relinks an unsent lead moved from the paused old campaign to the new draft', async () => {
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
+  const harness = createService({
+    autoUploadEnabled: true, replacementCampaigns: campaigns,
+    rows: [{ id: 'moved-customer', email: 'moved@company.test', verantwoordelijk: 'Serve',
+      instantlyCampaignId: '6ba410c6-d97a-4186-a414-83ba95022b1a',
+      instantlyLeadId: 'moved-lead', instantlyManualUploadId: 'instantly-auto-old-serve', instantlyStatus: 'synced' }],
+    remoteInstantlyLeadsByCampaign: {
+      [campaigns.serve]: [{ id: 'moved-lead', email: 'moved@company.test',
+        payload: { softora_customer_id: 'moved-customer', softora_instantly_upload_id: 'instantly-auto-old-serve' }, status: 1 }],
+      '6ba410c6-d97a-4186-a414-83ba95022b1a': [],
+    },
+    fetchJsonWithTimeout: async (url) => ({ response: { ok: true, status: 200 }, data: {
+      name: url.includes(campaigns.martijn) ? 'Martijn van de Ven Softora.nl - frisse start' : 'Servé Creusen Softora.nl - frisse start',
+      status: 0,
+    } }),
+  });
+  const result = await harness.service.autoUploadMailReady();
+  assert.equal(result.reason, 'moved_leads_linked');
+  assert.equal(result.movedLinks, 1);
+  assert.equal(harness.getRows()[0].instantlyCampaignId, campaigns.serve);
+  assert.equal(harness.getRows()[0].instantlyLeadId, 'moved-lead');
+  assert.equal(harness.fetchCalls.filter((call) => call.url.endsWith('/leads/add') || call.url.includes('/activate')).length, 0);
 });
