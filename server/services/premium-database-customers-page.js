@@ -40,7 +40,7 @@ function createPremiumDatabaseCustomersPageCoordinator(deps = {}) {
       metaOnly: metaValue === '1' || metaValue === 'true',
       bypassReadFailureCooldown: true,
       suppressReadFailureCooldown: true,
-      suppressTransientReadFailureLog: true,
+      suppressTransientReadFailureLog: false,
     });
     if (!page) {
       return res.status(503).json({ ok: false, error: 'De officiële klantdatabase kon niet volledig worden gelezen.' });
