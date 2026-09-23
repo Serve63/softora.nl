@@ -11,7 +11,7 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; }
-.app { width: 100%; min-height: 100dvh; }
+.app { width: 100%; min-height: 100dvh; overflow-x: clip; }
 .app::before { content: ""; display: block; height: 5px; background: linear-gradient(90deg, #9b2355, #cf5c88 65%, #f0b5cb); }
 header { height: 52px; display: flex; align-items: center; gap: 9px; }
 .brand { font-size: 24px; font-weight: 850; letter-spacing: -3px; text-decoration: none; color: var(--ink); }
@@ -31,7 +31,8 @@ nav { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin: 8px
 .day[aria-pressed=true] { background: var(--accent); color: #fff; }
 .training-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 28px 0 24px; }
 h2 { font-size: clamp(26px, 3vw, 38px); line-height: 1.08; letter-spacing: -.05em; margin: 0 0 4px; }
-.exercise { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, .8fr); column-gap: 32px; align-items: center; margin-inline: calc(-1 * var(--row-gutter)); padding: 22px var(--row-gutter); border-top: 1px solid var(--line); }
+.exercise { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, .8fr); column-gap: 32px; align-items: center; margin-inline: calc(-1 * var(--row-gutter)); padding: 22px var(--row-gutter); }
+.exercise::before { content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%); border-top: 1px solid var(--line); pointer-events: none; }
 .exercise-top { display: flex; gap: 11px; align-items: center; min-width: 0; grid-column: 1; grid-row: 1; }
 .number { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 5px; background: var(--soft); color: var(--accent); font-size: 8px; font-weight: 650; flex-shrink: 0; }
 .exercise h3 { font-size: 14px; letter-spacing: .1px; margin: 0; flex: 1; min-width: 0; }
@@ -60,7 +61,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 /* Completion is green; the full exercise changes only after every set. */
 .set[aria-pressed=true] { background: #eaf7ed; border-color: #9bcba6; color: #216b36; }
 .set[aria-pressed=true] .tick { background: #278342; border-color: #278342; color: #fff; }
-.exercise.complete { background: #edf8ef; border-color: #b9d9c0; border-radius: 0; box-shadow: none; }
+.exercise.complete::before { background: #edf8ef; border-color: #b9d9c0; }
 .exercise.complete h3, .exercise.complete .weight { color: #216b36; }
 .exercise.complete .exercise-photo { border-color: #9bcba6; }
 
