@@ -28,8 +28,9 @@
         const doc = root.document;
         const state = options.state || {};
         const metrics = root.SoftoraDatabaseSystemMailCount;
+        const latestMetrics = metrics?.getMetricReadiness?.();
         await Promise.allSettled([
-            metrics?.refreshTodaySentCount?.(),
+            latestMetrics?.statsFresh === true ? undefined : metrics?.refreshTodaySentCount?.(),
             metrics?.loadPersistedDealCount?.({ force: true }),
         ]);
         const verified = metrics?.getMetricReadiness?.();
