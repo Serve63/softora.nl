@@ -1668,7 +1668,7 @@ test('Instantly status separates designs to upload, current campaign queue, fail
   const status = require('../../assets/premium-database-instantly-status.js');
   const normalize = (value) => String(value || '').toLowerCase();
   const design = { status: 'prospect', webdesignMailProvider: 'instantly', hasPhoto: true, hasMockup: true };
-  const queued = { status: 'prospect', instantlyLeadId: 'lead-1', instantlyCampaignId: '6ba410c6-d97a-4186-a414-83ba95022b1a', instantlyStatus: 'synced' };
+  const queued = { status: 'prospect', instantlyLeadId: 'lead-1', instantlyCampaignId: '7a94c361-d83c-4857-9395-e9c5ba603f90', instantlyStatus: 'synced' };
   const failed = { ...design, instantlyStatus: 'provider_not_found', lastColdmailProvider: 'instantly' };
   const sent = { ...queued, instantlyStatus: 'sent', instantlyEmailSentAt: '2026-09-21T09:00:00.000Z' };
 
@@ -1676,8 +1676,9 @@ test('Instantly status separates designs to upload, current campaign queue, fail
   assert.equal(status.isCurrentCampaignPrepared(design, normalize), false);
   assert.equal(status.isCurrentCampaignPrepared(queued, normalize), true);
   assert.equal(status.getCurrentCampaignOwner(queued), 'serve');
-  assert.equal(status.getCurrentCampaignOwner({ instantlyCampaignId: '79b1f8c0-35de-4687-95ea-8384c4c491bd' }), 'martijn');
-  assert.equal(status.getCurrentCampaignOwner({ instantlyCampaignId: '9a603e82-7a50-46e2-855a-5a2990a9304b' }), 'martijn');
+  assert.equal(status.getCurrentCampaignOwner({ instantlyCampaignId: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' }), 'martijn');
+  assert.equal(status.getCurrentCampaignOwner({ instantlyCampaignId: '6ba410c6-d97a-4186-a414-83ba95022b1a' }), '');
+  assert.equal(status.getCurrentCampaignOwner({ instantlyCampaignId: '9a603e82-7a50-46e2-855a-5a2990a9304b' }), '');
   assert.equal(status.isReadyForUpload(queued, normalize), false);
   assert.equal(status.isReadyForUpload(failed, normalize), false);
   assert.equal(status.isCurrentCampaignPrepared(sent, normalize), false);
@@ -2664,7 +2665,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260726a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260921-mailready-parity/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
   assert.match(webdesignVariantPickerScriptSource, /V1_VARIANT = "v1-prompt-only"/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
   assert.match(webdesignVariantPickerScriptSource, /return Promise\.resolve\(V2_VARIANT\)/);
@@ -2924,7 +2925,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   );
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260917-source/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260921-mailready-parity/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260914-provider/);
@@ -3083,7 +3084,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260817a/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260921-mailready-parity/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeVariant\(variant\) !== "v2-visual-dna"/);
@@ -3095,7 +3096,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /keepalive: true/);
   assert.match(webdesignActionScriptSource, /Webdesign-opdracht niet gevonden\. Probeer opnieuw\./);
-  assert.match(webdesignActionScriptSource, /if \(outcome === "success" \|\| outcome === "reconcile"\) queueFinishedPhotoRefresh\(job\.customerId, outcome === "success"\);/);
+  assert.match(webdesignActionScriptSource, /if \(outcome === "success" \|\| outcome === "reconcile"\) queueFinishedPhotoRefresh\(job\.customerId\);/);
   assert.match(webdesignActionScriptSource, /if \(message\) setStatusMessage\(message, "error"\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /Geen geldige website gevonden voor " \+ target\.bedrijf \+ "\.", "error", true/);
   assert.match(webdesignActionScriptSource, /function resumePendingJobs\(\)/);
@@ -3107,7 +3108,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignActionScriptSource, /schedulePoll\(jobId, resolveJobPollDelay\(job\)\);/);
   assert.match(webdesignActionScriptSource, /const FINISHED_PHOTO_REFRESH_DELAY_MS = 900;/);
   assert.match(webdesignActionScriptSource, /const AUTO_MOCKUP_IDLE_DELAY_MS = 350;/);
-  assert.match(webdesignActionScriptSource, /function queueFinishedPhotoRefresh\(customerId, announceSuccess\)/);
+  assert.match(webdesignActionScriptSource, /function queueFinishedPhotoRefresh\(customerId\)/);
   assert.match(webdesignActionScriptSource, /function pruneExpiredPendingJobs\(\)/);
   assert.match(webdesignActionScriptSource, /if \(!isPendingJobFresh\(pendingJob\)\) return;/);
   assert.match(webdesignActionScriptSource, /setPendingJob\(pendingJob, \{ deferRender: true \}\); schedulePoll\(pendingJob\.jobId, \(restoredCount % 80\) \* BATCH_POLL_STAGGER_MS\);/);
@@ -3123,8 +3124,10 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\)/);
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260921-mailready-parity/);
-  assert.match(webdesignActionScriptSource, /Webdesign klaar\. De lead staat nu bij Mailklaar\./);
+  assert.match(pageSource, /assets\/premium-database-instantly-status\.js\?v=20260923-current-campaigns/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
+  assert.doesNotMatch(webdesignActionScriptSource, /webdesigns klaar en naar Mailklaar verplaatst|Webdesign klaar\. De lead staat nu bij Mailklaar\./);
+  assert.match(webdesignActionScriptSource, /costReporter\.consume\(customerIds\)/);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \}; const databaseSortedLists = window\.SoftoraDatabaseSortedLists\.create/);
   assert.match(pageSource, /function setDatabaseTableBodyHtml\(html\) \{[\s\S]*data-photo-loaded=[\s\S]*databaseRenderRuntime\.tableStructureSignature === structuralSignature[\s\S]*nodes\.tbody\.innerHTML = nextHtml;/);
   assert.match(pageSource, /function getCustomerSearchHaystack\(customer\)/);
@@ -4477,6 +4480,65 @@ test('premium database webdesign action fails closed when the V2 picker is unava
   assert.match(messages[0].message, /V2-webdesigngenerator kon niet worden geladen/);
 });
 
+test('premium database webdesign action refreshes completed designs without a green completion notice', async () => {
+  const messages = [];
+  const timers = [];
+  const chargeLabels = [];
+  const refreshed = [];
+  const document = {
+    getElementById: () => null,
+    createElement: () => ({ ...createClassListNode(), style: {} }),
+    querySelectorAll: () => chargeLabels,
+    head: { appendChild() {} },
+    body: {
+      appendChild(node) {
+        node.parentNode = { removeChild() {} };
+        chargeLabels.push(node);
+      },
+    },
+  };
+  const webdesignActionClient = loadDatabaseWebdesignActionClient({
+    document,
+    setTimeout(callback, delay) { const timer = { callback, delay }; timers.push(timer); return timer; },
+    clearTimeout(timer) { const index = timers.indexOf(timer); if (index >= 0) timers.splice(index, 1); },
+    fetch: async (_url, options) => ({
+      ok: true,
+      json: async () => ({
+        job: {
+          id: JSON.parse(options.body).jobId,
+          customerId: 'customer-done',
+          company: 'Afgerond ontwerp',
+          status: 'done',
+        },
+      }),
+    }),
+  });
+  const controller = webdesignActionClient.createController({
+    state: { klanten: [{ id: 'customer-done', bedrijf: 'Afgerond ontwerp', website: 'softora.nl', dom: 'softora.nl', websitePhoto: '' }] },
+    escapeHtml: String,
+    shouldShowWebsitePhoto: () => true,
+    isValidWebsitePhotoDataUrl: () => false,
+    resolveCustomerWebsiteUrl: () => 'https://softora.nl/',
+    isWebdesignPhotoEligible: () => true,
+    openWebsitePhotoPreview() {},
+    setStatusMessage(message, tone, autoClear) { messages.push({ message, tone, autoClear }); },
+    renderPage() {},
+    refreshPhotos: async (context) => { refreshed.push(context); },
+  });
+
+  const result = await controller.generateForCustomer('customer-done');
+  assert.equal(result.done, true);
+  const refreshTimer = timers.find((timer) => timer.delay === 900);
+  assert.ok(refreshTimer);
+  refreshTimer.callback();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(refreshed.length, 1);
+  assert.equal(refreshed[0].customerId, 'customer-done');
+  assert.equal(messages.some((item) => item.tone === 'success'), false);
+  assert.equal(messages.some((item) => /klaar en naar Mailklaar|Webdesign klaar/.test(item.message)), false);
+});
+
 test('premium database webdesign action keeps a failed job visible and never announces false success', async () => {
   const messages = [];
   const chargeLabels = [];
@@ -5242,7 +5304,7 @@ test('Instantly separates waiting leads from confirmed deliveries', () => {
     { id: 'queued', status: 'prospect', instantlyQueueStatus: 'registered' },
     { id: 'confirmed', status: 'gemaild', instantlyLeadId: 'lead-sent', instantlyStatus: 'sent', instantlyEmailSentAt: '2026-09-10T08:00:00.000Z' },
     { id: 'manual', status: 'gemaild', instantlyLeadId: 'lead-manual', instantlyStatus: 'sent', instantlyManualSentClassification: 'user-requested-unverified' },
-    { id: 'current-queued', status: 'prospect', instantlyLeadId: 'lead-current', instantlyCampaignId: '6ba410c6-d97a-4186-a414-83ba95022b1a', instantlyStatus: 'synced', hasPhoto: true, hasMockup: true },
+    { id: 'current-queued', status: 'prospect', instantlyLeadId: 'lead-current', instantlyCampaignId: '7a94c361-d83c-4857-9395-e9c5ba603f90', instantlyStatus: 'synced', hasPhoto: true, hasMockup: true },
     { id: 'provider-missing', status: 'prospect', instantlyStatus: 'provider_not_found', lastColdmailProvider: 'instantly', hasPhoto: true, hasMockup: true },
   ];
   const mailed = item => item.status === 'gemaild' || Boolean(item.lastColdmailSentAt);
@@ -5272,12 +5334,14 @@ test('Instantly mail-ready menu and list mirror both current unsent campaigns an
     state: { klanten: [] }, nodes: {}, escapeHtml: String,
     normalizeDatabaseStatus: value => String(value || ''),
   });
-  const serve = { id: 'serve', email: 'serve@example.test', status: 'prospect', instantlyLeadId: 'serve-lead', instantlyCampaignId: '6ba410c6-d97a-4186-a414-83ba95022b1a', instantlyStatus: 'synced' };
-  const martijn = { ...serve, id: 'martijn', email: 'martijn@example.test', instantlyLeadId: 'martijn-lead', instantlyCampaignId: '9a603e82-7a50-46e2-855a-5a2990a9304b', instantlyStatus: 'paused' };
+  const serve = { id: 'serve', email: 'serve@example.test', status: 'prospect', instantlyLeadId: 'serve-lead', instantlyCampaignId: '7a94c361-d83c-4857-9395-e9c5ba603f90', instantlyStatus: 'synced' };
+  const martijn = { ...serve, id: 'martijn', email: 'martijn@example.test', instantlyLeadId: 'martijn-lead', instantlyCampaignId: 'e4f7df3a-6c53-4c03-911c-beb758d9231c', instantlyStatus: 'paused' };
   const contacts = [
     serve, martijn,
     { id: 'design-only', status: 'prospect', webdesignMailProvider: 'instantly', hasPhoto: true, hasMockup: true },
     { ...serve, id: 'old-campaign', instantlyCampaignId: 'old-campaign' },
+    { ...serve, id: 'retired-serve', instantlyCampaignId: '6ba410c6-d97a-4186-a414-83ba95022b1a' },
+    { ...martijn, id: 'retired-martijn', instantlyCampaignId: '9a603e82-7a50-46e2-855a-5a2990a9304b' },
     { ...serve, id: 'missing', instantlyStatus: 'provider_not_found' },
     { ...serve, id: 'reservation-only', instantlyLeadId: '' },
     { ...serve, id: 'already-sent', instantlyEmailSentAt: '2026-09-21T09:00:00.000Z' },
