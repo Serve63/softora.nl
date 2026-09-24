@@ -16,17 +16,30 @@ function createMailboxAiRepository({ getClient } = {}) {
   async function enqueue(sources) {
     if (!sources.length) return [];
     const unique = [...new Map(sources.map((source) => [source.id, source])).values()];
-    const signal = AbortSignal.timeout(1200), rows = [];
+    const rows = [];
+    async function recoverReady(items) {
+      // A slow eligibility RPC must never discard already paid, ready decisions.
+      try {
+        return await run((client) => client.from(TABLE).select('id,status,decision,version')
+          .in('id', items.map((source) => source.id)).eq('status', 'ready'),
+        AbortSignal.timeout(3000), 3000);
+      } catch (_) { return []; }
+    }
     async function batch(items) {
-      const read = () => run((client) => client.rpc('softora_mailbox_ai_states', { p_ids: items.map((source) => source.id) }), signal);
-      const existing = await read(), known = new Set((existing || []).map((row) => row.id));
-      const missing = items.filter((source) => !known.has(source.id));
-      if (!missing.length) return existing;
-      await run((client) => client.from(TABLE).upsert(missing.map((source) => ({
-        id: source.id, version: VERSION, account_email: source.account,
-        message_key: source.messageKey, source, status: source.unsupported ? 'failed' : 'queued',
-      })), { onConflict: 'id', ignoreDuplicates: true }), signal);
-      return read();
+      try {
+        const read = () => run((client) => client.rpc('softora_mailbox_ai_states', { p_ids: items.map((source) => source.id) }),
+          AbortSignal.timeout(1800), 1800);
+        const existing = await read(), known = new Set((existing || []).map((row) => row.id));
+        const missing = items.filter((source) => !known.has(source.id));
+        if (!missing.length) return existing;
+        await run((client) => client.from(TABLE).upsert(missing.map((source) => ({
+          id: source.id, version: VERSION, account_email: source.account,
+          message_key: source.messageKey, source, status: source.unsupported ? 'failed' : 'queued',
+        })), { onConflict: 'id', ignoreDuplicates: true }), AbortSignal.timeout(1800), 1800);
+        return read();
+      } catch (_) {
+        return recoverReady(items);
+      }
     }
     for (let offset = 0; offset < unique.length; offset += 160) {
       const chunks = [];
