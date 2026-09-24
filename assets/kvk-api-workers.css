@@ -6,7 +6,7 @@
 .header-controls .transfer-button:disabled{opacity:1;cursor:not-allowed}
 .header-controls svg{width:14px;height:14px;flex:none;stroke-width:1.7}
 .kvk-api-workers-open:focus-visible,.kvk-api-workers-dialog button:focus-visible{outline:2px solid #8e2f5f;outline-offset:3px}
-.kvk-api-workers-dialog{width:min(420px,calc(100vw - 28px));max-height:calc(100vh - 28px);padding:0;outline:none;border:1px solid #e7dce2;border-radius:13px;background:#fff;color:#2c2830;box-shadow:0 8px 28px rgba(65,43,54,.12);font-family:Inter,system-ui,sans-serif}
+.kvk-api-workers-dialog{width:min(420px,calc(100vw - 28px));max-height:calc(100vh - 28px);min-height:min(340px,calc(100vh - 28px));padding:0;outline:none;border:1px solid #e7dce2;border-radius:13px;background:#fff;color:#2c2830;box-shadow:0 8px 28px rgba(65,43,54,.12);font-family:Inter,system-ui,sans-serif}
 .kvk-api-workers-dialog::backdrop{background:transparent;backdrop-filter:none}
 .kvk-api-workers-dialog__head{display:flex;align-items:flex-start;justify-content:space-between;padding:19px 20px 14px;border-bottom:1px solid #f0e8ec}
 .kvk-api-workers-dialog__head h2{margin:0;font:600 19px Oswald,sans-serif;letter-spacing:.1px}
@@ -34,3 +34,4 @@
 .kvk-api-workers-dialog__row:last-of-type{border-bottom:0;margin-bottom:10px}
 .kvk-api-workers-dialog input:focus-visible{outline:2px solid #8e2f5f;outline-offset:2px}
 @media(max-width:420px){.kvk-api-workers-dialog__count{flex-direction:column;gap:3px;align-items:flex-start}.kvk-api-workers-dialog__actions{gap:8px}}
+

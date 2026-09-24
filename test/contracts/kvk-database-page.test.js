@@ -116,10 +116,10 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijvendatabase<\/h1>/);
-  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924b/);
+  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924f/);
   assert.match(redesignSource, /\.planning-panel \.location-button\{grid-template-columns:13px minmax\(0,1fr\) auto;column-gap:6px;padding-left:12px\}/);
   assert.match(redesignSource, /\.planning-panel \.rank\{width:13px;height:13px;font-size:6px;line-height:1\}/);
-  assert.match(pageSource, /<button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload/);
+  assert.match(pageSource, /<button id="kvk-upload-open" class="transfer-button" type="button" aria-label="Upload naar mailsysteem"[^>]*>Upload/);
   assert.doesNotMatch(pageSource, /<h2 class="fixed-section-title">Onderzoeksvoortgang<\/h2>/);
   assert.match(redesignSource, /\.inventory-grid \.stat-card-directory__open,\.research-grid \.stat-card-directory__open\{display:inline-flex!important;/);
   assert.doesNotMatch(redesignSource, /\.stat-card:focus-within/);
@@ -176,7 +176,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260923-short-websites/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260924-robot-label/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -417,7 +417,7 @@ test('kvk database shows every Robot result and only material Controller correct
   assert.match(html, /Geen mail/);
   assert.match(html, /0612345678/);
   assert.match(html, /Robot/);
-  assert.match(html, /Luna 5\.6 Max/);
+  assert.doesNotMatch(html, /Luna 5\.6 Max/);
   assert.match(html, /href="https:\/\/voorbeeld\.nl"[^>]*>voorbeeld\.nl<\/a>/);
   assert.doesNotMatch(html, />https?:\/\//i);
   assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
@@ -549,7 +549,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260914-fast-progress/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260923-delta-style/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260924-upload-refresh/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260917-control-orange/);
   assert.match(pageSource, /id="companies-control-room-last60"><span class="stat-delta-added"[^>]*>\+—<\/span><span class="stat-delta-removed"[^>]*>−—<\/span>/);
   assert.match(metricsSource, /companies-successful-found/);
@@ -566,7 +566,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.match(metricsSource, /unusable_grade_activity/);
   assert.match(metricsSource, /unusableGrades\['3'\]/);
   assert.match(metricsSource, /deps\.window\.setInterval\(controller\.renderMetrics, 1000\)/);
-  assert.match(metricsSource, /count > 0 \? '\+' : ''/);
+  assert.match(metricsSource, /count >= 0 \? '\+' : ''/);
   assert.match(metricsSource, /classList\.toggle\('is-negative', count < 0\)/);
   assert.match(metricsStyles, /\.stat-delta-number/);
   assert.match(redesignStyles, /\.inventory-grid \.stat-delta,\.research-grid \.stat-delta\{display:flex!important/);
@@ -707,13 +707,47 @@ test('KVK header shows the disabled mail upload action without a settings back l
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const redesignStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-redesign.css'), 'utf8');
   assert.doesNotMatch(pageSource, /data-settings-module-back-host|settings-module-back\.(?:js|css)/);
-  assert.match(pageSource, /class="header-controls">\s*<button id="kvk-api-workers-open"[^>]*>Werkers[\s\S]*?<\/button>\s*<button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload/);
+  assert.match(pageSource, /class="header-controls">\s*<button id="kvk-api-workers-open"[^>]*>Werkers[\s\S]*?<\/button>\s*<button id="kvk-upload-open" class="transfer-button" type="button" aria-label="Upload naar mailsysteem"[^>]*>Upload/);
   const workerStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-api-workers.css'), 'utf8');
   assert.match(workerStyles, /min-height:32px/);
   assert.match(workerStyles, /'Oswald',sans-serif/);
   assert.match(workerStyles, /\.kvk-api-workers-dialog::backdrop\{background:transparent;backdrop-filter:none\}/);
-  assert.match(pageSource, /kvk-api-workers\.css\?v=20260924b/);
+  assert.match(pageSource, /kvk-api-workers\.css\?v=20260924-size/);
   assert.doesNotMatch(pageSource, /id="kvk-worker-status"/);
   assert.match(pageSource, /id="companies-total">0<\/strong>\s*<\/div>\s*<div class="stat-delta"><span class="stat-delta-label">Alles gevonden<\/span>/);
   assert.ok(pageSource.indexOf('/assets/kvk-database-worker-status.js') < pageSource.indexOf('/assets/kvk-database.js'));
+});
+
+ test('planning aligns its content into fixed table-like columns', () => {
+ const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../assets/kvk-database-redesign.css'), 'utf8');
+ assert.match(css, /grid-template-columns:repeat\(8,minmax\(0,1fr\)\)/);
+ assert.match(css, /\.planning-panel \.location-main\{display:contents\}/);
+ });
+
+test('Robot activities show one role label without a model subtitle', () => {
+ const { activityRowHtml } = require('../../assets/kvk-database-luna-errors');
+ for (const model of ['Sol 5.6 Xhigh', 'Robot']) {
+ const html = activityRowHtml({ found_by_role_label: 'Robot', found_by_model_label: model });
+ assert.match(html, /<strong>Robot<\/strong><\/span>/);
+ assert.doesNotMatch(html, /<span>(Sol 5.6 Xhigh|Robot)<\/span>/);
+ }
+ assert.match(activityRowHtml({found_by_role_label:'Searcher', found_by_model_label:'Sol 6 Max'}), /Sol 6 Max/);
+});
+
+test('planning checks and progress align with phone and email columns', () => {
+ const css = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-redesign.css'), 'utf8');
+ assert.match(css, /\.location-statuses\{grid-column:5;padding-left:9px/);
+ assert.match(css, /\.location-stage-progress\{grid-column:6;padding-left:9px/);
+ assert.match(css, /\.latest-treated-panel td\{width:12.5%\}/);
+});
+
+test('activity deltas keep a sign at zero and use the short period label', () => {
+ const { renderLast60Delta } = require('../../assets/kvk-database-metrics');
+ for (const [value, expected] of [[0,'+0'],[7,'+7'],[-3,'-3']]) {
+ const number = {}, label = {}; const classes = {};
+ renderLast60Delta({querySelector: selector => selector === '.stat-delta-number' ? number : label, classList:{toggle:(key,value)=>{classes[key]=value;}}},value);
+ assert.equal(number.textContent, expected);
+ assert.equal(label.textContent,'60m');
+ assert.equal(classes['is-negative'],value<0);
+ }
 });

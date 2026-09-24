@@ -502,6 +502,34 @@ function createMailboxIndexStore(deps = {}) {
       .map((message) => buildProviderMessageRow({ ...message, provider: normalizedProvider }))
       .filter(Boolean);
     if (!rows.length) return { ok: true, data: [], upserted: 0 };
+    // Instantly's later list responses can omit emoji that a delivered reply
+    // proves were sent. A routine sync must not overwrite that exact copy.
+    const unprovenSentKeys = normalizedProvider === 'instantly'
+      ? rows.filter((row) => row.payload.originalCampaignOutbound === true &&
+        row.payload.providerOriginalBodyAvailable !== true).map((row) => row.message_key)
+      : [];
+    if (unprovenSentKeys.length) {
+      const existing = await runPriorityRead('preserve-provider-original-bodies', (client) => client
+        .from(MAILBOX_INDEX_TABLES.messages)
+        .select('message_key,body_text,preview,has_body,body_truncated,payload')
+        .in('message_key', unprovenSentKeys));
+      if (!existing.ok) return existing;
+      const proven = new Map((existing.data || [])
+        .filter((row) => row.payload?.providerOriginalBodyAvailable === true)
+        .map((row) => [row.message_key, row]));
+      rows.forEach((row) => {
+        const previous = proven.get(row.message_key);
+        if (!previous) return;
+        row.body_text = previous.body_text;
+        row.preview = previous.preview;
+        row.has_body = previous.has_body;
+        row.body_truncated = previous.body_truncated;
+        row.payload = { ...row.payload, providerOriginalBodyEvidenceKnown: true,
+          providerOriginalBodyAvailable: true,
+          webdesignLinkEvidenceKnown: previous.payload.webdesignLinkEvidenceKnown === true,
+          webdesignLinkUrl: previous.payload.webdesignLinkUrl || '' };
+      });
+    }
     const result = await runDurableWrite(`upsert-provider-messages:${normalizedProvider}`, (client) =>
       client.from(MAILBOX_INDEX_TABLES.messages).upsert(rows, {
         onConflict: 'message_key',

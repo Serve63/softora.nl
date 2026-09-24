@@ -322,7 +322,10 @@
       .join(' · ');
     const escapeHtml = typeof options.escapeHtml === 'function' ? options.escapeHtml : String;
     const routing = campaignInbox?.renderMessageRouting?.(mail, escapeHtml) || '';
-    return `<section class="detail-mail-section detail-mail-section-sent" data-mailbox-message-direction="sent" data-mailbox-root-message="true"><div class="detail-mail-section-label">Jouw bericht</div>${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}${routing}`;
+    const sentProvider = String(mail?.provider || '').trim().toLowerCase() === 'instantly'
+      ? ' data-mailbox-provider="instantly"'
+      : '';
+    return `<section class="detail-mail-section detail-mail-section-sent" data-mailbox-message-direction="sent" data-mailbox-root-message="true"${sentProvider}><div class="detail-mail-section-label">Jouw bericht</div>${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}${routing}`;
   }
 
   function create(options = {}) {

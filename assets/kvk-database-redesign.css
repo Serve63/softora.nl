@@ -106,7 +106,7 @@ button,input,select,textarea{font-family:inherit}
 
 /* Contextual legend, opened by the help button. Native popover supports Escape and outside click. */
 .planning-title-row{justify-content:flex-start;gap:8px}
-.planning-help-button{anchor-name:--planning-help;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;padding:0;border:1px solid #d8bdcb;border-radius:50%;background:#faf3f6;color:var(--accent);font:600 9px/1 'Inter',sans-serif;cursor:pointer}
+.planning-help-button{anchor-name:--planning-help;display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;padding:0;border:1px solid #d8bdcb;border-radius:50%;background:#faf3f6;color:var(--accent);font:600 8px/1 'Inter',sans-serif;cursor:pointer}
 .planning-help-button:hover,.planning-help-button:focus-visible{background:#f0e0e8;border-color:var(--accent)}
 .planning-help-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .planning-legend-popover{position:fixed;inset:auto;top:anchor(bottom);left:anchor(left);position-anchor:--planning-help;position-try-fallbacks:flip-inline,flip-block;margin:8px 0 0;padding:16px;width:290px;max-width:calc(100vw - 32px);border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);box-shadow:0 8px 28px #30202a20;font-family:'Inter',sans-serif}
@@ -179,3 +179,32 @@ button,input,select,textarea{font-family:inherit}
 
 /* Keep both panel headings visually identical. */
 .planning-title-row .fixed-section-title,.latest-treated-panel h2{font-family:'Oswald',sans-serif;font-size:9px!important;font-weight:700!important;letter-spacing:2px;line-height:1.4;text-transform:uppercase;color:var(--ink)}
+
+.latest-treated-panel thead{display:none}
+
+/* Planning uses aligned table columns and the activity table's row rhythm. */
+.planning-title-row{border-bottom:1px solid var(--line)}
+.planning-panel .panel-heading{display:none}
+.planning-panel .location-list{padding:0;gap:0;grid-auto-rows:31px!important}
+.planning-panel .location-item{border-bottom:1px solid rgba(110,85,97,.065)}
+.planning-panel .location-button{position:relative;grid-template-columns:repeat(8,minmax(0,1fr));gap:0;padding:4px 0;height:30px!important;min-height:30px;border-radius:0}
+.planning-panel .location-main{display:contents}
+.planning-panel .location-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.planning-panel .location-statuses{justify-self:start}
+.planning-panel .location-stage-progress{margin:0;font-size:var(--list-meta-size);color:var(--muted);font-weight:400}
+.planning-panel .location-button>.badge{justify-self:start;min-width:0;border-radius:5px;padding:3px 6px;font-size:8px}
+.planning-panel .location-button.is-complete .location-main::after{display:none}
+@media(max-width:700px){.planning-panel .location-button{min-width:600px}}
+
+/* Share the eight-column activity table's exact horizontal anchors. */
+.planning-panel .location-button>.rank{position:absolute;left:9px;top:50%;transform:translateY(-50%)}
+.planning-panel .location-path{grid-column:1 / 5;padding-left:45px;padding-right:9px}
+.planning-panel .location-statuses{grid-column:5;padding-left:9px}
+.planning-panel .location-stage-progress{grid-column:6;padding-left:9px;white-space:nowrap}
+.planning-panel .location-button>.badge{grid-column:8;margin-left:9px}
+.latest-treated-panel td{width:12.5%}
+@media(max-width:700px){.planning-panel .location-button{min-width:1050px}}
+
+/* Compact signed activity: direction carries the color, period stays neutral. */
+.inventory-grid .stat-delta .stat-delta-number,.research-grid .stat-delta .stat-delta-number,.research-grid .stat-delta-flow.is-zero .stat-delta-added{color:var(--green)!important}
+.inventory-grid .stat-delta.is-negative .stat-delta-number,.research-grid .stat-delta.is-negative .stat-delta-number,.research-grid .stat-delta-flow .stat-delta-removed,.research-grid .stat-delta-flow.is-zero .stat-delta-removed{color:#b54747!important}

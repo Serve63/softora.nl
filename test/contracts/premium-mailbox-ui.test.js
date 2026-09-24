@@ -201,8 +201,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
-  assert.match(page, /assets\/premium-mailbox\.js\?v=20260924c/);
-  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260907b/);
+  assert.match(page, /assets\/premium-mailbox\.js\?v=20260924d/);
+  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260924a/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-read\.js\?v=20260826a/);
@@ -213,7 +213,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-owner-preference\.js\?v=20260822a/);
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
-  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260924a/);
+  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260924b/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260908a/);
   assert.match(page, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
@@ -227,7 +227,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-contact-view.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260921c') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
-  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260924a'));
+  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260924b'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260924a'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260924a') < page.indexOf('premium-mailbox-index.js?v=20260924a'));
   assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-browser-storage.js?v=20260828b'));
@@ -989,6 +989,7 @@ test('BCC en CC verschijnen alleen met exacte provenance in lijst en detail', ()
   const instantly = {
     ...direct,
     id: 'instantly:reply-1',
+    folder: 'inbox',
     provider: 'instantly',
     receivedAt: '2026-07-29T12:00:00.000Z',
   };
@@ -1116,9 +1117,61 @@ test('lijst toont een roze omgevouwen hoek alleen wanneer het nieuwste echte ber
   assert.match(instantlyWaiting, /Instantly · wacht op jouw antwoord/);
   assert.doesNotMatch(instantlyWaiting, /mail-reply-corner/);
   const instantlyAnswered = listModule.renderItem({ ...answered, provider: 'instantly' }, baseOptions);
-  assert.match(instantlyAnswered, /mail-provider-corner-instantly/);
+  assert.doesNotMatch(instantlyAnswered, /mail-provider-corner-instantly/);
+  assert.doesNotMatch(instantlyAnswered, /Instantly · wacht op jouw antwoord/);
   assert.doesNotMatch(instantlyAnswered, /mail-reply-corner/);
+  assert.doesNotMatch(listModule.renderItem({
+    ...waitingForReply,
+    provider: 'instantly',
+    replyDismissedAt: '2026-08-04T15:10:00.000Z',
+  }, baseOptions), /mail-provider-corner-instantly/);
   assert.match(readPage(), /\.mail-reply-corner \{[^}]*var\(--crimson\)/);
+});
+
+test('uitgaande Instantly-berichten zijn blauw en Softora-berichten blijven paars', () => {
+  const rootInstantly = renderMailboxBodyForTest('Mijn Instantly-bericht.', [], {
+    contactDossierMode: true,
+    mail: {
+      id: 'instantly:sent-root', folder: 'sent', direction: 'sent',
+      provider: 'instantly', providerOwner: 'serve', accountEmail: 'servec321@gmail.com',
+      body: 'Mijn Instantly-bericht.', threadMessages: [],
+    },
+  });
+  assert.match(rootInstantly, /<section class="detail-mail-section detail-mail-section-sent"[^>]*data-mailbox-root-message="true" data-mailbox-provider="instantly"/);
+  const rootSoftora = renderMailboxBodyForTest('Mijn Softora-bericht.', [], {
+    contactDossierMode: true,
+    mail: {
+      id: 'sent:softora-root', folder: 'sent', direction: 'sent',
+      provider: 'smtp', accountEmail: 'serve@softora.nl',
+      body: 'Mijn Softora-bericht.', threadMessages: [],
+    },
+  });
+  assert.match(rootSoftora, /<section class="detail-mail-section detail-mail-section-sent"[^>]*data-mailbox-root-message="true"/);
+  assert.doesNotMatch(rootSoftora, /data-mailbox-provider="instantly"/);
+
+  const thread = campaignInboxModule.renderThreadMessages({
+    id: 'inbox:reply', accountEmail: 'serve@softora.nl',
+    threadMessages: [{
+      id: 'instantly:sent-parent', folder: 'sent', provider: 'instantly', providerOwner: 'serve',
+      accountEmail: 'servec321@gmail.com', receivedAt: '2026-09-23T10:00:00.000Z',
+      body: 'Instantly-tekst.', hasBody: true, bodyLoaded: true,
+    }, {
+      id: 'smtp:sent-reply', folder: 'sent', provider: 'smtp', accountEmail: 'serve@softora.nl',
+      receivedAt: '2026-09-23T11:00:00.000Z',
+      body: 'Softora-tekst.', hasBody: true, bodyLoaded: true,
+    }, {
+      id: 'instantly:received', folder: 'inbox', provider: 'instantly',
+      accountEmail: 'servec321@gmail.com', receivedAt: '2026-09-23T12:00:00.000Z',
+      body: 'Ontvangen tekst.', hasBody: true, bodyLoaded: true,
+    }],
+  }, String, () => ({ date: '23 september', time: '12:00' }));
+  assert.match(thread, /<section class="detail-mail-section detail-mail-section-sent" data-mailbox-provider="instantly">[\s\S]*?Instantly-tekst\./);
+  assert.match(thread, /<section class="detail-mail-section detail-mail-section-sent">[\s\S]*?Softora-tekst\./);
+  assert.doesNotMatch(thread, /detail-mail-section-received" data-mailbox-provider="instantly"/);
+
+  const page = readPage();
+  assert.match(page, /\.detail-mail-section-sent\[data-mailbox-provider="instantly"\] \{[^}]*background: rgba\(37,99,235,\.055\);[^}]*border-left-color: rgba\(37,99,235,\.58\);/);
+  assert.match(page, /\.detail-mail-section-sent \{[^}]*background: rgba\(155,35,85,\.055\);/);
 });
 
 test('ieder gesprek toont bewezen Van en Aan zonder dubbele adresregels onder de avatar', () => {
@@ -4662,9 +4715,9 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260924c/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260924d/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260910a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260924a/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260924b/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260924a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -4763,7 +4816,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260924a/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260924c/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260924d/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -9992,8 +10045,8 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
     'de vervolgknop hoort na de resultatenlijst te staan'
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
-  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260907b/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20260924c/);
+  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260924a/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20260924d/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);

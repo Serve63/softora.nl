@@ -118,8 +118,8 @@
     const count = Number.isFinite(rawCount) ? rawCount : 0;
     const numberNode = element.querySelector('.stat-delta-number');
     const labelNode = element.querySelector('.stat-delta-label');
-    if (numberNode) numberNode.textContent = `${count > 0 ? '+' : ''}${numberFormat.format(count)}`;
-    if (labelNode) labelNode.textContent = 'laatste 60 min';
+    if (numberNode) numberNode.textContent = `${count >= 0 ? '+' : ''}${numberFormat.format(count)}`;
+    if (labelNode) labelNode.textContent = '60m';
     element.classList.toggle('is-zero', count === 0);
     element.classList.toggle('is-negative', count < 0);
   }
@@ -136,7 +136,7 @@
       removedNode.textContent = `-${numberFormat.format(removed)}`;
       removedNode.hidden = !showRemoved;
     }
-    if (labelNode) labelNode.textContent = 'laatste 60 min';
+    if (labelNode) labelNode.textContent = '60m';
   }
 
   function renderControlRoomLast60(element, activity) {
@@ -311,6 +311,7 @@
     const controller = createController(deps);
     controller.renderMetrics();
     void controller.refreshCanonicalCounts();
+    deps.window.addEventListener('kvk-upload-completed', () => { void controller.refreshCanonicalCounts(); });
     const treatedTotal = deps.document.getElementById('companies-treated');
     if (treatedTotal && typeof deps.window.MutationObserver === 'function') {
       const treatedObserver = new deps.window.MutationObserver(controller.renderMetrics);

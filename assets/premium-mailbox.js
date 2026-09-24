@@ -515,7 +515,10 @@ function renderMailBody(value, images, options) {
     const copyRouting = contactDossierMode
       ? window.SoftoraMailboxCampaignInbox?.renderMessageRouting?.(options && options.mail, escapeHtml) || ''
       : '';
-    renderedSections.push(`<section class="detail-mail-section detail-mail-section-sent"><div class="detail-mail-section-label">${copyLabel}</div>${copyMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(copyMeta)}</div>` : ''}${copyRouting}`);
+    const sentProvider = String(options?.mail?.provider || '').trim().toLowerCase() === 'instantly'
+      ? ' data-mailbox-provider="instantly"'
+      : '';
+    renderedSections.push(`<section class="detail-mail-section detail-mail-section-sent"${sentProvider}><div class="detail-mail-section-label">${copyLabel}</div>${copyMeta ? `<div class="detail-mail-quote-meta">${escapeHtml(copyMeta)}</div>` : ''}${copyRouting}`);
   }
   let injectedImages = false, injectedAttachments = false, insertedReplyAction = false, insertedOlderThreadMessages = false, insertedRootIncomingMeta = false;
   let rootIncomingOpen = rootIncoming;

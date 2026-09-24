@@ -34,9 +34,9 @@
       searchMatch, mail.searchQuery, escapeHtml
     );
     const badges = copyKind ? `<span class="mail-copy-badge">${escapeHtml(copyKind)}</span>` : '';
-    const cornerLabel = isInstantly
-      ? needsReply ? 'Instantly · wacht op jouw antwoord' : 'Instantly'
-      : needsReply ? 'Wacht op jouw antwoord' : '';
+    const cornerLabel = needsReply
+      ? isInstantly ? 'Instantly · wacht op jouw antwoord' : 'Wacht op jouw antwoord'
+      : '';
     const cornerClass = isInstantly ? 'mail-provider-corner-instantly' : 'mail-reply-corner';
     return `
     <div class="mail-item ${mail.unread ? 'unread' : ''} ${needsReply ? 'needs-reply' : ''} ${String(options.activeMail) === String(mail.id) ? 'active' : ''}" data-mailbox-received-at="${escapeHtml(activityAt)}">

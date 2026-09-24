@@ -1,0 +1,9 @@
+.header-controls .transfer-button:not(:disabled){cursor:pointer}
+.kvk-upload-dialog .kvk-api-workers-dialog__count input{width:64px}
+.kvk-upload-dialog .kvk-api-workers-dialog__row>div:first-child{min-width:0}
+#kvk-upload-result{display:block;margin:15px 20px;color:#8e2f5f;font-size:11px;text-underline-offset:3px}
+#kvk-upload-result[hidden]{display:none}
+.kvk-upload-dialog a:focus-visible{outline:2px solid #8e2f5f;outline-offset:3px}
+@media(max-width:380px){.kvk-upload-dialog .kvk-api-workers-dialog__row{flex-wrap:wrap}.kvk-upload-dialog .kvk-api-workers-dialog__actions{margin-left:auto}}
+.kvk-upload-dialog[open]{display:flex;flex-direction:column}
+.kvk-upload-dialog .kvk-api-workers-dialog__row{flex:1;min-height:90px}
