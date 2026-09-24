@@ -34,3 +34,6 @@
 .kvk-api-workers-dialog__row:last-of-type{border-bottom:0;margin-bottom:10px}
 .kvk-api-workers-dialog input:focus-visible{outline:2px solid #8e2f5f;outline-offset:2px}
 @media(max-width:420px){.kvk-api-workers-dialog__count{flex-direction:column;gap:3px;align-items:flex-start}.kvk-api-workers-dialog__actions{gap:8px}}
+
+#kvk-api-workers-reserved{font-size:10px;color:#827680;text-align:right;margin-top:3px}
+#kvk-api-workers-reserved:not([hidden]){display:block}

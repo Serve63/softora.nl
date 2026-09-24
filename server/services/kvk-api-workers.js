@@ -128,7 +128,27 @@ function createKvkApiWorkersService(deps = {}) {
 
   async function poll(req, res) {
     if (!tokenAllowed(req)) return res.status(401).json({ ok: false, error: 'Ongeldig worker-token.' });
+    if (req.body?.diagnose === true) return diagnose(res);
     return getStatus(req, res);
+  }
+
+  function safeProviderMessage(value) {
+    let message = String(value || 'OpenAI-aanvraag mislukt.');
+    if (env.OPENAI_API_KEY) message = message.split(env.OPENAI_API_KEY).join('[afgeschermd]');
+    return message.replace(/sk-[A-Za-z0-9_-]+/g, '[afgeschermd]').slice(0, 500);
+  }
+
+  async function diagnose(res) {
+    return handle(res, async () => {
+      if (!env.OPENAI_API_KEY) return res.json({ ok: true, diagnostics: { available: false, code: 'missing_key' } });
+      const response = await fetchImpl(`https://api.openai.com/v1/models/${MODEL}`, {
+        headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}` }, signal: AbortSignal.timeout(15000),
+      });
+      const data = await response.json().catch(() => ({}));
+      return res.json({ ok: true, diagnostics: { model: MODEL, available: response.ok,
+        status: response.status, code: data.error?.code || null,
+        message: data.error ? safeProviderMessage(data.error.message) : null } });
+    });
   }
 
   async function report(req, res) {
@@ -212,7 +232,23 @@ function createKvkApiWorkersService(deps = {}) {
           }),
         });
         data = await response.json().catch(() => ({}));
-        if (!response.ok) throw Object.assign(new Error(data.error?.message || 'OpenAI-aanvraag mislukt; de budgetreservering blijft veilig vaststaan.'), { status: 502 });
+        if (!response.ok) {
+          const detail = safeProviderMessage(data.error?.message);
+          const rejectedBeforeGeneration = [400, 401, 403, 404, 422, 429].includes(response.status)
+            && Boolean(data.error) && !data.id && !data.usage;
+          if (rejectedBeforeGeneration) {
+            const { data: released, error: releaseError } = await client().rpc('softora_kvk_api_settle', {
+              p_request_id: requestId, p_actual_eur_cents: 0,
+            });
+            if (releaseError || released !== true) throw Object.assign(new Error('OpenAI wees de aanvraag af; vrijgave van de reservering is nog onzeker.'), { status: 503 });
+          }
+          const failure = `OpenAI ${response.status}: ${detail}`;
+          await client().from(TABLE).update({ [`${role}_enabled`]: false,
+            [`${role}_message`]: `Gestopt: ${failure}`.slice(0, 180) }).eq('id', true);
+          console.error('[kvk-api-workers]', JSON.stringify({ requestId, status: response.status,
+            code: data.error?.code, message: detail, reservationReleased: rejectedBeforeGeneration }));
+          throw Object.assign(new Error(failure), { status: 502 });
+        }
       } finally { clearTimeout(timer); }
 
       const actualCents = conservativeActualCents(data);

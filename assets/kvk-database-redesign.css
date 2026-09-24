@@ -106,7 +106,7 @@ button,input,select,textarea{font-family:inherit}
 
 /* Contextual legend, opened by the help button. Native popover supports Escape and outside click. */
 .planning-title-row{justify-content:flex-start;gap:8px}
-.planning-help-button{anchor-name:--planning-help;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;padding:0;border:1px solid #d8bdcb;border-radius:50%;background:#faf3f6;color:var(--accent);font:600 9px/1 'Inter',sans-serif;cursor:pointer}
+.planning-help-button{anchor-name:--planning-help;display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;padding:0;border:1px solid #d8bdcb;border-radius:50%;background:#faf3f6;color:var(--accent);font:600 8px/1 'Inter',sans-serif;cursor:pointer}
 .planning-help-button:hover,.planning-help-button:focus-visible{background:#f0e0e8;border-color:var(--accent)}
 .planning-help-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .planning-legend-popover{position:fixed;inset:auto;top:anchor(bottom);left:anchor(left);position-anchor:--planning-help;position-try-fallbacks:flip-inline,flip-block;margin:8px 0 0;padding:16px;width:290px;max-width:calc(100vw - 32px);border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);box-shadow:0 8px 28px #30202a20;font-family:'Inter',sans-serif}
@@ -179,3 +179,5 @@ button,input,select,textarea{font-family:inherit}
 
 /* Keep both panel headings visually identical. */
 .planning-title-row .fixed-section-title,.latest-treated-panel h2{font-family:'Oswald',sans-serif;font-size:9px!important;font-weight:700!important;letter-spacing:2px;line-height:1.4;text-transform:uppercase;color:var(--ink)}
+
+.latest-treated-panel thead{display:none}
