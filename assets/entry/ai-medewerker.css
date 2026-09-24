@@ -57,3 +57,4 @@
 
 /* Photography from the same warm office series as the service cards. */
 .toekomst-ai .meet-softora{background-image:linear-gradient(90deg,#21121dc2,#21121d6b 52%,#21121d30),url('/assets/entry/meet-softora-office.webp')}
+@media(min-width:761px){.toekomst-ai .ai-feature-image{object-position:center 47%}}
