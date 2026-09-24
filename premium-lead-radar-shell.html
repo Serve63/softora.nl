@@ -12,7 +12,7 @@
   <script src="/assets/personnel-theme.js?v=20260519b" defer></script>
   <style>
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; overflow: hidden; background: #f4f1ed; scrollbar-width: none; -ms-overflow-style: none; }
+    html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg-primary); scrollbar-width: none; -ms-overflow-style: none; }
     html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
     .lead-radar-shell { display: flex; min-height: 100vh; }
     .lead-radar-shell > .sidebar { z-index: 10 !important; pointer-events: auto !important; }
@@ -23,20 +23,21 @@
       min-height: 100vh;
       margin-left: var(--premium-sidebar-width, 320px);
       overflow: hidden;
-      background: #f4f1ed;
+      background: var(--bg-primary);
     }
+    .dashboard-layout[data-sidebar-shell="canonical"] > main.lead-radar-shell__content { padding: 0 !important; }
     .lead-radar-shell__frame {
       display: block;
       width: 100%;
       height: 100vh;
       border: 0;
-      background: #f4f1ed;
+      background: var(--bg-primary);
     }
     @media (max-width: 900px) {
       html, body { overflow: auto; }
       .lead-radar-shell { display: block; }
       .lead-radar-shell__content { width: 100%; margin-left: 0; min-height: 100dvh; }
-      .lead-radar-shell__frame { min-height: 100dvh; height: auto; }
+      .lead-radar-shell__frame { min-height: 100dvh; height: 100dvh; }
     }
   </style>
 </head>
