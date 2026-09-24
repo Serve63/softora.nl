@@ -302,7 +302,7 @@ function createHtmlPageCoordinator(options = {}) {
       ? ' data-softora-encoding="base64"'
       : '';
     const scriptTag = `<script id="${scriptId}" type="application/json"${encodingAttribute}>${serialized}</script>`;
-    const sessionBootstrapTag = '<script src="/assets/premium-page-bootstrap-session.js?v=20260723c"></script>';
+    const sessionBootstrapTag = '<script src="/assets/premium-page-bootstrap-session.js?v=20260924a"></script>';
     const bootstrapHtml = `${scriptTag}${sessionBootstrapTag}`;
 
     if (marker) {
