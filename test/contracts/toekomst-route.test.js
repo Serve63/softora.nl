@@ -16,7 +16,7 @@ test('toekomst route serves the chooser with production links and available asse
 });
 test('desktop chooser allocates space to all sections without clipping overflow', () => {
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
- assert.match(css,/grid-template-rows:72px minmax\(170px,1fr\) minmax\(155px,1fr\) 100px/);
+ assert.match(css,/grid-template-rows:72px minmax\(130px,1fr\) minmax\(155px,1fr\) minmax\(130px,1fr\)/);
  assert.match(css,/height:100svh;min-height:640px/);
  assert.doesNotMatch(css,/\.toekomst-ai (?:body|\.page)\{[^}]*overflow:hidden/);
 });
@@ -44,9 +44,9 @@ test('new website choice links the published local design with Softora contact t
  }
 });
 
-test('tall desktop image rows stay capped for balanced spacing', () => {
+test('desktop banners retain equal grid tracks within a bounded chooser', () => {
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
- assert.match(css,/grid-template-rows:72px minmax\(170px,230px\) minmax\(155px,230px\) 100px/);
+ assert.match(css,/max-height:800px;margin:0 0 auto/);
 });
 
 test("toekomst names the telephone and implementation offers", () => {
@@ -60,4 +60,16 @@ test('toekomst uses SEO Solution consistently', () => {
  assert.match(html,/<h2>SEO SOLUTION<\/h2>/);
  assert.match(html,/<strong>SEO Solution<\/strong>/);
  assert.doesNotMatch(html,/SEO-tool/i);
+});
+
+test('final chooser labels and direct product destinations stay intact', () => {
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ for(const route of ['nieuwe-website','seo-login','chatbot-login','voicesoftware']) assert.match(html,new RegExp('<a class="choice" href="/'+route+'"'));
+ assert.match(html,/<h2>AI-IMPLEMENTATIE IN JE BEDRIJF<span>\.<\/span><\/h2>/);
+ assert.doesNotMatch(html,/<a[^>]*class="ai-feature"/);
+ for(const file of ['assets/entry/toekomst.html','assets/seo-login/index.html']) {
+  const content=fs.readFileSync(path.join(root,file),'utf8');
+  assert.doesNotMatch(content,/SEO (System|Manager)|SEO-tool/i);
+  assert.match(content,/SEO Solution/i);
+ }
 });
