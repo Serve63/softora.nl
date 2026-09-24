@@ -290,6 +290,7 @@ test('Searcher runs Luna 6 Max once with its own short brief and returns the pag
   assert.equal(body.tools[0].search_context_size, 'low');
   assert.match(body.input[0].content, /hoogstens 2 zoekacties/);
   assert.match(body.input[0].content, /holding, beheer-bv of vastgoed-bv/);
+  assert.match(body.input[0].content, /nooit op alleen het KVK-nummer/);
 });
 
 test('dashboard state names the model that actually runs', async () => {
