@@ -238,7 +238,7 @@ test('API research uses available web tools and explicit evidence-preserving rep
  assert.match(runner,/public_page_evidence/);
  assert.match(runner,/validate_saved_result\(path, result, flags\)/);
  const evidence=fs.readFileSync(path.join(root,'scripts/kvk_api_evidence.py'),'utf8');
- assert.match(evidence,/api.whatsapp.com/);
+ assert.match(evidence,/api\.whatsapp\.com/);
  assert.match(evidence,/require_public_url\(newurl\)/);
  assert.match(evidence,/never copy it automatically/);
 });
