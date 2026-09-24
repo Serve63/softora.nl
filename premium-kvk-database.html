@@ -18,8 +18,8 @@
   <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20260809f">
   <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909c">
   <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909e">
-  <link rel="stylesheet" href="/assets/kvk-database-redesign.css?v=20260924b">
-  <link rel="stylesheet" href="/assets/kvk-api-workers.css?v=20260924b">
+  <link rel="stylesheet" href="/assets/kvk-database-redesign.css?v=20260924c">
+  <link rel="stylesheet" href="/assets/kvk-api-workers.css?v=20260924c">
 </head>
 <body>
   <main class="app-shell">
@@ -184,7 +184,7 @@
       <div><h2 id="kvk-api-workers-title">Database vullen</h2></div>
       <button id="kvk-api-workers-close" type="button" aria-label="Sluiten">×</button>
     </div>
-    <div class="kvk-api-workers-dialog__budget"><span>Besteed bedrag</span><strong id="kvk-api-workers-budget">€ 0 / € 100</strong></div>
+    <div class="kvk-api-workers-dialog__budget"><span>Besteed bedrag</span><div><strong id="kvk-api-workers-budget">€ 0 / € 100</strong><small id="kvk-api-workers-reserved" hidden></small></div></div>
     <div class="kvk-api-workers-dialog__row"><div><strong>Searchers</strong><small id="kvk-api-searcher-status">Uit</small></div><div class="kvk-api-workers-dialog__actions"><label class="kvk-api-workers-dialog__count">Aantal<input id="kvk-api-searcher-count" aria-label="Aantal searchers" type="text" inputmode="numeric" pattern="(?:[1-9]|10)" maxlength="2" value="1" autocomplete="off" disabled></label><button id="kvk-api-searcher-toggle" type="button" aria-pressed="false" disabled>Aanzetten</button></div></div>
     <div class="kvk-api-workers-dialog__row"><div><strong>Controleurs</strong><small id="kvk-api-controller-status">Uit</small></div><div class="kvk-api-workers-dialog__actions"><label class="kvk-api-workers-dialog__count">Aantal<input id="kvk-api-controller-count" aria-label="Aantal controleurs" type="text" inputmode="numeric" pattern="(?:[1-9]|10)" maxlength="2" value="1" autocomplete="off" disabled></label><button id="kvk-api-controller-toggle" type="button" aria-pressed="false" disabled>Aanzetten</button></div></div>
     <div class="kvk-api-workers-dialog__row"><div><strong>Robot</strong><small id="kvk-api-robot-status">Uit</small></div><div class="kvk-api-workers-dialog__actions"><button id="kvk-api-robot-toggle" type="button" aria-pressed="false" disabled>Aanzetten</button></div></div>
@@ -200,6 +200,6 @@
   <script src="/assets/kvk-database-metrics.js?v=20260923-delta-style"></script>
   <script src="/assets/kvk-database-luna-errors.js?v=20260923-short-websites"></script>
   <script src="/assets/kvk-database-control.js?v=20260923-location-count"></script>
-  <script src="/assets/kvk-api-workers.js?v=20260924c"></script>
+  <script src="/assets/kvk-api-workers.js?v=20260924d"></script>
 </body>
 </html>

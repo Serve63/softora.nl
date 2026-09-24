@@ -141,3 +141,48 @@ test('robot control keeps evidence review separate from approved inventory', () 
   assert.match(runner, /os\.killpg/);
   assert.doesNotMatch(runner, /contact_validate_apply|\/research|api\.openai/);
 });
+
+test('worker dialog shows real spend, separate reservations and halted errors without success notices', () => {
+  const js = fs.readFileSync(path.join(root, 'assets/kvk-api-workers.js'), 'utf8');
+  const css = fs.readFileSync(path.join(root, 'assets/kvk-database-redesign.css'), 'utf8');
+  assert.doesNotMatch(js, /spentEur \+ state\.budget\.reservedEur/);
+  assert.match(js, /reservationLabel\.textContent/);
+  assert.match(js, /\^Gestopt:/);
+  assert.doesNotMatch(js, /'aangezet' : 'uitgezet'/);
+  assert.match(css, /\.latest-treated-panel thead\{display:none\}/);
+  assert.match(css, /width:12px;height:12px;padding:0;border:1px solid #d8bdcb/);
+});
+
+test('authenticated diagnostics perform only a free model read and redact the key', async () => {
+  let calls = 0;
+  const service = createKvkApiWorkersService({ kvkDatabaseSyncToken: 'sync-test', env: { OPENAI_API_KEY: 'sk-test-secret' },
+    fetchImpl: async (url, options) => { calls++; assert.match(url, /\/models\/gpt-6-sol$/); assert.equal(options.method, undefined);
+      return { ok: false, status: 401, json: async () => ({ error: { code: 'invalid_api_key', message: 'Bad key sk-test-secret' } }) }; } });
+  const bad = response();
+  await service.poll({ headers: {}, body: { diagnose: true } }, bad);
+  assert.equal(bad.statusCode, 401); assert.equal(calls, 0);
+  const good = response();
+  await service.poll({ headers: { authorization: 'Bearer sync-test' }, body: { diagnose: true } }, good);
+  assert.equal(good.body.diagnostics.available, false); assert.equal(calls, 1);
+  assert.doesNotMatch(JSON.stringify(good.body), /sk-test-secret/);
+});
+
+test('definite upstream rejection releases the reservation while ambiguous failures retain it', async () => {
+  for (const status of [400, 401, 403, 404, 422, 429, 500, 502, 503]) {
+    const rpcCalls = [];
+    const updates = [];
+    const client = { rpc: async (name, args) => { rpcCalls.push({ name, args }); return { data: true }; },
+      from() { return { update(value) { updates.push(value); return { eq: async () => ({ error: null }) }; } }; } };
+    const service = createKvkApiWorkersService({ kvkDatabaseSyncToken: 'sync-test', env: { OPENAI_API_KEY: 'sk-test-secret' },
+      now: () => new Date('2026-09-24T12:00:00Z'), getSupabaseClient: () => client,
+      fetchImpl: async () => ({ ok: false, status, json: async () => ({ error: { code: 'rejected', message: 'Failure sk-test-secret' } }) }) });
+    const res = response();
+    await service.research({ headers: { authorization: 'Bearer sync-test' }, body: {
+      role: 'searcher', company: { kvk_nummer: '12345678' }, brief: {} } }, res);
+    assert.equal(res.statusCode, 502);
+    assert.equal(rpcCalls.length, status < 500 ? 2 : 1);
+    if (status < 500) assert.equal(rpcCalls[1].args.p_actual_eur_cents, 0);
+    assert.equal(updates[0].searcher_enabled, false);
+    assert.doesNotMatch(res.body.error, /sk-test-secret/);
+  }
+});

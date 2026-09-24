@@ -3,6 +3,7 @@
   const opener = document.getElementById('kvk-api-workers-open');
   if (!dialog || !opener) return;
   const budgetLabel = document.getElementById('kvk-api-workers-budget');
+  const reservationLabel = document.getElementById('kvk-api-workers-reserved');
   const message = document.getElementById('kvk-api-workers-message');
   const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
   const controls = {
@@ -16,7 +17,9 @@
 
   function render() {
     if (!state) return;
-    budgetLabel.textContent = `${euro.format(state.budget.spentEur + state.budget.reservedEur)} / ${euro.format(state.budget.limitEur)}`;
+    budgetLabel.textContent = `${euro.format(state.budget.spentEur)} / ${euro.format(state.budget.limitEur)}`;
+    reservationLabel.hidden = !(state.budget.reservedEur > 0);
+    reservationLabel.textContent = state.budget.reservedEur > 0 ? `${euro.format(state.budget.reservedEur)} gereserveerd` : '';
     for (const [role, control] of Object.entries(controls)) {
       const worker = state.workers[role];
       if (control.count) {
@@ -26,7 +29,7 @@
       control.button.setAttribute('aria-pressed', String(worker.enabled));
       control.button.textContent = worker.enabled ? 'Uitzetten' : 'Aanzetten';
       control.button.disabled = busy || (role !== 'robot' && !worker.enabled && (!state.apiKeyConfigured || state.budget.availableEur < (state.budget.reservationEur || 12)));
-      control.status.textContent = worker.active ? (worker.message || 'Actief') : worker.enabled ? (worker.message || 'Start aangevraagd') : 'Uit';
+      control.status.textContent = worker.active ? (worker.message || 'Actief') : worker.enabled ? (worker.message || 'Start aangevraagd') : /^Gestopt:/.test(worker.message || '') ? worker.message : 'Uit';
     }
     if (!state.apiKeyConfigured) message.textContent = 'De bestaande API-sleutel is niet beschikbaar op de server.';
     else if (state.budget.availableEur < (state.budget.reservationEur || 12)) message.textContent = 'Budgetruimte is tijdelijk gereserveerd of onvoldoende voor een nieuwe aanvraag.';
@@ -59,9 +62,7 @@
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'Instellen mislukt.');
       state = payload.state;
-      message.textContent = changes.count !== undefined
-        ? `Aantal opgeslagen: ${state.workers[role].count}.`
-        : `${role === 'robot' ? 'Robot' : role === 'searcher' ? 'Searchers' : 'Controleurs'} ${state.workers[role].enabled ? 'aangezet' : 'uitgezet'}.`;
+      message.textContent = '';
     } catch (error) { message.textContent = error.message || 'Instellen mislukt.'; }
     finally { busy = false; render(); }
   }

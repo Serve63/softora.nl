@@ -116,7 +116,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijvendatabase<\/h1>/);
-  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924b/);
+  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924c/);
   assert.match(redesignSource, /\.planning-panel \.location-button\{grid-template-columns:13px minmax\(0,1fr\) auto;column-gap:6px;padding-left:12px\}/);
   assert.match(redesignSource, /\.planning-panel \.rank\{width:13px;height:13px;font-size:6px;line-height:1\}/);
   assert.match(pageSource, /<button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload/);
@@ -712,7 +712,7 @@ test('KVK header shows the disabled mail upload action without a settings back l
   assert.match(workerStyles, /min-height:32px/);
   assert.match(workerStyles, /'Oswald',sans-serif/);
   assert.match(workerStyles, /\.kvk-api-workers-dialog::backdrop\{background:transparent;backdrop-filter:none\}/);
-  assert.match(pageSource, /kvk-api-workers\.css\?v=20260924b/);
+  assert.match(pageSource, /kvk-api-workers\.css\?v=20260924c/);
   assert.doesNotMatch(pageSource, /id="kvk-worker-status"/);
   assert.match(pageSource, /id="companies-total">0<\/strong>\s*<\/div>\s*<div class="stat-delta"><span class="stat-delta-label">Alles gevonden<\/span>/);
   assert.ok(pageSource.indexOf('/assets/kvk-database-worker-status.js') < pageSource.indexOf('/assets/kvk-database.js'));

@@ -40,7 +40,16 @@ def call(path: str, payload: dict, timeout: int = 45) -> dict:
     token = resolve_token()
     if not token:
         raise RuntimeError("Bestaande KVK-synctoken ontbreekt; geen API-aanvraag gedaan.")
-    return post_json(f"{API_URL}{path}", token, payload, timeout=timeout)
+    try:
+        return post_json(f"{API_URL}{path}", token, payload, timeout=timeout)
+    except HTTPError as error:
+        if error.code == 409:
+            raise
+        try:
+            details = json.loads(error.read().decode('utf-8')).get('error', '')
+        except (ValueError, UnicodeDecodeError):
+            details = ''
+        raise RuntimeError(f"HTTP {error.code}: {details or error.reason}") from None
 
 
 def report(role: str, message: str, kvk: str = "", halt: bool = False) -> None:
