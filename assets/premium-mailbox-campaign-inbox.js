@@ -830,11 +830,18 @@
         element.getAttribute('data-softora-encoding') === 'base64'
       ) {
         if (typeof global.atob !== 'function') return null;
-        const binary = global.atob(serialized.trim());
-        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-        serialized = typeof global.TextDecoder === 'function'
-          ? new global.TextDecoder('utf-8').decode(bytes)
-          : decodeURIComponent(escape(binary));
+        if (typeof element.softoraDecodedBootstrap === 'string') {
+          serialized = element.softoraDecodedBootstrap;
+        } else {
+          // Decoded once per page and shared with the other bootstrap readers.
+          const binary = global.atob(serialized.trim());
+          const bytes = new Uint8Array(binary.length);
+          for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+          serialized = typeof global.TextDecoder === 'function'
+            ? new global.TextDecoder('utf-8').decode(bytes)
+            : decodeURIComponent(escape(binary));
+          try { element.softoraDecodedBootstrap = serialized; } catch (_) { /* decode again next time */ }
+        }
       }
       const payload = JSON.parse(serialized);
       return payload && typeof payload === 'object' ? payload : null;

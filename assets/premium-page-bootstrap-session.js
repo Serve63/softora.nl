@@ -26,16 +26,22 @@
         ? atob
         : null;
     if (!decodeBase64) return '';
+    // Decoded once per page: the Mailbox bootstrap is ~2 MB and several
+    // modules read it while the page opens.
+    if (typeof element.softoraDecodedBootstrap === 'string') return element.softoraDecodedBootstrap;
     const binary = decodeBase64(raw.trim());
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
     const Decoder = target && target.TextDecoder
       ? target.TextDecoder
       : typeof TextDecoder === 'function'
         ? TextDecoder
         : null;
-    return Decoder
+    const text = Decoder
       ? new Decoder('utf-8').decode(bytes)
       : decodeURIComponent(escape(binary));
+    try { element.softoraDecodedBootstrap = text; } catch (_) { /* read-only element: decode again next time */ }
+    return text;
   }
 
   function readSession(target) {

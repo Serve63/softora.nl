@@ -44,13 +44,16 @@
             return raw;
         }
         if (!global || typeof global.atob !== "function") return "";
+        // Decoded once per page and shared with the other bootstrap readers.
+        if (typeof element.softoraDecodedBootstrap === "string") return element.softoraDecodedBootstrap;
         var binary = global.atob(raw.trim());
-        var bytes = Uint8Array.from(binary, function (character) {
-            return character.charCodeAt(0);
-        });
-        return typeof global.TextDecoder === "function"
+        var bytes = new Uint8Array(binary.length);
+        for (var index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+        var text = typeof global.TextDecoder === "function"
             ? new global.TextDecoder("utf-8").decode(bytes)
             : decodeURIComponent(escape(binary));
+        try { element.softoraDecodedBootstrap = text; } catch (_) { /* decode again next time */ }
+        return text;
     }
 
     function primeUiState(scope, value, options) {
