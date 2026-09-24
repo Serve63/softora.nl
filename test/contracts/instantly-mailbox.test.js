@@ -12,6 +12,7 @@ const {
   buildStrictThreadQuotedMessageSource,
   buildOriginalMessageSource,
   extractQuotedOriginalBody,
+  needsQuotedBodyAudit,
 } = require('../../server/services/instantly-original-message-source');
 const { createMailboxService } = require('../../server/services/mailbox');
 const { MAILBOX_VISIBILITY_PROTOCOL } = require('../../server/services/mailbox-delete-message');
@@ -948,6 +949,59 @@ test('exact reply in the same thread restores delivered emoji without optional c
   assert.match(restored.body, /📍 Berkel-Enschot/u);
 });
 
+test('an old reply restores proven emoji when its HTML omits the complete text quote', async () => {
+  const providerBody = 'Goedendag,\n\nIk zag jullie website en maakte met plezier een nieuw ontwerp. Ik ben benieuwd wat je ervan vindt en hoor graag je eerlijke mening\n\nMet vriendelijke groet,\nMartijn van de Ven\nAlphen';
+  const quotedBody = providerBody.replace('eerlijke mening', 'eerlijke mening 😁')
+    .replace('\nAlphen', '\n📍 Alphen');
+  const rawSent = incoming({ id: 'old-emoji-sent', thread_id: 'old-emoji-thread',
+    campaign_id: 'campaign-martijn', email_type: '1',
+    eaccount: 'martijn-sender@example.com',
+    from_address_email: 'martijn-sender@example.com',
+    to_address_email_list: ['prospect@example.org'],
+    timestamp_email: '2026-07-03T05:00:00.000Z',
+    body: { text: providerBody, html: '<p>Goedendag,</p><p>Ik zag jullie website en maakte met plezier een nieuw ontwerp. Ik ben benieuwd wat je ervan vindt en hoor graag je eerlijke mening</p><p>Met vriendelijke groet,<br>Martijn van de Ven<br>Alphen</p>' } });
+  const rawReply = incoming({ id: 'old-emoji-reply', thread_id: 'old-emoji-thread',
+    campaign_id: 'campaign-martijn', eaccount: 'martijn-sender@example.com',
+    from_address_email: 'prospect@example.org',
+    to_address_email_list: ['martijn-sender@example.com'],
+    timestamp_email: '2026-07-03T06:00:00.000Z',
+    body: { html: '<p>Bedankt voor de mail.</p>',
+      text: `Bedankt voor de mail.\n\nVan: Martijn van de Ven <martijn-sender@example.com>\nVerzonden: vrijdag 3 juli 2026 07:00\nAan: Prospect <prospect@example.org>\nOnderwerp: Kleine vraag\n\n${quotedBody}` } });
+  const oldSent = buildService().service.normalizeInstantlyMessage(rawSent);
+  oldSent.providerBodyHtmlEvidenceKnown = true;
+  oldSent.providerOriginalBodyEvidenceKnown = true;
+  oldSent.providerOriginalBodyAvailable = false;
+  const store = createStore([oldSent, buildService().service.normalizeInstantlyMessage(rawReply)]);
+  const { service, requests } = buildService({ store, getCustomerSourcesByEmails: async () => [],
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.searchParams.get('search') === 'thread:old-emoji-thread') {
+        return { response: { ok: true, status: 200 }, data: { items: [rawSent, rawReply] } };
+      }
+      return { response: { ok: true, status: 200 }, data: { items: [] } };
+    } });
+  await service.syncOwner('martijn');
+  const restored = store.rows.find((message) => message.providerMessageId === 'old-emoji-sent');
+  assert.equal(restored.providerOriginalBodyAvailable, true);
+  assert.equal(restored.providerQuotedBodyAuditReplyId, 'v1:old-emoji-reply');
+  assert.match(restored.body, /eerlijke mening 😁/u);
+  assert.match(restored.body, /📍 Alphen/u);
+  assert.equal(requests.some((request) => new URL(request.url).searchParams.get('search') ===
+    'thread:old-emoji-thread'), true);
+});
+
+test('a checked unmatched quote waits for a new reply before another audit', () => {
+  const sent = { folder: 'sent', originalCampaignOutbound: true,
+    providerOriginalBodyAvailable: false, providerQuotedBodyAuditReplyId: 'v1:first-reply',
+    date: '2026-07-03T05:00:00.000Z' };
+  const firstReply = { folder: 'inbox', providerMessageId: 'first-reply',
+    date: '2026-07-03T06:00:00.000Z' };
+  assert.equal(needsQuotedBodyAudit([sent, firstReply]), false);
+  assert.equal(needsQuotedBodyAudit([sent, firstReply, {
+    ...firstReply, providerMessageId: 'new-reply', date: '2026-07-04T06:00:00.000Z',
+  }]), true);
+});
+
 test('exact lead source restores Ramon-style emoji and direct hier link after strict provenance checks', async () => {
   const exactUrl = 'https://www.softora.nl/webdesign/ramon-design-store?cid=exact&sender=serve';
   const providerHtml = [
@@ -1221,13 +1275,15 @@ test('active Instantly replies outside the newest 2000-message window are still 
   });
   const store = createStore();
   const normalizer = buildService({ store }).service;
-  store.rows.push(
-    normalizer.normalizeInstantlyMessage(targetReceived),
-    normalizer.normalizeInstantlyMessage(targetSent)
-  );
+  const normalizedReceived = normalizer.normalizeInstantlyMessage(targetReceived);
+  const normalizedSent = normalizer.normalizeInstantlyMessage(targetSent);
+  normalizedSent.providerBodyHtmlEvidenceKnown = true;
+  normalizedSent.providerOriginalBodyEvidenceKnown = true;
+  normalizedSent.providerOriginalBodyAvailable = false;
+  store.rows.push(normalizedReceived, normalizedSent);
   store.listProviderMessages = async () => [];
-  store.listProviderActiveConversationAuditMessages =
-    createStore(store.rows).listProviderActiveConversationAuditMessages;
+  store.listProviderActiveConversationAuditMessages = async () =>
+    [normalizedSent, normalizedReceived];
 
   const { service, requests } = buildService({
     store,
@@ -1255,6 +1311,7 @@ test('active Instantly replies outside the newest 2000-message window are still 
   const audited = store.rows.find((message) => message.providerMessageId === 'outside-window-sent');
   assert.equal(audited.providerOriginalBodyEvidenceKnown, true);
   assert.equal(audited.providerOriginalBodyAvailable, false);
+  assert.equal(audited.providerQuotedBodyAuditReplyId, 'v1:outside-window-received');
   assert.equal(
     requests.some((request) => request.url.endsWith('/emails/outside-window-sent')),
     true

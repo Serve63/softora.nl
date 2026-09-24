@@ -10,6 +10,7 @@ const {
   createMailboxMessageReferenceLookup,
 } = require('../repositories/mailbox-message-reference-lookup');
 const { createMailboxQuotedSentCandidateLookup } = require('../repositories/mailbox-quoted-sent-candidate-lookup');
+const { createMailboxProviderActiveAuditLookup } = require('../repositories/mailbox-provider-active-audit-lookup');
 const { createMailboxIndexTargetedLookups } = require('../repositories/mailbox-index-targeted-lookups');
 const { createMailboxStoredMessageEvidenceLookup } = require('../repositories/mailbox-stored-message-evidence-lookup');
 const { createMailboxIndexVisibilityStore } = require('./mailbox-index-visibility-store');
@@ -413,6 +414,7 @@ function createMailboxIndexStore(deps = {}) {
       normalized.providerRichBodyAvailable = payload.providerRichBodyAvailable === true;
       normalized.providerOriginalBodyEvidenceKnown = payload.providerOriginalBodyEvidenceKnown === true;
       normalized.providerOriginalBodyAvailable = payload.providerOriginalBodyAvailable === true;
+      normalized.providerQuotedBodyAuditReplyId = normalizeString(payload.providerQuotedBodyAuditReplyId);
       normalized.storageFolder = normalizeFolder(row.folder);
       normalized.storageUid = uid;
       normalized.uid = 0;
@@ -489,6 +491,7 @@ function createMailboxIndexStore(deps = {}) {
         providerRichBodyAvailable: message.providerRichBodyAvailable === true,
         providerOriginalBodyEvidenceKnown: message.providerOriginalBodyEvidenceKnown === true,
         providerOriginalBodyAvailable: message.providerOriginalBodyAvailable === true,
+        providerQuotedBodyAuditReplyId: truncateText(normalizeString(message.providerQuotedBodyAuditReplyId), 120),
         webdesignLinkEvidenceKnown: message.webdesignLinkEvidenceKnown === true,
         webdesignLinkUrl: truncateText(normalizeString(message.webdesignLinkUrl), 4000),
       },
@@ -514,10 +517,16 @@ function createMailboxIndexStore(deps = {}) {
         .select('message_key,body_text,preview,has_body,body_truncated,payload')
         .in('message_key', unprovenSentKeys));
       if (!existing.ok) return existing;
+      const previousRows = new Map((existing.data || [])
+        .map((row) => [row.message_key, row]));
       const proven = new Map((existing.data || [])
         .filter((row) => row.payload?.providerOriginalBodyAvailable === true)
         .map((row) => [row.message_key, row]));
       rows.forEach((row) => {
+        const priorAuditId = previousRows.get(row.message_key)?.payload?.providerQuotedBodyAuditReplyId;
+        if (!row.payload.providerQuotedBodyAuditReplyId && priorAuditId) {
+          row.payload.providerQuotedBodyAuditReplyId = priorAuditId;
+        }
         const previous = proven.get(row.message_key);
         if (!previous) return;
         row.body_text = previous.body_text;
@@ -571,82 +580,17 @@ function createMailboxIndexStore(deps = {}) {
     return (result.data || []).map((row) => normalizeMessageRow(row, { includeBody }));
   }
 
-  async function listProviderActiveConversationAuditMessages({
-    provider,
-    accountEmails = [],
-  } = {}) {
-    const normalizedProvider = normalizeString(provider).toLowerCase();
-    const normalizedAccounts = Array.from(
-      new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean))
-    );
-    if (!normalizedProvider || !normalizedAccounts.length) return [];
-
-    const activeThreadKeys = new Set();
-    for (
-      let offset = 0;
-      offset < PROVIDER_ACTIVE_THREAD_MAX_COUNT;
-      offset += MAILBOX_INDEX_PAGE_SIZE
-    ) {
-      const result = await run(
-        `list-provider-active-thread-ids:${normalizedProvider}:${offset}`,
-        (client) =>
-          client
-            .from(MAILBOX_INDEX_TABLES.messages)
-            .select('account_email,provider_thread_id:payload->>providerThreadId')
-            .eq('folder', normalizedProvider)
-            .in('account_email', normalizedAccounts)
-            .eq('payload->>direction', 'received')
-            .is('deleted_at', null)
-            .order('date', { ascending: false })
-            .range(offset, offset + MAILBOX_INDEX_PAGE_SIZE - 1)
-      );
-      if (!result.ok) return null;
-      const page = Array.isArray(result.data) ? result.data : [];
-      page.forEach((row) => {
-        const accountEmail = normalizeEmail(row && row.account_email);
-        const threadId = normalizeString(row && row.provider_thread_id);
-        if (accountEmail && threadId) activeThreadKeys.add(`${accountEmail}|${threadId}`);
-      });
-      if (page.length < MAILBOX_INDEX_PAGE_SIZE) break;
-    }
-    if (!activeThreadKeys.size) return [];
-
-    const threadIds = Array.from(
-      new Set(Array.from(activeThreadKeys, (key) => key.slice(key.indexOf('|') + 1)))
-    );
-    const rowsByKey = new Map();
-    for (
-      let offset = 0;
-      offset < threadIds.length;
-      offset += PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE
-    ) {
-      const batch = threadIds.slice(offset, offset + PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE);
-      const result = await run(
-        `list-provider-active-audit-messages:${normalizedProvider}:${offset}`,
-        (client) =>
-          client
-            .from(MAILBOX_INDEX_TABLES.messages)
-            .select(MAILBOX_MESSAGE_METADATA_COLUMNS)
-            .eq('folder', normalizedProvider)
-            .in('account_email', normalizedAccounts)
-            .in('payload->>providerThreadId', batch)
-            .contains('payload', { originalCampaignOutbound: true })
-            .is('deleted_at', null)
-            .order('date', { ascending: false })
-      );
-      if (!result.ok) return null;
-      (Array.isArray(result.data) ? result.data : []).forEach((row) => {
-        const messageKey = normalizeString(row && row.message_key);
-        if (messageKey && !rowsByKey.has(messageKey)) rowsByKey.set(messageKey, row);
-      });
-    }
-
-    return Array.from(rowsByKey.values())
-      .map((row) => normalizeMessageRow(row))
-      .filter((message) => activeThreadKeys.has(
-        `${normalizeEmail(message.providerAccountEmail || message.accountEmail)}|${normalizeString(message.providerThreadId)}`
-      ));
-  }
+  const listProviderActiveConversationAuditMessages = createMailboxProviderActiveAuditLookup({
+    run,
+    tableName: MAILBOX_INDEX_TABLES.messages,
+    metadataColumns: MAILBOX_MESSAGE_METADATA_COLUMNS,
+    pageSize: MAILBOX_INDEX_PAGE_SIZE,
+    maxCount: PROVIDER_ACTIVE_THREAD_MAX_COUNT,
+    lookupBatchSize: PROVIDER_ACTIVE_THREAD_LOOKUP_BATCH_SIZE,
+    normalizeString,
+    normalizeEmail,
+    normalizeMessageRow,
+  });
 
   async function getProviderMessage({ provider, providerMessageId, accountEmail } = {}) {
     const normalizedProvider = normalizeString(provider).toLowerCase();
