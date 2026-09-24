@@ -1083,7 +1083,7 @@ mailboxDetailController = window.SoftoraMailboxDetailStability?.createController
   getScope: () => ({ folder: activeFolder, owner: activeFolder === 'outreach' ? window.SoftoraMailboxCampaignInbox.getOwner() : '', account: activeFolder === 'outreach' ? '' : activeMailboxAccount }), getVisibilityKey: (mail) => window.SoftoraMailboxCampaignInbox.getConversationVisibilityKey(mail),
   getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, select: (id) => window.SoftoraMailboxDetailState?.select?.(id), renderList,
   onSelect: (mail, openOptions) => { if (mail.unread) window.SoftoraMailboxUiState.markReadOnOpen({ mail, skipReadPersist: openOptions.skipReadPersist, readController: mailboxReadController, renderList, getActiveMail: () => activeMail, openMail }); },
-  getDetailElement: () => document.getElementById('mail-detail'), renderHtml: renderMailboxDetailHtml,
+  getDetailElement: () => document.getElementById('mail-detail'), renderHtml: renderMailboxDetailHtml, snapshot: window.SoftoraMailboxDetailSnapshot, shouldCaptureSnapshot: (mail) => String(getMailsForFolder(activeFolder)[0]?.id ?? '') === String(mail.id),
   needsRootHydration: (mail, openOptions) => (openOptions.forceRootHydration || !mail.bodyLoaded || mail.recipientRoutingNeedsHydration) && !openOptions.skipBodyFetch,
   hydrateRoot: ({ mail, token, signal, requestRender }) => loadMailboxMessageBody(mail.id, { token: { ...token, signal }, openMail: requestRender }),
   hydrateTimeline: ({ mail, signal }) => mailboxDiscoveryController?.loadContactTimeline?.(mail, { deferRender: true, signal }),
