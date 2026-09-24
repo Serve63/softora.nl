@@ -222,3 +222,21 @@ test('actual search usage is billed even when the provider exceeds the requested
  assert.equal(calls[1].name,'softora_kvk_api_settle');
  assert.equal(calls[1].args.p_actual_eur_cents,72);
 });
+
+test('API research uses available web tools and explicit evidence-preserving repair instructions', () => {
+ const source=fs.readFileSync(path.join(root,'server/services/kvk-api-workers.js'),'utf8');
+ assert.match(source,/geen lokale scripts of bestanden/);
+ assert.match(source,/behoud bewezen gegevens uit previous_result/);
+ assert.match(source,/zet nooit alleen een voltooiingsvlag om/);
+ assert.match(source,/const MAX_TOOL_CALLS = 16/);
+ const runner=fs.readFileSync(path.join(root,'scripts/kvk_api_workers.py'),'utf8');
+ assert.match(runner,/MAX_REPAIR_ATTEMPTS = 3/);
+ assert.match(runner,/if transient_control_failure\(error\):/);
+ assert.doesNotMatch(runner,/"bindend": packet.get\("bindend"\)/);
+});
+test('a failing budget status read does not discard settled paid research', async()=>{
+ const client={rpc:async()=>({data:true}),from(){throw new Error('temporary status outage');}};
+ const service=createKvkApiWorkersService({getSupabaseClient:()=>client,kvkDatabaseSyncToken:'test',env:{OPENAI_API_KEY:'test'},now:()=>new Date('2026-09-24'),fetchImpl:async()=>({ok:true,json:async()=>({model:'gpt-6-sol',status:'completed',usage:{input_tokens:100,output_tokens:100},output_text:'{"kvk_nummer":"12345678"}'})})});
+ const res=response();await service.research({headers:{authorization:'Bearer test'},body:{role:'searcher',company:{kvk_nummer:'12345678'},brief:{}}},res);
+ assert.equal(res.statusCode,200);assert.equal(res.body.result.kvk_nummer,'12345678');assert.equal(res.body.budget,null);
+});
