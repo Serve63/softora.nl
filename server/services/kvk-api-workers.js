@@ -181,7 +181,8 @@ function createKvkApiWorkersService(deps = {}) {
     if (!Number.isFinite(input) || !Number.isFinite(output) || input < 0 || output < 0
       || input > 922000 || output > MAX_OUTPUT_TOKENS || data.model !== MODEL) return null;
     const webCalls = (data.output || []).filter((item) => item.type === 'web_search_call').length;
-    if (webCalls > MAX_TOOL_CALLS) return null;
+    // The provider can return more search calls than requested. Charge every
+    // observed call; research still rejects costs above the reserved amount.
     // Worst case for every input token: long-context cache write at $5/M.
     // Worst case output: long-context $15/M. USD-to-EUR factor 2 includes FX/fees margin.
     const upperUsd = input * 5 / 1000000 + output * 15 / 1000000 + webCalls * 0.01;
