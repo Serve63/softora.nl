@@ -328,6 +328,85 @@ async function syncInBackground({ account, folder, loadMessages }) {
   }
 }
 
+// Applies an indexed /messages/bodies result to a root message. Shared by
+// the detail load and the background prefetch so both end in the same state.
+function applyIndexedRootBody(mail, indexedMessage) {
+  const indexedBody = normalizeText(indexedMessage.body || '');
+  mail.body = indexedBody; mail.aiPresentation = indexedMessage.aiPresentation ?? null;
+  mail.hasBody = Boolean(indexedMessage.hasBody || indexedBody);
+  mail.bodyTruncated = Boolean(indexedMessage.bodyTruncated);
+  mail.bodyLoaded = Boolean(
+    !mail.bodyTruncated && (indexedBody || indexedMessage.hasBody === false)
+  );
+  mail.bodyImageEvidenceKnown = Boolean(indexedMessage.bodyImageEvidenceKnown);
+  mail.embeddedImageCount = Math.max(
+    0,
+    Math.min(8, Number(indexedMessage.embeddedImageCount) || 0)
+  );
+  mail.originalCampaignOutbound = Boolean(indexedMessage.originalCampaignOutbound);
+  mail.webdesignLinkEvidenceKnown = Boolean(indexedMessage.webdesignLinkEvidenceKnown);
+  if (mail.webdesignLinkEvidenceKnown) mail.webdesignLinkHydrationAttempted = true;
+  mail.webdesignLinkUrl = normalizeText(indexedMessage.webdesignLinkUrl);
+  mail.to = normalizeText(indexedMessage.to || mail.to);
+  mail.toDisplay = normalizeText(indexedMessage.toDisplay || indexedMessage.to || mail.toDisplay || mail.to);
+  mail.cc = normalizeText(indexedMessage.cc);
+  mail.bcc = normalizeText(indexedMessage.bcc);
+  mail.deliveredTo = normalizeText(indexedMessage.deliveredTo);
+  mail.recipientRoutingEvidenceKnown = indexedMessage.recipientRoutingEvidenceKnown === true;
+  mail.recipientRoutingNeedsHydration = !mail.recipientRoutingEvidenceKnown;
+  mail.attachments = Array.isArray(indexedMessage.attachments) ? indexedMessage.attachments : [];
+  mail.attachmentEvidenceKnown = indexedMessage.attachmentEvidenceKnown === true;
+  if (mail.attachmentEvidenceKnown) mail.attachmentHydrationAttempted = true;
+  mail.bodyLoadError = '';
+}
+
+function rootBodyNeedsLiveEnrichment(mail) {
+  return Boolean(
+    mail.recipientRoutingNeedsHydration ||
+    (mail.originalCampaignOutbound &&
+    (
+      !mail.bodyImageEvidenceKnown ||
+      mail.embeddedImageCount > 0 ||
+      !mail.webdesignLinkEvidenceKnown
+    ))
+  );
+}
+
+// Background warm-up of root bodies (with their AI presentation) for
+// conversations that are not open yet, so a click can render at once. A
+// result that still needs live provider enrichment is left for the detail.
+async function prefetchRootBodies({ mails, getRequest, getActiveMail, fetchImpl, signal }) {
+  const candidates = (Array.isArray(mails) ? mails : []).filter((mail) => mail && !mail.bodyLoading &&
+    String(getActiveMail?.() || '') !== String(mail.id) &&
+    (!mail.bodyLoaded || (mail.aiPresentationUnknown === true && mail.aiPresentation === undefined)));
+  const entries = candidates.map((mail) => ({ mail, request: getRequest?.(mail) }))
+    .filter(({ request }) => request && request.account && request.folder && request.id).slice(0, 20);
+  if (!entries.length) return 0;
+  const request = typeof fetchImpl === 'function' ? fetchImpl : fetch;
+  const response = await request('/api/mailbox/messages/bodies', {
+    method: 'POST', credentials: 'same-origin', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ messages: entries.map(({ request: ref }) => ({ account: ref.account, folder: ref.folder, id: String(ref.id) })) }),
+    ...(signal ? { signal } : {}),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.ok || !Array.isArray(data.messages)) return 0;
+  let applied = 0;
+  entries.forEach(({ mail, request: ref }, index) => {
+    const indexedMessage = data.messages.find((message) => message && String(message.id) === String(ref.id) &&
+      normalizeText(message.accountEmail).toLowerCase() === normalizeText(ref.account).toLowerCase()) || data.messages[index];
+    if (!indexedMessage || indexedMessage.resolved === false || String(indexedMessage.id) !== String(ref.id)) return;
+    // Opened or reloaded meanwhile: the detail load owns this message now.
+    if (mail.bodyLoading || String(getActiveMail?.() || '') === String(mail.id)) return;
+    const probe = { ...mail };
+    applyIndexedRootBody(probe, indexedMessage);
+    if (!probe.bodyLoaded || rootBodyNeedsLiveEnrichment(probe)) return;
+    applyIndexedRootBody(mail, indexedMessage);
+    applied += 1;
+  });
+  return applied;
+}
+
 async function loadBody({
   id,
   requestId,
@@ -379,43 +458,9 @@ async function loadBody({
         indexedMessage &&
         indexedMessage.resolved !== false
       ) {
-        const indexedBody = normalizeText(indexedMessage.body || '');
-        mail.body = indexedBody; mail.aiPresentation = indexedMessage.aiPresentation ?? null;
-        mail.hasBody = Boolean(indexedMessage.hasBody || indexedBody);
-        mail.bodyTruncated = Boolean(indexedMessage.bodyTruncated);
-        mail.bodyLoaded = Boolean(
-          !mail.bodyTruncated && (indexedBody || indexedMessage.hasBody === false)
-        );
-        mail.bodyImageEvidenceKnown = Boolean(indexedMessage.bodyImageEvidenceKnown);
-        mail.embeddedImageCount = Math.max(
-          0,
-          Math.min(8, Number(indexedMessage.embeddedImageCount) || 0)
-        );
-        mail.originalCampaignOutbound = Boolean(indexedMessage.originalCampaignOutbound);
-        mail.webdesignLinkEvidenceKnown = Boolean(indexedMessage.webdesignLinkEvidenceKnown);
-        if (mail.webdesignLinkEvidenceKnown) mail.webdesignLinkHydrationAttempted = true;
-        mail.webdesignLinkUrl = normalizeText(indexedMessage.webdesignLinkUrl);
-        mail.to = normalizeText(indexedMessage.to || mail.to);
-        mail.toDisplay = normalizeText(indexedMessage.toDisplay || indexedMessage.to || mail.toDisplay || mail.to);
-        mail.cc = normalizeText(indexedMessage.cc);
-        mail.bcc = normalizeText(indexedMessage.bcc);
-        mail.deliveredTo = normalizeText(indexedMessage.deliveredTo);
-        mail.recipientRoutingEvidenceKnown = indexedMessage.recipientRoutingEvidenceKnown === true;
-        mail.recipientRoutingNeedsHydration = !mail.recipientRoutingEvidenceKnown;
-        mail.attachments = Array.isArray(indexedMessage.attachments) ? indexedMessage.attachments : [];
-        mail.attachmentEvidenceKnown = indexedMessage.attachmentEvidenceKnown === true;
-        if (mail.attachmentEvidenceKnown) mail.attachmentHydrationAttempted = true;
-        mail.bodyLoadError = '';
+        applyIndexedRootBody(mail, indexedMessage);
         exactBodyAvailable = Boolean(mail.bodyLoaded && normalizeText(mail.body));
-        const needsLiveCampaignEnrichment = Boolean(
-          mail.recipientRoutingNeedsHydration ||
-          (mail.originalCampaignOutbound &&
-          (
-            !mail.bodyImageEvidenceKnown ||
-            mail.embeddedImageCount > 0 ||
-            !mail.webdesignLinkEvidenceKnown
-          ))
-        );
+        const needsLiveCampaignEnrichment = rootBodyNeedsLiveEnrichment(mail);
         if (mail.bodyLoaded && !needsLiveCampaignEnrichment) return;
         if (exactBodyAvailable) {
           mail.bodyLoading = false;
@@ -964,6 +1009,7 @@ function bindImageRecovery({ getActiveMail, getMail, loadMessageBody, openMail }
 }
 
 window.SoftoraMailboxIndex = {
+  prefetchRootBodies,
   bindImageRecovery,
   decorateMessage,
   guardVisibleBodyLoading,

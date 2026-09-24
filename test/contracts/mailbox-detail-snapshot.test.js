@@ -130,7 +130,7 @@ test('the Mailbox wires the detail snapshot before its page script and only capt
   const adapter = page.indexOf('assets/premium-mailbox-detail-snapshot.js?v=20260924a');
   assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < adapter);
   assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924b') < adapter);
-  assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20260924d'));
+  assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20260924e'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /snapshot: window\.SoftoraMailboxDetailSnapshot, shouldCaptureSnapshot: \(mail\) => String\(getMailsForFolder\(activeFolder\)\[0\]\?\.id \?\? ''\) === String\(mail\.id\)/);
   const snapshotAdapter = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-detail-snapshot.js'), 'utf8');
