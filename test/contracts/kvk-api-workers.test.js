@@ -20,6 +20,10 @@ test('KVK dashboard exposes one control for each API worker', () => {
   assert.match(page, /id="kvk-api-searcher-toggle"/);
   assert.match(page, /id="kvk-api-controller-toggle"/);
   assert.match(page, /assets\/kvk-api-workers\.js/);
+  for (const role of ['searcher', 'controller']) {
+    assert.match(page, new RegExp(`<input id="kvk-api-${role}-count"[^>]+type="text"[^>]+inputmode="numeric"`));
+  }
+  assert.doesNotMatch(page, /<select id="kvk-api-(searcher|controller)-count"/);
 });
 
 test('KVK API budget starts at exactly 100 EUR with both workers off', () => {

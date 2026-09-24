@@ -18,7 +18,7 @@
     budgetLabel.textContent = `${euro.format(state.budget.spentEur + state.budget.reservedEur)} / ${euro.format(state.budget.limitEur)}`;
     for (const [role, control] of Object.entries(controls)) {
       const worker = state.workers[role];
-      control.count.value = String(worker.count || 1);
+      if (document.activeElement !== control.count || busy) control.count.value = String(worker.count || 1);
       control.count.disabled = busy;
       control.button.setAttribute('aria-pressed', String(worker.enabled));
       control.button.textContent = worker.enabled ? 'Uitzetten' : 'Aanzetten';
@@ -67,7 +67,18 @@
   document.getElementById('kvk-api-workers-close').addEventListener('click', () => dialog.close());
   for (const [role, control] of Object.entries(controls)) {
     control.button.addEventListener('click', () => { if (state) void update(role, { enabled: !state.workers[role].enabled }); });
-    control.count.addEventListener('change', () => void update(role, { count: Number(control.count.value) }));
+    control.count.addEventListener('change', () => {
+      const value = control.count.value.trim();
+      if (!/^(?:[1-9]|10)$/.test(value)) {
+        message.textContent = 'Vul een heel aantal van 1 tot 10 in.';
+        control.count.value = String(state?.workers[role].count || 1);
+        return;
+      }
+      void update(role, { count: Number(value) });
+    });
+    control.count.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') { event.preventDefault(); control.count.blur(); }
+    });
   }
   setInterval(() => { if (dialog.open && !busy) void load(); }, 5000);
 })();
