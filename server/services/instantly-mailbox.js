@@ -7,6 +7,8 @@ const {
   buildOriginalMessageSource,
   extractLeadId,
   hydrateIndexedThreadMessageEvidence,
+  latestQuoteAuditReplyId,
+  needsQuotedBodyAudit,
 } = require('./instantly-original-message-source');
 const {
   buildAutomatedReplyEvidence,
@@ -358,6 +360,7 @@ function createInstantlyMailboxService(deps = {}) {
       providerRichBodyAvailable: Boolean(providerHtml.body),
       providerOriginalBodyEvidenceKnown: originalSource?.evidenceKnown === true,
       providerOriginalBodyAvailable: originalSource?.available === true,
+      providerQuotedBodyAuditReplyId: normalizeText(originalSource?.auditedReplyId),
       webdesignLinkEvidenceKnown: originalSource?.available
         ? originalSource.webdesignLinkEvidenceKnown === true
         : providerHtml.webdesignLinkEvidenceKnown,
@@ -493,7 +496,14 @@ function createInstantlyMailboxService(deps = {}) {
         });
         continue;
       }
-      if (!providerApi.canReadLeads()) { enrichedMessages.push(rawMessage); continue; }
+      if (!providerApi.canReadLeads()) {
+        enrichedMessages.push({ ...rawMessage, __softoraOriginalMessageSource: strictThreadQuote });
+        continue;
+      }
+      const withQuoteAudit = (source) => ({
+        ...source,
+        auditedReplyId: strictThreadQuote.auditedReplyId || '',
+      });
       const leadId = extractLeadId(rawMessage);
       const leadCacheKey = leadId || `${normalizeText(rawMessage.campaign_id)}|${recipientEmail}`;
       try {
@@ -521,7 +531,7 @@ function createInstantlyMailboxService(deps = {}) {
         const exactLead = leadSourceCache.get(leadCacheKey);
         enrichedMessages.push({
           ...rawMessage,
-          __softoraOriginalMessageSource: exactLead
+          __softoraOriginalMessageSource: withQuoteAudit(exactLead
             ? buildOriginalMessageSource(
                 rawMessage,
                 exactLead,
@@ -531,22 +541,22 @@ function createInstantlyMailboxService(deps = {}) {
                 evidenceKnown: true,
                 available: false,
                 reason: 'exact-lead-not-found',
-              },
+              }),
         });
       } catch (error) {
         if (Number(error?.providerStatus) === 404) {
           enrichedMessages.push({
             ...rawMessage,
-            __softoraOriginalMessageSource: {
+            __softoraOriginalMessageSource: withQuoteAudit({
               evidenceKnown: true,
               available: false,
               reason: 'lead-not-found',
-            },
+            }),
           });
           continue;
         }
         logger.warn('[InstantlyMailbox][OriginalSource]', error?.message || error);
-        enrichedMessages.push(rawMessage);
+        enrichedMessages.push({ ...rawMessage, __softoraOriginalMessageSource: strictThreadQuote });
       }
     }
     const messages = enrichedMessages
@@ -585,6 +595,8 @@ function createInstantlyMailboxService(deps = {}) {
           direction: 'sent',
           providerOriginalBodyEvidenceKnown: true,
           providerOriginalBodyAvailable: false,
+          providerQuotedBodyAuditReplyId:
+            latestQuoteAuditReplyId(exactIndexedMessages, storedMessage),
         });
       }
     }
@@ -755,7 +767,8 @@ function createInstantlyMailboxService(deps = {}) {
           .filter(([key, candidate]) => {
             const indexedMessages = indexedThreadMessages.get(key) || [];
             const hasMissingThreadMember = indexedMessages.length <= 1;
-            const needsExactProviderBody = indexedMessages.some((message) => (
+            const needsExactProviderBody = needsQuotedBodyAudit(indexedMessages) ||
+              indexedMessages.some((message) => (
               message.folder === 'sent' &&
               message.originalCampaignOutbound === true &&
               (
@@ -771,7 +784,8 @@ function createInstantlyMailboxService(deps = {}) {
           if (!providerApi.canStartAudit()) { historyDeferred = true; break; }
           const indexedMessages = indexedThreadMessages.get(key) || [];
           const hasMissingThreadMember = indexedMessages.length <= 1;
-          const needsExactProviderBody = indexedMessages.some((message) => (
+          const needsExactProviderBody = needsQuotedBodyAudit(indexedMessages) ||
+            indexedMessages.some((message) => (
             message.folder === 'sent' &&
             message.originalCampaignOutbound === true &&
             (
