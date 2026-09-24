@@ -114,14 +114,15 @@ def save_result(path: Path, result: dict) -> None:
     os.replace(temporary, path)
 
 
-def apply_result(path: Path, flags: list[str], apply_lock: threading.Lock, role: str) -> bool:
+def apply_result(path: Path, flags: list[str], apply_lock: threading.Lock, role: str,
+                 check_before_precheck: bool = True) -> bool:
     COMPLETED.mkdir(parents=True, exist_ok=True)
     destination = COMPLETED / path.name
     if destination.exists():
         destination = COMPLETED / f"{path.stem}_{int(time.time())}.json"
     archive_temp = destination.with_suffix(".json.pending")
     with apply_lock:
-        if not is_enabled(role):
+        if check_before_precheck and not is_enabled(role):
             return False
         run_cli("contact_agent_precheck.py", str(path), *flags)
         if not is_enabled(role):
@@ -363,6 +364,7 @@ def apply_ready_prefix(role: str, packet: dict, flags: list[str], apply_lock: th
 
 
 SEARCHER_LOOKAHEAD = 3  # queue window as a multiple of the chosen worker count
+SEARCHER_REFRESH_SECONDS = 30
 
 
 def apply_searcher_head(packet: dict, flags: list[str], apply_lock: threading.Lock) -> bool:
@@ -373,7 +375,8 @@ def apply_searcher_head(packet: dict, flags: list[str], apply_lock: threading.Lo
         return False
     try:
         # apply_result runs the precheck that creates the hash-bound draft; no second precheck.
-        applied = apply_result(path, flags, apply_lock, "searcher")
+        # The precheck writes nothing, so only the write step checks the dashboard switch.
+        applied = apply_result(path, flags, apply_lock, "searcher", check_before_precheck=False)
     except ValidationFailure as error:
         raise ValidationFailure(f"{kvk}: Luna-antwoord bewaard, maar de database weigert het: {str(error)[-300:]}") from None
     if applied:
@@ -386,32 +389,40 @@ def run_searcher_pipeline(apply_lock: threading.Lock) -> None:
 
     A worker that finishes starts the next company right away instead of waiting
     for the slowest request of a batch. Each company is still paid exactly once.
+    Only this process changes the queue, so the window is kept locally and read
+    again when it runs short or every SEARCHER_REFRESH_SECONDS.
     """
     in_flight: dict[str, object] = {}
     pool = ThreadPoolExecutor(max_workers=10)
+    window: list[dict] = []
+    flags: list[str] = []
+    count, refreshed = 1, 0.0
     with Heartbeat("searcher", "doorlopend"):
         try:
             while True:
-                worker = ((call("/poll", {}).get("state") or {}).get("workers") or {}).get("searcher") or {}
-                if not worker.get("enabled"):
-                    return
-                count = max(1, min(10, int(worker.get("count") or 1)))
+                if len(window) <= count or time.monotonic() - refreshed > SEARCHER_REFRESH_SECONDS:
+                    worker = ((call("/poll", {}).get("state") or {}).get("workers") or {}).get("searcher") or {}
+                    if not worker.get("enabled"):
+                        return
+                    count = max(1, min(10, int(worker.get("count") or 1)))
+                    packet_result = next_packet("searcher", count * SEARCHER_LOOKAHEAD)
+                    refreshed = time.monotonic()
+                    window, flags = (list(packet_result[0]["bedrijven"]), packet_result[1]) if packet_result else ([], [])
                 denied = False
                 for kvk, future in list(in_flight.items()):
                     if future.done():
                         del in_flight[kvk]
                         denied = future.result() is False or denied  # raises a failed request
-                packet_result = next_packet("searcher", count * SEARCHER_LOOKAHEAD)
-                if packet_result is None:
+                if not window:
                     if not in_flight:
                         report("searcher", "Wachtrij leeg; wacht op nieuw werk.")
                         time.sleep(30)
                     else:
                         wait(list(in_flight.values()), timeout=10, return_when=FIRST_COMPLETED)
+                    refreshed = 0.0
                     continue
-                packet, flags = packet_result
                 if not denied:
-                    for company in packet["bedrijven"]:
+                    for company in window:
                         if len(in_flight) >= count:
                             break
                         kvk = str(company["kvk_nummer"])
@@ -419,13 +430,15 @@ def run_searcher_pipeline(apply_lock: threading.Lock) -> None:
                         if kvk in in_flight or path.exists():
                             continue
                         in_flight[kvk] = pool.submit(luna_search_one, company, flags, False)
-                if apply_searcher_head(packet, flags, apply_lock):
+                if apply_searcher_head({"bedrijven": window}, flags, apply_lock):
+                    window.pop(0)
                     continue
                 report("searcher", f"{len(in_flight)} van {count} bezig.")
                 if in_flight:
                     wait(list(in_flight.values()), timeout=10, return_when=FIRST_COMPLETED)
                 else:
                     time.sleep(10)  # budget or concurrency slot not available yet
+                    refreshed = 0.0
         finally:
             # Paid requests already running finish and are saved for reuse.
             pool.shutdown(wait=True)

@@ -358,3 +358,14 @@ test('Luna Searcher keeps opened search pages and exact field URLs as recorded s
   assert.match(mapper, /"Zoekpagina" if SEARCH_URL\.search/);
   assert.match(mapper, /add\(url, "Bron van een gecontroleerd veld\.", exact=True\)/);
 });
+
+test('Searcher spends as little time as possible outside Luna', () => {
+  const prompt = fs.readFileSync(path.join(root, 'server/services/kvk-luna-searcher-prompt.js'), 'utf8');
+  assert.match(prompt, /Schrijf het antwoord kort/);
+  const runner = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
+  assert.match(runner, /SEARCHER_REFRESH_SECONDS = 30/);
+  assert.match(runner, /check_before_precheck=False/);
+  const mapper = fs.readFileSync(path.join(root, 'scripts/kvk_luna_searcher.py'), 'utf8');
+  assert.match(mapper, /def fetch_page\(url: str, timeout: int = 8\)/);
+  assert.match(mapper, /pool\.map\(fetch, wanted\)/);
+});
