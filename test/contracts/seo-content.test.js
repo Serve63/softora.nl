@@ -661,6 +661,19 @@ test('CRM-kostengids gebruikt precies twee eigen beelden en natuurlijke inkomend
 
   assert.equal(item.image.src, '/assets/seo-content/crm-totale-kostenopbouw-mkb-softora.jpg');
   assert.equal(item.secondaryImage.src, '/assets/seo-content/crm-kostenscenarios-standaard-maatwerk-softora.jpg');
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.sections.length, 8);
+  assert.equal(item.publishedAt, '2026-07-19');
+  assert.equal(item.updatedAt, '2026-09-24');
+  assert.equal(item.growthEventKind, 'other_growth_action');
+  assert.equal(item.growthEventAt, '2026-09-24');
+  assert.equal(item.keywordEvidence.callsUsed, 4);
+  assert.equal(item.faq.length, 4);
+  assert.match(html, /Bij <a href="\/crm-systeem-op-maat">CRM op maat<\/a>/);
+  assert.match(html, /<a href="\/kennisbank\/crm-migratie-stappenplan">een proefimport<\/a>/);
+  assert.doesNotMatch(html, /Voor zoekintentie koopintentie|Een goed artikel of goede landingspagina/);
+  const serviceHtml = fs.readFileSync(path.join(__dirname, '../../crm-systeem-op-maat.html'), 'utf8');
+  assert.match(serviceHtml, /<a href="\/blog\/crm-systeem-kosten-mkb">CRM-kostenbegroting<\/a>/);
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
   assert.match(html, /width="1600" height="1000" loading="lazy"/);
