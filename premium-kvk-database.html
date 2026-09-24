@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909e">
   <link rel="stylesheet" href="/assets/kvk-database-redesign.css?v=20260924f">
   <link rel="stylesheet" href="/assets/kvk-api-workers.css?v=20260924c">
-  <link rel="stylesheet" href="/assets/kvk-database-upload.css?v=20260924a">
+  <link rel="stylesheet" href="/assets/kvk-database-upload.css?v=20260924-count">
 </head>
 <body>
   <main class="app-shell">
@@ -180,13 +180,17 @@
 
   </main>
 
-  <dialog id="kvk-upload-dialog" class="kvk-upload-dialog" aria-labelledby="kvk-upload-title">
-    <header><h2 id="kvk-upload-title">Upload naar mailsysteem</h2><button id="kvk-upload-close" type="button" aria-label="Sluiten">×</button></header>
-    <div class="kvk-upload-options">
-      <button id="kvk-upload-with-website" class="kvk-upload-option" type="button" disabled><strong>Met website uploaden</strong><small id="kvk-upload-count">Voorraad controleren…</small></button>
-      <button class="kvk-upload-option" type="button" disabled><strong>Zonder website uploaden</strong><small>Nog niet beschikbaar</small></button>
+  <dialog id="kvk-upload-dialog" class="kvk-api-workers-dialog kvk-upload-dialog" aria-labelledby="kvk-upload-title">
+    <div class="kvk-api-workers-dialog__head"><h2 id="kvk-upload-title">Upload naar mailsysteem</h2><button id="kvk-upload-close" type="button" aria-label="Sluiten">×</button></div>
+    <div class="kvk-api-workers-dialog__row">
+      <div><strong>Met website</strong><small id="kvk-upload-count">Voorraad controleren…</small></div>
+      <div class="kvk-api-workers-dialog__actions">
+        <label class="kvk-api-workers-dialog__count">Aantal<input id="kvk-upload-amount" aria-label="Aantal bedrijven uploaden" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="5" value="1" autocomplete="off" disabled></label>
+        <button id="kvk-upload-with-website" type="button" disabled>Uploaden</button>
+      </div>
     </div>
-    <p id="kvk-upload-message" role="status" aria-live="polite"></p>
+    <div class="kvk-api-workers-dialog__row"><div><strong>Zonder website</strong><small>Nog niet beschikbaar</small></div><div class="kvk-api-workers-dialog__actions"><button type="button" disabled>Uploaden</button></div></div>
+    <p id="kvk-upload-message" class="kvk-api-workers-dialog__message" role="status" aria-live="polite"></p>
     <a id="kvk-upload-result" href="/premium-database?tab=beschikbaar" target="_top" hidden>Bekijk in Beschikbaar →</a>
   </dialog>
   <dialog id="kvk-api-workers-dialog" class="kvk-api-workers-dialog" aria-labelledby="kvk-api-workers-title">
@@ -211,6 +215,6 @@
   <script src="/assets/kvk-database-luna-errors.js?v=20260924-robot-label"></script>
   <script src="/assets/kvk-database-control.js?v=20260923-location-count"></script>
   <script src="/assets/kvk-api-workers.js?v=20260924-status"></script>
-  <script src="/assets/kvk-database-upload.js?v=20260924a"></script>
+  <script src="/assets/kvk-database-upload.js?v=20260924-count"></script>
 </body>
 </html>

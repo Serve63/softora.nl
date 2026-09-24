@@ -41,6 +41,10 @@ function createKvkDatabaseUploadService({ getSupabaseClient, getUiStateValues, r
     if (mode !== 'with-website' || (!dryRun && !UUID.test(String(requestId || '')))) {
       return res.status(400).json({ ok: false, error: 'Alleen uploaden met website is beschikbaar. Een geldige uploadcode is vereist.' });
     }
+    const amount = dryRun ? null : req.body?.count;
+    if (!dryRun && (!Number.isInteger(amount) || amount < 1 || amount > 50000)) {
+      return res.status(400).json({ ok: false, error: 'Vul een heel aantal van 1 tot 50.000 in.' });
+    }
     try {
       const db = client();
       if (!dryRun) {
@@ -49,9 +53,10 @@ function createKvkDatabaseUploadService({ getSupabaseClient, getUiStateValues, r
         if (receipt.data) { await refreshDestination(); return res.json({ ok: true, ...receipt.data.result, replayed: true }); }
       }
       const rows = await candidates(db);
-      const { data, error } = await db.rpc('softora_kvk_upload_available', {
-        p_request_id: requestId, p_mode: mode, p_dry_run: dryRun, p_candidates: rows,
+      const { data, error } = await db.rpc('softora_kvk_upload_available_counted', {
+        p_request_id: requestId, p_mode: mode, p_dry_run: dryRun, p_candidates: rows, p_limit: amount,
       });
+      if (error?.code === 'P0002') return res.status(409).json({ ok: false, error: 'Er zijn minder bedrijven beschikbaar dan het gekozen aantal. Open het venster opnieuw en kies een lager aantal.' });
       if (error || !data || typeof data.count !== 'number') throw new Error('Upload kon niet worden bevestigd. Probeer opnieuw; dezelfde upload wordt niet dubbel uitgevoerd.');
       if (!dryRun) await refreshDestination();
       return res.json({ ok: true, ...data });
