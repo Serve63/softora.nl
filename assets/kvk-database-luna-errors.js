@@ -68,7 +68,7 @@
       missing_email: 'Geen mail',
       missing_phone_and_email: 'Geen contact',
       stopped: 'Gestopt',
-      operational_unclear: 'Status onduidelijk',
+      operational_unclear: 'Ter controle',
       non_specific_entity: 'Geen specifiek bedrijf',
       weak_source_quality: 'Zwakke bron',
       no_own_contact: 'Geen eigen contact',
@@ -95,6 +95,9 @@
     const isRobot = String(activity.found_by_role_label || '').trim().toLowerCase() === 'robot';
     const modelHtml = isRobot ? '' : `<span>${escapeHtml(activity.found_by_model_label || '-')}</span>`;
     const location = [activity.woonplaats, activity.provincie].filter(Boolean).join(', ');
+    const statusExplanation = activity.unusable_reason === 'operational_unclear'
+      ? 'Bedrijfsactiviteit nog niet bevestigd. Staat in de controlelijst; contactgegevens blijven bewaard.'
+      : '';
     const statusClass = activity.lead_status === 'usable' && !activity.review_finding
       ? ' is-usable'
       : ' is-unusable';
@@ -102,7 +105,7 @@
       <tr>
         <td>${escapeHtml(relativeTimeLabel(activity.contact_checked_at))}</td>
         <td><span class="cell-stack"><strong>${escapeHtml(activity.bedrijfsnaam)}</strong><span>KVK ${escapeHtml(activity.kvk_nummer || '-')}</span></span></td>
-        <td><span class="company-status${statusClass}">${escapeHtml(activityStatus(activity))}</span></td>
+        <td><span class="company-status${statusClass}"${statusExplanation ? ` title="${escapeHtml(statusExplanation)}"` : ''}>${escapeHtml(activityStatus(activity))}</span></td>
         <td><span class="cell-stack"><strong>${escapeHtml(activity.found_by_role_label || '-')}</strong>${modelHtml}</span></td>
         <td>${escapeHtml(fieldValue(activity.telefoonnummer))}</td>
         <td>${escapeHtml(fieldValue(activity.email))}</td>
@@ -126,7 +129,7 @@
         : [];
       body.innerHTML = activities.length
         ? activities.map(activityRowHtml).join('')
-        : '<tr class="empty-row"><td colspan="8">Nog geen nieuwe Robot-resultaten of Controleur-correcties.</td></tr>';
+        : '<tr class="empty-row"><td colspan="8">Nog geen nieuwe onderzoeksresultaten of Controleur-correcties.</td></tr>';
     }
 
     return { render };

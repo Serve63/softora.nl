@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 
 from start_database_fill_control import post_json, resolve_token
+from kvk_api_validation import PROFILE
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -180,6 +181,15 @@ def result_page_evidence(path, result):
 
 def validate_saved_result(path, result, flags):
     from kvk_api_evidence import unreviewed_contacts
+    if result.get("validation_profile") not in (None, PROFILE):
+        raise ValidationFailure("Onbekend API-onderzoekscontract")
+    if result.get("validation_profile") != PROFILE:
+        # Preserve the paid evidence exactly; only version the acceptance contract.
+        original = path.with_suffix(".legacy-contract.json")
+        if path.exists() and not original.exists():
+            shutil.copy2(path, original)
+        result["validation_profile"] = PROFILE
+        save_result(path, result)
     pages = result_page_evidence(path, result)
     try:
         run_cli("contact_agent_precheck.py", str(path), *flags)
@@ -256,25 +266,19 @@ def api_brief(packet: dict) -> dict:
         for key in (schema.get("route_notes") or {})
     }
     return {
-        "contract": "api-evidence-v2",
+        "contract": PROFILE,
         "planning_scope": packet.get("planning_scope"),
         "bindend": [
-            "Onderzoek uitsluitend deze exacte onderneming met openbare webbronnen.",
-            "Verifieer naam, adres en KVK; neem geen contactgegevens van een ander bedrijf over.",
-            "lead_status=usable vereist ALLEMAAL: bewezen telefoonnummer EN email, source_quality official of supported, operational_status operational, entity_role specific. Anders unusable met feitelijke reden; ontbrekende contacten nooit verzinnen.",
-            "Begin KVK-first: zoek eerst exact KVK en vestigingsnummer met telefoon, email/e-mail, website/contact; daarna exacte bedrijfsnaam + adres/plaats. Noteer de werkelijk gebruikte queries in search_engine, inclusief KVK-first, telefoon en email.",
-            "Open de eigen site en contact/over-ons/privacy/voorwaarden. Controleer contactlinks, mailto/tel en zichtbare pagina-bron/metadata. Bij ontbrekend contact: controleer openbare wp-json/Elementor en flyer/afbeelding/banner/PDF-contactinfo; vermeld exact wat leesbaar was of blocked is. Claim geen HTML-extractie die je tool niet kan doen.",
-            "Zonder email bij een eigen site: volg mailto/EMAIL-knoppen, vermomde adressen, domein-mail queries (info@domein, @domein), same-domain snippets, social bio en openbare /wp-json/wp/v2/pages of /wp-json/wp/v2/posts; leg de exacte route of concrete 404/blokkade/geen WordPress vast.",
-            "Zonder telefoon: zoek domein+telefoon, naam+adres+telefoon en KVK+telefoon; doe een exacte gidsdetail-check (bedrijfsnaam + plaats/adres + Telefoonboek/Goudengids/Cylex/Infobel + telefoon/Bellen/+31/06). Noteer in directories welke detailpagina matcht of waarom die niet gevonden/geblokkeerd/afgewezen is; categoriepagina's zijn geen bedrijfsbewijs. Volg iedere contacthint of wijs de afwijkende entiteit concreet af.",
-            "Zonder eigen site: volg gids-naar-site en handelsnaam/alias/merk/exploitant-hints. Controleer compacte domeinvariant, volledige streepjesvariant, bij meerwoordnamen streepjesvariant per woordgrens en korte merk/acroniem-domeinvariant of concrete afwijzing. Controleer sitebuilder/oude-site routes (Jimdo/Wix/WordPress/Google Sites/social). Persoonsnamen vereisen een publieke profiel/bio/team/zzp-route met entiteitscontrole. Noteer uitgevoerde varianten letterlijk.",
-            "Een gidsnummer zonder site/mail is een reverse-phone/handelsnaam-brug. Een sectorportaal/dealerprofiel vereist volgen van de bedrijfswebsite/externe-link of concrete afwijzing. Noteer sectorportaal gevolgd/afgewezen met reden wanneer zo'n hint voorkomt.",
-            "Bij ontbrekend contact: zoek openbare Facebook/Instagram/LinkedIn-profielen en lees bio/about/direct-contact/WhatsApp/menu/bestel-links. social_search, social_bio, order_links en final_crosscheck krijgen checked, not_found of blocked (geen not_applicable). Zonder bestel-links: not_found met de daadwerkelijk gecontroleerde pagina. Noem social/bio/WhatsApp/menu, gidsen en domeinvarianten in de eindconclusie.",
-            "Een volledig lege contactset vereist ten minste twee concrete geopende bedrijfs/detailbronnen; zoekresultaten en brede gidszoekpagina's tellen niet. no_website/not_working vereist minimaal drie concrete checks/bronnen. Een site in onderhoud bewijst geen actieve operatie. Onbereikbare bronnen eerlijk als blocked noteren, nooit als afwezig bewijs.",
-            "Stop extra fallbackonderzoek zodra telefoon + email + sterke bron + specifieke operationele entiteit hard kloppen. Overige routes dan not_applicable met deze bewezen stopreden. Bij bewezen holding/keten/gestopt leg je de uitsluitingsgrond vast; niet gokken op basis van de naam.",
-            "Bewijs elk ingevuld contactveld met een exacte bron-URL; vul ontbrekende gegevens niet in.",
-            "route_notes bevat echte OBJECTEN met status, notes, urls; geen tekst zoals 'status=blocked; notes=...'. Vul alle routes. checks_completed=true alleen na werkelijk uitgevoerd onderzoek inclusief eerlijk beschreven blokkades; false blijft onvoltooid.",
-            "Controleurs: begin bij prior_evidence en heropen de opgeslagen exacte bronnen. Zoek uitsluitend gericht verder waar bewijs ontbreekt/conflicteert. Bij review_unusable en opnieuw onbruikbaar: zet ONBRUIKBAAR_REVIEWED_V1 in conclusion_note. Verwijder nooit een eerdere bewezen contactwaarde zonder hercontrole van de oorspronkelijke bron.",
-            "Gebruik de webtools; lokale bestanden en scripts zijn geen onderdeel van deze API-opdracht.",
+            "Onderzoek alleen deze exacte onderneming met openbare webbronnen. Begin met doel-KVK en bedrijfsnaam + adres/plaats; noteer de werkelijk gebruikte queries met het KVK-nummer.",
+            "Verifieer de koppeling tussen naam, adres en doel-KVK. identity, entity_match en final_crosscheck zijn checked met concrete bevindingen; identity noemt het KVK en verwijst naar een geopende bron. Geen contacten van een andere onderneming overnemen.",
+            "lead_status=usable vereist telefoonnummer EN email, source_quality official of supported, operational_status operational en entity_role specific. Anders unusable met feitelijke reden; dat is een kandidaat voor controle, geen definitieve afwijzing.",
+            "Open een gevonden eigen site en contactpagina; bekijk mailto/tel/WhatsApp-links. Bij ontbrekende contacten volg je concrete domein-, gids- of socialhints. Een onderhoudspagina bewijst geen gestopt bedrijf: controleer eerst de gekoppelde officiële socials of actuele diensten/boekingsinformatie voordat je operational_unclear kiest. Geen verplichte willekeurige domeincombinaties of vaste woorden in de notities.",
+            "Alle sources zijn objecten met exacte URL en feitelijke note. Elk gevuld contactveld heeft field_evidence met de exacte bron-URL. Elk leeg contactveld heeft een uitleg van wat niet bewezen is of geblokkeerd was. Geen gegevens of uitgevoerde checks verzinnen.",
+            "Bij ontbrekende telefoon/mail krijgen search_engine, directories en website_basic een werkelijk uitgevoerde controle met status checked, not_found of blocked. Bij een gevonden eigen site geldt dit ook voor website_deep. Beschrijf wat je kon lezen, zonder toolfouten als bewijs van afwezigheid te gebruiken.",
+            "Een volledig lege contactset vereist twee concrete geopende bedrijfsdetailbronnen; zoekpagina's tellen niet. no_website/not_working vereist minimaal drie vastgelegde bronnen/checks. no_website betekent geen website aangetoond; niet bewezen dat er geen bestaat.",
+            "Vul alle route_notes als objecten met status, notes, urls. Routes die geen extra bewijs opleveren mogen not_applicable met eerlijke reden. checks_completed=true betekent dat dit basiscontract werkelijk is uitgevoerd. Stop zodra de contactset en exacte entiteit hard bewezen zijn.",
+            "Controleurs: heropen eerst prior_evidence en zoek gericht verder bij ontbrekend/conflicterend bewijs. Verwijder geen bewezen contact zonder hercontrole. Bij review_unusable en opnieuw onbruikbaar zet je ONBRUIKBAAR_REVIEWED_V1 in conclusion_note.",
+            "Gebruik webtools; lokale bestanden en scripts zijn niet beschikbaar. Bestaande public_page_evidence bevat aanvullende contactkandidaten die je aan deze entiteit moet koppelen of met reden afwijzen.",
         ],
         "result_schema": schema,
         "review_approved": packet.get("review_approved"),
@@ -356,6 +360,10 @@ def work(role: str, apply_lock: threading.Lock) -> None:
 
 
 def main() -> int:
+    from install_kvk_api_validation import patched_source
+    canonical = (ROOT / "scripts/contact_research.py").read_text()
+    if patched_source(canonical) != canonical:
+        raise RuntimeError("Installeer eerst het API-basiscontract; geen werker gestart.")
     PENDING.mkdir(parents=True, exist_ok=True)
     LOCK.touch(exist_ok=True)
     with LOCK.open("r+") as lock:
