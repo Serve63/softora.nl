@@ -175,7 +175,14 @@ test('definite upstream rejection releases the reservation while ambiguous failu
       from() { return { update(value) { updates.push(value); return { eq: async () => ({ error: null }) }; } }; } };
     const service = createKvkApiWorkersService({ kvkDatabaseSyncToken: 'sync-test', env: { OPENAI_API_KEY: 'sk-test-secret' },
       now: () => new Date('2026-09-24T12:00:00Z'), getSupabaseClient: () => client,
-      fetchImpl: async () => ({ ok: false, status, json: async () => ({ error: { code: 'rejected', message: 'Failure sk-test-secret' } }) }) });
+      fetchImpl: async (_url, options) => {
+        const body = JSON.parse(options.body);
+        assert.equal(body.tools[0].type, 'web_search');
+        assert.equal(body.text, undefined, 'web search must not use incompatible JSON mode');
+        assert.equal(body.model, 'gpt-6-sol');
+        assert.equal(body.reasoning.effort, 'max');
+        return { ok: false, status, json: async () => ({ error: { code: 'rejected', message: 'Failure sk-test-secret' } }) };
+      } });
     const res = response();
     await service.research({ headers: { authorization: 'Bearer sync-test' }, body: {
       role: 'searcher', company: { kvk_nummer: '12345678' }, brief: {} } }, res);
@@ -185,4 +192,11 @@ test('definite upstream rejection releases the reservation while ambiguous failu
     assert.equal(updates[0].searcher_enabled, false);
     assert.doesNotMatch(res.body.error, /sk-test-secret/);
   }
+});
+
+test('expired in-flight slots preserve the shared money reservation', () => {
+ const sql = fs.readFileSync(path.join(root, 'supabase/migrations/20260924124059_kvk_api_stale_slot_recovery.sql'), 'utf8');
+ assert.match(sql, /created_at > now\(\) - interval '15 minutes'/);
+ assert.match(sql, /spent_eur_cents \+ reserved_eur_cents \+ p_reserve_eur_cents <= limit_eur_cents/);
+ assert.doesNotMatch(sql, /reserved_eur_cents = reserved_eur_cents -/);
 });
