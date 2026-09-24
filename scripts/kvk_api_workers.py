@@ -84,7 +84,7 @@ def run_cli(script: str, *args: str, timeout: int = 900) -> str:
         check=False,
     )
     if process.returncode:
-        details = (process.stderr + "\n" + process.stdout).strip()[-1400:]
+        details = (process.stderr + "\n" + process.stdout).strip()[-6000:]
         error_type = ValidationFailure if script in ("contact_agent_precheck.py", "contact_validate_apply.py") else RuntimeError
         raise error_type(f"{script} stopte met code {process.returncode}: {details}")
     return process.stdout
@@ -166,6 +166,33 @@ def is_enabled(role: str) -> bool:
     return bool(((state.get("workers") or {}).get(role) or {}).get("enabled"))
 
 
+def result_page_evidence(path, result):
+    from kvk_api_evidence import public_page_evidence
+    import hashlib
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    evidence_path = path.with_suffix('.pages.json')
+    cached = json.loads(evidence_path.read_text()) if evidence_path.exists() else {}
+    if cached.get('result_sha256') != digest:
+        cached = {'result_sha256': digest, 'pages': public_page_evidence(result)}
+        save_result(evidence_path, cached)
+    return cached.get('pages') or []
+
+
+def validate_saved_result(path, result, flags):
+    from kvk_api_evidence import unreviewed_contacts
+    pages = result_page_evidence(path, result)
+    try:
+        run_cli("contact_agent_precheck.py", str(path), *flags)
+        failure = ''
+    except ValidationFailure as error:
+        failure = str(error)
+    missing = unreviewed_contacts(result, pages)
+    if missing:
+        failure += '\nPublieke HTML bevat nog onbeoordeelde mailto/tel/WhatsApp-contacten: ' + json.dumps(missing, ensure_ascii=False)
+    if failure:
+        raise ValidationFailure(failure)
+
+
 def research_one(role: str, company: dict, brief: dict, flags: list[str], validate: bool = True) -> bool:
     kvk = str(company["kvk_nummer"])
     path = pending_path(role, kvk, flags)
@@ -178,7 +205,7 @@ def research_one(role: str, company: dict, brief: dict, flags: list[str], valida
     if path.exists():
         previous = json.loads(path.read_text())
         try:
-            run_cli("contact_agent_precheck.py", str(path), *flags)
+            validate_saved_result(path, previous, flags)
             return True  # Only validated paid results are reusable.
         except ValidationFailure as error:
             failure = str(error)
@@ -188,6 +215,7 @@ def research_one(role: str, company: dict, brief: dict, flags: list[str], valida
         repair_brief = dict(brief)
         if previous is not None:
             repair_brief["repair"] = {"previous_result": previous, "validation_error": failure}
+            repair_brief["public_page_evidence"] = result_page_evidence(path, previous)
             archive = path.with_suffix(f".rejected-{recovery['attempts']}.json")
             if not archive.exists():
                 save_result(archive, previous)
@@ -210,7 +238,7 @@ def research_one(role: str, company: dict, brief: dict, flags: list[str], valida
         if not validate:
             return True
         try:
-            run_cli("contact_agent_precheck.py", str(path), *flags)
+            validate_saved_result(path, result, flags)
             return True
         except ValidationFailure as error:
             failure = str(error)
@@ -220,17 +248,35 @@ def research_one(role: str, company: dict, brief: dict, flags: list[str], valida
 
 
 def api_brief(packet: dict) -> dict:
+    # The compact native packet references local workpacks. An API model cannot
+    # read those: send the actual acceptance criteria before the first paid run.
+    schema = dict(packet.get("result_schema_eenmaal") or {})
+    schema["route_notes"] = {
+        key: {"status": "checked | not_found | blocked | not_applicable", "notes": "concrete bevinding", "urls": []}
+        for key in (schema.get("route_notes") or {})
+    }
     return {
+        "contract": "api-evidence-v2",
         "planning_scope": packet.get("planning_scope"),
         "bindend": [
             "Onderzoek uitsluitend deze exacte onderneming met openbare webbronnen.",
             "Verifieer naam, adres en KVK; neem geen contactgegevens van een ander bedrijf over.",
-            "Zoek de eigen website en contactpagina, sociale profielen en concrete gidsvermeldingen.",
+            "lead_status=usable vereist ALLEMAAL: bewezen telefoonnummer EN email, source_quality official of supported, operational_status operational, entity_role specific. Anders unusable met feitelijke reden; ontbrekende contacten nooit verzinnen.",
+            "Begin KVK-first: zoek eerst exact KVK en vestigingsnummer met telefoon, email/e-mail, website/contact; daarna exacte bedrijfsnaam + adres/plaats. Noteer de werkelijk gebruikte queries in search_engine, inclusief KVK-first, telefoon en email.",
+            "Open de eigen site en contact/over-ons/privacy/voorwaarden. Controleer contactlinks, mailto/tel en zichtbare pagina-bron/metadata. Bij ontbrekend contact: controleer openbare wp-json/Elementor en flyer/afbeelding/banner/PDF-contactinfo; vermeld exact wat leesbaar was of blocked is. Claim geen HTML-extractie die je tool niet kan doen.",
+            "Zonder email bij een eigen site: volg mailto/EMAIL-knoppen, vermomde adressen, domein-mail queries (info@domein, @domein), same-domain snippets, social bio en openbare /wp-json/wp/v2/pages of /wp-json/wp/v2/posts; leg de exacte route of concrete 404/blokkade/geen WordPress vast.",
+            "Zonder telefoon: zoek domein+telefoon, naam+adres+telefoon en KVK+telefoon; doe een exacte gidsdetail-check (bedrijfsnaam + plaats/adres + Telefoonboek/Goudengids/Cylex/Infobel + telefoon/Bellen/+31/06). Noteer in directories welke detailpagina matcht of waarom die niet gevonden/geblokkeerd/afgewezen is; categoriepagina's zijn geen bedrijfsbewijs. Volg iedere contacthint of wijs de afwijkende entiteit concreet af.",
+            "Zonder eigen site: volg gids-naar-site en handelsnaam/alias/merk/exploitant-hints. Controleer compacte domeinvariant, volledige streepjesvariant, bij meerwoordnamen streepjesvariant per woordgrens en korte merk/acroniem-domeinvariant of concrete afwijzing. Controleer sitebuilder/oude-site routes (Jimdo/Wix/WordPress/Google Sites/social). Persoonsnamen vereisen een publieke profiel/bio/team/zzp-route met entiteitscontrole. Noteer uitgevoerde varianten letterlijk.",
+            "Een gidsnummer zonder site/mail is een reverse-phone/handelsnaam-brug. Een sectorportaal/dealerprofiel vereist volgen van de bedrijfswebsite/externe-link of concrete afwijzing. Noteer sectorportaal gevolgd/afgewezen met reden wanneer zo'n hint voorkomt.",
+            "Bij ontbrekend contact: zoek openbare Facebook/Instagram/LinkedIn-profielen en lees bio/about/direct-contact/WhatsApp/menu/bestel-links. social_search, social_bio, order_links en final_crosscheck krijgen checked, not_found of blocked (geen not_applicable). Zonder bestel-links: not_found met de daadwerkelijk gecontroleerde pagina. Noem social/bio/WhatsApp/menu, gidsen en domeinvarianten in de eindconclusie.",
+            "Een volledig lege contactset vereist ten minste twee concrete geopende bedrijfs/detailbronnen; zoekresultaten en brede gidszoekpagina's tellen niet. no_website/not_working vereist minimaal drie concrete checks/bronnen. Een site in onderhoud bewijst geen actieve operatie. Onbereikbare bronnen eerlijk als blocked noteren, nooit als afwezig bewijs.",
+            "Stop extra fallbackonderzoek zodra telefoon + email + sterke bron + specifieke operationele entiteit hard kloppen. Overige routes dan not_applicable met deze bewezen stopreden. Bij bewezen holding/keten/gestopt leg je de uitsluitingsgrond vast; niet gokken op basis van de naam.",
             "Bewijs elk ingevuld contactveld met een exacte bron-URL; vul ontbrekende gegevens niet in.",
-            "Noteer per route wat werkelijk is gedaan; gebruik blocked of not_applicable met reden waar nodig.",
+            "route_notes bevat echte OBJECTEN met status, notes, urls; geen tekst zoals 'status=blocked; notes=...'. Vul alle routes. checks_completed=true alleen na werkelijk uitgevoerd onderzoek inclusief eerlijk beschreven blokkades; false blijft onvoltooid.",
+            "Controleurs: begin bij prior_evidence en heropen de opgeslagen exacte bronnen. Zoek uitsluitend gericht verder waar bewijs ontbreekt/conflicteert. Bij review_unusable en opnieuw onbruikbaar: zet ONBRUIKBAAR_REVIEWED_V1 in conclusion_note. Verwijder nooit een eerdere bewezen contactwaarde zonder hercontrole van de oorspronkelijke bron.",
             "Gebruik de webtools; lokale bestanden en scripts zijn geen onderdeel van deze API-opdracht.",
         ],
-        "result_schema": packet.get("result_schema_eenmaal"),
+        "result_schema": schema,
         "review_approved": packet.get("review_approved"),
         "review_unusable": packet.get("review_unusable"),
     }
