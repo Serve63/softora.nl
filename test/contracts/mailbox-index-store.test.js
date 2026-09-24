@@ -2908,7 +2908,7 @@ test('mailbox index schema declares tables, indexes, RLS and service-role access
   assert.match(schema, /softora_find_mailbox_unthreaded_sent_candidates/);
   assert.equal(schema.includes("'^\\s*((re|fw|fwd)\\s*:\\s*)+'"), true);
   assert.equal(schema.includes("'^\\\\s*((re|fw|fwd)\\\\s*:\\\\s*)+'"), false);
-  assert.match(schema, /softora_mailbox_sent_thread_lookup_idx/);
+  assert.match(schema, /create index if not exists softora_mailbox_sent_thread_recent_idx\n  on public\.softora_mailbox_messages \(account_email, date desc\)\n  where folder = 'sent' and deleted_at is null;\ndrop index if exists public\.softora_mailbox_sent_thread_lookup_idx;/);
   assert.match(schema, /softora_mailbox_messages_account_folder_date_idx/);
   assert.match(schema, /softora_mailbox_sync_state_account_folder_idx/);
   assert.match(schema, /alter table public\.softora_mailbox_messages enable row level security;/);

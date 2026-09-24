@@ -1342,10 +1342,11 @@ create index if not exists softora_mailbox_send_provenance_account_status_idx
 create index if not exists softora_mailbox_send_provenance_conversation_idx
   on public.softora_mailbox_send_provenance (account_email, conversation_id, accepted_at desc)
   where status = 'accepted';
-create index if not exists softora_mailbox_sent_thread_lookup_idx
+-- No INCLUDE columns: large sent payloads must never be copied into index rows.
+create index if not exists softora_mailbox_sent_thread_recent_idx
   on public.softora_mailbox_messages (account_email, date desc)
-  include (subject, recipients_text, message_id, in_reply_to, references_text, payload)
   where folder = 'sent' and deleted_at is null;
+drop index if exists public.softora_mailbox_sent_thread_lookup_idx;
 
 create or replace function public.softora_find_mailbox_unthreaded_sent_candidates(
   p_targets jsonb,
