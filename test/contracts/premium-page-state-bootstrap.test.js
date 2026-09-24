@@ -484,3 +484,34 @@ test('mailbox-bootstrap weigert oude provenance-loze cache en laadt Ramon direct
   assert.equal(payload.mailbox.messages[0].providerOwner, 'serve');
   assert.equal(payload.mailbox.messages[0].providerThreadId, 'ramon-thread');
 });
+
+test('mailbox-bootstrap hergebruikt het geparste snapshot zolang change_seq gelijk blijft', async () => {
+  const persisted = serializeMailboxCampaignSnapshot(
+    { ok: true, messages: [{ id: 'inbox:7', uid: 7, accountEmail: 'serve@softora.nl', from: 'Eerste versie',
+      email: 'klant@example.test', subject: 'Re: vraag', body: 'Tekst', date: '2026-09-24T08:00:00.000Z' }],
+    sync: { indexed: true, stale: false } },
+    { savedAt: '2026-09-24T08:01:00.000Z' }
+  );
+  let changeSeq = '41';
+  const reads = [];
+  const service = createPremiumPageStateBootstrapService({
+    getUiStateValues: async (scope, options = {}) => {
+      if (scope !== MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE) return { values: {}, source: 'supabase' };
+      reads.push(options.metadataOnly ? 'meta' : 'full');
+      assert.equal(options.includeChangeSeq, true);
+      return options.metadataOnly
+        ? { values: {}, source: 'supabase', exists: true, changeSeq }
+        : { values: { [MAILBOX_CAMPAIGN_SNAPSHOT_KEY]: persisted }, source: 'supabase', changeSeq };
+    },
+    mailboxCoordinator: { listCampaignReplies: async () => ({ ok: true, messages: [], sync: { source: 'background' } }) },
+  });
+
+  await service.buildPageStateBootstrapPayload('premium-mailbox.html');
+  const second = await service.buildPageStateBootstrapPayload('premium-mailbox.html');
+  assert.deepEqual(reads, ['full', 'meta'], 'an unchanged snapshot is proven with a metadata read only');
+  assert.equal(second.mailbox.messages[0].from, 'Eerste versie');
+
+  changeSeq = '42';
+  await service.buildPageStateBootstrapPayload('premium-mailbox.html');
+  assert.deepEqual(reads, ['full', 'meta', 'meta', 'full'], 'a changed snapshot is read in full again');
+});
