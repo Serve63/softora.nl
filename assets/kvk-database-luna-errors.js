@@ -92,6 +92,8 @@
   }
 
   function activityRowHtml(activity) {
+    const isRobot = String(activity.found_by_role_label || '').trim().toLowerCase() === 'robot';
+    const modelHtml = isRobot ? '' : `<span>${escapeHtml(activity.found_by_model_label || '-')}</span>`;
     const location = [activity.woonplaats, activity.provincie].filter(Boolean).join(', ');
     const statusClass = activity.lead_status === 'usable' && !activity.review_finding
       ? ' is-usable'
@@ -101,7 +103,7 @@
         <td>${escapeHtml(relativeTimeLabel(activity.contact_checked_at))}</td>
         <td><span class="cell-stack"><strong>${escapeHtml(activity.bedrijfsnaam)}</strong><span>KVK ${escapeHtml(activity.kvk_nummer || '-')}</span></span></td>
         <td><span class="company-status${statusClass}">${escapeHtml(activityStatus(activity))}</span></td>
-        <td><span class="cell-stack"><strong>${escapeHtml(activity.found_by_role_label || '-')}</strong><span>${escapeHtml(activity.found_by_model_label || '-')}</span></span></td>
+        <td><span class="cell-stack"><strong>${escapeHtml(activity.found_by_role_label || '-')}</strong>${modelHtml}</span></td>
         <td>${escapeHtml(fieldValue(activity.telefoonnummer))}</td>
         <td>${escapeHtml(fieldValue(activity.email))}</td>
         <td class="link-like">${websiteHtml(activity.website)}</td>
