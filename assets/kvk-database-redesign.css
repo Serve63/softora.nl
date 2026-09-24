@@ -181,3 +181,17 @@ button,input,select,textarea{font-family:inherit}
 .planning-title-row .fixed-section-title,.latest-treated-panel h2{font-family:'Oswald',sans-serif;font-size:9px!important;font-weight:700!important;letter-spacing:2px;line-height:1.4;text-transform:uppercase;color:var(--ink)}
 
 .latest-treated-panel thead{display:none}
+
+/* Planning uses aligned table columns and the activity table's row rhythm. */
+.planning-title-row{border-bottom:1px solid var(--line)}
+.planning-panel .panel-heading{display:none}
+.planning-panel .location-list{padding:0;gap:0;grid-auto-rows:31px!important}
+.planning-panel .location-item{border-bottom:1px solid rgba(110,85,97,.065)}
+.planning-panel .location-button{grid-template-columns:24px minmax(180px,1fr) 76px minmax(95px,.45fr) 110px;gap:12px;padding:4px 9px;height:30px!important;min-height:30px;border-radius:0}
+.planning-panel .location-main{display:contents}
+.planning-panel .location-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.planning-panel .location-statuses{justify-self:start}
+.planning-panel .location-stage-progress{margin:0;font-size:var(--list-meta-size);color:var(--muted);font-weight:400}
+.planning-panel .location-button>.badge{justify-self:start;min-width:0;border-radius:5px;padding:3px 6px;font-size:8px}
+.planning-panel .location-button.is-complete .location-main::after{display:none}
+@media(max-width:700px){.planning-panel .location-button{min-width:600px}}
