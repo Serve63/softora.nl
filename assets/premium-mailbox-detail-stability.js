@@ -144,7 +144,7 @@
     return account && messageId ? JSON.stringify([account, messageId]) : '';
   }
 
-  const PARTIAL_RENDER_HOLD_MS = 3000;
+  const PARTIAL_RENDER_HOLD_MS = 10000;
 
   function createController(options = {}) {
     const stability = create();
@@ -327,7 +327,7 @@
       );
       // While this message is already on screen, only the final, fully
       // hydrated render replaces it: no intermediate body-only version. A slow
-      // provider may not keep a read-only snapshot up for long, though.
+      // provider (measured up to ~4 s) may not keep a read-only snapshot up forever, though.
       let holdPartialRenders = keepDetailVisible;
       if (holdPartialRenders) {
         const fallback = setTimeout(() => {

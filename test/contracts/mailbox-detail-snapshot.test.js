@@ -172,3 +172,8 @@ test('a conversation is first shown complete: cleaned AI text and a loaded conta
   assert.deepEqual(rendered, ['Cleaned|']);
   assert.ok(originalCommitHtml);
 });
+
+test('a read-only snapshot survives a slow body and AI read (~4 s) instead of showing an intermediate version', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-detail-stability.js'), 'utf8');
+  assert.match(source, /const PARTIAL_RENDER_HOLD_MS = 10000;/);
+});
