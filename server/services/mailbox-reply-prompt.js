@@ -324,6 +324,19 @@ function enforceMailboxReplyProfile(value, options = {}) {
   return `${greeting}\n\n${body}\n\n${sender.signature}`;
 }
 
+function buildSimpleRejectionReply(payload, accountEmail) {
+  if (payload?.conceptAntwoord || !payload?.ontvangenMail) return '';
+  const inboundText = payload.ontvangenMail.body || payload.ontvangenMail.preview || '';
+  const policy = analyzeMailboxReplyContext(inboundText, {
+    originalText: payload.oorspronkelijkeVerzondenMail?.body || payload.oorspronkelijkeVerzondenMail?.preview,
+    conversation: payload.gespreksverloop,
+  });
+  if (policy.intent !== 'rejection' || policy.questions.length || policy.feedback || policy.authoredText.length > 240) return '';
+  return enforceMailboxReplyProfile('', { inboundText, accountEmail,
+    firstName: payload.antwoordContext?.aanhefNaam, senderName: payload.afzenderContext?.naam,
+    originalSentMail: payload.oorspronkelijkeVerzondenMail, conversation: payload.gespreksverloop });
+}
+
 function enforceMailboxReplySignature(value, senderName) {
   const text = String(value || '').replace(/\r\n?/g, '\n').trim();
   const safeSenderName = cleanLine(senderName) || 'Softora';
@@ -357,6 +370,7 @@ module.exports = {
   buildMailboxReplySystemPrompt,
   classifyMailboxReplyIntent,
   enforceMailboxReplyProfile,
+  buildSimpleRejectionReply,
   enforceMailboxReplySignature,
   inferMailboxReplyFirstName,
   resolveMailboxReplySenderProfile,
