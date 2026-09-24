@@ -126,11 +126,30 @@
         return ready;
     }
 
+    function actionsBound() {
+        const doc = root.document;
+        const chat = doc?.getElementById?.('dashboardAiChatToggle');
+        const save = doc?.getElementById?.('aiManagementConfigSave');
+        return chat?.dataset.softoraActionBound === 'true' && save?.dataset.softoraActionBound === 'true';
+    }
+
+    // With complete server data the screen is ready as soon as its controls are
+    // bound. Publishing earlier made readiness fail and kept the boot loader up
+    // until the recovery refresh (~3 s).
+    function publishBootstrapReadiness(attempt) {
+        if (disposed) return;
+        if (actionsBound() || attempt >= 40) {
+            void publishScreenReadiness(true);
+            return;
+        }
+        root.setTimeout(() => publishBootstrapReadiness(attempt + 1), 50);
+    }
+
     function mount() {
         if (mounted) return;
         disposed = false;
         mounted = true;
-        if (state.ordersHydrated && state.customersHydrated) void publishScreenReadiness(true);
+        if (state.ordersHydrated && state.customersHydrated) publishBootstrapReadiness(0);
         pollTimer = root.setInterval(refreshWhenVisible, 30000);
         root.addEventListener('focus', refreshWhenVisible);
         root.document.addEventListener('visibilitychange', refreshWhenVisible);
