@@ -601,7 +601,8 @@ test('kvk database omits the fill status widget and keeps worker control read-on
   const controlStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.css'), 'utf8');
   const metricsStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.css'), 'utf8');
 
-  assert.doesNotMatch(pageSource, /database-fill-toggle|Database vullen/);
+  assert.doesNotMatch(pageSource, /database-fill-toggle/);
+  assert.match(pageSource, /id="kvk-api-workers-title">Database vullen<\/h2>/);
   assert.match(pageSource, /id="last-refresh-time" class="kvk-visually-hidden"/);
   assert.doesNotMatch(pageSource, /Tijd sinds laatste refresh/);
   assert.match(controlSource, /seconds === 1 \? 'seconde' : 'seconden'/);
