@@ -176,3 +176,47 @@ test('quoteparser houdt twee structurele quotes rond een losse -- als twee echte
   assert.ok(parsed.segments[0].end <= body.split('\n').indexOf('--'));
   assert.ok(parsed.segments[1].start > body.split('\n').indexOf('--'));
 });
+
+test('a quoted sent mail is proven even when the client rewrote its link as markdown', () => {
+  const sentBody = [
+    'Goedendag,',
+    '',
+    'Uit enthousiasme heb ik een fris webdesign gemaakt. Je vindt het ontwerp in de bijlage bij deze e-mail.',
+    '',
+    'Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze link [https://www.softora.nl/webdesign/voorbeeld?cid=kvk-1&sender=serve] bekijken 🎨',
+    '',
+    'Met vriendelijke groet,',
+    'Servé Creusen',
+  ].join('\n');
+  const incoming = [
+    'Beste Servé,',
+    '',
+    'Bedankt, maar wij hebben geen interesse.',
+    '',
+    'On Tuesday, September 22nd, 2026 at 2:09 PM, Servé Creusen <serve@softora.nl> wrote:',
+    '',
+    '> Goedendag,',
+    '>',
+    '> Uit enthousiasme heb ik een fris webdesign gemaakt. Je vindt het ontwerp in de bijlage bij deze e-mail.',
+    '>',
+    '> Lukt het niet om de bijlage te openen? Dan kun je het webdesign ook via deze [link](https://www.softora.nl/webdesign/voorbeeld?cid=kvk-1&sender=serve) bekijken 🎨',
+    '>',
+    '> Met vriendelijke groet,',
+    '> Servé Creusen',
+  ].join('\n');
+  const sent = {
+    id: 'sent:1', folder: 'sent', accountEmail: 'serve@softora.nl', messageId: '<sent-1@softora.nl>',
+    date: '2026-09-22T12:09:16.000Z', body: sentBody,
+  };
+  const result = quotedThread.stripProvenQuotedOutbound(incoming, [sent], {
+    directParentMessageIds: ['sent-1@softora.nl'], directParentScopeProven: true, incomingAt: '2026-09-22T12:17:19.000Z',
+  });
+  assert.equal(result.matchedMessages.length, 1);
+  assert.equal(result.body, 'Beste Servé,\n\nBedankt, maar wij hebben geen interesse.');
+
+  // A different link label is different text and stays visible.
+  const changed = incoming.replace('deze [link](', 'deze [andere pagina](');
+  assert.equal(quotedThread.stripProvenQuotedOutbound(changed, [sent], {
+    directParentMessageIds: ['sent-1@softora.nl'], directParentScopeProven: true, incomingAt: '2026-09-22T12:17:19.000Z',
+  }).matchedMessages.length, 0);
+});

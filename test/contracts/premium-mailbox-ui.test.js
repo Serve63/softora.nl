@@ -195,7 +195,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   const page = readPage();
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
-  assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260910a/);
+  assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20260924a/);
   assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260921b/);
   assert.match(page, /assets\/premium-mailbox-contact-view\.js\?v=20260921b/);
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260921c/);
@@ -223,7 +223,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260924b/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260924c/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260910a') < page.indexOf('premium-mailbox-signature.js?v=20260921b'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260924a') < page.indexOf('premium-mailbox-signature.js?v=20260921b'));
   assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-contact-view.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260921c') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
@@ -4716,7 +4716,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260924f/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260910a/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260924a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260924c/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260924b/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
