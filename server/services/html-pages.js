@@ -262,19 +262,18 @@ function createHtmlPageCoordinator(options = {}) {
   }
 
   function escapeJsonForInlineHtml(value) {
-    return JSON.stringify(value === undefined ? null : value)
+    return escapeSerializedJsonForInlineHtml(JSON.stringify(value === undefined ? null : value));
+  }
+
+  // JSON text only contains <, >, & and U+2028/9 inside strings, so escaping
+  // them keeps the JSON identical while it can never close the script tag.
+  function escapeSerializedJsonForInlineHtml(serialized) {
+    return String(serialized)
       .replace(/</g, '\\u003c')
       .replace(/>/g, '\\u003e')
       .replace(/&/g, '\\u0026')
       .replace(/\u2028/g, '\\u2028')
       .replace(/\u2029/g, '\\u2029');
-  }
-
-  function encodePageStateBootstrap(value) {
-    const serialized = typeof value === 'string'
-      ? value
-      : JSON.stringify(value === undefined ? null : value);
-    return Buffer.from(serialized, 'utf8').toString('base64');
   }
 
   function injectPageBootstrapHtml(html, bootstrapData) {
@@ -285,35 +284,29 @@ function createHtmlPageCoordinator(options = {}) {
     if (!scriptId) return sourceHtml;
 
     const marker = normalizeString(bootstrapData.marker || '');
-    const isEncodedMailboxBootstrap =
+    // Mail content arrives as plain escaped JSON (base64 made the ~1.5 MB
+    // Mailbox bootstrap 35% larger after compression and cost a decode pass).
+    const isMailboxBootstrap =
       scriptId === 'softoraPageStateBootstrap' &&
       normalizeString(bootstrapData.data && bootstrapData.data.page).toLowerCase() ===
         'premium-mailbox.html';
-    const serialized = isEncodedMailboxBootstrap
-      ? encodePageStateBootstrap(
-          typeof bootstrapData.serialized === 'string'
-            ? bootstrapData.serialized
-            : bootstrapData.data
-        )
-      : typeof bootstrapData.serialized === 'string'
-        ? bootstrapData.serialized
-        : escapeJsonForInlineHtml(bootstrapData.data);
-    const encodingAttribute = isEncodedMailboxBootstrap
-      ? ' data-softora-encoding="base64"'
-      : '';
-    const scriptTag = `<script id="${scriptId}" type="application/json"${encodingAttribute}>${serialized}</script>`;
+    const serialized = typeof bootstrapData.serialized === 'string'
+      ? (isMailboxBootstrap ? escapeSerializedJsonForInlineHtml(bootstrapData.serialized) : bootstrapData.serialized)
+      : escapeJsonForInlineHtml(bootstrapData.data);
+    const scriptTag = `<script id="${scriptId}" type="application/json">${serialized}</script>`;
     const sessionBootstrapTag = '<script src="/assets/premium-page-bootstrap-session.js?v=20260723c"></script>';
     const bootstrapHtml = `${scriptTag}${sessionBootstrapTag}`;
 
     if (marker) {
       const markerToken = `<!-- ${marker} -->`;
       if (sourceHtml.includes(markerToken)) {
-        return sourceHtml.replace(markerToken, bootstrapHtml);
+        // A function replacement: "$&" or "$'" in customer data must stay literal.
+        return sourceHtml.replace(markerToken, () => bootstrapHtml);
       }
     }
 
     if (/<\/body>/i.test(sourceHtml)) {
-      return sourceHtml.replace(/<\/body>/i, `${bootstrapHtml}\n</body>`);
+      return sourceHtml.replace(/<\/body>/i, () => `${bootstrapHtml}\n</body>`);
     }
 
     return `${sourceHtml}\n${bootstrapHtml}`;
