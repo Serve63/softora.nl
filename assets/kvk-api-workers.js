@@ -6,62 +6,68 @@
   const message = document.getElementById('kvk-api-workers-message');
   const euro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
   const controls = {
-    searcher: { button: document.getElementById('kvk-api-searcher-toggle'), status: document.getElementById('kvk-api-searcher-status') },
-    controller: { button: document.getElementById('kvk-api-controller-toggle'), status: document.getElementById('kvk-api-controller-status') },
+    searcher: { count: document.getElementById('kvk-api-searcher-count'), button: document.getElementById('kvk-api-searcher-toggle'), status: document.getElementById('kvk-api-searcher-status') },
+    controller: { count: document.getElementById('kvk-api-controller-count'), button: document.getElementById('kvk-api-controller-toggle'), status: document.getElementById('kvk-api-controller-status') },
   };
   let state = null;
   let busy = false;
+  let revision = 0;
 
   function render() {
     if (!state) return;
     budgetLabel.textContent = `${euro.format(state.budget.spentEur + state.budget.reservedEur)} / ${euro.format(state.budget.limitEur)}`;
     for (const [role, control] of Object.entries(controls)) {
       const worker = state.workers[role];
+      control.count.value = String(worker.count || 1);
+      control.count.disabled = busy;
       control.button.setAttribute('aria-pressed', String(worker.enabled));
       control.button.textContent = worker.enabled ? 'Uitzetten' : 'Aanzetten';
-      control.button.disabled = busy || (!worker.enabled && (!state.apiKeyConfigured || state.budget.availableEur < 12));
-      control.status.textContent = worker.active ? (worker.currentBatch || 'Actief') : worker.enabled ? (worker.message || 'Start aangevraagd') : 'Uit';
+      control.button.disabled = busy || (!worker.enabled && (!state.apiKeyConfigured || state.budget.availableEur < (state.budget.reservationEur || 12)));
+      control.status.textContent = worker.active ? (worker.message || 'Actief') : worker.enabled ? (worker.message || 'Start aangevraagd') : 'Uit';
     }
     if (!state.apiKeyConfigured) message.textContent = 'De bestaande API-sleutel is niet beschikbaar op de server.';
-    else if (state.budget.availableEur < 12) message.textContent = 'Gezamenlijke limiet bereikt; nieuwe aanvragen staan uit.';
+    else if (state.budget.availableEur < (state.budget.reservationEur || 12)) message.textContent = 'Budgetruimte is tijdelijk gereserveerd of onvoldoende voor een nieuwe aanvraag.';
   }
 
   async function load() {
+    const requestedRevision = revision;
     try {
       const response = await fetch('/api/kvk-database/api-workers', { cache: 'no-store', credentials: 'same-origin' });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'Status niet beschikbaar.');
+      if (busy || requestedRevision !== revision) return;
       state = payload.state;
       render();
     } catch (error) { message.textContent = error.message || 'Status niet beschikbaar.'; }
   }
 
-  async function toggle(role) {
+  async function update(role, changes) {
     if (!state || busy) return;
+    revision += 1;
     busy = true;
     message.textContent = '';
     render();
     try {
-      const desired = {
-        searcherEnabled: state.workers.searcher.enabled,
-        controllerEnabled: state.workers.controller.enabled,
-      };
-      desired[role === 'searcher' ? 'searcherEnabled' : 'controllerEnabled'] = !state.workers[role].enabled;
       const response = await fetch('/api/kvk-database/api-workers', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-Softora-Requested-With': 'premium' },
-        body: JSON.stringify(desired),
+        body: JSON.stringify({ role, ...changes }),
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'Instellen mislukt.');
       state = payload.state;
-      message.textContent = `${role === 'searcher' ? 'Searcher' : 'Controleur'} ${state.workers[role].enabled ? 'aangezet' : 'uitgezet'}.`;
+      message.textContent = changes.count !== undefined
+        ? `Aantal opgeslagen: ${state.workers[role].count}.`
+        : `${role === 'searcher' ? 'Searchers' : 'Controleurs'} ${state.workers[role].enabled ? 'aangezet' : 'uitgezet'}.`;
     } catch (error) { message.textContent = error.message || 'Instellen mislukt.'; }
     finally { busy = false; render(); }
   }
 
   opener.addEventListener('click', () => { dialog.showModal(); void load(); });
   document.getElementById('kvk-api-workers-close').addEventListener('click', () => dialog.close());
-  for (const [role, control] of Object.entries(controls)) control.button.addEventListener('click', () => void toggle(role));
+  for (const [role, control] of Object.entries(controls)) {
+    control.button.addEventListener('click', () => { if (state) void update(role, { enabled: !state.workers[role].enabled }); });
+    control.count.addEventListener('change', () => void update(role, { count: Number(control.count.value) }));
+  }
   setInterval(() => { if (dialog.open && !busy) void load(); }, 5000);
 })();

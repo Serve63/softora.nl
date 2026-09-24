@@ -705,7 +705,11 @@ test('KVK header shows the disabled mail upload action without a settings back l
   const redesignStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-redesign.css'), 'utf8');
   assert.doesNotMatch(pageSource, /data-settings-module-back-host|settings-module-back\.(?:js|css)/);
   assert.match(pageSource, /class="header-controls">\s*<button id="kvk-api-workers-open"[^>]*>Werkers[\s\S]*?<\/button>\s*<button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload/);
-  assert.match(redesignStyles, /\.header-controls \.transfer-button\{min-height:37px;padding:9px 12px/);
+  const workerStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-api-workers.css'), 'utf8');
+  assert.match(workerStyles, /min-height:32px/);
+  assert.match(workerStyles, /'Oswald',sans-serif/);
+  assert.match(workerStyles, /\.kvk-api-workers-dialog::backdrop\{background:transparent;backdrop-filter:none\}/);
+  assert.match(pageSource, /kvk-api-workers\.css\?v=20260924a/);
   assert.doesNotMatch(pageSource, /id="kvk-worker-status"/);
   assert.match(pageSource, /id="companies-total">0<\/strong>\s*<\/div>\s*<div class="stat-delta"><span class="stat-delta-label">Alles gevonden<\/span>/);
   assert.ok(pageSource.indexOf('/assets/kvk-database-worker-status.js') < pageSource.indexOf('/assets/kvk-database.js'));

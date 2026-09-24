@@ -52,11 +52,13 @@ function createKvkApiWorkersService(deps = {}) {
     return {
       model: MODEL,
       reasoningEffort: 'max',
+      maxWorkersPerRole: 10,
       apiKeyConfigured: Boolean(env.OPENAI_API_KEY),
       budget: { limitEur: limit / 100, spentEur: spent / 100, reservedEur: reserved / 100,
-        availableEur: Math.max(0, limit - spent - reserved) / 100 },
+        reservationEur: RESERVATION_CENTS / 100, availableEur: Math.max(0, limit - spent - reserved) / 100 },
       workers: Object.fromEntries([...ROLES].map((role) => [role, {
         enabled: row[`${role}_enabled`] === true,
+        count: Number(row[`${role}_count`] || 1),
         active: isLive(row, role),
         heartbeatAt: row[`${role}_heartbeat_at`] || null,
         message: String(row[`${role}_message`] || '').slice(0, 180),
@@ -77,11 +79,27 @@ function createKvkApiWorkersService(deps = {}) {
   async function setEnabled(req, res) {
     return handle(res, async () => {
       const body = req.body || {};
-      if (typeof body.searcherEnabled !== 'boolean' || typeof body.controllerEnabled !== 'boolean') {
-        return res.status(400).json({ ok: false, error: 'Kies voor beide werkers aan of uit.' });
+      const requested = {};
+      if (ROLES.has(body.role)) {
+        if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
+          return res.status(400).json({ ok: false, error: 'Ongeldige aan/uit-instelling.' });
+        }
+        if (body.count !== undefined && (!Number.isInteger(body.count) || body.count < 1 || body.count > 10)) {
+          return res.status(400).json({ ok: false, error: 'Kies een aantal van 1 tot en met 10.' });
+        }
+        if (body.enabled === undefined && body.count === undefined) {
+          return res.status(400).json({ ok: false, error: 'Kies een aantal of zet de werkers aan/uit.' });
+        }
+        requested[body.role] = { enabled: body.enabled, count: body.count };
+      } else if (typeof body.searcherEnabled === 'boolean' && typeof body.controllerEnabled === 'boolean') {
+        // Compatibility for an already open dashboard from before the count selector.
+        requested.searcher = { enabled: body.searcherEnabled };
+        requested.controller = { enabled: body.controllerEnabled };
+      } else {
+        return res.status(400).json({ ok: false, error: 'Ongeldige werkrol of instelling.' });
       }
       const row = await readRow();
-      const wantsStart = body.searcherEnabled || body.controllerEnabled;
+      const wantsStart = Object.entries(requested).some(([role, value]) => value.enabled === true && !row[`${role}_enabled`]);
       if (wantsStart && !env.OPENAI_API_KEY) {
         return res.status(503).json({ ok: false, error: 'Bestaande OpenAI API-sleutel ontbreekt op de server.' });
       }
@@ -92,10 +110,13 @@ function createKvkApiWorkersService(deps = {}) {
         return res.status(409).json({ ok: false, error: 'Het gezamenlijke budget heeft te weinig ruimte voor een volgende aanvraag.' });
       }
       const changes = {};
-      for (const [role, enabled] of [['searcher', body.searcherEnabled], ['controller', body.controllerEnabled]]) {
-        changes[`${role}_enabled`] = enabled;
-        changes[`${role}_requested_at`] = enabled && !row[`${role}_enabled`] ? now().toISOString() : row[`${role}_requested_at`];
-        changes[`${role}_message`] = enabled ? 'Start aangevraagd; wacht op lokale werker.' : 'Uitgezet via dashboard.';
+      for (const [role, value] of Object.entries(requested)) {
+        if (value.count !== undefined) changes[`${role}_count`] = value.count;
+        if (value.enabled !== undefined) {
+          changes[`${role}_enabled`] = value.enabled;
+          changes[`${role}_requested_at`] = value.enabled && !row[`${role}_enabled`] ? now().toISOString() : row[`${role}_requested_at`];
+          changes[`${role}_message`] = value.enabled ? 'Start aangevraagd; wacht op lokale werker.' : 'Uitgezet via dashboard.';
+        }
       }
       const { error } = await client().from(TABLE).update(changes).eq('id', true);
       if (error) throw error;

@@ -60,3 +60,45 @@ test('worker research cannot call OpenAI after reservation is denied', async () 
   assert.equal(res.statusCode, 409);
   assert.equal(fetchCalls, 0);
 });
+
+function settingsFixture(overrides = {}) {
+  const row = { id: true, limit_eur_cents: 10000, spent_eur_cents: 0, reserved_eur_cents: 0,
+    searcher_enabled: false, controller_enabled: false, searcher_count: 1, controller_count: 1, ...overrides };
+  const writes = [];
+  const client = { from() { return {
+    select() { return { eq() { return { single: async () => ({ data: { ...row } }) }; } }; },
+    update(changes) { return { async eq() { writes.push(changes); Object.assign(row, changes); return { error: null }; } }; },
+  }; } };
+  return { row, writes, service: createKvkApiWorkersService({ getSupabaseClient: () => client, env: {} }) };
+}
+
+test('count changes persist independently without enabling either role or requiring an API key', async () => {
+  const { service, row, writes } = settingsFixture();
+  const res = response();
+  await service.setEnabled({ body: { role: 'searcher', count: 4 } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(writes, [{ searcher_count: 4 }]);
+  assert.equal(res.body.state.workers.searcher.count, 4);
+  assert.equal(row.searcher_enabled, false);
+  assert.equal(row.controller_count, 1);
+});
+
+test('count rejects fractions, coercion and values outside the supported range before writing', async () => {
+  for (const count of [0, 11, 2.5, '3', null]) {
+    const { service, writes } = settingsFixture();
+    const res = response();
+    await service.setEnabled({ body: { role: 'controller', count } }, res);
+    assert.equal(res.statusCode, 400);
+    assert.equal(writes.length, 0);
+  }
+});
+
+test('stopping one role remains possible with exhausted budget and leaves the other role untouched', async () => {
+  const { service, row, writes } = settingsFixture({ searcher_enabled: true, controller_enabled: true, spent_eur_cents: 10000 });
+  const res = response();
+  await service.setEnabled({ body: { role: 'searcher', enabled: false } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(row.searcher_enabled, false);
+  assert.equal(row.controller_enabled, true);
+  assert.equal(Object.hasOwn(writes[0], 'controller_enabled'), false);
+});
