@@ -55,3 +55,12 @@ test('UI preserves request ID after uncertain failure and prevents duplicate in-
  resolvePost({ok:false,json:async()=>({ok:false,error:'probeer opnieuw'})});await first;
  await f.ui.upload();assert.equal(JSON.parse(f.requests[1].body).requestId,JSON.parse(f.requests[2].body).requestId);assert.equal(f.refreshed,1);assert.equal(f.elements.get('kvk-upload-result').hidden,false);
 });
+test('bulk upload materializes source and guard sets once for the full inventory',()=>{
+ const sql=fs.readFileSync(path.join(__dirname,'../../supabase/migrations/20260924134500_kvk_upload_guard_lookup.sql'),'utf8');
+ for(const name of ['incoming','unused','blocked_sources','existing_identities']) assert.ok(sql.includes(`${name} as materialized`));
+ assert.match(sql,/join public.softora_outbound_recipient_guards g on g.guard_key = candidate_guard.guard_key/);
+ assert.match(sql,/c.identity_key not in \(select identity_key from existing_identities\)/);
+ assert.match(sql,/source_company_id not in \(select source_company_id from blocked_sources\)/);
+ assert.match(sql,/if p_dry_run then return v_result/);
+ assert.match(sql,/lock table public.softora_customers in share row exclusive mode/);
+});
