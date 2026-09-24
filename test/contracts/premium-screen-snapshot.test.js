@@ -120,7 +120,7 @@ test('Mailsysteem shows its snapshot instead of the loading row and replaces it 
   assert.match(page, /function setDatabaseTableBodyHtml\(html\) \{ window\.SoftoraDatabaseScreenSnapshot\?\.release\(\);/);
   assert.match(page, /setDatabaseTableBodyHtml\(tableBodyHtml\); if \(state\.remoteCustomersLoaded && !state\.dataLoading && !state\.photoRestorePending && !state\.photoRestoreFailed\) window\.SoftoraDatabaseScreenSnapshot\?\.capture\(state\);/);
   const snapshotScript = page.indexOf('assets/premium-database-screen-snapshot.js?v=20260924a');
-  assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924a') < snapshotScript);
+  assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924b') < snapshotScript);
   assert.ok(snapshotScript < page.indexOf('const state = {'), 'the snapshot is available before the first render');
 
   const adapter = require('../../assets/premium-database-screen-snapshot');
@@ -135,7 +135,7 @@ test('Klanten shows its snapshot instead of the loading overlay and releases it 
   assert.match(page, /isSnapshotShowing: function \(\) \{ return Boolean\(window\.SoftoraCustomersScreenSnapshot\?\.isShowing\(\)\); \}/);
   const adapterScript = page.indexOf('assets/premium-customers-screen-snapshot.js?v=20260924a');
   assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < adapterScript);
-  assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924a') < adapterScript);
+  assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924b') < adapterScript);
   assert.ok(page.indexOf('<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->') < adapterScript, 'the signed-in identity is known before restore');
   assert.ok(adapterScript < page.indexOf('const state = {'));
 });
@@ -148,4 +148,18 @@ test('Mailsysteem shows its subtitle and complete mail totals from the first pai
   assert.match(metrics, /if \(completeCount && instantlyCountsFromMemory\) \{/, 'the first complete count replaces the remembered one');
   assert.match(metrics, /if \(completeCount\) \{\n\s+const store = lastKnownStore\(\);\n\s+if \(store\) store\.rememberLastKnown\(INSTANTLY_COUNTS_KEY/);
   assert.match(metrics, /remembered\.dayKey === getAmsterdamDateKey\(new Date\(\)\)/, "today's Instantly count only applies on the same Amsterdam day");
+});
+
+test('capture skips screens that are too large or changed before the idle write', () => {
+  const page = setup();
+  const oversized = create({ key: 'large-page', document: page.doc, store: page.store, maxChars: 40,
+    elements: [{ id: 'rows', html: true }] });
+  page.elements.rows.innerHTML = '<tr><td>' + 'x'.repeat(100) + '</td></tr>';
+  oversized.capture('view');
+  assert.equal(page.storage.map.size, 0, 'an oversized screen is not stored');
+
+  page.snapshot.capture('view', { isValid: () => false });
+  assert.equal(page.storage.map.size, 0, 'a screen that no longer matches its view is not stored');
+  page.snapshot.capture('view', { isValid: () => true });
+  assert.equal(page.storage.map.size, 1);
 });
