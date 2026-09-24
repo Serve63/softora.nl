@@ -804,7 +804,7 @@ test('Lead Radar page, sidebar and user-visible website labels are wired', () =>
   assert.doesNotMatch(script, /instagram/i);
   assert.doesNotMatch(page, /Eigen regio's|scan-region-input|id="scan-regions"|value="custom"/);
   assert.doesNotMatch(page, /coverage-panel|Scanruns en dekking|filter-bar|filter-form|filter-platform|filter-days|filter-website-status|filter-lead-status|filter-min-score|filter-search|Filteren/i);
-  assert.match(page, /lead-radar\.css\?v=20260906a/);
+  assert.match(page, /lead-radar\.css\?v=20260924a/);
   assert.match(page, /lead-radar\.js\?v=20260906a/);
   assert.match(page, /id="scan-summary"[^>]*aria-live="polite"/);
   assert.doesNotMatch(page, /id="scan-platforms"|id="scan-region-mode"|id="scan-max-age-days"|data-custom-select/);
