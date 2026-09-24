@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="/assets/kvk-database-compact.css?v=20260909e">
   <link rel="stylesheet" href="/assets/kvk-database-redesign.css?v=20260924f">
   <link rel="stylesheet" href="/assets/kvk-api-workers.css?v=20260924c">
+  <link rel="stylesheet" href="/assets/kvk-database-upload.css?v=20260924a">
 </head>
 <body>
   <main class="app-shell">
@@ -31,7 +32,7 @@
       </div>
       <div class="header-controls">
         <button id="kvk-api-workers-open" class="kvk-api-workers-open" type="button" aria-haspopup="dialog" aria-controls="kvk-api-workers-dialog">Werkers <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="currentColor" stroke="none"/><circle cx="15" cy="17" r="3" fill="currentColor" stroke="none"/></svg></button>
-        <button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 15v5h16v-5"/></svg></button>
+        <button id="kvk-upload-open" class="transfer-button" type="button" aria-label="Upload naar mailsysteem" aria-haspopup="dialog" aria-controls="kvk-upload-dialog">Upload <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 15v5h16v-5"/></svg></button>
         <span id="last-refresh-time" class="kvk-visually-hidden">--</span>
       </div>
     </header>
@@ -179,6 +180,15 @@
 
   </main>
 
+  <dialog id="kvk-upload-dialog" class="kvk-upload-dialog" aria-labelledby="kvk-upload-title">
+    <header><h2 id="kvk-upload-title">Upload naar mailsysteem</h2><button id="kvk-upload-close" type="button" aria-label="Sluiten">×</button></header>
+    <div class="kvk-upload-options">
+      <button id="kvk-upload-with-website" class="kvk-upload-option" type="button" disabled><strong>Met website uploaden</strong><small id="kvk-upload-count">Voorraad controleren…</small></button>
+      <button class="kvk-upload-option" type="button" disabled><strong>Zonder website uploaden</strong><small>Nog niet beschikbaar</small></button>
+    </div>
+    <p id="kvk-upload-message" role="status" aria-live="polite"></p>
+    <a id="kvk-upload-result" href="/premium-database?tab=beschikbaar" target="_top" hidden>Bekijk in Beschikbaar →</a>
+  </dialog>
   <dialog id="kvk-api-workers-dialog" class="kvk-api-workers-dialog" aria-labelledby="kvk-api-workers-title">
     <div class="kvk-api-workers-dialog__head">
       <div><h2 id="kvk-api-workers-title">Database vullen</h2></div>
@@ -197,9 +207,10 @@
   <script src="/assets/kvk-database.js?v=20260914-fast-progress-planning-sync"></script>
   <script src="/assets/kvk-database-fast-progress.js?v=20260915b-planning-sync"></script>
   <script src="/assets/kvk-database-total-found.js?v=20260914a"></script>
-  <script src="/assets/kvk-database-metrics.js?v=20260924-compact-delta"></script>
+  <script src="/assets/kvk-database-metrics.js?v=20260924-upload-refresh"></script>
   <script src="/assets/kvk-database-luna-errors.js?v=20260924-robot-label"></script>
   <script src="/assets/kvk-database-control.js?v=20260923-location-count"></script>
   <script src="/assets/kvk-api-workers.js?v=20260924d"></script>
+  <script src="/assets/kvk-database-upload.js?v=20260924a"></script>
 </body>
 </html>

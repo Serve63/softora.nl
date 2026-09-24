@@ -119,7 +119,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924f/);
   assert.match(redesignSource, /\.planning-panel \.location-button\{grid-template-columns:13px minmax\(0,1fr\) auto;column-gap:6px;padding-left:12px\}/);
   assert.match(redesignSource, /\.planning-panel \.rank\{width:13px;height:13px;font-size:6px;line-height:1\}/);
-  assert.match(pageSource, /<button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload/);
+  assert.match(pageSource, /<button id="kvk-upload-open" class="transfer-button" type="button" aria-label="Upload naar mailsysteem"[^>]*>Upload/);
   assert.doesNotMatch(pageSource, /<h2 class="fixed-section-title">Onderzoeksvoortgang<\/h2>/);
   assert.match(redesignSource, /\.inventory-grid \.stat-card-directory__open,\.research-grid \.stat-card-directory__open\{display:inline-flex!important;/);
   assert.doesNotMatch(redesignSource, /\.stat-card:focus-within/);
@@ -549,7 +549,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260914-fast-progress/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260924-compact-delta/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260924-upload-refresh/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260917-control-orange/);
   assert.match(pageSource, /id="companies-control-room-last60"><span class="stat-delta-added"[^>]*>\+—<\/span><span class="stat-delta-removed"[^>]*>−—<\/span>/);
   assert.match(metricsSource, /companies-successful-found/);
@@ -707,7 +707,7 @@ test('KVK header shows the disabled mail upload action without a settings back l
   const pageSource = fs.readFileSync(path.join(repoRoot, 'premium-kvk-database.html'), 'utf8');
   const redesignStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-redesign.css'), 'utf8');
   assert.doesNotMatch(pageSource, /data-settings-module-back-host|settings-module-back\.(?:js|css)/);
-  assert.match(pageSource, /class="header-controls">\s*<button id="kvk-api-workers-open"[^>]*>Werkers[\s\S]*?<\/button>\s*<button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload/);
+  assert.match(pageSource, /class="header-controls">\s*<button id="kvk-api-workers-open"[^>]*>Werkers[\s\S]*?<\/button>\s*<button id="kvk-upload-open" class="transfer-button" type="button" aria-label="Upload naar mailsysteem"[^>]*>Upload/);
   const workerStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-api-workers.css'), 'utf8');
   assert.match(workerStyles, /min-height:32px/);
   assert.match(workerStyles, /'Oswald',sans-serif/);

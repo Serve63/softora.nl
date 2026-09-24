@@ -311,6 +311,7 @@
     const controller = createController(deps);
     controller.renderMetrics();
     void controller.refreshCanonicalCounts();
+    deps.window.addEventListener('kvk-upload-completed', () => { void controller.refreshCanonicalCounts(); });
     const treatedTotal = deps.document.getElementById('companies-treated');
     if (treatedTotal && typeof deps.window.MutationObserver === 'function') {
       const treatedObserver = new deps.window.MutationObserver(controller.renderMetrics);

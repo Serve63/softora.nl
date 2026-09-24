@@ -69,6 +69,7 @@ const { createPremiumDatabaseCustomersPageCoordinator } = require('./premium-dat
 const { createInstantlyQueueRegistrationService } = require('./instantly-queue-registration');
 const { createKvkDatabaseSnapshotService } = require('./kvk-database-snapshot');
 const { createKvkDatabaseControlService } = require('./kvk-database-control');
+const { createKvkDatabaseUploadService } = require('./kvk-database-upload');
 const { createKvkApiWorkersService } = require('./kvk-api-workers');
 const { createKvkCompanyDirectoryService } = require('./kvk-company-directory');
 const {
@@ -329,6 +330,7 @@ function registerFeatureRoutes(app, deps = {}) {
   registerKvkDatabaseRoutes(app, {
     coordinator: kvkDatabaseSnapshotCoordinator,
     controlCoordinator: kvkDatabaseControlCoordinator,
+    uploadCoordinator: createKvkDatabaseUploadService({ getSupabaseClient: whoopHealth.getSupabaseClient, getUiStateValues: deps.getUiStateValues, refreshDestination: () => premiumDatabaseMailReadySnapshotService.refreshAfterImport() }),
     apiWorkersCoordinator: kvkApiWorkersCoordinator,
     directoryCoordinator: kvkCompanyDirectoryCoordinator,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
