@@ -145,6 +145,7 @@
   }
 
   const PARTIAL_RENDER_HOLD_MS = 10000;
+  const PENDING_PARTIAL_RENDER_DELAY_MS = 1500;
 
   function createController(options = {}) {
     const stability = create();
@@ -325,15 +326,20 @@
       const keepDetailVisible = showsSnapshot || Boolean(
         preserveVisibleDetail && !detail?.classList?.contains?.('is-detail-pending')
       );
-      // While this message is already on screen, only the final, fully
-      // hydrated render replaces it: no intermediate body-only version. A slow
-      // provider (measured up to ~4 s) may not keep a read-only snapshot up forever, though.
-      let holdPartialRenders = keepDetailVisible;
+      // Only the final, fully hydrated render is shown: no body-only version
+      // that later jumps when the timeline and earlier messages arrive. A slow
+      // provider may not hold the screen forever, though: an opened message
+      // shows its complete body after a short wait, and an already visible
+      // one (snapshot or refresh; measured up to ~4 s) after a longer one.
+      const partialRenderDelayMs = keepDetailVisible
+        ? (Number.isFinite(options.visiblePartialRenderDelayMs) ? options.visiblePartialRenderDelayMs : PARTIAL_RENDER_HOLD_MS)
+        : (Number.isFinite(options.partialRenderDelayMs) ? options.partialRenderDelayMs : PENDING_PARTIAL_RENDER_DELAY_MS);
+      let holdPartialRenders = partialRenderDelayMs > 0;
       if (holdPartialRenders) {
         const fallback = setTimeout(() => {
           holdPartialRenders = false;
           if (activeContext) void publish(activeContext);
-        }, PARTIAL_RENDER_HOLD_MS);
+        }, partialRenderDelayMs);
         fallback?.unref?.();
       }
       const pendingMarker = setPending(mail.id, { keepVisible: keepDetailVisible });
