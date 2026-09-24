@@ -115,23 +115,29 @@ def website_state(answer: dict, fetch) -> tuple[str, str, str]:
 def lead_sources(answer: dict, consulted_urls: list[str], extra: list[str]) -> list[dict]:
     sources, seen = [], set()
 
-    def add(url, note, label="Bron"):
+    def add(url, note, label="Bron", exact=False):
         url = clean(url)
-        if urlsplit(url).scheme not in ("http", "https") or SEARCH_URL.search(url) or url_key(url) in seen:
+        key = url if exact else url_key(url)
+        if urlsplit(url).scheme not in ("http", "https") or key in seen \
+                or (exact and url in [source["url"] for source in sources]):
             return
-        seen.add(url_key(url))
+        seen.add(key)
         sources.append({"url": url, "label": label, "note": clean(note) or "Door Luna geopende bron."})
 
-    for source in answer.get("bronnen") or []:
-        if isinstance(source, dict):
-            add(source.get("url"), source.get("wat_gezien"))
+    listed = [source for source in answer.get("bronnen") or [] if isinstance(source, dict)]
+    # Concrete pages first; a search page Luna opened still counts as a recorded check.
+    for source in sorted(listed, key=lambda item: bool(SEARCH_URL.search(clean(item.get("url"))))):
+        label = "Zoekpagina" if SEARCH_URL.search(clean(source.get("url"))) else "Bron"
+        add(source.get("url"), source.get("wat_gezien"), label)
+    # Field evidence cites these exact URLs, so www and slash variants must not hide them.
     for url in extra:
-        add(url, "Bron van een gecontroleerd veld.")
+        add(url, "Bron van een gecontroleerd veld.", exact=True)
     # Pages Luna retrieved count as consulted sources when fewer were listed.
     for url in consulted_urls:
         if len(sources) >= 3:
             break
-        add(url, "Door Luna via de webzoektool geopend.", "Geraadpleegd")
+        if not SEARCH_URL.search(url):
+            add(url, "Door Luna via de webzoektool geopend.", "Geraadpleegd")
     return sources[:15]
 
 
