@@ -134,6 +134,6 @@ test('unavailable canonical counts preserve the snapshot fallback and remain ret
 
 test('the dashboard requests the repaired metrics asset with a fresh cache key', () => {
   const page = fs.readFileSync(path.join(__dirname, '../../premium-kvk-database.html'), 'utf8');
-  assert.match(page, /kvk-database-metrics\.js\?v=20260923-delta-style/);
+  assert.match(page, /kvk-database-metrics\.js\?v=20260924-compact-delta/);
   assert.doesNotMatch(page, /kvk-database-metrics\.js\?v=20260910-flow/);
 });

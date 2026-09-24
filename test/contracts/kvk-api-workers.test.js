@@ -200,3 +200,10 @@ test('expired in-flight slots preserve the shared money reservation', () => {
  assert.match(sql, /spent_eur_cents \+ reserved_eur_cents \+ p_reserve_eur_cents <= limit_eur_cents/);
  assert.doesNotMatch(sql, /reserved_eur_cents = reserved_eur_cents -/);
 });
+
+test('uncertain usage reports metering metadata without company content', () => {
+ const source = fs.readFileSync(path.join(root, 'server/services/kvk-api-workers.js'), 'utf8');
+ assert.match(source, /uncertain usage/);
+ assert.match(source, /responseId: data.id/);
+ assert.match(source, /input: data.usage\?\.input_tokens/);
+});

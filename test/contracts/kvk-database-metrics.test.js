@@ -217,8 +217,8 @@ test('an open page expires activity without a new snapshot and resumes with fres
   assert.equal(elements['companies-treated-last60'].nodes['.stat-delta-number'].textContent, '+24');
   now += 1000;
   controller.renderMetrics();
-  assert.equal(elements['companies-treated-last60'].nodes['.stat-delta-number'].textContent, '0');
-  assert.equal(elements['companies-usable-last60'].nodes['.stat-delta-number'].textContent, '0');
+  assert.equal(elements['companies-treated-last60'].nodes['.stat-delta-number'].textContent, '+0');
+  assert.equal(elements['companies-usable-last60'].nodes['.stat-delta-number'].textContent, '+0');
   assert.equal(elements['companies-treated'].textContent, '32.518');
   snapshot = { generatedAt: new Date(now).toISOString(), state: { ...snapshot.state, last_60_minutes: { treated: 2 } } };
   controller.renderMetrics();
@@ -271,5 +271,5 @@ test('new declarations use review decisions and do not reuse the available-stock
   assert.equal(successful.nodes['.stat-delta-number'].textContent, '-1');
   activity = { luna_max_found: 0, usable: 2 };
   controller.renderMetrics();
-  assert.equal(successful.nodes['.stat-delta-number'].textContent, '0');
+  assert.equal(successful.nodes['.stat-delta-number'].textContent, '+0');
 });
