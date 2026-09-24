@@ -166,7 +166,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.doesNotMatch(pageSource, /id="latest-treated-table-frame"/);
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260914-fast-progress/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260924-review-status/);
   assert.match(pageSource, /assets\/kvk-database-fast-progress\.js\?v=20260915b/);
   const fastProgressSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-fast-progress.js'), 'utf8');
   assert.match(fastProgressSource, /\/api\/kvk-database\/snapshot\/progress/);
@@ -176,7 +176,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260924-robot-label/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260924-worker-attribution/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -548,7 +548,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260914-fast-progress/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260924-review-status/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260924-upload-refresh/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260917-control-orange/);
   assert.match(pageSource, /id="companies-control-room-last60"><span class="stat-delta-added"[^>]*>\+—<\/span><span class="stat-delta-removed"[^>]*>−—<\/span>/);
