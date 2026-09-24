@@ -320,7 +320,14 @@ def main() -> int:
             return 1
         # A restarted process never resumes a paid run without a new button press.
         for role in ("searcher", "controller"):
-            report(role, "Lokale werker gereed; wacht op handmatige start.", halt=True)
+            while True:
+                try:
+                    report(role, "Lokale werker gereed; wacht op handmatige start.", halt=True)
+                    break
+                except RemoteFailure as error:
+                    if not transient_control_failure(error):
+                        raise
+                    time.sleep(15)
         apply_lock = threading.Lock()
         threads = [threading.Thread(target=work, args=(role, apply_lock), daemon=True)
                    for role in ("searcher", "controller")]
