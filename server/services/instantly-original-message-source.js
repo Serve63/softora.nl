@@ -12,6 +12,22 @@ const SOFTORA_SOURCE_TEXT_KEYS = Object.freeze([
 const OUTLOOK_FROM_HEADER_PATTERN = /^(?:van|from):\s*(.+)$/i;
 const OUTLOOK_SUBJECT_HEADER_PATTERN = /^(?:onderwerp|subject):/i;
 const QUOTED_BODY_AUDIT_VERSION = 'v1';
+// Instantly rotates Softora's sending accounts per sender profile, so the
+// lead's softora_sender_email (the profile default) may differ from the
+// account that actually sent it. Accounts of the same profile are the same
+// sender; any other account is still a mismatch.
+const INSTANTLY_SENDER_PROFILE_BY_ACCOUNT = Object.freeze({
+  'serve@websoftora.com': 'serve', 'servecreusen@websoftora.com': 'serve',
+  'martijn@websoftora.com': 'martijn', 'martijnven@websoftora.com': 'martijn',
+  'martijnvandeven@websoftora.com': 'martijn',
+});
+
+function isSameInstantlySender(actual, expected) {
+  if (!actual || !expected) return false;
+  if (actual === expected) return true;
+  const profile = INSTANTLY_SENDER_PROFILE_BY_ACCOUNT[actual];
+  return Boolean(profile && profile === INSTANTLY_SENDER_PROFILE_BY_ACCOUNT[expected]);
+}
 
 function text(value) {
   return String(value || '').trim();
@@ -564,7 +580,8 @@ function buildOriginalMessageSource(rawMessage = {}, rawLead = {}, options = {})
     expectedRecipient &&
     actualRecipient === expectedRecipient &&
     expectedSender &&
-    actualSender === expectedSender &&
+    (isSameInstantlySender(actualSender, expectedSender) ||
+      [lead.email_account, lead.eaccount].map(email).includes(expectedSender)) &&
     expectedSubject &&
     actualSubject === expectedSubject
   );
@@ -601,6 +618,7 @@ function buildOriginalMessageSource(rawMessage = {}, rawLead = {}, options = {})
 }
 
 module.exports = {
+  ORIGINAL_SOURCE_EVIDENCE_VERSION: 2,
   bodyMatchesProviderCopy,
   buildStrictThreadQuotedMessageSource,
   buildIndexedThreadAuditState,

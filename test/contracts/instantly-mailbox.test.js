@@ -2492,3 +2492,32 @@ test('campaign aggregation retains both proven owners while refreshing only the 
     { code: 'INSTANTLY_OWNER_REQUIRED', status: 400 }
   );
 });
+
+test('exact lead source accepts another Instantly account of the same sender profile, never another profile', () => {
+  const providerText = 'Dit is een voldoende lange providertekst met concrete inhoud voor een betrouwbare vergelijking van dezelfde originele mail.';
+  const rawMessage = {
+    lead_id: 'lead-1', campaign_id: 'campaign-martijn', subject: 'Kleine vraag',
+    body: { html: `<p>${providerText}</p>` },
+  };
+  const lead = (senderEmail) => ({
+    id: 'lead-1', campaign: 'campaign-martijn', email: 'prospect@example.org',
+    payload: {
+      softora_sender_email: senderEmail,
+      softora_subject: 'Kleine vraag',
+      softora_webdesign_public_url: 'https://www.softora.nl/webdesign/prospect',
+      softora_instantly_email_html: `<p>${providerText} 😁</p><p><a href="https://www.softora.nl/webdesign/prospect">hier</a> 🎨</p>`,
+    },
+  });
+  // Instantly sent from martijnven@, the lead carries Martijn's profile default martijn@.
+  const sameProfile = buildOriginalMessageSource(rawMessage, lead('martijn@websoftora.com'), {
+    accountEmail: 'martijnven@websoftora.com', recipientEmail: 'prospect@example.org',
+  });
+  assert.equal(sameProfile.available, true);
+  assert.match(sameProfile.body, /😁/);
+  assert.match(sameProfile.body, /🎨/);
+
+  const otherProfile = buildOriginalMessageSource(rawMessage, lead('serve@websoftora.com'), {
+    accountEmail: 'martijnven@websoftora.com', recipientEmail: 'prospect@example.org',
+  });
+  assert.deepEqual(otherProfile, { evidenceKnown: true, available: false, reason: 'identity-mismatch' });
+});
