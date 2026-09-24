@@ -544,13 +544,27 @@ async function refreshTeam() {
     return;
   }
   var list = document.getElementById('personeel-list');
-  renderUserManagementEmptyState(list, 'Gebruikers laden...');
+  // Open with the last verified team (docs/platform-performance.md); its rows
+  // stay inert until the live list replaces them, so no action runs on it.
+  var store = typeof window !== 'undefined' ? window.SoftoraReadModelStore : null;
+  var canRemember = Boolean(store && typeof store.readLastKnown === 'function' && typeof store.rememberLastKnown === 'function');
+  var remembered = canRemember ? store.readLastKnown('premium-users', 36 * 60 * 60 * 1000) : null;
+  if (Array.isArray(remembered)) {
+    team = remembered;
+    render();
+    list.inert = true;
+  } else {
+    renderUserManagementEmptyState(list, 'Gebruikers laden...');
+  }
   try {
     var payload = await fetchJson('/api/premium-users', { method: 'GET' });
     team = Array.isArray(payload.users) ? payload.users : [];
+    if (canRemember) store.rememberLastKnown('premium-users', team);
     render();
+    list.inert = false;
   } catch (error) {
-    renderUserManagementEmptyState(list, error.message || 'Gebruikers laden mislukt.');
+    // A remembered list stays display-only when the live list is unavailable.
+    if (!Array.isArray(remembered)) renderUserManagementEmptyState(list, error.message || 'Gebruikers laden mislukt.');
   }
 }
 

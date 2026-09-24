@@ -113,7 +113,7 @@ test('premium instellingen gebruikt delegated actions zonder inline handlers', (
   assert.doesNotMatch(userManagementSource, /window\.location\.href = moduleHref;/);
   assert.match(source, /premium-extra-modules\.js\?v=20260811a/);
   assert.match(source, /settings-module-routes\.js\?v=20260910a/);
-  assert.match(source, /premium-user-management\.js\?v=20260909c/);
+  assert.match(source, /premium-user-management\.js\?v=20260924a/);
   assert.match(userManagementSource, /card\.className = 'tegel settings-extra-card';/);
   assert.match(userManagementSource, /appendUserManagementTextElement\(card, 'div', 'tegel-label', label\);/);
   assert.match(moduleRoutesSource, /label: 'Winnen'[\s\S]*label: 'Database'[\s\S]*label: "Servé's gezondheidsdossier"/);
@@ -147,4 +147,15 @@ test('EXTRA-kaarten sorteren stabiel op toegang: eerst unlocked, daarna locked',
     extraModules.sortExtraSettingsItems(items).map((item) => item.label),
     ['open-a', 'open-b', 'locked-a', 'locked-b']
   );
+});
+
+test('instellingen opent met het laatst bekende team, alleen-lezen tot de live lijst binnen is', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../assets/premium-user-management.js'), 'utf8');
+  assert.match(source, /var remembered = canRemember \? store\.readLastKnown\('premium-users', 36 \* 60 \* 60 \* 1000\) : null;/);
+  assert.match(source, /team = remembered;\n\s+render\(\);\n\s+list\.inert = true;/);
+  assert.match(source, /if \(canRemember\) store\.rememberLastKnown\('premium-users', team\);\n\s+render\(\);\n\s+list\.inert = false;/);
+  assert.match(source, /if \(!Array\.isArray\(remembered\)\) renderUserManagementEmptyState\(list, error\.message \|\| 'Gebruikers laden mislukt\.'\);/);
+  assert.doesNotMatch(source, /finally \{\n\s+list\.inert = false;/, 'a failed refresh never unlocks a remembered list');
+  const page = fs.readFileSync(path.join(__dirname, '../../premium-instellingen.html'), 'utf8');
+  assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < page.indexOf('assets/premium-user-management.js?v=20260924a'));
 });
