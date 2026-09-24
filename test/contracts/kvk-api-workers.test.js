@@ -316,3 +316,10 @@ test('only search actions carry the per-call search fee', () => {
   // An item without a recognisable action is charged as a search.
   assert.deepEqual(toolUsage(data), { searches: 3, pageOpens: 2 });
 });
+
+test('Luna Searcher records mentioned but unkept contacts as rejected for the canonical validator', () => {
+  const mapper = fs.readFileSync(path.join(root, 'scripts/kvk_luna_searcher.py'), 'utf8');
+  assert.match(mapper, /def withhold_unaccepted_contacts/);
+  assert.match(mapper, /"reason_code": "unverified_candidate"/);
+  assert.match(mapper, /withhold_unaccepted_contacts\(result, reference/);
+});
