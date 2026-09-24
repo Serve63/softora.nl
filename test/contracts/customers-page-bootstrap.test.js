@@ -1289,3 +1289,11 @@ test('dashboard customer bootstrap misses are logged once per reason instead of 
     console.warn = originalWarn;
   }
 });
+
+test('the agenda runtime options keep listDashboardCustomers for the Dashboard and Klanten bootstrap', () => {
+  const { buildAgendaAppRuntimeOptions } = require('../../server/services/server-app-runtime-feature-options');
+  const listDashboardCustomers = async () => [];
+  const options = buildAgendaAppRuntimeOptions({ listDashboardCustomers });
+  assert.equal(options.listDashboardCustomers, listDashboardCustomers,
+    'dropping it made every Dashboard and Klanten HTML bootstrap come back without customers');
+});

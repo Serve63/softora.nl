@@ -321,6 +321,7 @@ function buildAgendaAppRuntimeOptions({
   agendaPostCallHelpers,
   getUiStateValues,
   setUiStateValues,
+  listDashboardCustomers,
   premiumActiveOrdersScope,
   premiumActiveCustomOrdersKey,
   premiumCustomersScope,
@@ -422,6 +423,8 @@ function buildAgendaAppRuntimeOptions({
     agendaPostCallHelpers,
     getUiStateValues,
     setUiStateValues,
+    // Without it the Dashboard and Klanten HTML bootstrap never contains customers.
+    listDashboardCustomers,
     premiumActiveOrdersScope,
     premiumActiveCustomOrdersKey,
     premiumCustomersScope,
