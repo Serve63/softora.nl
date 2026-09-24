@@ -412,7 +412,10 @@ function createMailboxIndexStore(deps = {}) {
       normalized.providerOwner = normalizeString(payload.providerOwner).toLowerCase();
       normalized.providerBodyHtmlEvidenceKnown = payload.providerBodyHtmlEvidenceKnown === true;
       normalized.providerRichBodyAvailable = payload.providerRichBodyAvailable === true;
-      normalized.providerOriginalBodyEvidenceKnown = payload.providerOriginalBodyEvidenceKnown === true;
+      // An unavailable verdict from before the sender-profile fix (evidence
+      // version 2) is re-audited once; a proven original always stays.
+      normalized.providerOriginalBodyEvidenceKnown = payload.providerOriginalBodyEvidenceKnown === true &&
+        (payload.providerOriginalBodyAvailable === true || Number(payload.providerOriginalBodyEvidenceVersion) >= 2);
       normalized.providerOriginalBodyAvailable = payload.providerOriginalBodyAvailable === true;
       normalized.providerQuotedBodyAuditReplyId = normalizeString(payload.providerQuotedBodyAuditReplyId);
       normalized.storageFolder = normalizeFolder(row.folder);
@@ -490,6 +493,7 @@ function createMailboxIndexStore(deps = {}) {
         providerBodyHtmlEvidenceKnown: message.providerBodyHtmlEvidenceKnown === true,
         providerRichBodyAvailable: message.providerRichBodyAvailable === true,
         providerOriginalBodyEvidenceKnown: message.providerOriginalBodyEvidenceKnown === true,
+        providerOriginalBodyEvidenceVersion: message.providerOriginalBodyEvidenceKnown === true ? 2 : 0,
         providerOriginalBodyAvailable: message.providerOriginalBodyAvailable === true,
         providerQuotedBodyAuditReplyId: truncateText(normalizeString(message.providerQuotedBodyAuditReplyId), 120),
         webdesignLinkEvidenceKnown: message.webdesignLinkEvidenceKnown === true,
@@ -533,7 +537,7 @@ function createMailboxIndexStore(deps = {}) {
         row.preview = previous.preview;
         row.has_body = previous.has_body;
         row.body_truncated = previous.body_truncated;
-        row.payload = { ...row.payload, providerOriginalBodyEvidenceKnown: true,
+        row.payload = { ...row.payload, providerOriginalBodyEvidenceKnown: true, providerOriginalBodyEvidenceVersion: 2,
           providerOriginalBodyAvailable: true,
           webdesignLinkEvidenceKnown: previous.payload.webdesignLinkEvidenceKnown === true,
           webdesignLinkUrl: previous.payload.webdesignLinkUrl || '' };
