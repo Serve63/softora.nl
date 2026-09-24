@@ -1,0 +1,50 @@
+/*
+ * The Typekit service used to deliver this font or fonts for use on websites
+ * is provided by Adobe and is subject to these Terms of Use
+ * http://www.adobe.com/products/eulas/tou_typekit. For font license
+ * information, see the list below.
+ *
+ * forma-djr-deck:
+ *   - http://typekit.com/eulas/00000000000000007759f927
+ *   - http://typekit.com/eulas/00000000000000007759f93a
+ *   - http://typekit.com/eulas/00000000000000007759f92d
+ *   - http://typekit.com/eulas/00000000000000007759f92f
+ *   - http://typekit.com/eulas/00000000000000007759f92c
+ *
+ * © 2009-2026 Adobe Systems Incorporated. All Rights Reserved.
+ */
+/*{"last_published":"2026-09-19 22:24:25 UTC"}*/
+
+
+
+@font-face {
+font-family:"forma-djr-deck";
+src:url("media/16979c3dae-l.woff2") format("woff2"),url("media/b2b02c2285-d.woff2") format("woff"),url("media/f96afd4231-a.woff2") format("opentype");
+font-display:auto;font-style:normal;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"forma-djr-deck";
+src:url("media/f73b34e981-l.woff2") format("woff2"),url("media/17db381b25-d.woff2") format("woff"),url("media/36f65c2add-a.woff2") format("opentype");
+font-display:auto;font-style:italic;font-weight:400;font-stretch:normal;
+}
+
+@font-face {
+font-family:"forma-djr-deck";
+src:url("media/4c82d12e1e-l.woff2") format("woff2"),url("media/5440d65971-d.woff2") format("woff"),url("media/252db0c162-a.woff2") format("opentype");
+font-display:auto;font-style:normal;font-weight:500;font-stretch:normal;
+}
+
+@font-face {
+font-family:"forma-djr-deck";
+src:url("media/db5942b30a-l.woff2") format("woff2"),url("media/24b6684cd8-d.woff2") format("woff"),url("media/82eb867dad-a.woff2") format("opentype");
+font-display:auto;font-style:italic;font-weight:700;font-stretch:normal;
+}
+
+@font-face {
+font-family:"forma-djr-deck";
+src:url("media/f0979165a2-l.woff2") format("woff2"),url("media/46d5ad222f-d.woff2") format("woff"),url("media/a76efadef2-a.woff2") format("opentype");
+font-display:auto;font-style:normal;font-weight:700;font-stretch:normal;
+}
+
+.tk-forma-djr-deck { font-family: "forma-djr-deck",sans-serif; }

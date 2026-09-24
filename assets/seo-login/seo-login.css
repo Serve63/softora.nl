@@ -1,0 +1,26 @@
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif}.field{display:flex;flex-direction:column;gap:7px}.button{cursor:pointer}.login-notice{font-size:12px;color:#77717b;line-height:1.6;margin-top:18px}@font-face{font-family:Oswald;src:url('/assets/fonts/oswald-latin.woff2')}
+.login-screen--calm { display: flex; flex-direction: column; min-height: 100vh; background: #f8f7f5; color: #24212a; }
+.login-screen--calm .calm-brand { padding: 32px 40px; text-align: center; }
+.login-screen--calm .calm-brand a { display: inline-block; font: 700 25px/1 Oswald, sans-serif; letter-spacing: -.6px; color: #24212a; text-decoration: none; }
+.login-screen--calm .calm-brand a::after { content: ''; display: block; width: 46px; height: 3px; background: #8b2252; margin: 8px auto 0; }
+.login-screen--calm .login-form-wrap { display: flex; flex: 1; align-items: flex-start; justify-content: center; padding: clamp(24px,8vh,88px) 24px 64px; background: transparent; }
+.login-screen--calm .login-card { width: 100%; max-width: 420px; padding: 38px 36px; border: 1px solid #eae5e7; border-radius: 20px; background: #fff; box-shadow: 0 12px 40px #35202b06; }
+.login-screen--calm .login-card .eyebrow { color: #8b2252; font: 600 10px/1.4 Inter,sans-serif; letter-spacing: 1.6px; margin-bottom: 12px; }
+.login-screen--calm .login-card h2 { font: 700 30px/1.2 Oswald,sans-serif; letter-spacing: -.5px; margin: 0 0 12px; text-transform: none; }
+.login-screen--calm .login-card > p { font: 400 13px/1.7 Inter,sans-serif; color: #77717b; margin: 0 0 28px; }
+.login-screen--calm .field { margin: 0 0 18px; }
+.login-screen--calm .field label { font: 500 12px/1.5 Inter,sans-serif; color: #443c46; }
+.login-screen--calm .field input { font: 400 13px/1.5 Inter,sans-serif; min-height: 46px; border: 1px solid #e1dbe0; border-radius: 9px; background: #fff; padding: 12px 14px; }
+.login-screen--calm .field input:focus { outline: 2px solid #8b225225; border-color: #8b2252; }
+.login-screen--calm .button--primary { width: 100%; min-height: 46px; margin-top: 6px; border: 0; border-radius: 9px; background: #8b2252; color: #fff; font: 600 13px/1.5 Inter,sans-serif; letter-spacing: 0; }
+.login-screen--calm .button--primary:hover { background: #762047; }
+.login-screen--calm .auth-switch, .login-screen--calm .calm-local-link { display: block; text-align: center; margin: 20px auto 0; color: #82727c; font: 400 11px/1.5 Inter,sans-serif; text-decoration: none; }
+@media(max-width: 520px) { .login-screen--calm .calm-brand { padding: 28px 20px; } .login-screen--calm .login-form-wrap { padding: 24px 18px 40px; } .login-screen--calm .login-card { padding: 30px 24px; } }
+
+.login-screen--calm { position: relative; isolation: isolate; }
+.login-screen--calm .calm-brand { position: absolute; top: 0; left: 0; right: 0; z-index: 1; }
+.login-screen--calm .login-form-wrap { min-height: 100svh; align-items: center; padding: 112px 24px; }
+@media(max-width: 520px) { .login-screen--calm .login-form-wrap { padding: 100px 18px; } }
+
+.login-screen--calm { background: linear-gradient(rgba(248,247,245,.38), rgba(248,247,245,.38)), url('seo-login-background-v2.png') center / cover no-repeat; }
+.login-screen--calm .login-card { background: rgba(255,255,255,.96); box-shadow: 0 18px 60px #35202b0a; }
