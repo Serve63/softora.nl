@@ -1,18 +1,7 @@
 .header-controls .transfer-button:not(:disabled){cursor:pointer}
-.kvk-upload-dialog{width:min(410px,calc(100vw - 40px));padding:0;border:1px solid #e6dce2;border-radius:14px;background:#fff;color:#302630;box-shadow:0 12px 40px #47243a20;font-family:Inter,sans-serif}
-.kvk-upload-dialog::backdrop{background:transparent}
-.kvk-upload-dialog header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid #f0e8ec}
-.kvk-upload-dialog h2{margin:0;font:600 19px Oswald,sans-serif}
-#kvk-upload-close{border:0;background:none;font-size:22px;color:#827680;cursor:pointer}
-.kvk-upload-options{display:grid;gap:10px;padding:18px 20px 0}
-.kvk-upload-option{display:flex;flex-direction:column;align-items:flex-start;gap:7px;width:100%;padding:15px;border:1px solid #d9becd;border-radius:9px;background:#fcf7fa;color:#8e2f5f;font:500 12px Inter,sans-serif;text-align:left;cursor:pointer}
-.kvk-upload-option strong{font-size:12px;font-weight:650}
-.kvk-upload-option small{font-size:10px;color:#827680;line-height:1.4}
-.kvk-upload-option:hover:not(:disabled){border-color:#8e2f5f;background:#f8eef3}
-.kvk-upload-option:disabled{cursor:default;background:#faf9fa;border-color:#ece7ea;color:#a1969e}
-#kvk-upload-message{margin:15px 20px;color:#71636d;font-size:11px;line-height:1.5}
-#kvk-upload-message:empty{display:none}
+.kvk-upload-dialog .kvk-api-workers-dialog__count input{width:64px}
+.kvk-upload-dialog .kvk-api-workers-dialog__row>div:first-child{min-width:0}
 #kvk-upload-result{display:block;margin:15px 20px;color:#8e2f5f;font-size:11px;text-underline-offset:3px}
 #kvk-upload-result[hidden]{display:none}
-.kvk-upload-options{padding-bottom:18px}
-.kvk-upload-dialog button:focus-visible,.kvk-upload-dialog a:focus-visible{outline:2px solid #8e2f5f;outline-offset:3px}
+.kvk-upload-dialog a:focus-visible{outline:2px solid #8e2f5f;outline-offset:3px}
+@media(max-width:380px){.kvk-upload-dialog .kvk-api-workers-dialog__row{flex-wrap:wrap}.kvk-upload-dialog .kvk-api-workers-dialog__actions{margin-left:auto}}

@@ -23,10 +23,10 @@ test('preview is read-only and derives candidates from the canonical source',asy
  const r=res();await f.service.preview({},r);assert.equal(r.body.count,1);assert.equal(f.calls[0].args.p_dry_run,true);assert.equal(f.calls[0].args.p_request_id,null);assert.ok(f.calls[0].args.p_candidates[0].guard_keys.includes('email:info@voorbeeld.nl'));
 });
 test('committed retry returns the receipt without selecting or uploading more companies',async()=>{
- const f=fixture({receipt:{result:{count:12,destination:'available'}}});const r=res();await f.service.upload({body:{mode:'with-website',requestId:id}},r);assert.equal(r.body.count,12);assert.equal(r.body.replayed,true);assert.equal(f.calls.length,0);assert.equal(f.invalidated,1);
+ const f=fixture({receipt:{result:{count:12,destination:'available'}}});const r=res();await f.service.upload({body:{mode:'with-website',requestId:id,count:1}},r);assert.equal(r.body.count,12);assert.equal(r.body.replayed,true);assert.equal(f.calls.length,0);assert.equal(f.invalidated,1);
 });
 test('unreadable source never falls back to uploading client data',async()=>{
- const f=fixture({fail:true});const r=res();await f.service.upload({body:{mode:'with-website',requestId:id,rows:[{email:'evil'}]}},r);assert.equal(r.statusCode,503);assert.equal(f.calls.length,0);
+ const f=fixture({fail:true});const r=res();await f.service.upload({body:{mode:'with-website',requestId:id,count:1,rows:[{email:'evil'}]}},r);assert.equal(r.statusCode,503);assert.equal(f.calls.length,0);
 });
 test('both upload routes require admin access',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../../server/routes/kvk-database.js'),'utf8');
@@ -53,7 +53,7 @@ test('UI preserves request ID after uncertain failure and prevents duplicate in-
  const f=uiFixture(async(options,n)=>{if(!options.method)return {ok:true,json:async()=>({ok:true,count:3})};if(n===2)return new Promise(resolve=>{resolvePost=resolve;});return {ok:true,json:async()=>({ok:true,count:3})};});
  await f.ui.open(); const first=f.ui.upload(); await Promise.resolve(); await f.ui.upload();assert.equal(f.requests.length,2);
  resolvePost({ok:false,json:async()=>({ok:false,error:'probeer opnieuw'})});await first;
- await f.ui.upload();assert.equal(JSON.parse(f.requests[1].body).requestId,JSON.parse(f.requests[2].body).requestId);assert.equal(f.refreshed,1);assert.equal(f.elements.get('kvk-upload-result').hidden,false);
+ f.elements.get('kvk-upload-amount').value='999';await f.ui.upload();assert.equal(JSON.parse(f.requests[2].body).count,1);assert.equal(JSON.parse(f.requests[1].body).requestId,JSON.parse(f.requests[2].body).requestId);assert.equal(f.refreshed,1);assert.equal(f.elements.get('kvk-upload-result').hidden,false);
 });
 test('bulk upload materializes source and guard sets once for the full inventory',()=>{
  const sql=fs.readFileSync(path.join(__dirname,'../../supabase/migrations/20260924134500_kvk_upload_guard_lookup.sql'),'utf8');
@@ -63,4 +63,32 @@ test('bulk upload materializes source and guard sets once for the full inventory
  assert.match(sql,/source_company_id not in \(select source_company_id from blocked_sources\)/);
  assert.match(sql,/if p_dry_run then return v_result/);
  assert.match(sql,/lock table public.softora_customers in share row exclusive mode/);
+});
+
+test('upload requires an explicit integer count and passes it to the transaction',async()=>{
+ for(const count of [undefined,0,-1,1.5,'2',50001]) {
+  const f=fixture();const r=res();await f.service.upload({body:{mode:'with-website',requestId:id,count}},r);
+  assert.equal(r.statusCode,400);assert.equal(f.calls.length,0);
+ }
+ const f=fixture();const r=res();await f.service.upload({body:{mode:'with-website',requestId:id,count:2}},r);
+ assert.equal(f.calls[0].name,'softora_kvk_upload_available_counted');assert.equal(f.calls[0].args.p_limit,2);
+});
+test('counted transaction limits only after deduplication and fails before writes if stock fell',()=>{
+ const sql=fs.readFileSync(path.join(__dirname,'../../supabase/migrations/20260924140652_kvk_upload_selected_count.sql'),'utf8');
+ assert.match(sql,/v_ids := v_ids\[1:p_limit\]/);
+ assert.match(sql,/v_count < p_limit/);
+ assert.match(sql,/errcode = 'P0002'/);
+ assert.ok(sql.indexOf('v_count < p_limit')<sql.indexOf('insert into public.softora_customers'));
+ assert.match(sql,/array_agg\(source_company_id order by source_company_id\)/);
+ assert.match(sql,/from public,anon,authenticated/);
+});
+test('upload modal reuses worker design and has a typeable count without spinner arrows',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../../premium-kvk-database.html'),'utf8');
+ assert.match(html,/class="kvk-api-workers-dialog kvk-upload-dialog"/);
+ assert.match(html,/id="kvk-upload-amount"[^>]*type="text"[^>]*inputmode="numeric"/);
+});
+test('UI sends the chosen count and rejects numbers above the available stock',async()=>{
+ const f=uiFixture(async()=>({ok:true,json:async()=>({ok:true,count:12})}));
+ await f.ui.open();f.elements.get('kvk-upload-amount').value='13';await f.ui.upload();assert.equal(f.requests.length,1);
+ f.elements.get('kvk-upload-amount').value='5';await f.ui.upload();assert.equal(JSON.parse(f.requests[1].body).count,5);
 });
