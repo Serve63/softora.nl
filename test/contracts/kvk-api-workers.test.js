@@ -295,3 +295,11 @@ test('dashboard state names the model that actually runs', async () => {
   assert.equal(res.body.state.modelLabel, 'Luna 6 Max');
   assert.equal(res.body.state.budget.reservationEur, 1);
 });
+
+test('Searcher maps a saved Luna answer before the apply step looks for it', () => {
+  const runner = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
+  const searcher = runner.slice(runner.indexOf('def luna_search_one'), runner.indexOf('def research_one'));
+  assert.ok(searcher.indexOf('to_canonical(') > 0);
+  assert.ok(searcher.indexOf('to_canonical(') < searcher.indexOf('if not validate:'),
+    'apply_ready_prefix skips a queue head whose mapped result does not exist yet');
+});

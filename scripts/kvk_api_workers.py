@@ -229,11 +229,12 @@ def luna_search_one(company: dict, flags: list[str], validate: bool = True) -> b
             raise RuntimeError("Luna gaf geen geldig antwoord voor de juiste onderneming terug.")
         save_result(answer_path, {"answer": answer, "consulted_urls": response.get("consultedUrls") or [],
                                   "cost_eur_cents": response.get("costEurCents")})
+    if not path.exists():
+        # The apply step only picks up a queue head whose mapped result exists.
+        saved = json.loads(answer_path.read_text())
+        save_result(path, to_canonical(company, saved["answer"], saved.get("consulted_urls") or []))
     if not validate:
         return True
-    saved = json.loads(answer_path.read_text())
-    if not path.exists():
-        save_result(path, to_canonical(company, saved["answer"], saved.get("consulted_urls") or []))
     try:
         run_cli("contact_agent_precheck.py", str(path), *flags)
     except ValidationFailure as error:

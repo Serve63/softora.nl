@@ -39,9 +39,21 @@ class WorkerTests(unittest.TestCase):
         def call(path, payload, **kwargs):
             barrier.wait(timeout=3)
             return {'ok': True, 'result': payload['company']}
-        with patch.object(runner, 'call', side_effect=call):
+        with patch.object(runner, 'call', side_effect=call), \
+                patch.object(kvk_luna_searcher, 'to_canonical', side_effect=lambda company, *_: company):
             runner.research_batch('searcher', self.packet, [], 3)
         self.assertEqual(len(list(runner.PENDING.glob('contact_agent_results_api_searcher_initial_????????.luna.json'))), 3)
+        # The apply step needs the mapped result, not only the raw answer.
+        self.assertEqual(len(list(runner.PENDING.glob('contact_agent_results_api_searcher_initial_????????.json'))), 3)
+
+    def test_researched_queue_head_reaches_the_apply_step(self):
+        with patch.object(runner, 'call', return_value={'ok': True, 'result': self.packet['bedrijven'][0]}), \
+                patch.object(kvk_luna_searcher, 'to_canonical', side_effect=lambda company, *_: company), \
+                patch.object(runner, 'apply_result', return_value=True) as apply, patch.object(runner, 'report'):
+            packet = {'bedrijven': self.packet['bedrijven'][:1]}
+            runner.research_batch('searcher', packet, [], 1)
+            self.assertEqual(runner.apply_ready_prefix('searcher', packet, [], threading.Lock()), 1)
+            apply.assert_called_once()
 
     def test_saved_paid_results_are_reused(self):
         company = self.packet['bedrijven'][0]
@@ -67,10 +79,11 @@ class WorkerTests(unittest.TestCase):
         company = self.packet['bedrijven'][0]
         path = runner.pending_path('searcher', company['kvk_nummer'], [])
         runner.save_result(path, dict(company, model='sol'))
-        with patch.object(runner, 'call', return_value={'ok': True, 'result': company}) as call:
+        with patch.object(runner, 'call', return_value={'ok': True, 'result': company}) as call, \
+                patch.object(kvk_luna_searcher, 'to_canonical', return_value=company):
             self.assertTrue(runner.research_one('searcher', company, {}, [], False))
             call.assert_called_once()
-        self.assertFalse(path.exists())
+        self.assertNotIn('sol', path.read_text())
         self.assertEqual(len(list(runner.PENDING.glob('*.retired-*.json'))), 1)
 
     def test_apply_never_skips_missing_queue_head(self):
@@ -85,7 +98,8 @@ class WorkerTests(unittest.TestCase):
             if payload['company']['kvk_nummer'] == '00000002':
                 raise RuntimeError('provider failed')
             return {'ok': True, 'result': payload['company']}
-        with patch.object(runner, 'call', side_effect=call):
+        with patch.object(runner, 'call', side_effect=call), \
+                patch.object(kvk_luna_searcher, 'to_canonical', side_effect=lambda company, *_: company):
             with self.assertRaises(RuntimeError):
                 runner.research_batch('searcher', self.packet, [], 3)
         self.assertEqual(len(list(runner.PENDING.glob('contact_agent_results_api_searcher_initial_????????.luna.json'))), 2)
