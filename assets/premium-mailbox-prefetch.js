@@ -9,6 +9,7 @@
 
   const DEFAULT_MAX = 6;
   const DEFAULT_DELAY_MS = 1200;
+  const STALE_RETRY_MS = 60000;
 
   function create(options = {}) {
     const max = Math.max(1, Number(options.max) || DEFAULT_MAX);
@@ -21,6 +22,8 @@
     let running = false;
     let rerun = false;
     const warmed = new WeakSet();
+    const staleAttempts = new WeakMap();
+    const now = options.now || (() => Date.now());
 
     const isActive = (mail) => String(options.getActiveMail?.() || '') === String(mail?.id || '');
 
@@ -30,7 +33,12 @@
       const list = (options.getMails?.() || []).filter(Boolean);
       const activeIndex = list.findIndex(isActive);
       const ordered = [...(activeIndex >= 0 ? list.slice(activeIndex + 1, activeIndex + 1 + max) : []), ...list.slice(0, max)];
-      return [...new Set(ordered)].filter((mail) => !isActive(mail) && !warmed.has(mail)).slice(0, max);
+      // A dossier that a list refresh marked stale is warmed again (at most
+      // once a minute, so a dossier that cannot refresh is not retried per render).
+      const staleDue = (mail) => mail.contactTimelineNeedsRefresh === true &&
+        (!staleAttempts.has(mail) || now() - staleAttempts.get(mail) >= STALE_RETRY_MS);
+      return [...new Set(ordered)].filter((mail) => !isActive(mail) &&
+        (!warmed.has(mail) || staleDue(mail))).slice(0, max);
     }
 
     async function warm(run) {
@@ -47,6 +55,7 @@
         if (!current()) return;
         if (isActive(mail)) continue;
         try {
+          if (mail.contactTimelineNeedsRefresh === true) staleAttempts.set(mail, now());
           await options.discovery?.prefetchContactTimeline?.(mail, { signal });
           if (!current() || isActive(mail)) continue;
           if (mail.bodyLoaded && options.shouldHydrateThread?.(mail)) {
