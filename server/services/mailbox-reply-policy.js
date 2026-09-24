@@ -1,6 +1,6 @@
 const REPLY_QUOTE_HEADER_PATTERN = /^(?:op\s.+\sheeft\s.+\shet\svolgende\sgeschreven:|op\s.+\sschreef\s.+:|on\s.+\swrote:|van:|from:)/i;
 const CTA_PATTERN = /\b(?:langskom|langskomen|kennismaken|afspraak\s+maken|even\s+bellen|samen\s+bespreken|samen\s+(?:kort\s+)?bekijken|welke\s+dag\s+(?:past|schikt)|wanneer\s+(?:past|schikt))\b/i;
-const REPLY_POLICY_VERSION = 'softora-grounded-reply-v7';
+const REPLY_POLICY_VERSION = 'softora-grounded-reply-v8';
 const { hasUngroundedReplyFacts } = require('./mailbox-reply-facts');
 const STOP_WORDS = new Set([
   'aan', 'als', 'ben', 'bij', 'dan', 'dat', 'de', 'deze', 'die', 'dit', 'een', 'en', 'er', 'geen',
@@ -85,7 +85,10 @@ function clean(value) {
 }
 
 function authoredReplyText(value) {
-  const lines = clean(value).split('\n');
+  // Mobile mail clients sometimes glue the original-message separator to the
+  // sender's last line. The quoted sales mail must not become the new request.
+  const beforeOriginal = clean(value).split(/[-–]{4,}\s*(?:Oorspronkelijk bericht|Original Message)\s*[-–]{4,}/i)[0];
+  const lines = beforeOriginal.split('\n');
   const quoteIndex = lines.findIndex((line) => REPLY_QUOTE_HEADER_PATTERN.test(line.trim()) || /^(?:(?:met\s+)?(?:hartelijke|vriendelijke)\s+groet(?:en)?|groetjes|groeten|groet|mvg)[,.!;]?$/i.test(line.trim()) || /^>/.test(line.trim()));
   return (quoteIndex >= 0 ? lines.slice(0, quoteIndex) : lines).join('\n').trim();
 }
@@ -121,7 +124,7 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
     .map((text, index) => ({ id: `q${index + 1}`, text: text.trim() }));
   const text = normalize(authoredText);
   const rejection = matches(text,
-    /\b(?:geen|niet)\s+(?:enige\s+)?(?:interesse|behoefte|belangstelling)\b|\bniet\s+geinteresseerd\b|\bniet\s+meer\s+mailen\b|\bmail\s+(?:mij|ons)\s+niet\s+meer\b|\bschrijf\s+(?:mij|ons)\s+uit\b|\bafmelden\b|\buitschrijven\b|\bgeen\s+gebruik\s+maken\b|\bniet\s+ingaan\s+op\b|\blaat\s+het\s+hierbij\b|\bhelaas\s+niet\b|\bniet\s+wat\s+(?:ik|we|wij)\s+zoek(?:en)?\b|\bbuiten\s+(?:onze|de)\s+scope\b|\b(?:traject|samenwerking|vervolg|opdracht)\b[^.!?]{0,120}\b(?:niet\s+aan\s+de\s+orde|geen\s+sprake|niet\s+relevant)\b|\b(?:wij|we|ik)\s+(?:gaan|willen|kunnen)\s+(?:hier\s+)?niet\s+(?:mee\s+)?(?:verder|door)\b|\b(?:wij|we|ik)\s+(?:gaan|zullen|willen)\s+(?:het|dit|dat)\s+(?:echter\s+)?niet\s+gebruiken\b/
+    /\b(?:geen|niet)\s+(?:enige\s+)?(?:interesse|behoefte|belangstelling)\b|\bgeen\s+(?:verdere\s+)?ondersteuning\s+nodig\b|\bniet\s+geinteresseerd\b|\bniet\s+meer\s+mailen\b|\bmail\s+(?:mij|ons)\s+niet\s+meer\b|\bschrijf\s+(?:mij|ons)\s+uit\b|\bafmelden\b|\buitschrijven\b|\bgeen\s+gebruik\s+maken\b|\bniet\s+ingaan\s+op\b|\blaat\s+het\s+hierbij\b|\bhelaas\s+niet\b|\bniet\s+wat\s+(?:ik|we|wij)\s+zoek(?:en)?\b|\bbuiten\s+(?:onze|de)\s+scope\b|\b(?:traject|samenwerking|vervolg|opdracht)\b[^.!?]{0,120}\b(?:niet\s+aan\s+de\s+orde|geen\s+sprake|niet\s+relevant)\b|\b(?:wij|we|ik)\s+(?:gaan|willen|kunnen)\s+(?:hier\s+)?niet\s+(?:mee\s+)?(?:verder|door)\b|\b(?:wij|we|ik)\s+(?:gaan|zullen|willen)\s+(?:het|dit|dat)\s+(?:echter\s+)?niet\s+gebruiken\b/
   );
   const noFurtherContact = matches(text,
     /\bniet\s+meer\s+mailen\b|\bmail\s+(?:mij|ons)\s+niet\s+(?:meer|opnieuw)\b|\bgeen\s+(?:verdere\s+)?berichten\b|\bschrijf\s+(?:mij|ons)\s+uit\b|\bafmelden\b|\buitschrijven\b|\bverwijder\s+(?:mij|ons)\b|\blaat\s+(?:mij|ons)\s+met\s+rust\b/
@@ -322,6 +325,12 @@ function enforceGroundedMailboxReply(generatedValue, options = {}) {
   const structured = parseStructuredDraft(generatedValue);
   const paragraphs = structured && validateStructuredParagraphs(structured, policy);
   if (!paragraphs) {
+    const safeToReplace = !structured || (Array.isArray(structured.paragraphs) &&
+      structured.paragraphs.length > 0 && structured.paragraphs.every((item) =>
+        item && typeof item.text === 'string' && !hasUnsafeOrIrrelevantText(item.text, policy)));
+    if (safeToReplace && !policy.conceptText && policy.rejection && !policy.questions.length && !policy.substantiveFeedback) {
+      return { policy, paragraphs: ['Dankjewel voor je reactie. Duidelijk, ik laat het hierbij.'], short: false };
+    }
     const error = new Error('Deze voorgestelde reactie is onvoldoende onderbouwd of beantwoordt niet alle vragen. Je concept is behouden; probeer opnieuw of vul de ontbrekende informatie aan.');
     error.status = 422;
     error.code = 'MAILBOX_REPLY_NEEDS_REVIEW';
