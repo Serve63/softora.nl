@@ -88,12 +88,10 @@ const DEFAULT_MAILBOX_EMAILS = [
   'martijn@softora.nl',
   'servecreusen@softora.nl',
   'martijnvandeven@softora.nl',
-  'servec321@gmail.com',
-  'martijnven123@gmail.com',
-  'serve290@gmail.com',
-  'servecreusen7@gmail.com',
-  'contact.venvisuals@gmail.com',
+  'servec321@gmail.com', 'martijnven123@gmail.com', 'serve290@gmail.com', 'servecreusen7@gmail.com', 'contact.venvisuals@gmail.com',
 ];
+// Mailboxes no longer in use: never synced or offered, even while their credentials are still configured.
+const RETIRED_MAILBOX_EMAILS = new Set(['zakelijk@theimpactbox.co']);
 const DEFAULT_CUSTOMER_PHOTO_SCOPE = 'premium_database_photos';
 const DEFAULT_CUSTOMER_PHOTO_KEY = 'softora_database_photos_v1';
 const DEFAULT_CUSTOMER_DB_SCOPE = 'premium_customers_database';
@@ -686,7 +684,7 @@ function createMailboxService(deps = {}) {
         ...DEFAULT_MAILBOX_EMAILS,
         baseAccount.email,
         ...fromJson.map((item) => normalizeEmail(item.email || item.address)),
-      ].filter(Boolean))
+      ].filter((email) => email && !RETIRED_MAILBOX_EMAILS.has(email)))
     );
 
     return emails.map((email) => {
