@@ -6,6 +6,12 @@ const { createKvkApiWorkersService } = require('../../server/services/kvk-api-wo
 
 const root = path.join(__dirname, '../..');
 
+test('API worker and evidence profile regressions pass without paid requests', () => {
+  const { spawnSync } = require('node:child_process');
+  const result = spawnSync('python3', ['-m', 'unittest', 'discover', '-s', 'test', '-p', 'kvk_api_*test.py'], { cwd: root, encoding: 'utf8', timeout: 30000 });
+  assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
+});
+
 function response() {
   return {
     statusCode: 200,
@@ -233,7 +239,10 @@ test('API research uses available web tools and explicit evidence-preserving rep
  assert.match(runner,/MAX_REPAIR_ATTEMPTS = 3/);
  assert.match(runner,/if transient_control_failure\(error\):/);
  assert.doesNotMatch(runner,/"bindend": packet.get\("bindend"\)/);
- assert.match(runner,/api-evidence-v2/);
+ assert.match(runner,/"contract": PROFILE/);
+ const validation=fs.readFileSync(path.join(root,'scripts/kvk_api_validation.py'),'utf8');
+ assert.match(validation,/api-basic-v1/);
+ assert.match(validation,/validate_api_evidence/);
  assert.match(runner,/telefoonnummer EN email/);
  assert.match(runner,/public_page_evidence/);
  assert.match(runner,/validate_saved_result\(path, result, flags\)/);

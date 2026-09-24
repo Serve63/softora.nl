@@ -392,7 +392,7 @@ test('kvk database shows every Robot result and only material Controller correct
 
   assert.match(scriptSource, /snapshot\?\.latestTreated/);
   assert.doesNotMatch(scriptSource, /snapshot\?\.latestLunaErrors/);
-  assert.match(scriptSource, /Nog geen nieuwe Robot-resultaten of Controleur-correcties\./);
+  assert.match(scriptSource, /Nog geen nieuwe onderzoeksresultaten of Controleur-correcties\./);
   assert.match(scriptSource, /incorrect_approval: 'Onterecht goedgekeurd'/);
   assert.match(scriptSource, /missed_usable: 'Onterecht afgekeurd'/);
   assert.doesNotMatch(scriptSource, /Afwijzing bevestigd|Bruikbaar bevestigd/);
@@ -732,6 +732,15 @@ test('Robot activities show one role label without a model subtitle', () => {
  assert.doesNotMatch(html, /<span>(Sol 5.6 Xhigh|Robot)<\/span>/);
  }
  assert.match(activityRowHtml({found_by_role_label:'Searcher', found_by_model_label:'Sol 6 Max'}), /Sol 6 Max/);
+});
+
+test('uncertain activity is explicitly pending review without changing eligibility', () => {
+  const { activityRowHtml, activityStatus } = require('../../assets/kvk-database-luna-errors');
+  const row = { lead_status: 'unusable', unusable_reason: 'operational_unclear', found_by_role_label: 'Searcher', found_by_model_label: 'Sol 6 Max' };
+  assert.equal(activityStatus(row), 'Ter controle');
+  assert.match(activityRowHtml(row), /Bedrijfsactiviteit nog niet bevestigd/);
+  assert.match(activityRowHtml(row), /is-unusable/);
+  assert.equal(row.lead_status, 'unusable');
 });
 
 test('planning checks and progress align with phone and email columns', () => {
