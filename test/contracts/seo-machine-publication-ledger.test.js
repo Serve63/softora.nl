@@ -216,6 +216,12 @@ test('content growth actions have an explicit machine-readable event plan', () =
         'other_growth_action',
         'scheduled',
       ],
+      [
+        '/blog/crm-systeem-kosten-mkb',
+        '2026-09-24',
+        'other_growth_action',
+        'scheduled',
+      ],
     ]
   );
   assert.equal(
