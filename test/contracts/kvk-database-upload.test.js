@@ -6,11 +6,11 @@ const {createKvkDatabaseUploadService} = require('../../server/services/kvk-data
 const {createController} = require('../../assets/kvk-database-upload');
 const id = '06ef6c6d-98ef-4cc4-b5f4-39e6d1d6bbc4';
 function res() { return {statusCode:200,status(code){this.statusCode=code;return this;},json(data){this.body=data;return this;},setHeader(){}}; }
-function fixture({rows=[],receipt=null,fail=false}={}) {
+function fixture({rows=[],receipt=null,fail=false,refreshFail=false}={}) {
  const calls=[]; let invalidated=0;
  const db={from(table){ if(table==='softora_kvk_upload_receipts') return {select:()=>({eq:()=>({maybeSingle:async()=>({data:receipt})})})};
  const q={select(){return q;},neq(){return q;},gt(){return q;},order(){return q;},limit:async()=>({data:rows,error:fail?{}:null})}; return q;},rpc:async(name,args)=>{calls.push({name,args});return {data:{count:args.p_candidates.length,destination:'available'}};}};
- const service=createKvkDatabaseUploadService({getSupabaseClient:()=>db,getUiStateValues:async()=>({values:{}}),refreshDestination:()=>invalidated++});
+ const service=createKvkDatabaseUploadService({getSupabaseClient:()=>db,getUiStateValues:async()=>({values:{}}),refreshDestination:()=>{invalidated++;if(refreshFail)throw new Error("Snapshot temporarily unavailable");},logger:{warn(){}}});
  return {service,calls,get invalidated(){return invalidated;}};
 }
 test('upload refuses without-website, missing mode and invalid IDs before any write',async()=>{
@@ -91,4 +91,25 @@ test('UI sends the chosen count and rejects numbers above the available stock',a
  const f=uiFixture(async()=>({ok:true,json:async()=>({ok:true,count:12})}));
  await f.ui.open();f.elements.get('kvk-upload-amount').value='13';await f.ui.upload();assert.equal(f.requests.length,1);
  f.elements.get('kvk-upload-amount').value='5';await f.ui.upload();assert.equal(JSON.parse(f.requests[1].body).count,5);
+});
+
+test('a committed upload stays successful when destination refresh fails, including receipt replay',async()=>{
+ for(const receipt of [null,{result:{count:10,destination:'available'}}]) {
+  const f=fixture({refreshFail:true,receipt});const r=res();
+  await f.service.upload({body:{mode:'with-website',requestId:id,count:10}},r);
+  assert.equal(r.statusCode,200);assert.equal(r.body.ok,true);assert.equal(r.body.snapshotReady,false);
+  if(receipt)assert.equal(f.calls.length,0);
+ }
+});
+test('UI confirms stored companies when the snapshot is pending and prevents another upload',async()=>{
+ const f=uiFixture(async(options)=>({ok:true,json:async()=>({ok:true,count:10,snapshotReady:!options.method})}));
+ await f.ui.open();await f.ui.upload();await f.ui.upload();
+ assert.equal(f.requests.length,2);assert.match(f.elements.get('kvk-upload-message').textContent,/opgeslagen/);
+ assert.equal(f.elements.get('kvk-upload-result').hidden,false);
+});
+test('both dialogs share the same minimum height and upload rows fill the larger dialog',()=>{
+ const shared=fs.readFileSync(path.join(__dirname,'../../assets/kvk-api-workers.css'),'utf8');
+ const upload=fs.readFileSync(path.join(__dirname,'../../assets/kvk-database-upload.css'),'utf8');
+ assert.match(shared,/min-height:min\(340px,calc\(100vh - 28px\)\)/);
+ assert.match(upload,/\.kvk-upload-dialog\[open\]\{display:flex;flex-direction:column\}/);
 });

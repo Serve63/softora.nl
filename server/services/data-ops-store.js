@@ -1,3 +1,4 @@
+const { readOutboundGuardKeys } = require('./outbound-guard-key-reader');
 const { createMailboxStatsMessagesRepository } = require('../repositories/mailbox-stats-messages');
 const { createHash } = require('crypto');
 const { normalizeWebdesignJobRetryPayload, buildWebdesignJobPayload } = require('./webdesign-job-payload');
@@ -1879,50 +1880,9 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
   }
 
-  async function listOutboundRecipientGuardKeys(guardKeys, options = {}) {
-    const keys = Array.from(new Set(
-      (Array.isArray(guardKeys) ? guardKeys : [])
-        .map(normalizeString)
-        .filter(Boolean)
-    ));
-    if (!keys.length) return [];
-    const found = new Set();
-    const chunks = [];
-    for (let index = 0; index < keys.length; index += OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE) {
-      chunks.push(keys.slice(index, index + OUTBOUND_GUARD_KEY_LOOKUP_CHUNK_SIZE));
-    }
-    let cursor = 0;
-    let failed = false;
-    async function worker() {
-      while (!failed && cursor < chunks.length) {
-        const keyChunk = chunks[cursor];
-        cursor += 1;
-      const result = await run('list-outbound-recipient-guard-keys', (client) =>
-        client
-          .from(TABLES.outboundRecipientGuards)
-          .select('guard_key')
-          .in('guard_key', keyChunk)
-          .in('status', ['sent', 'reserved'])
-          .limit(keyChunk.length),
-      {
-        timeoutMs: Math.max(1000, Math.min(30000, Number(options.timeoutMs) || dataOpsReadQueryTimeoutMs)),
-        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
-        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
-        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
-      });
-        if (!result.ok) {
-          failed = true;
-          return;
-        }
-      (result.data || []).forEach((row) => {
-        const key = normalizeString(row && row.guard_key);
-        if (key) found.add(key);
-      });
-      }
-    }
-    await Promise.all(Array.from({ length: Math.min(6, chunks.length) }, worker));
-    if (failed) return null;
-    return Array.from(found);
+  function listOutboundRecipientGuardKeys(guardKeys, options = {}) {
+    return readOutboundGuardKeys({ run, table: TABLES.outboundRecipientGuards,
+      normalizeString, defaultTimeoutMs: dataOpsReadQueryTimeoutMs }, guardKeys, options);
   }
 
   async function listOutboundRecipientGuardsForPreview(options = {}) {
