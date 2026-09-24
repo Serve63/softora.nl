@@ -990,22 +990,22 @@ test('html page coordinator houdt een koude premium pagina niet vast en levert d
   assert.ok(Date.now() - startedAt < 180, 'koude serverdata mag de eerste HTML niet blokkeren');
   assert.match(res.body, /id="softoraPageStateBootstrap"/);
   const bootstrapMatch = res.body.match(
-    /id="softoraPageStateBootstrap"[^>]*data-softora-encoding="base64"[^>]*>([^<]+)<\/script>/
+    /id="softoraPageStateBootstrap" type="application\/json">([^<]+)<\/script>/
   );
   assert.ok(bootstrapMatch);
-  const bootstrapPayload = JSON.parse(Buffer.from(bootstrapMatch[1], 'base64').toString('utf8'));
+  const bootstrapPayload = JSON.parse(bootstrapMatch[1]);
   assert.equal(bootstrapPayload.session.email, 'serve@softora.nl');
   assert.match(res.body, /premium-page-bootstrap-session\.js\?v=20260924a/);
   assert.doesNotMatch(res.body, /nooit-in-html/);
 });
 
-test('mailbox-bootstrap blijft geldige HTML bij scripts en binaire mailinhoud', async () => {
+test('mailbox-bootstrap blijft geldige, compacte JSON bij scripts, $-patronen en binaire mailinhoud', async () => {
   const pagesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'softora-html-pages-mailbox-base64-'));
   fs.writeFileSync(
     path.join(pagesDir, 'premium-mailbox.html'),
     '<!DOCTYPE html><html><head><title>Mailbox</title></head><body><!-- SOFTORA_PAGE_STATE_BOOTSTRAP --><script src="assets/mailbox.js"></script></body></html>'
   );
-  const dangerousBody = 'Voorbeeld </script><div id="mail-leak">zichtbaar</div> \\u0000 � einde';
+  const dangerousBody = 'Voorbeeld </script><div id="mail-leak">zichtbaar</div> <!-- \\u0000 \u0000 \u2028 \ud800 $& $\' $` $1 � einde';
   const coordinator = createHtmlPageCoordinator({
     pagesDir,
     logger: { info() {}, error() {} },
@@ -1041,10 +1041,11 @@ test('mailbox-bootstrap blijft geldige HTML bij scripts en binaire mailinhoud', 
   );
 
   const bootstrapMatch = res.body.match(
-    /<script id="softoraPageStateBootstrap" type="application\/json" data-softora-encoding="base64">([^<]+)<\/script>/
+    /<script id="softoraPageStateBootstrap" type="application\/json">([^<]+)<\/script>/
   );
-  assert.ok(bootstrapMatch, 'mailbox-bootstrap hoort volledig als veilige base64 in één script te staan');
-  const payload = JSON.parse(Buffer.from(bootstrapMatch[1], 'base64').toString('utf8'));
+  assert.ok(bootstrapMatch, 'mailbox-bootstrap hoort volledig als veilige JSON in één script te staan');
+  assert.doesNotMatch(res.body, /data-softora-encoding="base64"/, 'base64 made the bootstrap 35% larger after compression');
+  const payload = JSON.parse(bootstrapMatch[1]);
   assert.equal(payload.mailbox.messages[0].body, dangerousBody);
   assert.equal((res.body.match(/id="softoraPageStateBootstrap"/g) || []).length, 1);
   assert.equal((res.body.match(/assets\/mailbox\.js/g) || []).length, 1);
