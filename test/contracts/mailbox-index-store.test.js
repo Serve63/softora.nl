@@ -600,6 +600,8 @@ test('mailbox index store joins exact active Instantly threads without a broad b
             data: [{
               account_email: 'serve-sender@example.com',
               provider_thread_id: 'provider-active-thread',
+              provider_message_id: 'provider-active-reply',
+              date: '2026-06-06T12:00:00.000Z',
             }],
             error: null,
           });
@@ -626,13 +628,15 @@ test('mailbox index store joins exact active Instantly threads without a broad b
     accountEmails: ['serve-sender@example.com'],
   });
 
-  assert.equal(messages.length, 1);
+  assert.equal(messages.length, 2);
   assert.equal(messages[0].providerMessageId, 'provider-active-sent');
   assert.equal(messages[0].providerThreadId, 'provider-active-thread');
+  assert.equal(messages[1].providerMessageId, 'provider-active-reply');
+  assert.equal(messages[1].folder, 'inbox');
   assert.equal(
     calls.some((call) => (
       call[0] === 'select' &&
-      call[2] === 'account_email,provider_thread_id:payload->>providerThreadId'
+      call[2] === 'account_email,provider_thread_id:payload->>providerThreadId,provider_message_id:payload->>providerMessageId,date'
     )),
     true
   );
@@ -2680,6 +2684,32 @@ test('a later Instantly list response cannot erase a proven delivered emoji copy
   const stored = saved.get('instantly|emoji-copy');
   assert.equal(stored.body_text, 'Eerlijke mening 😁\n📍 Berkel-Enschot');
   assert.equal(stored.payload.providerOriginalBodyAvailable, true);
+});
+
+test('a later Instantly list response keeps the last checked reply id', async () => {
+  const saved = new Map();
+  const client = { from() { return {
+    select() { return { in(_field, keys) {
+      return Promise.resolve({ data: keys.map((key) => saved.get(key)).filter(Boolean), error: null });
+    } }; },
+    async upsert(rows) { rows.forEach((row) => saved.set(row.message_key, row));
+      return { data: rows, error: null }; },
+  }; } };
+  const store = createMailboxIndexStore({ isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client });
+  const message = { providerMessageId: 'checked-copy', providerThreadId: 'checked-thread',
+    providerAccountEmail: 'martijn@example.org', providerOwner: 'martijn',
+    accountEmail: 'martijn@example.org', folder: 'sent', direction: 'sent',
+    originalCampaignOutbound: true, from: 'Martijn', email: 'martijn@example.org',
+    to: 'prospect@example.org', subject: 'Ontwerp', date: '2026-09-23T12:00:00.000Z',
+    body: 'Een bewaard bericht zonder exact passend citaat.' };
+  assert.equal((await store.upsertProviderMessages({ provider: 'instantly', messages: [{ ...message,
+    providerOriginalBodyEvidenceKnown: true, providerOriginalBodyAvailable: false,
+    providerQuotedBodyAuditReplyId: 'v1:old-reply' }] })).ok, true);
+  assert.equal((await store.upsertProviderMessages({ provider: 'instantly', messages: [{ ...message,
+    providerOriginalBodyEvidenceKnown: false, providerOriginalBodyAvailable: false }] })).ok, true);
+  assert.equal(saved.get('instantly|checked-copy').payload.providerQuotedBodyAuditReplyId,
+    'v1:old-reply');
 });
 
 test('mailbox index store finalizes a fenced sync even while the read/write circuit is open', async () => {
