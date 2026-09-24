@@ -207,3 +207,15 @@ test('uncertain usage reports metering metadata without company content', () => 
  assert.match(source, /responseId: data.id/);
  assert.match(source, /input: data.usage\?\.input_tokens/);
 });
+
+test('actual search usage is billed even when the provider exceeds the requested tool count', async () => {
+ const calls = [];
+ const row = {limit_eur_cents:10000,spent_eur_cents:72,reserved_eur_cents:0};
+ const client = {rpc:async(name,args)=>{calls.push({name,args});return {data:true};}, from:()=>({select:()=>({eq:()=>({single:async()=>({data:row})})})})};
+ const service = createKvkApiWorkersService({getSupabaseClient:()=>client,kvkDatabaseSyncToken:'test',env:{OPENAI_API_KEY:'test'},now:()=>new Date('2026-09-24'),fetchImpl:async()=>({ok:true,json:async()=>({model:'gpt-6-sol',status:'completed',usage:{input_tokens:42842,output_tokens:3635},output:[...Array.from({length:9},()=>({type:'web_search_call'})),{content:[{type:'output_text',text:'{"kvk_nummer":"12345678"}'}]}]})})});
+ const res = response();
+ await service.research({headers:{authorization:'Bearer test'},body:{role:'searcher',company:{kvk_nummer:'12345678'},brief:{}}},res);
+ assert.equal(res.statusCode,200);
+ assert.equal(calls[1].name,'softora_kvk_api_settle');
+ assert.equal(calls[1].args.p_actual_eur_cents,72);
+});
