@@ -323,3 +323,22 @@ test('Luna Searcher records mentioned but unkept contacts as rejected for the ca
   assert.match(mapper, /"reason_code": "unverified_candidate"/);
   assert.match(mapper, /withhold_unaccepted_contacts\(result, reference/);
 });
+
+test('an incomplete Luna answer is settled and reports why it stopped', async () => {
+  const calls = [];
+  const client = { rpc: async (name, args) => { calls.push({ name, args }); return { data: true }; } };
+  const service = createKvkApiWorkersService({ getSupabaseClient: () => client, kvkDatabaseSyncToken: 'test',
+    env: { OPENAI_API_KEY: 'test' }, now: () => new Date('2026-09-24'),
+    fetchImpl: async (_url, options) => {
+      assert.equal(JSON.parse(options.body).max_output_tokens, 40000);
+      return { ok: true, json: async () => ({ model: 'gpt-6-luna', status: 'incomplete',
+        incomplete_details: { reason: 'max_output_tokens' }, usage: { input_tokens: 20000, output_tokens: 40000 },
+        output: [{ type: 'web_search_call', action: { type: 'search' } }] }) };
+    } });
+  const res = response();
+  await service.research({ headers: { authorization: 'Bearer test' }, body: { role: 'searcher', company: { kvk_nummer: '12345678' }, brief: {} } }, res);
+  assert.equal(res.statusCode, 502);
+  assert.equal(calls[1].name, 'softora_kvk_api_settle');
+  assert.match(res.body.error, /max_output_tokens/);
+  assert.match(res.body.error, /"searches":1/);
+});
