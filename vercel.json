@@ -144,6 +144,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/nieuwe-website", "destination": "/assets/website-showcase/index.html" },
+    { "source": "/seo-login", "destination": "/assets/seo-login/index.html" },
     { "source": "/voicesoftware", "destination": "/assets/voicesoftware/index.html" },
     { "source": "/toekomst", "destination": "/assets/entry/toekomst.html" },
     {
