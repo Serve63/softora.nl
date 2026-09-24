@@ -9,6 +9,7 @@ const {
 } = require('../../server/services/instantly-mailbox');
 const {
   buildCustomerQuotedMessageSource,
+  buildStrictThreadQuotedMessageSource,
   buildOriginalMessageSource,
   extractQuotedOriginalBody,
 } = require('../../server/services/instantly-original-message-source');
@@ -891,6 +892,55 @@ test('delivered quote restoration fails closed when exact customer provenance dr
     available: false,
     reason: 'customer-identity-mismatch',
   });
+});
+
+test('exact reply in the same thread restores delivered emoji without optional customer fields', async () => {
+  const providerBody = [
+    'Goedendag,', '',
+    'Afgelopen week kwam ik jullie website voorbeeld.nl tegen. Ik heb met plezier een nieuw ontwerp gemaakt en hoor graag je eerlijke mening',
+    '', 'Met vriendelijke groet,', 'Martijn van de Ven', '', 'Berkel-Enschot',
+  ].join('\n');
+  const deliveredBody = providerBody.replace('eerlijke mening', 'eerlijke mening 😁')
+    .replace('\nBerkel-Enschot', '\n📍 Berkel-Enschot');
+  const rawSent = incoming({ id: 'emoji-sent', thread_id: 'emoji-thread', campaign_id: 'campaign-martijn', email_type: '1',
+    eaccount: 'martijn-sender@example.com', from_address_email: 'martijn-sender@example.com',
+    to_address_email_list: ['prospect@example.org'], body: { text: providerBody },
+    timestamp_email: '2026-07-24T10:00:00.000Z' });
+  const rawReply = incoming({ id: 'emoji-reply', thread_id: 'emoji-thread', campaign_id: 'campaign-martijn',
+    eaccount: 'martijn-sender@example.com', to_address_email_list: ['martijn-sender@example.com'],
+    timestamp_email: '2026-07-25T10:00:00.000Z',
+    body: { text: `Dank je.\n\nOp 24 jul 2026 om 12:00 schreef Martijn <martijn-sender@example.com>:\n\n${deliveredBody}` } });
+  const source = buildStrictThreadQuotedMessageSource(rawSent, [rawSent, rawReply], {
+    accountEmail: 'martijn-sender@example.com', recipientEmail: 'prospect@example.org',
+  });
+  assert.equal(source.available, true);
+  assert.match(source.body, /eerlijke mening 😁/u);
+  assert.match(source.body, /📍 Berkel-Enschot/u);
+  assert.equal(buildStrictThreadQuotedMessageSource(rawSent, [{ ...rawReply, thread_id: 'wrong-thread' }], {
+    accountEmail: 'martijn-sender@example.com', recipientEmail: 'prospect@example.org',
+  }).available, false);
+  assert.equal(buildStrictThreadQuotedMessageSource(rawSent, [{ ...rawReply,
+    body: { text: rawReply.body.text.replace('nieuw ontwerp', 'ander ontwerp') } }], {
+    accountEmail: 'martijn-sender@example.com', recipientEmail: 'prospect@example.org',
+  }).available, false);
+
+  const store = createStore();
+  const { service } = buildService({ store, getCustomerSourcesByEmails: async () => [{
+    id: 'prospect', email: 'prospect@example.org', instantlyCampaignId: 'campaign-martijn',
+    instantlyLeadId: 'lead-emoji',
+  }], fetchJsonWithTimeout: async (url) => {
+    const parsed = new URL(url);
+    if (parsed.searchParams.get('search') === 'thread:emoji-thread') {
+      return { response: { ok: true, status: 200 }, data: { items: [rawSent, rawReply] } };
+    }
+    return { response: { ok: true, status: 200 }, data: { items: [] } };
+  } });
+  await service.hydrateThread({ threadId: 'emoji-thread', accountEmail: 'martijn-sender@example.com', owner: 'martijn' });
+  const restored = store.rows.find((message) => message.providerMessageId === 'emoji-sent');
+  assert.ok(restored, JSON.stringify(store.rows.map((message) => message.providerMessageId)));
+  assert.equal(restored.providerOriginalBodyAvailable, true);
+  assert.match(restored.body, /eerlijke mening 😁/u);
+  assert.match(restored.body, /📍 Berkel-Enschot/u);
 });
 
 test('exact lead source restores Ramon-style emoji and direct hier link after strict provenance checks', async () => {

@@ -2655,6 +2655,33 @@ test('mailbox index store bewaart providerberichten duurzaam ondanks een open re
   assert.equal(failedResult.ok, false);
 });
 
+test('a later Instantly list response cannot erase a proven delivered emoji copy', async () => {
+  const saved = new Map();
+  const client = { from() { return {
+    select() { return { in(_field, keys) {
+      return Promise.resolve({ data: keys.map((key) => saved.get(key)).filter(Boolean), error: null });
+    } }; },
+    async upsert(rows) { rows.forEach((row) => saved.set(row.message_key, row));
+      return { data: rows, error: null }; },
+  }; } };
+  const store = createMailboxIndexStore({ isSupabaseConfigured: () => true,
+    getSupabaseClient: () => client });
+  const message = { providerMessageId: 'emoji-copy', providerThreadId: 'emoji-thread',
+    providerAccountEmail: 'martijn@example.org', providerOwner: 'martijn',
+    accountEmail: 'martijn@example.org', folder: 'sent', direction: 'sent',
+    originalCampaignOutbound: true, from: 'Martijn', email: 'martijn@example.org',
+    to: 'prospect@example.org', subject: 'Ontwerp', date: '2026-09-23T12:00:00.000Z' };
+  assert.equal((await store.upsertProviderMessages({ provider: 'instantly', messages: [{ ...message,
+    body: 'Eerlijke mening 😁\n📍 Berkel-Enschot', providerOriginalBodyEvidenceKnown: true,
+    providerOriginalBodyAvailable: true }] })).ok, true);
+  assert.equal((await store.upsertProviderMessages({ provider: 'instantly', messages: [{ ...message,
+    body: 'Eerlijke mening\nBerkel-Enschot', providerOriginalBodyEvidenceKnown: false,
+    providerOriginalBodyAvailable: false }] })).ok, true);
+  const stored = saved.get('instantly|emoji-copy');
+  assert.equal(stored.body_text, 'Eerlijke mening 😁\n📍 Berkel-Enschot');
+  assert.equal(stored.payload.providerOriginalBodyAvailable, true);
+});
+
 test('mailbox index store finalizes a fenced sync even while the read/write circuit is open', async () => {
   let finishCalls = 0;
   const requestedClientOptions = [];

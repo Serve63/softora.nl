@@ -3,6 +3,7 @@ const { parseProviderHtml } = require('./mailbox-provider-rich-body');
 const {
   buildIndexedThreadAuditState,
   buildCustomerQuotedMessageSource,
+  buildStrictThreadQuotedMessageSource,
   buildOriginalMessageSource,
   extractLeadId,
   hydrateIndexedThreadMessageEvidence,
@@ -479,6 +480,16 @@ function createInstantlyMailboxService(deps = {}) {
         enrichedMessages.push({
           ...rawMessage,
           __softoraOriginalMessageSource: customerQuotedSource,
+        });
+        continue;
+      }
+      const strictThreadQuote = buildStrictThreadQuotedMessageSource(rawMessage, rawMessages, {
+        accountEmail: exactAccountEmail, recipientEmail,
+      });
+      if (strictThreadQuote.available === true) {
+        enrichedMessages.push({
+          ...rawMessage,
+          __softoraOriginalMessageSource: strictThreadQuote,
         });
         continue;
       }

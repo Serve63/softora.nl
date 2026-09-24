@@ -346,6 +346,45 @@ function extractQuotedOriginalBody(rawMessages = [], options = {}) {
   return extractQuotedOriginalBodyEvidence(rawMessages, options).body;
 }
 
+// A reply can contain the delivered text even when the customer/lead record
+// no longer has the optional source fields. Only restore an exact quote from
+// the same recipient, account and thread; punctuation and links must agree.
+function buildStrictThreadQuotedMessageSource(rawMessage = {}, rawMessages = [], options = {}) {
+  const sender = email(options.accountEmail);
+  const recipient = email(options.recipientEmail);
+  const threadId = text(rawMessage.thread_id);
+  const sentId = text(rawMessage.id || rawMessage.email_id || rawMessage.uuid);
+  const providerBody = getRawMessageBody(rawMessage);
+  if (!sender || !recipient || !threadId || !sentId || !text(rawMessage.campaign_id) || !providerBody) {
+    return { evidenceKnown: true, available: false, reason: 'quote-provenance-incomplete' };
+  }
+  const sentAt = Date.parse(rawMessage.timestamp_email || rawMessage.timestamp_created || rawMessage.created_at);
+  const replies = (Array.isArray(rawMessages) ? rawMessages : []).filter((candidate) => {
+    const replyAt = Date.parse(candidate.timestamp_email || candidate.timestamp_created || candidate.created_at);
+    const recipients = Array.isArray(candidate.to_address_email_list)
+      ? candidate.to_address_email_list.map(email)
+      : [email(candidate.to_address_email)];
+    return text(candidate.thread_id) === threadId &&
+      email(candidate.eaccount) === sender &&
+      email(candidate.from_address_email) === recipient &&
+      recipients.includes(sender) &&
+      Number.isFinite(sentAt) && Number.isFinite(replyAt) && replyAt >= sentAt;
+  });
+  const quote = extractQuotedOriginalBodyEvidence(replies, {
+    accountEmail: sender, providerBody, sourceMessageId: sentId,
+  });
+  const withoutEmoji = (value) => String(value || '')
+    .replace(/\p{Extended_Pictographic}\uFE0F?/gu, '')
+    .replace(/[\u200b-\u200d\u2060\ufeff]/gu, '')
+    .replace(/\s+/g, ' ').trim();
+  if (!quote.senderEmail || !['standard-reply-header', 'outlook-original-message-header'].includes(quote.source) ||
+    withoutEmoji(providerBody).length < 80 || withoutEmoji(providerBody) !== withoutEmoji(quote.body)) {
+    return { evidenceKnown: true, available: false, reason: 'quote-not-exact' };
+  }
+  return { evidenceKnown: true, available: true, body: quote.body,
+    webdesignLinkEvidenceKnown: false, webdesignLinkUrl: '', reason: `exact-delivered-thread-quote:${quote.source}` };
+}
+
 function normalizeExactWebdesignUrl(value, expectedCustomerId) {
   try {
     const url = new URL(text(value));
@@ -525,6 +564,7 @@ function buildOriginalMessageSource(rawMessage = {}, rawLead = {}, options = {})
 
 module.exports = {
   bodyMatchesProviderCopy,
+  buildStrictThreadQuotedMessageSource,
   buildIndexedThreadAuditState,
   buildCustomerQuotedMessageSource,
   buildOriginalMessageSource,
