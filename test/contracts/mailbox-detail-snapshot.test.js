@@ -130,10 +130,45 @@ test('the Mailbox wires the detail snapshot before its page script and only capt
   const adapter = page.indexOf('assets/premium-mailbox-detail-snapshot.js?v=20260924a');
   assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < adapter);
   assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924b') < adapter);
-  assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20260924c'));
+  assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20260924d'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /snapshot: window\.SoftoraMailboxDetailSnapshot, shouldCaptureSnapshot: \(mail\) => String\(getMailsForFolder\(activeFolder\)\[0\]\?\.id \?\? ''\) === String\(mail\.id\)/);
   const snapshotAdapter = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-detail-snapshot.js'), 'utf8');
   assert.match(snapshotAdapter, /inertIds: \['mail-detail'\]/);
   assert.match(snapshotAdapter, /maxChars: MAX_CHARS/);
+});
+
+test('a conversation is first shown complete: cleaned AI text and a loaded contact timeline', async () => {
+  const repoRoot = path.join(__dirname, '../..');
+  const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
+  // Page-bootstrap bodies carry no AI presentation; fetching it first avoids raw text followed by the cleaned version.
+  assert.match(source, /needsRootHydration: \(mail, openOptions\) => \(openOptions\.forceRootHydration \|\| !mail\.bodyLoaded \|\| \(mail\.aiPresentationUnknown === true && mail\.aiPresentation === undefined\) \|\| mail\.recipientRoutingNeedsHydration\) && !openOptions\.skipBodyFetch,/);
+  // The contact timeline needs the account list; without it the first render says "x berichten geladen".
+  assert.match(source, /return mailboxAccountsLoad \? mailboxAccountsLoad\.catch\(\(\) => \{\}\)\.then\(load\) : load\(\); \},/);
+  assert.match(source, /const accountLoad = mailboxAccountsLoad = loadMailboxAccounts\(\)\.finally\(\(\) => \{ mailboxAccountsLoad = null; \}\);/);
+  const index = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-index.js'), 'utf8');
+  const inbox = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-campaign-inbox.js'), 'utf8');
+  assert.match(inbox, /if \(fromBootstrap\) result\.messages\.forEach\(\(message\) => \{ if \(message && message\.aiPresentation === undefined\) message\.aiPresentationUnknown = true; \}\);/);
+  assert.match(index, /mail\.aiPresentation = indexedMessage\.aiPresentation \?\? null;/, 'a loaded body without AI is not refetched on every open');
+  assert.match(index, /mail\.aiPresentation = data\.message\.aiPresentation \?\? null;/);
+
+  // Controller behaviour: with a stored body but an unknown AI presentation nothing is shown until the cleaned body arrives.
+  const v = view({
+    savedView: '',
+    needsRootHydration: (mail) => mail.aiPresentation === undefined,
+    async hydrateRoot({ mail, requestRender }) {
+      mail.bodyLoading = true;
+      await tick();
+      mail.body = 'Cleaned'; mail.aiPresentation = { status: 'ready' }; mail.bodyLoading = false;
+      await requestRender(mail.id);
+    },
+  });
+  v.mail.body = 'Raw text with signature'; v.mail.bodyLoaded = true;
+  const rendered = [];
+  const originalCommitHtml = Object.getOwnPropertyDescriptor(v.detail, 'innerHTML');
+  let html = '';
+  Object.defineProperty(v.detail, 'innerHTML', { get: () => html, set: (value) => { html = value; rendered.push(value); } });
+  await v.controller.open(v.mail.id);
+  assert.deepEqual(rendered, ['Cleaned|']);
+  assert.ok(originalCommitHtml);
 });

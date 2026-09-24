@@ -380,7 +380,7 @@ async function loadBody({
         indexedMessage.resolved !== false
       ) {
         const indexedBody = normalizeText(indexedMessage.body || '');
-        mail.body = indexedBody; mail.aiPresentation = indexedMessage.aiPresentation;
+        mail.body = indexedBody; mail.aiPresentation = indexedMessage.aiPresentation ?? null;
         mail.hasBody = Boolean(indexedMessage.hasBody || indexedBody);
         mail.bodyTruncated = Boolean(indexedMessage.bodyTruncated);
         mail.bodyLoaded = Boolean(
@@ -440,7 +440,7 @@ async function loadBody({
     }
     if (!stillCurrent()) return;
     const body = normalizeText(data.message.body || '');
-    mail.body = body; mail.aiPresentation = data.message.aiPresentation;
+    mail.body = body; mail.aiPresentation = data.message.aiPresentation ?? null;
     mail.bodyImages = normalizeBodyImages(data.message.bodyImages || mail.bodyImages);
     mail.optOutUrl = normalizeOptOutUrl(data.message.optOutUrl || mail.optOutUrl);
     mail.hasBody = Boolean(data.message.hasBody || body);

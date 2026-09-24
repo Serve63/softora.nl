@@ -1081,15 +1081,18 @@ const mailboxAiRefresh = window.SoftoraMailboxAiRefresh?.create({ getMail: findM
 bindMailboxActions(); window.SoftoraMailboxIndex?.bindImageRecovery({ getActiveMail: () => activeMail, getMail: findMailById, loadMessageBody: (id, loadOptions = {}) => openMail(id, { ...loadOptions, skipReadPersist: true }), openMail });
 mailboxDiscoveryController = window.SoftoraMailboxDiscovery?.create({ document, fetch: (...args) => window.fetch(...args), getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), getMessageOwner: (mail) => window.SoftoraMailboxCampaignInbox.getMessageOwner(mail), getAccountEmails: getMailboxAccountEmails, getMessages: () => mails, setMessages: (value) => { mails = value; }, getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, getListElement: () => document.getElementById('mail-results-scroll'), normalizeMessage: (message) => normalizeMailboxApiMessage(message, { folder: 'outreach' }), renderList, openMail, resetDetail: resetDetailEmpty });
 const mailboxFreshnessStore = window.SoftoraReadModelStore?.readLastKnown ? window.SoftoraReadModelStore : null, rememberedMailboxFreshness = { ...(mailboxFreshnessStore?.readLastKnown('mailbox-freshness', 36 * 60 * 60 * 1000) || {}) }; mailboxRefreshController = window.SoftoraMailboxRefresh?.create({ autoStart: false, initiallyChecking: true, rememberedFreshness: rememberedMailboxFreshness, onFreshness: (scopeKey, at) => { rememberedMailboxFreshness[scopeKey] = at; mailboxFreshnessStore?.rememberLastKnown('mailbox-freshness', rememberedMailboxFreshness); }, getAccount: () => activeMailboxAccount, getFolder: () => activeFolder, getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), loadMessages: loadMailboxMessages, toast });
+let mailboxAccountsLoad = null;
 mailboxDetailController = window.SoftoraMailboxDetailStability?.createController?.({
   getMail: findMailById, ensureToken: () => mailboxOwnerView.ensureToken(), isTokenCurrent: isMailboxViewCurrent,
   getScope: () => ({ folder: activeFolder, owner: activeFolder === 'outreach' ? window.SoftoraMailboxCampaignInbox.getOwner() : '', account: activeFolder === 'outreach' ? '' : activeMailboxAccount }), getVisibilityKey: (mail) => window.SoftoraMailboxCampaignInbox.getConversationVisibilityKey(mail),
   getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, select: (id) => window.SoftoraMailboxDetailState?.select?.(id), renderList,
   onSelect: (mail, openOptions) => { if (mail.unread) window.SoftoraMailboxUiState.markReadOnOpen({ mail, skipReadPersist: openOptions.skipReadPersist, readController: mailboxReadController, renderList, getActiveMail: () => activeMail, openMail }); },
   getDetailElement: () => document.getElementById('mail-detail'), renderHtml: renderMailboxDetailHtml, snapshot: window.SoftoraMailboxDetailSnapshot, shouldCaptureSnapshot: (mail) => String(getMailsForFolder(activeFolder)[0]?.id ?? '') === String(mail.id),
-  needsRootHydration: (mail, openOptions) => (openOptions.forceRootHydration || !mail.bodyLoaded || mail.recipientRoutingNeedsHydration) && !openOptions.skipBodyFetch,
+  // A body without its AI presentation (page bootstrap) would first show the raw text and then jump to the cleaned version.
+  needsRootHydration: (mail, openOptions) => (openOptions.forceRootHydration || !mail.bodyLoaded || (mail.aiPresentationUnknown === true && mail.aiPresentation === undefined) || mail.recipientRoutingNeedsHydration) && !openOptions.skipBodyFetch,
   hydrateRoot: ({ mail, token, signal, requestRender }) => loadMailboxMessageBody(mail.id, { token: { ...token, signal }, openMail: requestRender }),
-  hydrateTimeline: ({ mail, signal }) => mailboxDiscoveryController?.loadContactTimeline?.(mail, { deferRender: true, signal }),
+  // The contact timeline needs the account list; waiting for it keeps the first render complete instead of "x berichten geladen" first.
+  hydrateTimeline: ({ mail, signal }) => { const load = () => mailboxDiscoveryController?.loadContactTimeline?.(mail, { deferRender: true, signal }); return mailboxAccountsLoad ? mailboxAccountsLoad.catch(() => {}).then(load) : load(); },
   shouldHydrateThread: (mail, openOptions) => !openOptions.skipThreadBodyFetch && activeFolder === 'outreach' && (window.SoftoraMailboxCampaignInbox.isCampaignMail(mail) || mail.contactTimelineLoaded),
   hydrateThread: ({ mail, signal, isCurrent, requestRender }) => window.SoftoraMailboxIndex?.loadThreadBodies?.({ mail, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl, getActiveMail: () => activeMail, openMail: requestRender, isCurrent, signal }),
   prepare: (mail, openOptions) => openOptions.imagesPrepared ? null : window.SoftoraMailboxImages?.prepareForCommit?.(window.SoftoraMailboxImages?.getConversationImages?.(mail) || mail.bodyImages),
@@ -1163,7 +1166,7 @@ window.addEventListener('keydown', (event) => {
     if (intent.account) activeMailboxAccount = intent.account;
     const initialFolder = String(intent.folder || 'outreach').trim().toLowerCase() || 'outreach';
     if (initialFolder === 'outreach') {
-      activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder); const accountLoad = loadMailboxAccounts();
+      activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder); const accountLoad = mailboxAccountsLoad = loadMailboxAccounts().finally(() => { mailboxAccountsLoad = null; });
       setMailboxAccountUi(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT); resetDetailEmpty();
       await loadMailboxMessages({ openLatest: !(intent.message || intent.email || intent.query) });
       await accountLoad;
