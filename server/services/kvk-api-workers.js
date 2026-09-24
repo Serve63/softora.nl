@@ -252,7 +252,9 @@ function createKvkApiWorkersService(deps = {}) {
 
       const actualCents = conservativeActualCents(data);
       if (actualCents === null || actualCents > RESERVATION_CENTS) {
-        throw Object.assign(new Error('Modelgebruik kon niet veilig worden afgerekend; reservering blijft vaststaan en de werker stopt.'), { status: 503 });
+        const metering = { model: safeProviderMessage(String(data.model || 'missing')), input: data.usage?.input_tokens, output: data.usage?.output_tokens, webCalls: (data.output || []).filter(item => item.type === 'web_search_call').length, status: data.status };
+        console.error('[kvk-api-workers] uncertain usage', JSON.stringify({ requestId, responseId: data.id, ...metering }));
+        throw Object.assign(new Error(`Kostencontrole gestopt: ${JSON.stringify(metering)}. Reservering blijft behouden.`), { status: 503 });
       }
       const { data: settled, error: settleError } = await client().rpc('softora_kvk_api_settle', {
         p_request_id: requestId, p_actual_eur_cents: actualCents,
