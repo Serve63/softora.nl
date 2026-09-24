@@ -4,7 +4,7 @@ const { legacyGuardEntriesToKeySet, COLDMAIL_SEND_GUARD_SCOPE, COLDMAIL_SEND_GUA
 const RECEIPTS = 'softora_kvk_upload_receipts';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function createKvkDatabaseUploadService({ getSupabaseClient, getUiStateValues, refreshDestination = () => {} } = {}) {
+function createKvkDatabaseUploadService({ getSupabaseClient, getUiStateValues, refreshDestination = () => {}, logger = console } = {}) {
   function client() {
     const value = getSupabaseClient?.({ timeoutMs: 120000, ignoreFailureCooldown: true });
     if (!value) throw new Error('Database niet beschikbaar.');
@@ -34,6 +34,15 @@ function createKvkDatabaseUploadService({ getSupabaseClient, getUiStateValues, r
       if (result.length > 50000) throw new Error('De uploadvoorraad is te groot voor één upload.');
     }
   }
+  async function finishCommittedUpload(res, result, replayed = false) {
+    let snapshotReady = true;
+    try { await refreshDestination(); }
+    catch (error) {
+      snapshotReady = false;
+      logger.warn?.('[KvkUpload][destination-refresh]', error?.message || 'Refresh unavailable');
+    }
+    return res.json({ ok: true, ...result, replayed, snapshotReady });
+  }
   async function execute(req, res, dryRun) {
     res.setHeader?.('Cache-Control', 'no-store');
     const mode = dryRun ? 'with-website' : req.body?.mode;
@@ -50,7 +59,7 @@ function createKvkDatabaseUploadService({ getSupabaseClient, getUiStateValues, r
       if (!dryRun) {
         const receipt = await db.from(RECEIPTS).select('result').eq('request_id', requestId).maybeSingle();
         if (receipt.error) throw new Error('Uploadstatus kon niet worden gecontroleerd.');
-        if (receipt.data) { await refreshDestination(); return res.json({ ok: true, ...receipt.data.result, replayed: true }); }
+        if (receipt.data) return finishCommittedUpload(res, receipt.data.result, true);
       }
       const rows = await candidates(db);
       const { data, error } = await db.rpc('softora_kvk_upload_available_counted', {
@@ -58,7 +67,7 @@ function createKvkDatabaseUploadService({ getSupabaseClient, getUiStateValues, r
       });
       if (error?.code === 'P0002') return res.status(409).json({ ok: false, error: 'Er zijn minder bedrijven beschikbaar dan het gekozen aantal. Open het venster opnieuw en kies een lager aantal.' });
       if (error || !data || typeof data.count !== 'number') throw new Error('Upload kon niet worden bevestigd. Probeer opnieuw; dezelfde upload wordt niet dubbel uitgevoerd.');
-      if (!dryRun) await refreshDestination();
+      if (!dryRun) return finishCommittedUpload(res, data);
       return res.json({ ok: true, ...data });
     } catch (error) {
       return res.status(503).json({ ok: false, error: error.message || 'Upload tijdelijk niet beschikbaar.' });

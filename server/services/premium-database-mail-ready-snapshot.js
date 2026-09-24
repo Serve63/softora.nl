@@ -1,3 +1,4 @@
+const { readGuardSetWithRetry } = require('./outbound-guard-key-reader');
 const { isKvkTransferRow } = require('./kvk-transfer-identity');
 const { sortCustomersByDistance, getCustomerLocationFields } = require('../../assets/premium-database-distance');
 const { normalizeContactStatus } = require('./customer-lifecycle');
@@ -603,7 +604,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     const guardsStartMs = Date.now();
     const [centralGuardKeys, legacyGuardKeys] = await Promise.all([
       readCentralGuardKeys(guardKeys),
-      readLegacyColdmailGuardKeys(getUiStateValues, logger),
+      readGuardSetWithRetry(() => readLegacyColdmailGuardKeys(getUiStateValues, logger)),
     ]);
     const guardsMs = Date.now() - guardsStartMs;
     if (centralGuardKeys === null || legacyGuardKeys === null) {

@@ -50,7 +50,9 @@
       message.textContent = 'Bedrijven worden geüpload…';
       try {
         const data = await request({ method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Softora-Requested-With': 'premium' }, body: JSON.stringify({ mode: 'with-website', requestId, count: requestedCount }) });
-        message.textContent = `${data.count.toLocaleString('nl-NL')} bedrijven toegevoegd aan Beschikbaar.`;
+        message.textContent = data.snapshotReady === false
+          ? `${data.count.toLocaleString('nl-NL')} bedrijven opgeslagen. De lijst Beschikbaar wordt bij openen opnieuw ververst.`
+          : `${data.count.toLocaleString('nl-NL')} bedrijven toegevoegd aan Beschikbaar.`;
         count.textContent = 'Upload afgerond'; resultLink.hidden = false; ready = false; requestId = null; requestedCount = null;
         refresh();
       } catch (error) {
