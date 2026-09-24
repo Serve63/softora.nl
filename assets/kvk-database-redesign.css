@@ -187,7 +187,7 @@ button,input,select,textarea{font-family:inherit}
 .planning-panel .panel-heading{display:none}
 .planning-panel .location-list{padding:0;gap:0;grid-auto-rows:31px!important}
 .planning-panel .location-item{border-bottom:1px solid rgba(110,85,97,.065)}
-.planning-panel .location-button{grid-template-columns:24px minmax(180px,1fr) 76px minmax(95px,.45fr) 110px;gap:12px;padding:4px 9px;height:30px!important;min-height:30px;border-radius:0}
+.planning-panel .location-button{position:relative;grid-template-columns:repeat(8,minmax(0,1fr));gap:0;padding:4px 0;height:30px!important;min-height:30px;border-radius:0}
 .planning-panel .location-main{display:contents}
 .planning-panel .location-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .planning-panel .location-statuses{justify-self:start}
@@ -195,3 +195,12 @@ button,input,select,textarea{font-family:inherit}
 .planning-panel .location-button>.badge{justify-self:start;min-width:0;border-radius:5px;padding:3px 6px;font-size:8px}
 .planning-panel .location-button.is-complete .location-main::after{display:none}
 @media(max-width:700px){.planning-panel .location-button{min-width:600px}}
+
+/* Share the eight-column activity table's exact horizontal anchors. */
+.planning-panel .location-button>.rank{position:absolute;left:9px;top:50%;transform:translateY(-50%)}
+.planning-panel .location-path{grid-column:1 / 5;padding-left:45px;padding-right:9px}
+.planning-panel .location-statuses{grid-column:5;padding-left:9px}
+.planning-panel .location-stage-progress{grid-column:6;padding-left:9px;white-space:nowrap}
+.planning-panel .location-button>.badge{grid-column:8;margin-left:9px}
+.latest-treated-panel td{width:12.5%}
+@media(max-width:700px){.planning-panel .location-button{min-width:1050px}}

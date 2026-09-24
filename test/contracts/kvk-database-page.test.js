@@ -116,7 +116,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijvendatabase<\/h1>/);
-  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924d/);
+  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924e/);
   assert.match(redesignSource, /\.planning-panel \.location-button\{grid-template-columns:13px minmax\(0,1fr\) auto;column-gap:6px;padding-left:12px\}/);
   assert.match(redesignSource, /\.planning-panel \.rank\{width:13px;height:13px;font-size:6px;line-height:1\}/);
   assert.match(pageSource, /<button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload/);
@@ -720,7 +720,7 @@ test('KVK header shows the disabled mail upload action without a settings back l
 
  test('planning aligns its content into fixed table-like columns', () => {
  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../assets/kvk-database-redesign.css'), 'utf8');
- assert.match(css, /grid-template-columns:24px minmax\(180px,1fr\) 76px minmax\(95px,.45fr\) 110px/);
+ assert.match(css, /grid-template-columns:repeat\(8,minmax\(0,1fr\)\)/);
  assert.match(css, /\.planning-panel \.location-main\{display:contents\}/);
  });
 
@@ -732,4 +732,11 @@ test('Robot activities show one role label without a model subtitle', () => {
  assert.doesNotMatch(html, /<span>(Sol 5.6 Xhigh|Robot)<\/span>/);
  }
  assert.match(activityRowHtml({found_by_role_label:'Searcher', found_by_model_label:'Sol 6 Max'}), /Sol 6 Max/);
+});
+
+test('planning checks and progress align with phone and email columns', () => {
+ const css = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-redesign.css'), 'utf8');
+ assert.match(css, /\.location-statuses\{grid-column:5;padding-left:9px/);
+ assert.match(css, /\.location-stage-progress\{grid-column:6;padding-left:9px/);
+ assert.match(css, /\.latest-treated-panel td\{width:12.5%\}/);
 });
