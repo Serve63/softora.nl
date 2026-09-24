@@ -27,6 +27,13 @@
     let roiDirtySinceLoad = false;
     let roiNeedsRemoteSync = false;
     let bootstrapStateApplied = false;
+    // The Instantly part of the totals is counted from all ~20k customers, which
+    // arrive after the first paint. The last complete count is remembered so the
+    // metrics show the right numbers from the start instead of jumping
+    // (docs/platform-performance.md); the next complete count replaces it.
+    const INSTANTLY_COUNTS_KEY = "mailsysteem-instantly-counts";
+    const INSTANTLY_COUNTS_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+    let instantlyCountsFromMemory = false;
 
     function fallbackNormalizeString(value) {
         return value === null || value === undefined ? "" : String(value).trim();
@@ -233,9 +240,28 @@
         return window.document || (typeof document === "undefined" ? null : document);
     }
 
+    function lastKnownStore() {
+        const store = window.SoftoraReadModelStore;
+        return store && typeof store.readLastKnown === "function" && typeof store.rememberLastKnown === "function" ? store : null;
+    }
+
+    function applyRememberedInstantlyCounts() {
+        const store = lastKnownStore();
+        const remembered = store ? store.readLastKnown(INSTANTLY_COUNTS_KEY, INSTANTLY_COUNTS_MAX_AGE_MS) : null;
+        const total = readNonNegativeInteger(remembered && remembered.total);
+        if (total === null) return;
+        lastInstantlyMailCount = Math.max(lastInstantlyMailCount, total);
+        const today = readNonNegativeInteger(remembered.today);
+        if (today !== null && remembered.dayKey === getAmsterdamDateKey(new Date())) {
+            lastInstantlyTodaySentCount = lastInstantlyTodaySentCount === null ? today : Math.max(lastInstantlyTodaySentCount, today);
+        }
+        instantlyCountsFromMemory = true;
+    }
+
     function applyBootstrapState() {
         if (bootstrapStateApplied) return;
         bootstrapStateApplied = true;
+        applyRememberedInstantlyCounts();
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("softoraCustomersBootstrap");
         if (!element) return;
@@ -716,13 +742,25 @@
         applyBootstrapState();
         bindRoiControls();
         bindTodaySentRefresh();
-        if (!(helpers && helpers.dataLoading)) {
+        const completeCount = Boolean(helpers && helpers.dataLoading === false);
+        if (completeCount && instantlyCountsFromMemory) {
+            // The first complete count replaces the remembered one, so a stale number never sticks.
+            instantlyCountsFromMemory = false;
+            lastInstantlyMailCount = getInstantlySystemMailSentCount(customers, helpers || {});
+            lastInstantlyTodaySentCount = getInstantlySystemMailSentTodayCount(customers, helpers || {});
+            renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, false);
+        } else if (!(helpers && helpers.dataLoading)) {
             lastInstantlyMailCount = Math.max(lastInstantlyMailCount, getInstantlySystemMailSentCount(customers, helpers || {}));
             const instantlyTodayCount = getInstantlySystemMailSentTodayCount(customers, helpers || {});
             lastInstantlyTodaySentCount = lastInstantlyTodaySentCount === null
                 ? instantlyTodayCount
                 : Math.max(lastInstantlyTodaySentCount, instantlyTodayCount);
             renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, false);
+        }
+        if (completeCount) {
+            const store = lastKnownStore();
+            if (store) store.rememberLastKnown(INSTANTLY_COUNTS_KEY, { total: lastInstantlyMailCount,
+                today: lastInstantlyTodaySentCount, dayKey: getAmsterdamDateKey(new Date()) });
         }
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailSentCount");

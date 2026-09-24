@@ -278,7 +278,7 @@ test('Mailsysteem loads the read model client before the mail metrics', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-database.html'), 'utf8');
   const store = page.indexOf('assets/premium-readmodel-store.js?v=20260924c');
   const client = page.indexOf('assets/premium-readmodel-client.js?v=20260924a');
-  const metrics = page.indexOf('assets/premium-database-system-mail-count.js?v=20260924-readmodel');
+  const metrics = page.indexOf('assets/premium-database-system-mail-count.js?v=20260924-stable-metrics');
   assert.ok(store > 0 && store < client && client < metrics);
   assert.equal(page.split('assets/premium-readmodel-store.js').length, 2, 'the store is loaded once');
 });
