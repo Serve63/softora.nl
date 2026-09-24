@@ -11,5 +11,6 @@ test('toekomst route serves the chooser with production links and available asse
  assert.match(html,/href="\/chatbot-login"/);
  assert.match(html,/<section class="ai-feature" aria-label="AI-medewerker — Binnenkort"/);
  assert.match(html,/AI-MEDEWERKER/);
+ assert.match(html,/src="\/assets\/entry\/ai-medewerker-box.webp"/);
  for(const match of html.matchAll(/(?:src|href)="(\/assets\/[^"?]+)/g)) assert.ok(fs.existsSync(path.join(root,match[1])),match[1]);
 });
