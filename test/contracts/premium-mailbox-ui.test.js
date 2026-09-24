@@ -222,14 +222,14 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827b/);
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260924a/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
-  assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260924b/);
+  assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260924c/);
   assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260910a') < page.indexOf('premium-mailbox-signature.js?v=20260921b'));
   assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-contact-view.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260921c') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
   assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260924c'));
-  assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260924b'));
-  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260924b') < page.indexOf('premium-mailbox-index.js?v=20260924a'));
+  assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260924c'));
+  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260924c') < page.indexOf('premium-mailbox-index.js?v=20260924a'));
   assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-browser-storage.js?v=20260828b'));
   assert.ok(page.indexOf('premium-browser-storage.js?v=20260828b') < page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c'));
   assert.ok(page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c') < page.indexOf('premium-mailbox-compose-send-state.js?v=20260831b'));
@@ -8253,6 +8253,8 @@ test('accountlijst hervat overgeslagen tijdlijn van cached mailbox terwijl provi
   await mailbox.loadMailboxAccounts();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(requests.filter((url) => url.includes('contact-timeline')).length, 1);
+  // A slow provider lookup no longer blocks reading once the short hold has passed.
+  await new Promise((resolve) => setTimeout(resolve, 1550));
   assert.match(mailbox.getElement('mail-detail').innerHTML, /Exact opgeslagen verzonden bericht/);
   assert.equal(providerCalls, 1);
   releaseProvider();
