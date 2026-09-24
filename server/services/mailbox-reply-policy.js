@@ -122,7 +122,9 @@ function analyzeMailboxReplyContext(inboundText, options = {}) {
   const conversation = Array.isArray(options.conversation) ? options.conversation : [];
   const questions = (authoredText.match(/[^.!?\n]+\?/g) || []).slice(0, 12)
     .map((text, index) => ({ id: `q${index + 1}`, text: text.trim() }));
-  const text = normalize(authoredText);
+  // HTML-only mobile replies can arrive with adjacent elements glued together
+  // (for example "nodigDankjewel"). Recover word boundaries for intent checks.
+  const text = normalize(authoredText.replace(/([\p{Ll}])([\p{Lu}])/gu, '$1 $2'));
   const rejection = matches(text,
     /\b(?:geen|niet)\s+(?:enige\s+)?(?:interesse|behoefte|belangstelling)\b|\bgeen\s+(?:verdere\s+)?ondersteuning\s+nodig\b|\bniet\s+geinteresseerd\b|\bniet\s+meer\s+mailen\b|\bmail\s+(?:mij|ons)\s+niet\s+meer\b|\bschrijf\s+(?:mij|ons)\s+uit\b|\bafmelden\b|\buitschrijven\b|\bgeen\s+gebruik\s+maken\b|\bniet\s+ingaan\s+op\b|\blaat\s+het\s+hierbij\b|\bhelaas\s+niet\b|\bniet\s+wat\s+(?:ik|we|wij)\s+zoek(?:en)?\b|\bbuiten\s+(?:onze|de)\s+scope\b|\b(?:traject|samenwerking|vervolg|opdracht)\b[^.!?]{0,120}\b(?:niet\s+aan\s+de\s+orde|geen\s+sprake|niet\s+relevant)\b|\b(?:wij|we|ik)\s+(?:gaan|willen|kunnen)\s+(?:hier\s+)?niet\s+(?:mee\s+)?(?:verder|door)\b|\b(?:wij|we|ik)\s+(?:gaan|zullen|willen)\s+(?:het|dit|dat)\s+(?:echter\s+)?niet\s+gebruiken\b/
   );
