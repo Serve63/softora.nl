@@ -7,7 +7,7 @@ precheck -> validate -> apply pipeline. No model key is stored locally.
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from urllib.error import HTTPError, URLError
 
 import fcntl
@@ -362,6 +362,75 @@ def apply_ready_prefix(role: str, packet: dict, flags: list[str], apply_lock: th
     return applied
 
 
+SEARCHER_LOOKAHEAD = 3  # queue window as a multiple of the chosen worker count
+
+
+def apply_searcher_head(packet: dict, flags: list[str], apply_lock: threading.Lock) -> bool:
+    """Apply the queue head once its mapped Luna result exists; never skip past it."""
+    kvk = str(packet["bedrijven"][0]["kvk_nummer"])
+    path = pending_path("searcher", kvk, flags)
+    if not path.exists():
+        return False
+    try:
+        # apply_result runs the precheck that creates the hash-bound draft; no second precheck.
+        applied = apply_result(path, flags, apply_lock, "searcher")
+    except ValidationFailure as error:
+        raise ValidationFailure(f"{kvk}: Luna-antwoord bewaard, maar de database weigert het: {str(error)[-300:]}") from None
+    if applied:
+        report("searcher", f"Resultaat toegepast: {kvk}")
+    return applied
+
+
+def run_searcher_pipeline(apply_lock: threading.Lock) -> None:
+    """Keep the chosen number of Luna requests running; apply results in queue order meanwhile.
+
+    A worker that finishes starts the next company right away instead of waiting
+    for the slowest request of a batch. Each company is still paid exactly once.
+    """
+    in_flight: dict[str, object] = {}
+    pool = ThreadPoolExecutor(max_workers=10)
+    with Heartbeat("searcher", "doorlopend"):
+        try:
+            while True:
+                worker = ((call("/poll", {}).get("state") or {}).get("workers") or {}).get("searcher") or {}
+                if not worker.get("enabled"):
+                    return
+                count = max(1, min(10, int(worker.get("count") or 1)))
+                denied = False
+                for kvk, future in list(in_flight.items()):
+                    if future.done():
+                        del in_flight[kvk]
+                        denied = future.result() is False or denied  # raises a failed request
+                packet_result = next_packet("searcher", count * SEARCHER_LOOKAHEAD)
+                if packet_result is None:
+                    if not in_flight:
+                        report("searcher", "Wachtrij leeg; wacht op nieuw werk.")
+                        time.sleep(30)
+                    else:
+                        wait(list(in_flight.values()), timeout=10, return_when=FIRST_COMPLETED)
+                    continue
+                packet, flags = packet_result
+                if not denied:
+                    for company in packet["bedrijven"]:
+                        if len(in_flight) >= count:
+                            break
+                        kvk = str(company["kvk_nummer"])
+                        path = pending_path("searcher", kvk, flags)
+                        if kvk in in_flight or path.exists():
+                            continue
+                        in_flight[kvk] = pool.submit(luna_search_one, company, flags, False)
+                if apply_searcher_head(packet, flags, apply_lock):
+                    continue
+                report("searcher", f"{len(in_flight)} van {count} bezig.")
+                if in_flight:
+                    wait(list(in_flight.values()), timeout=10, return_when=FIRST_COMPLETED)
+                else:
+                    time.sleep(10)  # budget or concurrency slot not available yet
+        finally:
+            # Paid requests already running finish and are saved for reuse.
+            pool.shutdown(wait=True)
+
+
 def work(role: str, apply_lock: threading.Lock) -> None:
     print(f"KVK API {role}: wacht op de dashboardknop.", flush=True)
     while True:
@@ -370,6 +439,9 @@ def work(role: str, apply_lock: threading.Lock) -> None:
             worker = (state.get("workers") or {}).get(role) or {}
             if not worker.get("enabled"):
                 time.sleep(10)
+                continue
+            if role == "searcher":
+                run_searcher_pipeline(apply_lock)
                 continue
             count = max(1, min(10, int(worker.get("count") or 1)))
             report(role, f"{count} ingesteld; wachtrij lezen.")
