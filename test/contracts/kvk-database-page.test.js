@@ -176,7 +176,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260923-short-websites/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260924-robot-label/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -417,7 +417,7 @@ test('kvk database shows every Robot result and only material Controller correct
   assert.match(html, /Geen mail/);
   assert.match(html, /0612345678/);
   assert.match(html, /Robot/);
-  assert.match(html, /Luna 5\.6 Max/);
+  assert.doesNotMatch(html, /Luna 5\.6 Max/);
   assert.match(html, /href="https:\/\/voorbeeld\.nl"[^>]*>voorbeeld\.nl<\/a>/);
   assert.doesNotMatch(html, />https?:\/\//i);
   assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
@@ -723,3 +723,13 @@ test('KVK header shows the disabled mail upload action without a settings back l
  assert.match(css, /grid-template-columns:24px minmax\(180px,1fr\) 76px minmax\(95px,.45fr\) 110px/);
  assert.match(css, /\.planning-panel \.location-main\{display:contents\}/);
  });
+
+test('Robot activities show one role label without a model subtitle', () => {
+ const { activityRowHtml } = require('../../assets/kvk-database-luna-errors');
+ for (const model of ['Sol 5.6 Xhigh', 'Robot']) {
+ const html = activityRowHtml({ found_by_role_label: 'Robot', found_by_model_label: model });
+ assert.match(html, /<strong>Robot<\/strong><\/span>/);
+ assert.doesNotMatch(html, /<span>(Sol 5.6 Xhigh|Robot)<\/span>/);
+ }
+ assert.match(activityRowHtml({found_by_role_label:'Searcher', found_by_model_label:'Sol 6 Max'}), /Sol 6 Max/);
+});
