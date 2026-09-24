@@ -408,6 +408,9 @@
       .join(' ')
       .normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '')
+      // Mail clients rewrite links: "[label](url)" in a quote is the same text
+      // as "label [url]" or "label url" in the sent copy.
+      .replace(/\[([^\]\n]*)\]\((?:https?:\/\/|mailto:)[^)\s]*\)/gi, ' $1 ')
       .replace(/\[\s*\d+\s*\]/g, ' ')
       .replace(/\[(https?:\/\/[^\]\s]+)\]/gi, ' ')
       .replace(/<?https?:\/\/[^\s>]+>?/gi, ' ')
