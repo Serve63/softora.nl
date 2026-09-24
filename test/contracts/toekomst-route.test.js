@@ -54,3 +54,10 @@ test("toekomst names the telephone and implementation offers", () => {
  assert.match(html,/<h2>AI-TELEFONIST<\/h2>/);
  assert.match(html,/AI-IMPLEMENTATIE/);
 });
+
+test('toekomst uses SEO System consistently', () => {
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ assert.match(html,/<h2>SEO SYSTEM<\/h2>/);
+ assert.match(html,/<strong>SEO System<\/strong>/);
+ assert.doesNotMatch(html,/SEO-tool/i);
+});
