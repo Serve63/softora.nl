@@ -343,6 +343,14 @@ test('Galaxy-antwoord van Bert wordt als afwijzing gelezen en levert ook bij ong
   assert.doesNotMatch(answer, /preview|afspraak|ontwerp/i);
 });
 
+test('samengeplakte mobiele HTML-tekst behoudt de afwijzing voor het lokale antwoord', () => {
+  const inbound = 'GoededagIk heb geen ondersteuning nodigDankjewelVan Esch infratechnical suppportVerzonden vanaf mijn Galaxy\n-------- Oorspronkelijk bericht --------Van: Servé Creusen Onderwerp: Kleine vraag over jullie website Kunnen we de preview bekijken?';
+  const policy = analyzeMailboxReplyContext(inbound);
+  assert.equal(policy.intent, 'rejection');
+  assert.equal(policy.questions.length, 0);
+  assert.equal(policy.ctaAllowed, false);
+});
+
 test('uitgebreide inhoud mag meer dan drie korte alinea’s hebben', () => {
   const texts = ['Dankjewel voor de uitgebreide uitleg.', 'Je eerdere investering snap ik.', 'De foto’s moeten echt bij jullie passen.', 'Ook de eigen huisstijl is duidelijk belangrijk.', 'De tekst moet leesbaar blijven.'];
   assert.ok(respond('We hebben geïnvesteerd in onze eigen huisstijl, foto’s en leesbare tekst.', texts).includes(texts.join('\n\n')));
