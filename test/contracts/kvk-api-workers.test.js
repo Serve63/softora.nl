@@ -348,7 +348,7 @@ test('Searcher refills a finished worker at once instead of waiting for the slow
   const runner = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
   const pipeline = runner.slice(runner.indexOf('def run_searcher_pipeline'), runner.indexOf('def work('));
   assert.match(pipeline, /return_when=FIRST_COMPLETED/);
-  assert.match(pipeline, /apply_searcher_head\(packet, flags, apply_lock\)/);
+  assert.match(pipeline, /apply_searcher_head\(\{"bedrijven": window\}, flags, apply_lock\)/);
   assert.match(pipeline, /pool\.shutdown\(wait=True\)/);
   assert.match(runner, /if role == "searcher":\n\s+run_searcher_pipeline\(apply_lock\)/);
 });
