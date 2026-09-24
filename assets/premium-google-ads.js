@@ -140,7 +140,32 @@
 
   if (refs.downloadPack) refs.downloadPack.addEventListener('click', downloadLaunchPack);
 
-  Promise.all([fetchJson('/api/google-ads/status'), fetchJson('/api/google-ads/blueprint'), fetchJson('/api/google-ads/launch-pack')])
-    .then(function (results) { renderStatus(results[0]); renderBlueprint(results[1]); renderLaunchPack(results[2]); })
+  // Open with the last verified status, blueprint and launch pack
+  // (docs/platform-performance.md); the live reads replace them. A remembered
+  // launch pack is never downloadable: only the live pack enables the button.
+  var lastKnownStore = window.SoftoraReadModelStore && typeof window.SoftoraReadModelStore.readLastKnown === 'function'
+    && typeof window.SoftoraReadModelStore.rememberLastKnown === 'function' ? window.SoftoraReadModelStore : null;
+  var remembered = lastKnownStore ? lastKnownStore.readLastKnown('google-ads', 36 * 60 * 60 * 1000) : null;
+  if (remembered && remembered.status && remembered.blueprint && remembered.pack) {
+    try {
+      renderStatus(remembered.status);
+      renderBlueprint(remembered.blueprint);
+      renderLaunchPack(remembered.pack);
+    } catch (_error) { /* The live reads below render the page as before. */ }
+    launchPack = null;
+    if (refs.downloadPack) refs.downloadPack.disabled = true;
+  }
+
+  Promise.all([
+    fetchJson('/api/google-ads/status'),
+    fetchJson('/api/google-ads/blueprint'),
+    fetchJson('/api/google-ads/launch-pack'),
+  ])
+    .then(function (results) {
+      renderStatus(results[0]);
+      renderBlueprint(results[1]);
+      renderLaunchPack(results[2]);
+      if (lastKnownStore) lastKnownStore.rememberLastKnown('google-ads', { status: results[0], blueprint: results[1], pack: results[2] });
+    })
     .catch(showError);
 })();

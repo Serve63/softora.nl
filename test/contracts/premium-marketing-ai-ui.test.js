@@ -22,8 +22,8 @@ test('premium advertenties bevat aparte Google en Facebook Ads dry-run werkruimt
   assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260922a"><\/script>/);
   assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/);
   assert.match(pageSource, /<script src="assets\/premium-marketing-content-lock\.js\?v=20260723b" defer><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-google-ads\.js\?v=20260716b" defer><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-facebook-ads\.js\?v=20260723a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-google-ads\.js\?v=20260924a" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-facebook-ads\.js\?v=20260924a" defer><\/script>/);
   assert.match(pageSource, /data-content-lock-scope="premium_advertenties_content_lock"/);
   assert.match(pageSource, /data-content-lock-input/);
   assert.match(pageSource, /data-content-lock-submit/);
