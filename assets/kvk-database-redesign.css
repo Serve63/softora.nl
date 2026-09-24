@@ -71,7 +71,7 @@ html,body,html[data-softora-sidebar-content-frame="1"]:root,html[data-softora-si
 
 /* Compact dashboard footprint, with breathing room around the whole page. */
 @media(min-width:701px){
-.app-shell{width:calc(100% - 80px);max-width:1320px;height:min(740px,calc(100dvh - 64px));min-height:0;margin:32px auto;padding:0;grid-template-rows:34px 100px 74px minmax(100px,.8fr) minmax(140px,1.2fr);gap:10px}
+.app-shell{width:calc(100% - 80px);max-width:1320px;height:min(820px,calc(100dvh - 64px));min-height:0;margin:32px auto;padding:0;grid-template-rows:34px 100px 74px minmax(100px,.8fr) minmax(140px,1.2fr);gap:10px}
 }
 @media(min-width:701px) and (max-height:760px){
 .app-shell{height:calc(100dvh - 32px);margin:16px auto;gap:8px;grid-template-rows:34px 100px 74px minmax(90px,.8fr) minmax(120px,1.2fr)}

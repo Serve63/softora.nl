@@ -20,6 +20,10 @@ test('KVK dashboard exposes one control for each API worker', () => {
   assert.match(page, /id="kvk-api-searcher-toggle"/);
   assert.match(page, /id="kvk-api-controller-toggle"/);
   assert.match(page, /assets\/kvk-api-workers\.js/);
+  for (const role of ['searcher', 'controller']) {
+    assert.match(page, new RegExp(`<input id="kvk-api-${role}-count"[^>]+type="text"[^>]+inputmode="numeric"`));
+  }
+  assert.doesNotMatch(page, /<select id="kvk-api-(searcher|controller)-count"/);
 });
 
 test('KVK API budget starts at exactly 100 EUR with both workers off', () => {
@@ -101,4 +105,37 @@ test('stopping one role remains possible with exhausted budget and leaves the ot
   assert.equal(row.searcher_enabled, false);
   assert.equal(row.controller_enabled, true);
   assert.equal(Object.hasOwn(writes[0], 'controller_enabled'), false);
+});
+
+test('Robot v5 can be enabled without an API key or paid budget reservation', async () => {
+  const { service, row, writes } = settingsFixture({ robot_enabled: false, spent_eur_cents: 10000 });
+  const res = response();
+  await service.setEnabled({ body: { role: 'robot', enabled: true } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(row.robot_enabled, true);
+  assert.equal(row.searcher_enabled, false);
+  assert.equal(row.controller_enabled, false);
+  assert.equal(writes.length, 1);
+  assert.equal(res.body.state.workers.robot.enabled, true);
+});
+
+test('robot cannot enter the paid research endpoint', async () => {
+  let touched = false;
+  const service = createKvkApiWorkersService({ kvkDatabaseSyncToken: 'robot-test', getSupabaseClient() { touched = true; } });
+  const res = response();
+  await service.research({ headers: { authorization: 'Bearer robot-test' }, body: { role: 'robot', company: { kvk_nummer: '12345678' }, brief: {} } }, res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(touched, false);
+});
+
+test('robot control keeps evidence review separate from approved inventory', () => {
+  const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
+  const runner = fs.readFileSync(path.join(root, 'scripts/kvk_robot_v5.py'), 'utf8');
+  assert.match(page, /id="kvk-api-robot-toggle"/);
+  assert.match(page, /resultaten ter controle/);
+  assert.match(runner, /planning-next/);
+  assert.match(runner, /completed\.json/);
+  assert.match(runner, /mode=ro/);
+  assert.match(runner, /os\.killpg/);
+  assert.doesNotMatch(runner, /contact_validate_apply|\/research|api\.openai/);
 });

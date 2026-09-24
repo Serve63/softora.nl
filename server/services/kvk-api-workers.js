@@ -7,7 +7,8 @@ const MAX_OUTPUT_TOKENS = 16000;
 const MAX_TOOL_CALLS = 8;
 const STALE_MS = 120000;
 const PRICE_REVIEW_DEADLINE = Date.parse('2026-10-23T00:00:00Z');
-const ROLES = new Set(['searcher', 'controller']);
+const PAID_ROLES = new Set(['searcher', 'controller']);
+const ROLES = new Set([...PAID_ROLES, 'robot']);
 
 function createKvkApiWorkersService(deps = {}) {
   const getSupabaseClient = deps.getSupabaseClient || (() => null);
@@ -84,6 +85,7 @@ function createKvkApiWorkersService(deps = {}) {
         if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
           return res.status(400).json({ ok: false, error: 'Ongeldige aan/uit-instelling.' });
         }
+        if (body.role === 'robot' && body.count !== undefined) return res.status(400).json({ ok: false, error: 'Robot v5 draait als een vaste werker.' });
         if (body.count !== undefined && (!Number.isInteger(body.count) || body.count < 1 || body.count > 10)) {
           return res.status(400).json({ ok: false, error: 'Kies een aantal van 1 tot en met 10.' });
         }
@@ -99,7 +101,7 @@ function createKvkApiWorkersService(deps = {}) {
         return res.status(400).json({ ok: false, error: 'Ongeldige werkrol of instelling.' });
       }
       const row = await readRow();
-      const wantsStart = Object.entries(requested).some(([role, value]) => value.enabled === true && !row[`${role}_enabled`]);
+      const wantsStart = Object.entries(requested).some(([role, value]) => PAID_ROLES.has(role) && value.enabled === true && !row[`${role}_enabled`]);
       if (wantsStart && !env.OPENAI_API_KEY) {
         return res.status(503).json({ ok: false, error: 'Bestaande OpenAI API-sleutel ontbreekt op de server.' });
       }
@@ -172,7 +174,7 @@ function createKvkApiWorkersService(deps = {}) {
       const role = String(req.body?.role || '');
       const company = req.body?.company;
       const brief = req.body?.brief;
-      if (!ROLES.has(role) || !company || !/^\d{8}$/.test(String(company.kvk_nummer || ''))
+      if (!PAID_ROLES.has(role) || !company || !/^\d{8}$/.test(String(company.kvk_nummer || ''))
         || !brief || typeof brief !== 'object'
         || JSON.stringify({ company, brief }).length > 50000) {
         return res.status(400).json({ ok: false, error: 'Ongeldige of te grote bedrijfsopdracht.' });

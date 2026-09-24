@@ -25,12 +25,12 @@
 
 .kvk-api-workers-dialog__actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .kvk-api-workers-dialog__count{display:flex;align-items:center;gap:7px;font-size:10px;color:#827680;text-transform:none}
-.kvk-api-workers-dialog__count select{width:48px;height:32px;padding:0 5px;border:1px solid #e1d7dd;border-radius:6px;background:#fff;color:#40343d;font:500 12px Inter,sans-serif}
+.kvk-api-workers-dialog__count input{width:48px;height:32px;padding:0 9px;border:1px solid #e1d7dd;border-radius:6px;background:#fff;color:#40343d;font:500 12px Inter,sans-serif}
 .kvk-api-workers-dialog__row button{min-width:81px;height:32px;padding:0 12px;border:1px solid transparent;border-radius:999px;background:#8e2f5f;color:#fff;font:500 11px 'Oswald',sans-serif;letter-spacing:.04em;text-transform:uppercase}
 .kvk-api-workers-dialog__row button[aria-pressed="true"]{background:#fff;border-color:#d8d0d4;color:#8e2f5f}
 .kvk-api-workers-dialog__row button:disabled{cursor:default}
 .kvk-api-workers-dialog__head button{text-transform:none}
 .kvk-api-workers-dialog__message:empty{display:none}
 .kvk-api-workers-dialog__row:last-of-type{border-bottom:0;margin-bottom:10px}
-.kvk-api-workers-dialog select:focus-visible{outline:2px solid #8e2f5f;outline-offset:2px}
+.kvk-api-workers-dialog input:focus-visible{outline:2px solid #8e2f5f;outline-offset:2px}
 @media(max-width:420px){.kvk-api-workers-dialog__count{flex-direction:column;gap:3px;align-items:flex-start}.kvk-api-workers-dialog__actions{gap:8px}}
