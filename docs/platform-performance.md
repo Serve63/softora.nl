@@ -81,6 +81,64 @@ statische nullen. De gereedheidsmarkering lost die zichtbare tussenstand niet op
 daarvoor is de blijvende shell nodig. Deze stap bewijst evenmin dat alle routes de
 3-secondennorm halen.
 
+## Direct zichtbare schermen (geïmplementeerd, verplicht voor nieuwe functies)
+
+Een personeelsscherm toont bij openen meteen een volledig scherm, nooit een
+laadtekst, lege tabel of verspringende bedragen. Actuele gegevens worden op de
+achtergrond bevestigd of bijgewerkt. Vier bouwstenen, allemaal zonder extra
+diensten of kosten:
+
+1. **Versies uit de database.** `softora_table_versions` telt via triggers elke
+   schrijfactie op een brontabel; `softora_runtime_state.change_seq` nummert
+   elke ui-state-rij uit één globale sequence. De server bewijst "ongewijzigd"
+   met één kleine query (`server/repositories/table-versions.js`,
+   `server/services/ui-state-readmodel.js`). Nieuwe brontabellen van een
+   leesmodel krijgen dezelfde trigger.
+2. **Versieprotocol.** De browser stuurt `X-Softora-Readmodel-Version` mee; de
+   server antwoordt `readModel: { unchanged: true }` of stuurt het deel met
+   nieuwe versie en `fields` (`server/services/readmodel-version-response.js`,
+   `assets/premium-readmodel-client.js`). Versies worden vóór de rijen gelezen,
+   zodat een kopie nooit een nieuwere versie draagt dan haar gegevens. Grote
+   collecties krijgen een delta (voorbeeld: klantenarchief, `?since=`).
+3. **Lokale kopieën.** Uitsluitend via `assets/premium-readmodel-store.js`
+   (de enige goedgekeurde browseropslag): per ingelogde gebruiker, gewist op de
+   inlogpagina (uitloggen, verlopen sessie, gebruikerswissel) en bij een andere
+   identiteit. `readLastKnown`/`rememberLastKnown` voor live-reads (kosten, SEO,
+   advertenties, teamlijst); alleen geverifieerde, geslaagde antwoorden worden
+   bewaard, met een expliciete maximale leeftijd.
+4. **Schermopnames.** `assets/premium-screen-snapshot.js` zet bij openen exact
+   terug wat laatst voor dezelfde gebruiker en weergave (filter, zoekterm,
+   sortering) zichtbaar was, alles-of-niets, en vervangt het bij de eerste echte
+   render. Voorbeelden: Mailsysteem en Klanten.
+
+Harde regels:
+
+- Teruggezette of onthouden inhoud is alleen-lezen (`inert`, gedeactiveerde
+  knoppen) tot de live data is verwerkt. Blijft een live-read mislukken, dan
+  blijft het alleen-lezen. Geen actie, download of schrijfactie ooit op
+  onthouden data.
+- Een mislukte verversing vervangt geverifieerde inhoud niet door een
+  foutscherm; toon een waarschuwing.
+- Opnames alleen na een volledige, geverifieerde render; nooit tijdens laden.
+- Een legacy- of beveiligingsread die alleen voor schrijfacties nodig is, mag de
+  eerste render niet blokkeren; de schrijfactie wacht erop (voorbeeld:
+  `state.fullCustomerRowsPending` op Klanten).
+- Nooit het wachtwoordregister, gevoelige scopes of een geheugenterugval
+  (`source: 'memory'`) als lokale kopie of versie.
+
+Checklist voor een nieuwe of gewijzigde personeelsfunctie:
+
+1. Staat er bij de tweede opening binnen 300 ms een volledig scherm zonder
+   laadtekst? Zo niet: bootstrap in de HTML, leesmodel met versie,
+   `readLastKnown` of een schermopname.
+2. Wacht de eerste render alleen op wat het scherm toont (parallelle reads)?
+3. Vraagt openen geen dure build of externe koppeling die ongewijzigd kan zijn?
+   Gebruik het versieprotocol of verplaats het naar de achtergrond.
+4. Zijn onthouden gegevens alleen-lezen tot live verwerkt, per gebruiker en bij
+   uitloggen gewist?
+5. Contracttests voor: onthouden → direct zichtbaar, live vervangt, mislukte
+   verversing, andere gebruiker, en dat acties geblokkeerd zijn.
+
 ## Nog te implementeren en te bewijzen
 
 1. Volledige nulmeting per hoofdmodule en inhoudstype; data, beelden, acties en
