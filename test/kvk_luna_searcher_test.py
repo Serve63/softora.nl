@@ -91,6 +91,20 @@ class LunaSearcherTests(unittest.TestCase):
         self.assertIn('013 533 1678', result['conclusion_note'])
         self.assertIn('https://voorbeeld.nl/contact', result['field_evidence']['telefoonnummer'])
 
+    def test_field_urls_stay_exact_next_to_www_variants(self):
+        result = canonical(answer(website='voorbeeld.nl', bronnen=[{'url': 'https://www.voorbeeld.nl/', 'wat_gezien': 'site'}]))
+        urls = [source['url'] for source in result['sources']]
+        self.assertIn(result['website'], urls)
+        self.assertIn(result['website'], result['field_evidence']['website'])
+
+    def test_opened_search_pages_count_as_recorded_checks_after_concrete_pages(self):
+        result = canonical(answer(website='', website_status='no_website', telefoonnummer='', email='',
+                                  identiteit={'bevestigd': False}, bronnen=[
+                                      {'url': 'https://www.kvk.nl/zoeken/?q=Voorbeeld', 'wat_gezien': 'geen treffer'},
+                                      {'url': 'https://gids.nl/voorbeeld', 'wat_gezien': 'adres'},
+                                      {'url': 'https://voorbeeld.nl/', 'wat_gezien': 'geparkeerd'}]))
+        self.assertEqual([source['label'] for source in result['sources']], ['Bron', 'Bron', 'Zoekpagina'])
+
     def test_dutch_phone_notations_match(self):
         for value in ('+31 (0)13 533 1678', '0031135331678', '+31135331678', '013-533 16 78'):
             self.assertEqual(phone_digits(value), '0135331678')

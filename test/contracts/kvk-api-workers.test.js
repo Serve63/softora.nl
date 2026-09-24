@@ -352,3 +352,9 @@ test('Searcher refills a finished worker at once instead of waiting for the slow
   assert.match(pipeline, /pool\.shutdown\(wait=True\)/);
   assert.match(runner, /if role == "searcher":\n\s+run_searcher_pipeline\(apply_lock\)/);
 });
+
+test('Luna Searcher keeps opened search pages and exact field URLs as recorded sources', () => {
+  const mapper = fs.readFileSync(path.join(root, 'scripts/kvk_luna_searcher.py'), 'utf8');
+  assert.match(mapper, /"Zoekpagina" if SEARCH_URL\.search/);
+  assert.match(mapper, /add\(url, "Bron van een gecontroleerd veld\.", exact=True\)/);
+});
