@@ -808,7 +808,10 @@
           : '';
       const actionBefore = sent ? messageActionHtml : '';
       const actionInside = sent ? '' : messageActionHtml;
-      return `${actionBefore}<section class="${sectionClass}">
+      const sentProvider = sent && String(message.provider || '').trim().toLowerCase() === 'instantly'
+        ? ' data-mailbox-provider="instantly"'
+        : '';
+      return `${actionBefore}<section class="${sectionClass}"${sentProvider}>
           <div class="detail-mail-section-label">${sent ? sentLabel : 'Eerder ontvangen'}</div>
           ${meta ? `<div class="detail-mail-quote-meta">${escapeHtml(meta)}</div>` : ''}
           ${renderedRouting}${renderedBody}${contactHtml}${renderedAttachments}${actionInside}
