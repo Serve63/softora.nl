@@ -35,8 +35,8 @@
 @media(min-width:761px){
  .toekomst-ai .page{height:100svh;min-height:640px}
  .toekomst-ai header{height:58px}
- .toekomst-ai main{display:grid;flex:1;grid-template-rows:72px minmax(130px,1fr) minmax(155px,1fr) minmax(130px,1fr);gap:18px;min-height:0;max-height:800px;margin:0 0 auto;padding:0 0 14px}
- .toekomst-ai .intro{padding:0 0 12px;align-self:start}
+ .toekomst-ai main{display:grid;flex:1;grid-template-rows:88px minmax(130px,1fr) minmax(155px,1fr) minmax(130px,1fr);gap:18px;min-height:0;max-height:800px;margin:0 0 auto;padding:0 0 14px}
+ .toekomst-ai .intro{padding:16px 0 12px;align-self:start}
  .toekomst-ai h1{font-size:clamp(38px,5.2svh,56px)}
  .toekomst-ai .ai-feature{min-height:0;height:100%}
  .toekomst-ai .ai-feature-copy{padding:18px 32px;max-width:72%}
@@ -58,3 +58,6 @@
 /* Photography from the same warm office series as the service cards. */
 .toekomst-ai .meet-softora{background-image:linear-gradient(90deg,#21121dc2,#21121d6b 52%,#21121d30),url('/assets/entry/meet-softora-office.webp')}
 @media(min-width:761px){.toekomst-ai .ai-feature-image{object-position:center 47%}}
+
+@media(min-width:761px) and (max-height:680px){.toekomst-ai main{gap:10px}}
+@media(max-width:760px){.toekomst-ai .intro{padding-top:32px}}
