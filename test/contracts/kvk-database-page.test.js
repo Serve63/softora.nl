@@ -496,6 +496,7 @@ test('kvk database balances activity and planning equally inside one desktop vie
   assert.match(compactStyleSource, /\.latest-treated-panel \.table-frame,[\s\S]*max-height:\s*none/);
   assert.match(compactStyleSource, /\.workspace-grid\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0/);
   assert.match(compactStyleSource, /\.planning-panel\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0/);
+  assert.ok(redesignStyleSource.includes('height:min(820px,calc(100dvh - 64px))'));
   assert.match(redesignStyleSource, /@media\(min-width:701px\)\{\.app-shell\{grid-template-rows:60px 100px 74px repeat\(2,minmax\(100px,1fr\)\)/);
   assert.match(redesignStyleSource, /@media\(max-width:700px\)\{\.app-shell\{grid-template-rows:82px 145px 130px repeat\(2,minmax\(110px,1fr\)\)/);
 });
