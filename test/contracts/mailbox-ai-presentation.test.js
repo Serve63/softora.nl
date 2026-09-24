@@ -203,7 +203,7 @@ test('storage failures and oversized inputs preserve original rather than fallin
     repository: { enqueue: async () => { throw new Error('db down'); } } });
   const result = await service.enrich([message, { ...message, body: 'x'.repeat(240001) }]);
   for (const mail of result) assert.ok(contract.read(mail).body.endsWith(mail.body));
-  assert.match(contract.read(result[0]).body, /tijdelijk niet beschikbaar/);
+  assert.equal(contract.read(result[0]).body, message.body);
 });
 test('worker never calls model without durable budget claim and does not retry a failed call', async () => {
   let calls = 0, claims = 0, finished = 0; const warnings = [];
@@ -229,6 +229,21 @@ test('pending cache becomes ready without body loading and never updates a switc
       fetchImpl: async () => { if (switchOwner) owner = 'martijn'; return { ok: true, json: async () => ({ ok: true, messages: [ready] }) }; } });
     refresh.watch(mail); await callback(); assert.equal(opens, switchOwner ? 0 : 1); assert.equal(mail.body, body); assert.equal(mail.bodyLoading, undefined); refresh.stop();
   }
+});
+test('temporary storage failure stays out of the email body and retries the existing decision', async () => {
+  const mail = { ...message, aiPresentation: { ...ready.aiPresentation, status: 'unavailable', reason: 'storage' } };
+  assert.equal(contract.read(mail).body, body);
+  let callback, opens = 0, reads = 0;
+  const refresh = createRefresh({ getMail: () => mail, getActiveId: () => mail.id, getOwner: () => 'serve',
+    schedule: (fn) => { callback = fn; return 1; }, cancel() {},
+    openMail: async () => { opens += 1; },
+    fetchImpl: async () => { reads += 1; return { ok: true, json: async () => ({ ok: true, messages: [ready] }) }; } });
+  refresh.watch(mail);
+  await callback();
+  assert.equal(reads, 1); assert.equal(opens, 1);
+  assert.equal(mail.aiPresentation.status, 'ready');
+  assert.doesNotMatch(contract.read(mail).body, /AI-opschoning/);
+  refresh.stop();
 });
 test('SQL migration actually fences access, reserves budget before claims and prevents duplicate spending', async () => {
   const { PGlite } = require('@electric-sql/pglite'); const db = new PGlite();
@@ -402,7 +417,9 @@ test('incoming gate holds unprocessed body and releases ready or failed mail wit
   assert.match(contract.read(ready).body, /offerte/);
   for (const reason of ['failed','budget','timeout','storage']) {
     const view = contract.read({ ...pending, aiPresentation: { ...pending.aiPresentation, status: 'unavailable', gate: false, reason } });
-    assert.ok(view.body.endsWith(body)); assert.match(view.body, /originele e-mail/);
+    assert.ok(view.body.endsWith(body));
+    if (reason === 'storage') assert.equal(view.body, body);
+    else assert.match(view.body, /originele e-mail/);
   }
 });
 
@@ -454,7 +471,7 @@ test('out-of-scope stored mail keeps normal formatting and quote cleanup in root
   const original = 'GoedendagIk heb geen ondersteuning nodigDankjewelVerzonden vanaf mijn Galaxy\n-------- Oorspronkelijk bericht --------Van: Servé <owner@example.nl> Datum: 22-09-2026 16:49 Aan: bert@example.nl Onderwerp: Vraag Goedendag,\nHier staat mijn eerdere voorstel voor jullie website.';
   const html = '<div>Goedendag</div><div>Ik heb geen ondersteuning nodig</div><div>Dankjewel</div><div>Verzonden vanaf mijn Galaxy</div><div>-------- Oorspronkelijk bericht --------</div><div>Van: Servé &lt;owner@example.nl&gt; </div><div>Datum: 22-09-2026 16:49 </div><div>Aan: bert@example.nl </div><div>Onderwerp: Vraag </div><p>Goedendag,</p><p>Hier staat mijn eerdere voorstel voor jullie website.</p>';
   const old = { ...message, body: original, sourceHtml: html };
-  for (const reason of ['outside_scope', 'timeout', 'budget']) {
+  for (const reason of ['outside_scope', 'timeout', 'budget', 'storage']) {
   const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' }, repository: {
     enqueue: async (sources) => sources.map((s) => ({ id:s.id, status:'queued', reason, gate:false })),
   } });
@@ -468,7 +485,7 @@ test('out-of-scope stored mail keeps normal formatting and quote cleanup in root
   assert.equal(views.length,2);
   for (const view of views) {
     assert.ok(view.body.endsWith('Goedendag\n\nIk heb geen ondersteuning nodig\n\nDankjewel'));
-    if (reason !== 'outside_scope') assert.match(view.body, /AI-opschoning/);
+    if (reason !== 'outside_scope' && reason !== 'storage') assert.match(view.body, /AI-opschoning/);
     assert.doesNotMatch(view.body,/Galaxy|eerdere voorstel|Oorspronkelijk bericht/);
   }
   }
