@@ -144,6 +144,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/voicesoftware", "destination": "/assets/voicesoftware/index.html" },
     { "source": "/toekomst", "destination": "/assets/entry/toekomst.html" },
     {
       "source": "/chatbot-login",
