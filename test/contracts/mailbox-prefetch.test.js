@@ -146,10 +146,43 @@ test('the contact timeline is prefetched without touching the open conversation'
 
 test('the Mailbox wires the prefetch after its detail controller and warms after each complete render', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
-  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260924b');
-  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260924f'));
+  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260924c');
+  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260924g'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /afterCommit: \(mail, \{ changed \}\) => \{ mailboxPrefetch\?\.schedule\?\.\(\);/);
   // The outreach list holds grouped copies; the detail opens the stored message, so that one is warmed.
   assert.match(source, /^mailboxPrefetch = window\.SoftoraMailboxPrefetch\?\.create\(\{ getMails: \(\) => getMailsForFolder\(activeFolder\)\.map\(\(item\) => findMailById\(item\.id\)\)\.filter\(Boolean\), getActiveMail: \(\) => activeMail,/m);
+});
+
+test('a dossier that a list refresh marked stale is warmed again, at most once a minute', async () => {
+  const calls = [];
+  let clock = 0;
+  let refreshWorks = true;
+  const mails = [{ id: 'open' }, { id: 'a', bodyLoaded: true }];
+  const prefetch = create({
+    delayMs: 0, now: () => clock, getMails: () => mails, getActiveMail: () => 'open',
+    index: { async prefetchRootBodies() {} },
+    discovery: { async prefetchContactTimeline(mail) { calls.push(mail.id); if (refreshWorks) mail.contactTimelineNeedsRefresh = false; } },
+  });
+  await prefetch.warmNow();
+  assert.deepEqual(calls, ['a']);
+  mails[1].contactTimelineNeedsRefresh = true; // a list refresh
+  await prefetch.warmNow();
+  assert.deepEqual(calls, ['a', 'a'], 'the stale dossier is refreshed before the next click');
+  await prefetch.warmNow();
+  assert.deepEqual(calls, ['a', 'a'], 'a fresh dossier is not fetched again');
+  mails[1].contactTimelineNeedsRefresh = true;
+  refreshWorks = false;
+  clock = 61000;
+  await prefetch.warmNow();
+  await prefetch.warmNow();
+  assert.deepEqual(calls, ['a', 'a', 'a'], 'a dossier that stays stale is not retried within a minute');
+  clock = 122000;
+  await prefetch.warmNow();
+  assert.deepEqual(calls, ['a', 'a', 'a', 'a']);
+});
+
+test('a click shows a complete but stale dossier at once and refreshes it in the background', () => {
+  const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
+  assert.match(source, /const stale = mail\.contactTimelineLoaded === true && mail\.contactTimelineNeedsRefresh === true && Number\(mail\.contactTimelineTotal\) > 0; const load = \(\) => mailboxDiscoveryController\?\.loadContactTimeline\?\.\(mail, \{ deferRender: !stale, signal \}\); if \(stale\) \{ void load\(\); return true; \}/);
 });
