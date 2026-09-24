@@ -114,7 +114,11 @@ function normalizeFirstName(value) {
 }
 
 function getNewestReplyLines(body) {
-  const lines = String(body || '').replace(/\r\n?/g, '\n').split('\n');
+  // Some mobile clients join the original-message divider to the quoted
+  // sender. A signature inside that quote must never become the addressee.
+  const newest = String(body || '').replace(/\r\n?/g, '\n')
+    .split(/[-–]{4,}\s*(?:Oorspronkelijk bericht|Original Message)\s*[-–]{4,}/i)[0];
+  const lines = newest.split('\n');
   const quoteIndex = lines.findIndex((line) => REPLY_QUOTE_HEADER_PATTERN.test(cleanLine(line)));
   return (quoteIndex >= 0 ? lines.slice(0, quoteIndex) : lines).map(cleanLine);
 }

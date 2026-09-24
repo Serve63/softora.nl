@@ -37,6 +37,11 @@ test('mailbox reply prompt kiest de ondertekende voornaam uit de nieuwste reacti
   );
 });
 
+test('geciteerde ondertekening van Servé wordt geen aanhef voor Bert', () => {
+  const body = 'GoededagIk heb geen ondersteuning nodigDankjewelVan Esch infratechnical suppport\n-------- Oorspronkelijk bericht --------Van: Servé Creusen\n\nMet vriendelijke groet,\nServé Creusen';
+  assert.equal(inferMailboxReplyFirstName({ from: 'Bert van Esch', body }), 'Bert');
+});
+
 test('mailbox reply prompt gebruikt geen bedrijfsnaam als aanhefnaam', () => {
   assert.equal(inferMailboxReplyFirstName({ from: 'De Vyldre', body: 'Geen interesse.' }), '');
   assert.equal(inferMailboxReplyFirstName({ from: 'Rijs Textiles', body: 'Bedankt.' }), '');
