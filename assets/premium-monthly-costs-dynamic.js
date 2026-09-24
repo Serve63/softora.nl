@@ -33,6 +33,10 @@
   let apiCostRetryTimer = null;
   let apiCostRetryAttempts = 0;
   let syncListenersBound = false;
+  // Last verified live amounts per user and month (docs/platform-performance.md):
+  // the page opens with them and the live reads only update what changed.
+  const LAST_KNOWN_PREFIX = 'premium-monthly-costs:last-known:';
+  const LAST_KNOWN_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
   function normalizeString(value) {
     return String(value || '').trim();
@@ -655,6 +659,7 @@
     coldcallingRefreshPromise = (async function () {
       try {
         const summary = await fetchMonthlyCostSummary();
+        rememberLastKnown('coldcalling', summary);
         const amountEur = Number(summary.costEur || 0) || 0;
         return { ok: true, updated: applyColdcallingCost(amountEur, buildColdcallingCostNote(summary)), amountEur };
       } catch (error) {
@@ -679,6 +684,7 @@
     apiCostRefreshPromise = (async function () {
       try {
         const summary = await fetchApiCostSummary();
+        rememberLastKnown('api', summary);
         const normalized = normalizeOpenAiCostPayload(summary);
         clearApiCostRetry();
         return {
@@ -712,6 +718,7 @@
     supabaseCostRefreshPromise = (async function () {
       try {
         const summary = await fetchSupabaseCostSummary();
+        rememberLastKnown('supabase', summary);
         return {
           ok: true,
           updated: applySupabaseCostSnapshot(summary),
@@ -732,11 +739,59 @@
     return supabaseCostRefreshPromise;
   }
 
+  function lastKnownScope() {
+    const store = window.SoftoraReadModelStore;
+    const bootstrap = window.SoftoraPageBootstrapSession;
+    const session = bootstrap && typeof bootstrap.get === 'function' ? bootstrap.get() : null;
+    const identity = normalizeString(session && session.authenticated ? (session.userId || session.email) : '').toLowerCase();
+    return store && typeof store.readSync === 'function' && typeof store.writeSync === 'function' && identity
+      ? { store: store, identity: identity }
+      : null;
+  }
+
+  function rememberLastKnown(name, payload) {
+    const scope = lastKnownScope();
+    if (!scope || !payload || typeof payload !== 'object') return;
+    try {
+      scope.store.writeSync(LAST_KNOWN_PREFIX + name, scope.identity, {
+        month: getMonthKeyFromMs(Date.now()),
+        savedAt: Date.now(),
+        payload: payload,
+      });
+    } catch (error) {
+      // A full or blocked storage only costs the instant view on the next open.
+    }
+  }
+
+  function readLastKnown(name) {
+    const scope = lastKnownScope();
+    if (!scope) return null;
+    try {
+      const record = scope.store.readSync(LAST_KNOWN_PREFIX + name, scope.identity);
+      if (!record || record.month !== getMonthKeyFromMs(Date.now())) return null;
+      if (!(Date.now() - Number(record.savedAt) < LAST_KNOWN_MAX_AGE_MS)) return null;
+      return record.payload && typeof record.payload === 'object' ? record.payload : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function applyLastKnownCosts() {
+    const coldcalling = resolveColdcallingCostItem() ? readLastKnown('coldcalling') : null;
+    if (coldcalling) applyColdcallingCost(Number(coldcalling.costEur || 0) || 0, buildColdcallingCostNote(coldcalling));
+    const apiCost = resolveApiCostItem() ? readLastKnown('api') : null;
+    if (apiCost) applyApiCostSnapshot(apiCost);
+    const supabaseCost = resolveSupabaseCostItem() ? readLastKnown('supabase') : null;
+    if (supabaseCost) applySupabaseCostSnapshot(supabaseCost);
+  }
+
   function startDynamicMonthlyCostsSync() {
     const hasColdcallingCostItem = Boolean(resolveColdcallingCostItem());
     const hasApiCostItem = Boolean(resolveApiCostItem());
     const hasSupabaseCostItem = Boolean(resolveSupabaseCostItem());
     if ((!hasColdcallingCostItem && !hasApiCostItem && !hasSupabaseCostItem) || !getMonthlyCostsRender()) return;
+
+    applyLastKnownCosts();
 
     if (hasColdcallingCostItem) void refreshMonthlyColdcallingCosts();
     if (hasApiCostItem) void refreshMonthlyApiCosts();

@@ -118,7 +118,7 @@ test('premium terugkerende kosten verbergt coldcalling en api kosten uit de stan
   assert.match(combinedSource, /window\.softoraMonthlyCostsData = data;/);
   assert.match(combinedSource, /window\.softoraMonthlyCostsRender = render;/);
   assert.match(pageSource, /<script src="assets\/premium-vaste-lasten\.js\?v=20260722a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260521d" defer><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-readmodel-store\.js\?v=20260924b" defer><\/script><script src="assets\/premium-monthly-costs-dynamic\.js\?v=20260924a" defer><\/script>/);
   assert.match(pageSource, /\.cost-row\.cost-row-accent\s*\{[\s\S]*border:\s*1px dashed var\(--crimson\);[\s\S]*background:\s*rgba\(139, 34, 82, 0\.04\);/);
   assert.match(combinedSource, /function createCategoryHeader\(cat, catTotal\) \{/);
   assert.match(combinedSource, /appendCostTextElement\(header, 'div', 'category-title', cat\);/);
