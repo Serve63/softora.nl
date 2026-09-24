@@ -18,6 +18,18 @@
 
   const pageSize = 8;
   let performanceRequest = 0;
+  // Search Console data changes at most daily: open with the last verified
+  // result and let the live read replace it (docs/platform-performance.md).
+  const LAST_KNOWN_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+
+  function lastKnownStore() {
+    const store = typeof window !== 'undefined' ? window.SoftoraReadModelStore : null;
+    return store && typeof store.readLastKnown === 'function' && typeof store.rememberLastKnown === 'function' ? store : null;
+  }
+
+  function isUsablePerformance(payload) {
+    return Boolean(payload && payload.connected && payload.ok !== false && payload.status !== 'error');
+  }
 
   const tableLabels = {
     queries: 'Zoekwoord',
@@ -388,29 +400,42 @@
   }
 
   async function loadAudit() {
+    const store = lastKnownStore();
+    const cached = store ? store.readLastKnown('seo-audit', LAST_KNOWN_MAX_AGE_MS) : null;
+    if (cached) renderAudit(cached);
     try {
       const response = await fetch(auditEndpoint, { headers: { Accept: 'application/json' } });
       const audit = await response.json().catch(() => ({}));
+      if (response.ok && audit && audit.ok !== false && store) store.rememberLastKnown('seo-audit', audit);
+      if (!response.ok && cached) return;
       renderAudit(response.ok ? audit : { ok: false });
     } catch (_error) {
-      renderAudit({ ok: false });
+      if (!cached) renderAudit({ ok: false });
     }
   }
 
   async function loadPerformance() {
     const request = ++performanceRequest;
-    state.loading = true;
-    state.payload = null;
+    const store = lastKnownStore();
+    const cacheKey = `seo-performance:${state.days}`;
+    const cached = store ? store.readLastKnown(cacheKey, LAST_KNOWN_MAX_AGE_MS) : null;
+    const showingCached = isUsablePerformance(cached);
     state.page = 0;
-    root.setAttribute('aria-busy', 'true');
-    setStatus('Search Console laden...', 'muted');
-    const period = get('[data-seo-period-label]');
-    if (period) period.textContent = 'Geselecteerde periode wordt geladen';
-    renderMetrics(null);
-    renderChart(null);
-    renderTable();
-    renderOpportunities(null);
-    renderActions();
+    if (showingCached) {
+      renderPayload(cached);
+    } else {
+      state.loading = true;
+      state.payload = null;
+      root.setAttribute('aria-busy', 'true');
+      setStatus('Search Console laden...', 'muted');
+      const period = get('[data-seo-period-label]');
+      if (period) period.textContent = 'Geselecteerde periode wordt geladen';
+      renderMetrics(null);
+      renderChart(null);
+      renderTable();
+      renderOpportunities(null);
+      renderActions();
+    }
     try {
       const response = await fetch(`${performanceEndpoint}?days=${state.days}`, {
         headers: { Accept: 'application/json' },
@@ -422,9 +447,19 @@
         payload.status = 'error';
         payload.message = payload.message || payload.error || 'Search Console-data kon nu niet worden opgehaald.';
       }
+      if (showingCached && !isUsablePerformance(payload)) {
+        // Keep the last verified data visible instead of replacing it with an error screen.
+        setStatus('Search Console verversen mislukt; laatst opgehaalde data zichtbaar', 'warning');
+        return;
+      }
+      if (isUsablePerformance(payload) && store) store.rememberLastKnown(cacheKey, payload);
       renderPayload(payload);
     } catch (_error) {
       if (request !== performanceRequest) return;
+      if (showingCached) {
+        setStatus('Search Console verversen mislukt; laatst opgehaalde data zichtbaar', 'warning');
+        return;
+      }
       renderPayload({
         ok: false,
         connected: true,

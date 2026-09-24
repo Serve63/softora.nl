@@ -9,7 +9,7 @@ test('premium seo page provides a live decision console in the premium shell', (
   const jsSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-seo-performance.js'), 'utf8');
 
   assert.match(source, /assets\/premium-seo-performance\.css\?v=20260906a/);
-  assert.match(source, /assets\/premium-seo-performance\.js\?v=20260906a/);
+  assert.match(source, /assets\/premium-seo-performance\.js\?v=20260924a/);
   assert.ok(
     source.indexOf('</style>') < source.indexOf('assets/premium-seo-performance.css?v=20260906a'),
     'console CSS hoort na de legacy SEO-styles te laden'

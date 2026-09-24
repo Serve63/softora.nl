@@ -192,8 +192,32 @@
             });
         }
 
+        // Last verified value of a live read, bound to the signed-in session: a page
+        // opens with it and lets the live read replace only what changed.
+        function sessionIdentity() {
+            try {
+                const session = typeof config.getSession === "function" ? config.getSession()
+                    : target && target.SoftoraPageBootstrapSession && typeof target.SoftoraPageBootstrapSession.get === "function"
+                        ? target.SoftoraPageBootstrapSession.get() : null;
+                return session && session.authenticated ? normalizeIdentity(session.userId || session.email) : "";
+            } catch (_error) { return ""; }
+        }
+
+        function readLastKnown(name, maxAgeMs) {
+            const record = readSync("last-known:" + String(name || "").trim(), sessionIdentity());
+            const maximumAge = Number(maxAgeMs) || 0;
+            if (!record || !maximumAge || !(Date.now() - Number(record.savedAt) < maximumAge)) return null;
+            return record.value === undefined ? null : record.value;
+        }
+
+        function rememberLastKnown(name, value) {
+            if (value === undefined || value === null) return false;
+            return writeSync("last-known:" + String(name || "").trim(), sessionIdentity(), { savedAt: Date.now(), value: value });
+        }
+
         return Object.freeze({ read: read, write: write, remove: remove, clearAll: clearAll,
-            readSync: readSync, writeSync: writeSync, removeSync: removeSync });
+            readSync: readSync, writeSync: writeSync, removeSync: removeSync,
+            readLastKnown: readLastKnown, rememberLastKnown: rememberLastKnown });
     }
 
     const store = createReadModelStore(global);

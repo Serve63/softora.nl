@@ -88,7 +88,7 @@ test('read model store never blocks without IndexedDB or identity', async () => 
 
 test('login page wipes every local read model before anyone can sign in again', () => {
   const login = fs.readFileSync(path.join(repoRoot, 'premium-personeel-login.html'), 'utf8');
-  const tag = '<script src="assets/premium-readmodel-store.js?v=20260924b" data-softora-readmodel-reset></script>';
+  const tag = '<script src="assets/premium-readmodel-store.js?v=20260924c" data-softora-readmodel-reset></script>';
   assert.ok(login.includes(tag));
   assert.ok(login.indexOf(tag) < login.indexOf("fetchWithTimeout('/api/auth/login'"));
   const store = fs.readFileSync(path.join(repoRoot, 'assets/premium-readmodel-store.js'), 'utf8');
@@ -247,8 +247,37 @@ test('customer loader keeps the network-only path when no signed-in identity is 
 
 test('Mailsysteem loads the read model store before the customer loader', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-database.html'), 'utf8');
-  const storeTag = page.indexOf('<script src="assets/premium-readmodel-store.js?v=20260924b"></script>');
+  const storeTag = page.indexOf('<script src="assets/premium-readmodel-store.js?v=20260924c"></script>');
   const loaderTag = page.indexOf('assets/premium-database-customers-loader.js?v=20260924-readmodel-version');
   assert.ok(storeTag > 0);
   assert.ok(storeTag < loaderTag);
+});
+
+test('last-known values are bound to the signed-in session and expire', () => {
+  const map = new Map();
+  const localStorage = { get length() { return map.size; }, key: (index) => [...map.keys()][index] ?? null,
+    getItem: (key) => (map.has(key) ? map.get(key) : null), setItem: (key, value) => map.set(key, String(value)), removeItem: (key) => map.delete(key) };
+  let session = { authenticated: true, email: 'Serve@Softora.nl' };
+  const store = createReadModelStore({ localStorage }, { getSession: () => session });
+  assert.equal(store.rememberLastKnown('seo-performance:28', { ok: true, clicks: 12 }), true);
+  assert.deepEqual(store.readLastKnown('seo-performance:28', 60000), { ok: true, clicks: 12 });
+  assert.equal(store.readLastKnown('seo-performance:28', 0), null, 'a caller must state how old a value may be');
+  assert.equal(store.readLastKnown('seo-performance:7', 60000), null);
+  session = { authenticated: false };
+  assert.equal(store.readLastKnown('seo-performance:28', 60000), null);
+  assert.equal(store.rememberLastKnown('seo-performance:28', { ok: true }), false, 'nothing is stored without a session');
+  session = { authenticated: true, email: 'ander@softora.nl' };
+  assert.equal(store.readLastKnown('seo-performance:28', 60000), null);
+  assert.equal(map.size, 0, "another user's values are wiped");
+});
+
+test('SEO opens with the last verified Search Console data and keeps it when a refresh fails', () => {
+  const seo = fs.readFileSync(path.join(repoRoot, 'assets/premium-seo-performance.js'), 'utf8');
+  assert.match(seo, /const cached = store \? store\.readLastKnown\(cacheKey, LAST_KNOWN_MAX_AGE_MS\) : null;/);
+  assert.match(seo, /if \(showingCached\) \{\n\s+renderPayload\(cached\);\n\s+\} else \{\n\s+state\.loading = true;/);
+  assert.match(seo, /if \(isUsablePerformance\(payload\) && store\) store\.rememberLastKnown\(cacheKey, payload\);/);
+  assert.match(seo, /Search Console verversen mislukt; laatst opgehaalde data zichtbaar/);
+  assert.match(seo, /store\.rememberLastKnown\('seo-audit', audit\)/);
+  const page = fs.readFileSync(path.join(repoRoot, 'premium-seo.html'), 'utf8');
+  assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < page.indexOf('assets/premium-seo-performance.js?v=20260924a'));
 });

@@ -127,3 +127,26 @@ test('CTR changes keep their sign and percentage-point unit', async (t) => {
   await f.respond(f.performance()[1], payload({ totals: { current: { ctr: 0.008 }, ctrDelta: -0.002 } }));
   assert.equal(f.get('[data-seo-delta="ctr"]').textContent, '-0,2 pp vs vorige periode');
 });
+
+test('a remembered Search Console result opens instantly and survives a failed refresh', async (t) => {
+  const remembered = new Map();
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  t.after(() => { if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow); else delete globalThis.window; });
+  globalThis.window = { SoftoraReadModelStore: {
+    readLastKnown: (name) => (remembered.has(name) ? remembered.get(name) : null),
+    rememberLastKnown: (name, value) => { remembered.set(name, value); return true; },
+  } };
+  remembered.set('seo-performance:28', payload({ totals: { current: { clicks: 42, impressions: 900, ctr: 0.05, position: 7 } } }));
+  const f = fixture(t);
+  assert.equal(f.get('[data-seo-metric="clicks"]').textContent, '42', 'the remembered result is on screen before the request returns');
+  assert.equal(f.root.attrs['aria-busy'], 'false');
+  await f.respond(f.performance()[0], { error: 'Unavailable' }, false);
+  assert.equal(f.get('[data-seo-metric="clicks"]').textContent, '42', 'a failed refresh keeps the verified data');
+  assert.equal(f.get('[data-seo-performance-status]').dataset.tone, 'warning');
+
+  f.groups['[data-seo-days]'][0].fire('click');
+  assert.equal(f.get('[data-seo-metric="clicks"]').textContent, '—', 'a period without a remembered result still shows it is loading');
+  await f.respond(f.performance()[1], payload({ totals: { current: { clicks: 5, impressions: 50, ctr: 0.1, position: 3 } } }));
+  assert.equal(f.get('[data-seo-metric="clicks"]').textContent, '5');
+  assert.equal(remembered.get('seo-performance:7').totals.current.clicks, 5, 'a verified live result is remembered');
+});
