@@ -142,12 +142,15 @@ test('robot control keeps evidence review separate from approved inventory', () 
   assert.doesNotMatch(runner, /contact_validate_apply|\/research|api\.openai/);
 });
 
-test('worker dialog shows real spend, separate reservations and halted errors without success notices', () => {
+test('worker dialog shows real spend and only Aan or Uit for worker status', () => {
   const js = fs.readFileSync(path.join(root, 'assets/kvk-api-workers.js'), 'utf8');
   const css = fs.readFileSync(path.join(root, 'assets/kvk-database-redesign.css'), 'utf8');
   assert.doesNotMatch(js, /spentEur \+ state\.budget\.reservedEur/);
-  assert.match(js, /reservationLabel\.textContent/);
-  assert.match(js, /\^Gestopt:/);
+  assert.doesNotMatch(js, /reservationLabel|gereserveerd`/);
+  assert.match(js, /control\.status\.textContent = worker\.enabled \? 'Aan' : 'Uit'/);
+  assert.doesNotMatch(js, /worker\.message/);
+  const html = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
+  assert.doesNotMatch(html, /kvk-api-workers-reserved/);
   assert.doesNotMatch(js, /'aangezet' : 'uitgezet'/);
   assert.match(css, /\.latest-treated-panel thead\{display:none\}/);
   assert.match(css, /width:12px;height:12px;padding:0;border:1px solid #d8bdcb/);
