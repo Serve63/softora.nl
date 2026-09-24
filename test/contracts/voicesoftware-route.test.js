@@ -1,0 +1,20 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname, '../..');
+test('voicesoftware route and toekomst entry serve the complete public page', () => {
+  const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
+  assert.ok(config.rewrites.some(r => r.source === '/voicesoftware' && r.destination === '/assets/voicesoftware/index.html'));
+  const entry = fs.readFileSync(path.join(root, 'assets/entry/toekomst.html'), 'utf8');
+  assert.match(entry, /href="\/voicesoftware"/);
+  const html = fs.readFileSync(path.join(root, 'assets/voicesoftware/index.html'), 'utf8');
+  assert.match(html, /24\/7 bereikbaar is/);
+  assert.doesNotMatch(html, /noindex|localhost|127\.0\.0\.1|Lokale demo/);
+  for (const match of html.matchAll(/(?:src|href)="(\/assets\/[^"?]+)/g)) assert.ok(fs.existsSync(path.join(root, match[1])), match[1]);
+  const script = fs.readFileSync(path.join(root, 'assets/voicesoftware/voice-page.js'), 'utf8');
+  const photos = [...script.matchAll(/photo: '([^']+)'/g)];
+  assert.equal(photos.length, 5);
+  for (const [, photo] of photos) assert.ok(fs.existsSync(path.join(root, 'assets/voicesoftware', photo)));
+  assert.match(script, /\/assets\/voicesoftware\/\$\{employee.photo\}/);
+});
