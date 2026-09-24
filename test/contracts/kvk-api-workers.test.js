@@ -369,3 +369,10 @@ test('Searcher spends as little time as possible outside Luna', () => {
   assert.match(mapper, /def fetch_page\(url: str, timeout: int = 8\)/);
   assert.match(mapper, /pool\.map\(fetch, wanted\)/);
 });
+
+test('Luna Searcher fills a missing contact only from this company\'s own structured data', () => {
+  const mapper = fs.readFileSync(path.join(root, 'scripts/kvk_luna_searcher.py'), 'utf8');
+  assert.match(mapper, /def structured_contacts\(page: str, company_name: str, kvk: str = ""\)/);
+  assert.match(mapper, /own = kvk in identifiers if identifiers else/);
+  assert.match(mapper, /if len\(matches\) != 1:/);
+});

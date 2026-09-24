@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
-from kvk_luna_searcher import phone_digits, phone_on_page, to_canonical
+from kvk_luna_searcher import phone_digits, phone_on_page, structured_contacts, to_canonical
 
 COMPANY = {'kvk_nummer': '12345678', 'bedrijfsnaam': 'Voorbeeld B.V.'}
 PAGES = {
@@ -113,6 +113,30 @@ class LunaSearcherTests(unittest.TestCase):
         result = to_canonical(COMPANY, answer(), [], fetch)
         self.assertEqual(result['lead_status'], 'usable')
         self.assertEqual(sorted(fetched), ['https://voorbeeld.nl/', 'https://voorbeeld.nl/contact'])
+
+    def test_hidden_directory_number_is_taken_from_this_companys_structured_data(self):
+        page = ('<a href="tel:+31135111966">andere praktijk</a><script type="application/ld&#x2B;json">'
+                '{"@type":"Physiotherapy","name":"Voorbeeld","telephone":"\\u002B31620703059",'
+                '"identifier":{"@type":"PropertyValue","name":"KVK","value":"12345678"}}</script>'
+                '<script type="application/ld+json">{"@type":"LocalBusiness","name":"Buurman","telephone":"0131234567"}</script>')
+        pages = dict(PAGES, **{'https://gids.nl/voorbeeld': page})
+        result = to_canonical(COMPANY, answer(website='', website_status='no_website', telefoonnummer='',
+                                              email='post@voorbeeld-mail.nl', source_quality='supported',
+                                              email_bron_url='https://gids.nl/voorbeeld'), [], pages.get)
+        self.assertEqual(result['telefoonnummer'], '+31620703059')
+        self.assertIn('gestructureerde bedrijfsgegevens', result['field_evidence']['telefoonnummer'])
+        self.assertIn('https://gids.nl/voorbeeld', [source['url'] for source in result['sources']])
+
+    def test_structured_data_of_another_or_ambiguous_company_is_ignored(self):
+        other_kvk = '<script type="application/ld+json">{"name":"Voorbeeld","telephone":"0612345678","identifier":{"name":"KVK","value":"87654321"}}</script>'
+        self.assertEqual(structured_contacts(other_kvk, 'Voorbeeld B.V.', '12345678'), {})
+        other_name = '<script type="application/ld+json">{"name":"Buurman Schilders","telephone":"0612345678"}</script>'
+        self.assertEqual(structured_contacts(other_name, 'Voorbeeld B.V.', '12345678'), {})
+        conflict = ('<script type="application/ld+json">[{"name":"Voorbeeld","telephone":"0612345678"},'
+                    '{"name":"Voorbeeld BV","telephone":"0687654321"}]</script>')
+        self.assertEqual(structured_contacts(conflict, 'Voorbeeld B.V.', '12345678'), {})
+        same = '<script type="application/ld+json">{"name":"Voorbeeld","email":"mailto:info@voorbeeld.nl"}</script>'
+        self.assertEqual(structured_contacts(same, 'Voorbeeld B.V.', '12345678'), {'e-mail': 'info@voorbeeld.nl'})
 
     def test_dutch_phone_notations_match(self):
         for value in ('+31 (0)13 533 1678', '0031135331678', '+31135331678', '013-533 16 78'):

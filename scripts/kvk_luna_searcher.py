@@ -8,8 +8,10 @@ among the pages Luna actually retrieved) is dropped instead of written.
 from __future__ import annotations
 
 import html
+import json
 import re
 from concurrent.futures import ThreadPoolExecutor
+from difflib import SequenceMatcher
 from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
@@ -28,6 +30,9 @@ CANON_PHONE_RE = re.compile(
 )
 CANON_EMAIL_RE = re.compile(r"\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 URL_RE = re.compile(r"https?://\S+")
+LD_JSON_RE = re.compile(r"<script[^>]+application/ld(?:\+|&#x2B;|&#43;)json[^>]*>(.*?)</script>", re.S | re.I)
+LEGAL_FORM_RE = re.compile(r"\b(?:b\.?\s?v\.?|v\.?\s?o\.?\s?f\.?|c\.?\s?v\.?|n\.?\s?v\.?|eenmanszaak)(?=\s|$)", re.I)
+EMAIL_VALUE_RE = re.compile(r"^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$", re.I)
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 Softora-Searcher-Verify"
 MAX_BYTES = 3_000_000
 
@@ -99,6 +104,62 @@ def verify_claim(kind: str, value: str, url: str, consulted: set[str], fetch) ->
     if url_key(url) in consulted:
         return True, f"{url} — {kind} {value} door Luna op deze pagina gezien; pagina lokaal niet leesbaar."
     return False, f"{kind} {value} niet opgenomen: bron {url} niet leesbaar en niet door Luna geopend."
+
+
+def name_key(value: str) -> str:
+    text = LEGAL_FORM_RE.sub(" ", html.unescape(clean(value)).lower())
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", text).split())
+
+
+def names_match(found: str, company: str) -> bool:
+    a, b = name_key(found), name_key(company)
+    return bool(a and b) and (a == b or (min(len(a), len(b)) >= 5 and (a in b or b in a))
+                              or SequenceMatcher(None, a, b).ratio() >= 0.85)
+
+
+def kvk_identifiers(item: dict) -> set[str]:
+    values = item.get("identifier")
+    values = values if isinstance(values, list) else [values]
+    return {re.sub(r"\D", "", clean(value.get("value"))) for value in values
+            if isinstance(value, dict) and "kvk" in clean(value.get("name")).lower()}
+
+
+def structured_contacts(page: str, company_name: str, kvk: str = "") -> dict[str, str]:
+    """Phone and e-mail from a page's schema.org data, only for the entry of this company.
+
+    An entry belongs to the company when it carries its KVK number, or its name when no
+    KVK number is given.
+
+    Directories often hide the number behind a "show number" button while their structured
+    data still carries it; related listings on the same page carry other names and are ignored.
+    """
+    matches = set()
+    for block in LD_JSON_RE.findall(page or ""):
+        try:
+            stack = [json.loads(html.unescape(block.strip()))]
+        except ValueError:
+            continue
+        while stack:
+            item = stack.pop()
+            if isinstance(item, list):
+                stack.extend(item)
+                continue
+            if not isinstance(item, dict):
+                continue
+            stack.extend(value for value in item.values() if isinstance(value, (dict, list)))
+            phone = clean(item.get("telephone")) if isinstance(item.get("telephone"), str) else ""
+            email = clean(item.get("email")).removeprefix("mailto:") if isinstance(item.get("email"), str) else ""
+            identifiers = kvk_identifiers(item)
+            own = kvk in identifiers if identifiers else \
+                isinstance(item.get("name"), str) and names_match(item["name"], company_name)
+            if (phone or email) and own:
+                matches.add((phone if len(phone_digits(phone)) >= 9 else "",
+                             email if EMAIL_VALUE_RE.match(email) else ""))
+    matches.discard(("", ""))
+    if len(matches) != 1:
+        return {}  # nothing, or conflicting entries: never guess
+    phone, email = matches.pop()
+    return {key: value for key, value in (("telefoon", phone), ("e-mail", email)) if value}
 
 
 def website_state(answer: dict, fetch) -> tuple[str, str, str]:
@@ -199,15 +260,21 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
     website_url = clean(answer.get("website"))
     if website_url and not urlsplit(website_url).scheme:
         website_url = "https://" + website_url
-    wanted = {url for url in (clean(answer.get("telefoon_bron_url")), clean(answer.get("email_bron_url")),
-                              website_url if clean(answer.get("website_status")) != "no_website" else "")
-              if urlsplit(url).scheme in ("http", "https")}
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        pages = dict(zip(wanted, pool.map(fetch, wanted)))
-    fetch = pages.get
     identity = answer.get("identiteit") if isinstance(answer.get("identiteit"), dict) else {}
     identity_url = clean(identity.get("bron_url"))
     identity_ok = identity.get("bevestigd") is True and bool(identity_url)
+    wanted = [clean(answer.get("telefoon_bron_url")), clean(answer.get("email_bron_url")),
+              website_url if clean(answer.get("website_status")) != "no_website" else ""]
+    # A missing contact may sit in the structured data of the pages Luna tied to this company.
+    lookup = []
+    if identity_ok and not (clean(answer.get("telefoonnummer")) and clean(answer.get("email"))):
+        listed = [clean(source.get("url")) for source in answer.get("bronnen") or [] if isinstance(source, dict)]
+        lookup = [url for url in dict.fromkeys([identity_url, website_url, *listed])
+                  if url and not SEARCH_URL.search(url)][:4]
+    wanted = list(dict.fromkeys(url for url in wanted + lookup if urlsplit(url).scheme in ("http", "https")))
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        pages = dict(zip(wanted, pool.map(fetch, wanted)))
+    fetch = pages.get
 
     phone_ok, phone_note = verify_claim("telefoon", clean(answer.get("telefoonnummer")),
                                         clean(answer.get("telefoon_bron_url")), consulted, fetch)
@@ -216,6 +283,23 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
     website, website_status, website_note = website_state(answer, fetch)
     phone = clean(answer.get("telefoonnummer")) if phone_ok else ""
     email = clean(answer.get("email")) if email_ok else ""
+    phone_url = clean(answer.get("telefoon_bron_url")) if phone else ""
+    email_url = clean(answer.get("email_bron_url")) if email else ""
+    filled = []
+    for url in lookup:
+        if phone and email:
+            break
+        found = structured_contacts(pages.get(url) or "", clean(company.get("bedrijfsnaam")), kvk)
+        def note(kind, value):
+            return f"{url} — {kind} {value} uit de gestructureerde bedrijfsgegevens van deze onderneming op deze pagina."
+        if not phone and found.get("telefoon"):
+            phone, phone_url = found["telefoon"], url
+            phone_note = note("telefoon", phone)
+            filled.append(phone_note)
+        if not email and found.get("e-mail"):
+            email, email_url = found["e-mail"], url
+            email_note = note("e-mail", email)
+            filled.append(email_note)
 
     operational = clean(answer.get("operational_status")) or "unclear"
     role = clean(answer.get("entity_role")) or "unclear"
@@ -225,11 +309,10 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
     usable = bool(phone and email) and identity_ok and operational == "operational" \
         and role == "specific" and quality in ("official", "supported")
 
-    field_urls = [identity_url, clean(answer.get("telefoon_bron_url")) if phone else "",
-                  clean(answer.get("email_bron_url")) if email else "", website]
+    field_urls = [identity_url, phone_url, email_url, website]
     sources = lead_sources(answer, consulted_urls, [url for url in field_urls if url])
     queries = [clean(query) for query in answer.get("zoekopdrachten") or [] if clean(query)]
-    dropped = [note for ok, note in ((phone_ok, phone_note), (email_ok, email_note)) if not ok and note]
+    dropped = [note for value, note in ((phone, phone_note), (email, email_note)) if not value and note]
     source_urls = [source["url"] for source in sources]
 
     def route(status, notes, urls=()):
@@ -249,6 +332,8 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
     conclusion = clean(answer.get("conclusie")) or "Luna Searcher v2."
     if dropped:
         conclusion += " Lokale controle: " + " ".join(dropped)
+    if filled:
+        conclusion += " Lokale aanvulling: " + " ".join(filled)
     result = {
         "kvk_nummer": kvk,
         "telefoonnummer": phone,
