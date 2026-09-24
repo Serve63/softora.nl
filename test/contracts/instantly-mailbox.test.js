@@ -907,7 +907,8 @@ test('exact reply in the same thread restores delivered emoji without optional c
     to_address_email_list: ['prospect@example.org'], body: { text: providerBody },
     timestamp_email: '2026-07-24T10:00:00.000Z' });
   const rawReply = incoming({ id: 'emoji-reply', thread_id: 'emoji-thread', campaign_id: 'campaign-martijn',
-    eaccount: 'martijn-sender@example.com', to_address_email_list: ['martijn-sender@example.com'],
+    eaccount: 'martijn-sender@example.com', from_address_email: 'prospect-alias@example.net',
+    to_address_email_list: ['martijn-sender@example.com'],
     timestamp_email: '2026-07-25T10:00:00.000Z',
     body: { text: `Dank je.\n\nOp 24 jul 2026 om 12:00 schreef Martijn <martijn-sender@example.com>:\n\n${deliveredBody}` } });
   const source = buildStrictThreadQuotedMessageSource(rawSent, [rawSent, rawReply], {
@@ -917,6 +918,10 @@ test('exact reply in the same thread restores delivered emoji without optional c
   assert.match(source.body, /eerlijke mening 😁/u);
   assert.match(source.body, /📍 Berkel-Enschot/u);
   assert.equal(buildStrictThreadQuotedMessageSource(rawSent, [{ ...rawReply, thread_id: 'wrong-thread' }], {
+    accountEmail: 'martijn-sender@example.com', recipientEmail: 'prospect@example.org',
+  }).available, false);
+  assert.equal(buildStrictThreadQuotedMessageSource(rawSent, [{ ...rawReply,
+    from_address_email: 'martijn-sender@example.com' }], {
     accountEmail: 'martijn-sender@example.com', recipientEmail: 'prospect@example.org',
   }).available, false);
   assert.equal(buildStrictThreadQuotedMessageSource(rawSent, [{ ...rawReply,

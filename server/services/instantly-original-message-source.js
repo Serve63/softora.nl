@@ -347,8 +347,8 @@ function extractQuotedOriginalBody(rawMessages = [], options = {}) {
 }
 
 // A reply can contain the delivered text even when the customer/lead record
-// no longer has the optional source fields. Only restore an exact quote from
-// the same recipient, account and thread; punctuation and links must agree.
+// no longer has the optional source fields. A recipient may answer from an
+// alias; the same account and thread plus the full unchanged text are proof.
 function buildStrictThreadQuotedMessageSource(rawMessage = {}, rawMessages = [], options = {}) {
   const sender = email(options.accountEmail);
   const recipient = email(options.recipientEmail);
@@ -361,12 +361,13 @@ function buildStrictThreadQuotedMessageSource(rawMessage = {}, rawMessages = [],
   const sentAt = Date.parse(rawMessage.timestamp_email || rawMessage.timestamp_created || rawMessage.created_at);
   const replies = (Array.isArray(rawMessages) ? rawMessages : []).filter((candidate) => {
     const replyAt = Date.parse(candidate.timestamp_email || candidate.timestamp_created || candidate.created_at);
+    const replySender = email(candidate.from_address_email);
     const recipients = Array.isArray(candidate.to_address_email_list)
       ? candidate.to_address_email_list.map(email)
       : [email(candidate.to_address_email)];
     return text(candidate.thread_id) === threadId &&
       email(candidate.eaccount) === sender &&
-      email(candidate.from_address_email) === recipient &&
+      replySender && replySender !== sender &&
       recipients.includes(sender) &&
       Number.isFinite(sentAt) && Number.isFinite(replyAt) && replyAt >= sentAt;
   });
