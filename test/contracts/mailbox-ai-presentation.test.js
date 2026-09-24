@@ -278,6 +278,20 @@ test('cached reads do not rewrite source or fetch full source payload; inserts a
   assert.equal((await repository.enqueue(sources)).length, 85); assert.equal(writes, 3); assert.equal(maxBatch, 40);
   await repository.enqueue(sources); assert.equal(writes, 3);
 });
+test('a failed AI state batch still returns its already ready decisions', async () => {
+  const { createMailboxAiRepository } = require('../../server/repositories/mailbox-ai-presentations');
+  const source = buildSource(message);
+  const repository = createMailboxAiRepository({ getClient: () => ({
+    rpc: async () => ({ error: new Error('slow eligibility query') }),
+    from: () => ({ select: () => ({ in: () => ({ eq: async () => ({ data: [{
+      id: source.id, status: 'ready', version: contract.VERSION, decision,
+    }] }) }) }) }),
+  }) });
+  const rows = await repository.enqueue([source]);
+  assert.equal(rows[0].status, 'ready');
+  const service = createMailboxAiPresentations({ env: { MAILBOX_AI_PRESENTATION_ENABLED: 'true' }, repository });
+  assert.equal(contract.read((await service.enrich([message]))[0]).body.includes('Print deze mail'), false);
+});
 test('phone validation accepts Unicode spacing/dashes without changing source contact text', () => {
   for (const phone of ['06\u00a012\u00a034\u00a056\u00a078', '+31\u202f6\u201112345678', '０６ １２ ３４ ５６ ７８']) {
     const body = `Ja, dat is akkoord.\n${phone}`;
@@ -319,7 +333,7 @@ test('background candidate reads survive the shared client default deadline whil
     } });
   const repository = createMailboxAiRepository({ getClient: store.getSupabaseClient });
   assert.deepEqual(await repository.candidates(), []);
-  await assert.rejects(repository.enqueue([{ id: 'offline-source' }]));
+  assert.deepEqual(await repository.enqueue([{ id: 'offline-source' }]), []);
 });
 
 test('background storage diagnostics identify the stage without logging private provider errors', async () => {

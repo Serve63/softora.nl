@@ -60,6 +60,7 @@ const {
 const { fitWebdesignPreviewForEmail } = require('./coldmail-image-frame');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const {
+  buildSimpleRejectionReply,
   buildMailboxDraftRewriteSystemPrompt,
   buildMailboxReplyPromptPayload,
   buildMailboxReplySystemPrompt,
@@ -2039,7 +2040,6 @@ function createMailboxService(deps = {}) {
   function cleanPromptText(value, maxLength = 6000) {
     return truncateText(sanitizeMailboxDisplayText(normalizeString(value)), maxLength);
   }
-
   async function rewriteDraft({ accountEmail, to, subject, body, context, senderProfile }) {
     const draft = cleanPromptText(body, 8000);
     const hasReplyContext = Boolean(
@@ -2050,14 +2050,6 @@ function createMailboxService(deps = {}) {
       error.status = 400;
       throw error;
     }
-
-    const apiKey = normalizeString(typeof getOpenAiApiKey === 'function' ? getOpenAiApiKey() : '');
-    if (!apiKey) {
-      const error = new Error('OpenAI API-key ontbreekt.');
-      error.status = 503;
-      throw error;
-    }
-
     const model = normalizeString(openAiModel) || 'gpt-5.5-pro';
     const { resolvedAccountEmail, accountSenderName } = await resolveRewriteIdentity({ context, accountEmail, recipientEmail: to, isReply: hasReplyContext });
     const payload = buildMailboxReplyPromptPayload({
@@ -2072,6 +2064,14 @@ function createMailboxService(deps = {}) {
       cleanPromptText,
       normalizeEmail,
     });
+    const shortcut = hasReplyContext && buildSimpleRejectionReply(payload, resolvedAccountEmail);
+    if (shortcut) return { text: shortcut, model: 'policy', usage: null, provider: 'local' };
+    const apiKey = normalizeString(typeof getOpenAiApiKey === 'function' ? getOpenAiApiKey() : '');
+    if (!apiKey) {
+      const error = new Error('OpenAI API-key ontbreekt.');
+      error.status = 503;
+      throw error;
+    }
     const systemPrompt = hasReplyContext
       ? buildMailboxReplySystemPrompt({ hasDraft: Boolean(draft), senderName: payload.afzenderContext?.naam })
       : buildMailboxDraftRewriteSystemPrompt({ senderName: accountSenderName });

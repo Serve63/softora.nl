@@ -5182,3 +5182,19 @@ test('reply quality failure returns 422 without canned text, retries or mail sen
   assert.equal(res.body.text, undefined);
   assert.match(res.body.detail, /Je concept is behouden/);
 });
+
+test('eenvoudige afwijzing van Bert krijgt zonder betaalde modelaanvraag een veilig concept', async () => {
+  const service = createMailboxService({
+    getOpenAiApiKey: () => '',
+    fetchJsonWithTimeout: async () => { throw new Error('Provider mag niet worden aangeroepen'); },
+  });
+  const result = await service.rewriteDraft({
+    accountEmail: 'servecreusen@softora.nl', to: 'bert@infratechnicalsupport.nl',
+    subject: 'Re: Kleine vraag over jullie website', body: '',
+    context: { from: 'Bert van Esch', email: 'bert@infratechnicalsupport.nl',
+      body: 'Goededag Ik heb geen ondersteuning nodig Dankjewel Van Esch infratechnical suppport Verzonden vanaf mijn Galaxy\n-------- Oorspronkelijk bericht --------Van: Servé Creusen Onderwerp: Kleine vraag over jullie website Kunnen we de preview bekijken?' },
+  });
+  assert.equal(result.provider, 'local');
+  assert.match(result.text, /Dankjewel voor je reactie/);
+  assert.doesNotMatch(result.text, /preview|afspraak/i);
+});
