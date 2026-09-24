@@ -803,15 +803,21 @@ function createCustomersPageBootstrapService(deps = {}) {
   }
 
   async function readDashboardCustomers() {
-    if (typeof listDashboardCustomers !== 'function') return null;
+    if (typeof listDashboardCustomers !== 'function') {
+      logBootstrapCustomersMiss('list-dashboard-customers-missing');
+      return null;
+    }
     try {
       const rows = await listDashboardCustomers({
         bypassReadFailureCooldown: true,
         suppressReadFailureCooldown: true,
-        suppressTransientReadFailureLog: true,
+        suppressTransientReadFailureLog: false,
         maxRows: 5000,
       });
-      if (!Array.isArray(rows)) return null;
+      if (!Array.isArray(rows)) {
+        logBootstrapCustomersMiss(`rows-${rows === null ? 'null' : typeof rows}`);
+        return null;
+      }
       return sortCustomers(
         rows.map((item, index) =>
           setExplicitResponsibleMetadata(
@@ -820,9 +826,19 @@ function createCustomersPageBootstrapService(deps = {}) {
           )
         )
       );
-    } catch (_) {
+    } catch (error) {
+      logBootstrapCustomersMiss(`error:${String(error && error.message || error).slice(0, 160)}`);
       return null;
     }
+  }
+
+  // Dashboard and Klanten always received an empty customer bootstrap while the
+  // same read works through /api/dashboard/customers; log why, once per reason.
+  const loggedBootstrapMisses = new Set();
+  function logBootstrapCustomersMiss(reason) {
+    if (loggedBootstrapMisses.has(reason) || loggedBootstrapMisses.size > 20) return;
+    loggedBootstrapMisses.add(reason);
+    console.warn('[CustomersBootstrap][dashboard-customers-miss]', reason);
   }
 
   function buildBootstrapStateSnapshot(state) {
