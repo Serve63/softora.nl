@@ -10,8 +10,8 @@ test('browsers keep personnel assets instead of revalidating ~50 files on every 
   const [assetRule, ...rest] = config.headers;
   assert.equal(assetRule.source, '/assets/((?!personnel-theme\\.).*)');
   assert.deepEqual(assetRule.headers, [{ key: 'Cache-Control', value: 'public, max-age=300, stale-while-revalidate=604800' }]);
-  // Same pattern as Vercel's path-to-regexp custom group.
-  const matcher = new RegExp(`^${assetRule.source}$`);
+  // The same pattern as a fixed regular expression (Vercel's custom group).
+  const matcher = /^\/assets\/((?!personnel-theme\.).*)$/;
   assert.equal(matcher.test('/assets/premium-mailbox.js'), true);
   assert.equal(matcher.test('/assets/fonts/inter.woff2'), true);
   assert.equal(matcher.test('/assets/personnel-theme.js'), false, 'the theme keeps its own must-revalidate rule');
