@@ -82,6 +82,12 @@
     let lifecycleGeneration = 0;
     let failureCount = 0;
     let initialCheckPending = options.initiallyChecking === true;
+    // Last successful provider check per scope from a previous visit
+    // (docs/platform-performance.md): the label opens with its age instead of
+    // "Controleren…", while the automatic check runs silently.
+    const rememberedFreshness = options.rememberedFreshness && typeof options.rememberedFreshness === 'object'
+      ? options.rememberedFreshness : {};
+    const onFreshness = typeof options.onFreshness === 'function' ? options.onFreshness : () => {};
 
     function handleDetailPriority() {
       if (!activeRequest || activeRequest.foreground) return;
@@ -96,7 +102,9 @@
     function getFreshness(scope = getScope()) {
       const key = getScopeKey(scope);
       if (!freshnessByScope.has(key)) {
-        freshnessByScope.set(key, { status: 'idle', lastSuccessfulAt: 0, lastErrorAt: 0 });
+        const remembered = Number(rememberedFreshness[key]);
+        const lastSuccessfulAt = Number.isFinite(remembered) && remembered > 0 && remembered <= getNow() ? remembered : 0;
+        freshnessByScope.set(key, { status: 'idle', lastSuccessfulAt, lastErrorAt: 0 });
       }
       return freshnessByScope.get(key);
     }
@@ -124,7 +132,9 @@
             ? `Verbindingsfout${ownerText}; de huidige mailbox blijft zichtbaar. Klik om opnieuw te proberen; automatisch herstel blijft actief.`
             : `Laatste volledige providercontrole${ownerText}: ${checkedText}`;
       if (ageLabel) {
-        if (checking) {
+        // An automatic check with a known last check stays silent; a manual
+        // refresh, or a scope that was never checked, shows it is working.
+        if (checking && (isForegroundChecking(scopeKey) || !state.lastSuccessfulAt)) {
           ageLabel.textContent = 'Controleren…';
         } else if (state.status === 'partial') {
           ageLabel.textContent = 'Deels bijgewerkt';
@@ -152,10 +162,19 @@
       setRefreshing(checking);
     }
 
+    function isForegroundChecking(scopeKey) {
+      return Array.from(inFlightRequests.values())
+        .some((requestState) => requestState.scopeKey === scopeKey && requestState.foreground);
+    }
+
     function setRefreshing(refreshing = isChecking()) {
       if (!button) return;
-      button.disabled = Boolean(refreshing);
-      button.classList.toggle('is-refreshing', Boolean(refreshing));
+      // A silent automatic check keeps the button usable; clicking it turns the
+      // running check into a visible foreground refresh.
+      const visible = Boolean(refreshing)
+        && (isForegroundChecking(getScopeKey(getScope())) || !getFreshness().lastSuccessfulAt);
+      button.disabled = visible;
+      button.classList.toggle('is-refreshing', visible);
       button.setAttribute('aria-busy', refreshing ? 'true' : 'false');
     }
 
@@ -366,6 +385,7 @@
             state.lastSuccessfulAt = getNow();
             state.status = 'ok';
             failureCount = 0;
+            try { onFreshness(getScopeKey(scope), state.lastSuccessfulAt); } catch (_) { /* remembering is optional */ }
           } else {
             state.status = 'partial';
             state.lastErrorAt = getNow();

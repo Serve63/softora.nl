@@ -1465,3 +1465,51 @@ test('BFCache return resumes one immediate mailbox refresh instead of leaving th
   assert.equal(Array.from(intervals.values()).filter((entry) => entry.active).length, 1);
   controller.destroy();
 });
+
+test('met een bekende laatste controle opent de mailbox zonder "Controleren…" en controleert stil op de achtergrond', async () => {
+  const ageLabel = { textContent: '', attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
+  const button = {
+    disabled: false, attributes: {}, listeners: {},
+    classList: { values: new Set(), toggle(name, active) { active ? this.values.add(name) : this.values.delete(name); } },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    addEventListener(name, handler) { this.listeners[name] = handler; },
+  };
+  const now = Date.parse('2026-09-24T10:00:00.000Z');
+  const releases = [];
+  const timers = [];
+  const remembered = [];
+  const controller = refreshModule.create({
+    autoStart: false, initiallyChecking: true, ageLabel, button,
+    rememberedFreshness: { 'outreach|serve|': now - 5 * 60 * 1000 },
+    onFreshness: (scopeKey, at) => remembered.push([scopeKey, at]),
+    now: () => now,
+    getFolder: () => 'outreach', getOwner: () => 'serve',
+    fetch: () => new Promise((resolve) => { releases.push(resolve); }),
+    loadMessages: async () => true,
+    setTimeout(handler, delay) { timers.push({ handler, delay }); return timers.length; },
+    clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+  });
+
+  assert.equal(ageLabel.textContent, '5 min geleden gecontroleerd');
+  assert.equal(button.disabled, false);
+  assert.equal(button.classList.values.has('is-refreshing'), false);
+  assert.equal(button.attributes['aria-busy'], 'true', 'assistive tech still hears that a check is running');
+
+  controller.start();
+  timers[0].handler();
+  await Promise.resolve();
+  assert.equal(ageLabel.textContent, '5 min geleden gecontroleerd', 'the automatic check stays silent');
+  assert.equal(button.classList.values.has('is-refreshing'), false);
+
+  button.listeners.click();
+  assert.equal(ageLabel.textContent, 'Controleren…', 'a manual refresh shows it is working');
+  assert.equal(button.classList.values.has('is-refreshing'), true);
+
+  for (let round = 0, answered = 0; round < 10; round += 1) {
+    while (answered < releases.length) releases[answered++](successfulResponse());
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.deepEqual(remembered.at(-1), ['outreach|serve|', now]);
+  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  controller.destroy();
+});

@@ -1963,3 +1963,11 @@ test('SQL-contract houdt discovery service-role-only, bounded en op de volledige
   assert.match(campaignProvenanceSource, /grant execute on function public\.softora_search_mailbox_contact_dossiers[\s\S]*to service_role/);
   assert.doesNotMatch(campaignProvenanceSource, /grant execute[\s\S]*to authenticated/);
 });
+
+test('the contact search trigram index matches the contact scope predicate', () => {
+  const sql = require('node:fs').readFileSync(require('node:path').join(__dirname,
+    '../../supabase/migrations/20260924111625_mailbox_search_document_generation_index.sql'), 'utf8');
+  assert.match(sql, /create index if not exists softora_mailbox_messages_search_document_active_generation_idx\s+on public\.softora_mailbox_messages using gin \(search_document gin_trgm_ops\)\s+where generation_superseded_at is null;/);
+  assert.doesNotMatch(sql.replace(/^--.*$/gm, ''), /deleted_at is null/, 'a deleted_at predicate would stop the contact scope from using the index');
+  assert.match(sql, /-- Rollback:/);
+});

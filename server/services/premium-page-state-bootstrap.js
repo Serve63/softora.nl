@@ -157,21 +157,39 @@ function createPremiumPageStateBootstrapService(deps = {}) {
     }
   }
 
+  // The persisted snapshot is ~1.5 MB. Its trigger-maintained change_seq
+  // (runtime_state_change_seq migration) proves with a metadata-only read that
+  // the stored snapshot is unchanged, so a warm instance reuses its parsed copy
+  // instead of reading and parsing it again on every Mailbox opening.
+  let persistedSnapshotCache = null;
   async function readPersistedMailboxSnapshot() {
+    const readOptions = {
+      uiStateReadTimeoutMs: Math.max(100, Math.min(1000, Number(readTimeoutMs) || 1000)),
+      bypassReadFailureCooldown: true,
+      suppressReadFailureCooldown: true,
+      suppressReadFailureLog: true,
+      preferSupabaseRestRead: true,
+      ignoreSupabaseRestFailureCooldown: true,
+      suppressSupabaseRestFailureCooldown: true,
+    };
     try {
-      const result = await getUiStateValues(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
-        uiStateReadTimeoutMs: Math.max(100, Math.min(1000, Number(readTimeoutMs) || 1000)),
-        bypassReadFailureCooldown: true,
-        suppressReadFailureCooldown: true,
-        suppressReadFailureLog: true,
-        preferSupabaseRestRead: true,
-        ignoreSupabaseRestFailureCooldown: true,
-        suppressSupabaseRestFailureCooldown: true,
-      });
+      if (persistedSnapshotCache) {
+        const meta = await getUiStateValues(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, {
+          ...readOptions, metadataOnly: true, includeChangeSeq: true,
+        });
+        if (meta && meta.source === 'supabase' && meta.exists === true && meta.changeSeq
+          && meta.changeSeq === persistedSnapshotCache.changeSeq) {
+          mailboxCache = { snapshot: persistedSnapshotCache.snapshot, cachedAt: Date.now() };
+          return persistedSnapshotCache.snapshot;
+        }
+      }
+      const result = await getUiStateValues(MAILBOX_CAMPAIGN_SNAPSHOT_SCOPE, { ...readOptions, includeChangeSeq: true });
       const snapshot = parseMailboxCampaignSnapshot(
         result && result.values && result.values[MAILBOX_CAMPAIGN_SNAPSHOT_KEY]
       );
       if (!snapshot?.complete) return null;
+      persistedSnapshotCache = result && result.source === 'supabase' && result.changeSeq
+        ? { changeSeq: result.changeSeq, snapshot } : null;
       mailboxCache = { snapshot, cachedAt: Date.now() };
       return snapshot;
     } catch (_error) {
