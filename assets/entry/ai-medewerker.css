@@ -23,3 +23,11 @@
 @media(prefers-reduced-motion:reduce){.ai-feature-invite>span{transition:none}}
 
 .ai-feature-invite{padding:9px 15px;border:1px solid #e6abc64d;border-radius:30px;color:#f3c4da;background:#ffffff08;font-size:9px;letter-spacing:1.8px}
+
+/* Approved AI appliance artwork. */
+.ai-feature{min-height:340px;background:#200d18;border-color:#b7718b55}
+.ai-feature-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;z-index:-2}
+.ai-feature:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#1b0b1640,transparent 65%);z-index:-1}
+.ai-feature-copy{padding:48px;max-width:65%}
+@media(max-width:760px){.ai-feature{min-height:460px;align-items:flex-end}.ai-feature-image{object-position:79% top}.ai-feature:after{background:linear-gradient(0deg,#200d18 0%,#200d18ed 28%,#200d1800 75%)}.ai-feature-copy{padding:26px;max-width:100%}.ai-feature h2{font-size:43px}}
+@media(max-width:760px){.ai-feature-image{height:285px;object-position:82% center}.ai-feature:after{background:linear-gradient(0deg,#200d18 0%,#200d18 32%,#200d1800 66%)}}
