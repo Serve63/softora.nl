@@ -149,8 +149,8 @@ button,input,select,textarea{font-family:inherit}
 .planning-help-button{box-shadow:0 1px 2px rgba(66,33,49,.06)}
 
 /* Give the numbered location markers and the following text one compact rhythm. */
-.planning-panel .location-button{grid-template-columns:16px minmax(0,1fr) auto;column-gap:7px;padding-left:12px}
-.planning-panel .rank{width:16px;height:16px;font-size:6.5px;line-height:1}
+.planning-panel .location-button{grid-template-columns:13px minmax(0,1fr) auto;column-gap:6px;padding-left:12px}
+.planning-panel .rank{width:13px;height:13px;font-size:6px;line-height:1}
 @media(prefers-reduced-motion:reduce){.latest-treated-panel tbody tr,.planning-panel .location-button{transition:none}}
 
 /* Subtle live activity beneath each total, without growing the dashboard cards. */
@@ -176,3 +176,6 @@ button,input,select,textarea{font-family:inherit}
 .header-controls .transfer-button{min-height:37px;padding:9px 12px;border-color:rgba(142,47,95,.27);background:linear-gradient(180deg,#fffafd,#f5eaf0);box-shadow:0 2px 5px rgba(77,35,57,.09),inset 0 1px 0 #fff;font-size:11px;font-weight:650;gap:8px}
 .header-controls .transfer-button span{font-size:14px}
 @media(max-width:700px){.inventory-grid .stat-delta,.research-grid .stat-delta{font-size:7px;gap:2px}.header-controls .transfer-button{min-height:34px;padding:7px 10px;font-size:10px}}
+
+/* Keep both panel headings visually identical. */
+.planning-title-row .fixed-section-title,.latest-treated-panel h2{font-family:'Oswald',sans-serif;font-size:9px!important;font-weight:700!important;letter-spacing:2px;line-height:1.4;text-transform:uppercase;color:var(--ink)}

@@ -116,13 +116,14 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijvendatabase<\/h1>/);
-  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924a/);
-  assert.match(redesignSource, /\.planning-panel \.location-button\{grid-template-columns:16px minmax\(0,1fr\) auto;column-gap:7px;padding-left:12px\}/);
-  assert.match(redesignSource, /\.planning-panel \.rank\{width:16px;height:16px;font-size:6\.5px;line-height:1\}/);
+  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924b/);
+  assert.match(redesignSource, /\.planning-panel \.location-button\{grid-template-columns:13px minmax\(0,1fr\) auto;column-gap:6px;padding-left:12px\}/);
+  assert.match(redesignSource, /\.planning-panel \.rank\{width:13px;height:13px;font-size:6px;line-height:1\}/);
   assert.match(pageSource, /<button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload/);
   assert.doesNotMatch(pageSource, /<h2 class="fixed-section-title">Onderzoeksvoortgang<\/h2>/);
   assert.match(redesignSource, /\.inventory-grid \.stat-card-directory__open,\.research-grid \.stat-card-directory__open\{display:inline-flex!important;/);
   assert.doesNotMatch(redesignSource, /\.stat-card:focus-within/);
+  assert.ok(redesignSource.includes('text-transform:uppercase;color:var(--ink)'));
   assert.match(pageSource, /id="companies-treated"/);
   assert.match(pageSource, /id="companies-total-card" class="stat-card stat-card-directory kvk-stat-card-enhanced"/);
   assert.doesNotMatch(pageSource, /id="companies-total-card"[^>]*stat-card-primary/);
@@ -600,7 +601,8 @@ test('kvk database omits the fill status widget and keeps worker control read-on
   const controlStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-control.css'), 'utf8');
   const metricsStyles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-metrics.css'), 'utf8');
 
-  assert.doesNotMatch(pageSource, /database-fill-toggle|Database vullen/);
+  assert.doesNotMatch(pageSource, /database-fill-toggle/);
+  assert.match(pageSource, /id="kvk-api-workers-title">Database vullen<\/h2>/);
   assert.match(pageSource, /id="last-refresh-time" class="kvk-visually-hidden"/);
   assert.doesNotMatch(pageSource, /Tijd sinds laatste refresh/);
   assert.match(controlSource, /seconds === 1 \? 'seconde' : 'seconden'/);

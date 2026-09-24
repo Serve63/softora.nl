@@ -61,7 +61,7 @@
       state = payload.state;
       message.textContent = changes.count !== undefined
         ? `Aantal opgeslagen: ${state.workers[role].count}.`
-        : `${role === 'robot' ? 'Robot v5' : role === 'searcher' ? 'Searchers' : 'Controleurs'} ${state.workers[role].enabled ? 'aangezet' : 'uitgezet'}.`;
+        : `${role === 'robot' ? 'Robot' : role === 'searcher' ? 'Searchers' : 'Controleurs'} ${state.workers[role].enabled ? 'aangezet' : 'uitgezet'}.`;
     } catch (error) { message.textContent = error.message || 'Instellen mislukt.'; }
     finally { busy = false; render(); }
   }

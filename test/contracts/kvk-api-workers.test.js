@@ -132,7 +132,9 @@ test('robot control keeps evidence review separate from approved inventory', () 
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
   const runner = fs.readFileSync(path.join(root, 'scripts/kvk_robot_v5.py'), 'utf8');
   assert.match(page, /id="kvk-api-robot-toggle"/);
-  assert.match(page, /resultaten ter controle/);
+  assert.match(page, /id="kvk-api-workers-title">Database vullen<\/h2>/);
+  assert.match(page, /<strong>Robot<\/strong>/);
+  assert.doesNotMatch(page, /Zonder AI · resultaten ter controle|Sol 6 Max via API|<strong>Robot v5/);
   assert.match(runner, /planning-next/);
   assert.match(runner, /completed\.json/);
   assert.match(runner, /mode=ro/);
