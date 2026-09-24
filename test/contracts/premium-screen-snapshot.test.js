@@ -139,3 +139,13 @@ test('Klanten shows its snapshot instead of the loading overlay and releases it 
   assert.ok(page.indexOf('<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->') < adapterScript, 'the signed-in identity is known before restore');
   assert.ok(adapterScript < page.indexOf('const state = {'));
 });
+
+test('Mailsysteem shows its subtitle and complete mail totals from the first paint', () => {
+  const page = fs.readFileSync(path.join(repoRoot, 'premium-database.html'), 'utf8');
+  assert.match(page, /<div class="page-sub" id="top-sub">De AI koppelt alle data slim aan elkaar\.<\/div>/);
+  const metrics = fs.readFileSync(path.join(repoRoot, 'assets/premium-database-system-mail-count.js'), 'utf8');
+  assert.match(metrics, /function applyBootstrapState\(\) \{\n\s+if \(bootstrapStateApplied\) return;\n\s+bootstrapStateApplied = true;\n\s+applyRememberedInstantlyCounts\(\);/);
+  assert.match(metrics, /if \(completeCount && instantlyCountsFromMemory\) \{/, 'the first complete count replaces the remembered one');
+  assert.match(metrics, /if \(completeCount\) \{\n\s+const store = lastKnownStore\(\);\n\s+if \(store\) store\.rememberLastKnown\(INSTANTLY_COUNTS_KEY/);
+  assert.match(metrics, /remembered\.dayKey === getAmsterdamDateKey\(new Date\(\)\)/, "today's Instantly count only applies on the same Amsterdam day");
+});

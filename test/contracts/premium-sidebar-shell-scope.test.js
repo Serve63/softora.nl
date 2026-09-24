@@ -1355,7 +1355,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.ok(extractSidebarLinkTargets(source).database);
   assert.match(source, /premium-database-boot\.js\?v=20260923-provider-readmodel/);
   assert.match(source, /premium-database-readiness\.js\?v=20260923-provider-readmodel/);
-  assert.match(source, /premium-database-system-mail-count\.js\?v=20260924-readmodel/);
+  assert.match(source, /premium-database-system-mail-count\.js\?v=20260924-stable-metrics/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260924-readmodel/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(source, /premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
