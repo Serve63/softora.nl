@@ -197,3 +197,11 @@ test('clicking a conversation renders it once, complete, instead of body first a
   const source = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-detail-stability.js'), 'utf8');
   assert.match(source, /const PENDING_PARTIAL_RENDER_DELAY_MS = 1500;/);
 });
+
+test('"E-mail laden…" only appears when opening really takes longer than a few frames', () => {
+  const page = fs.readFileSync(path.join(__dirname, '../../premium-mailbox.html'), 'utf8');
+  assert.match(page, /\.mail-detail\.is-detail-pending > \* \{ animation: mail-detail-pending-hide 0s linear 150ms forwards; \}/);
+  assert.match(page, /@keyframes mail-detail-pending-hide \{ to \{ visibility: hidden; \} \}/);
+  assert.match(page, /\.mail-detail\.is-detail-pending::after \{ content: 'E-mail laden…';[^}]* opacity: 0; animation: mail-detail-pending-show 0s linear 150ms forwards; \}/);
+  assert.doesNotMatch(page, /\.mail-detail\.is-detail-pending > \* \{ visibility: hidden; \}/);
+});
