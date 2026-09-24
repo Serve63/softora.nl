@@ -1130,3 +1130,15 @@ test('premium database mail-ready snapshot refuses fake empty totals when centra
     /Mailklare snapshot kon verzendbeveiliging niet laden/
   );
 });
+
+test('new website upload is immediately rebuilt into Available rather than mail-ready', async () => {
+ const row = {customer_id:'kvk-upload-new', company:'Nieuwe Upload BV',email:'info@nieuweupload.nl',website:'nieuweupload.nl',database_status:'prospect',lifecycle_status:'prospect',payload:{bronDatabase:'Softora Bedrijven Scraper',premiumTransferDestination:'available',status:'prospect',databaseStatus:'prospect'}};
+ const overrides = {customers:[]};
+ const {service} = createService(overrides);
+ await service.buildMailReadySnapshot({limit:10});
+ overrides.customers=[row];
+ await service.refreshAfterImport();
+ const data=await service.buildMailReadySnapshot({limit:10});
+ assert.ok(data.availableCustomers.some(item=>item.id===row.customer_id && item.availableSnapshot===true));
+ assert.ok(!data.customers.some(item=>item.id===row.customer_id));
+});

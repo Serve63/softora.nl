@@ -8,8 +8,12 @@ function registerKvkDatabaseRoutes(app, deps = {}) {
     controlCoordinator,
     directoryCoordinator,
     apiWorkersCoordinator,
+    uploadCoordinator,
     requirePremiumAdminApiAccess = passThrough,
   } = deps;
+
+  app.get('/api/kvk-database/upload', requirePremiumAdminApiAccess, (req, res) => uploadCoordinator.preview(req, res));
+  app.post('/api/kvk-database/upload', requirePremiumAdminApiAccess, (req, res) => uploadCoordinator.upload(req, res));
 
   app.get('/api/kvk-database/snapshot', (req, res) =>
     coordinator && typeof coordinator.sendGetSnapshotResponse === 'function'

@@ -1,3 +1,4 @@
+const { isKvkTransferRow } = require('./kvk-transfer-identity');
 const { sortCustomersByDistance, getCustomerLocationFields } = require('../../assets/premium-database-distance');
 const { normalizeContactStatus } = require('./customer-lifecycle');
 const { createSnapshotRowHelpers } = require('./premium-database-snapshot-row-helpers');
@@ -135,14 +136,6 @@ function getRowStatus(row = {}) {
 
 function getRowUpdatedAt(row = {}) {
   return pickRowValue(row, ['updatedAt', 'updated', 'updated_at', 'datum', 'paidAt']);
-}
-
-function isKvkTransferRow(row = {}) {
-  const payload = getRowPayload(row);
-  if (normalizeString(payload.bronDatabase).toLowerCase() === 'softora bedrijven scraper') return true;
-  if (/^kvk-transfer-/i.test(normalizeString(payload.premiumTransferRunId))) return true;
-  const history = Array.isArray(payload.hist) ? payload.hist : [];
-  return history.some((entry) => /^kvk-transfer:/i.test(normalizeString(entry && entry.messageKey)));
 }
 
 const { dedupeCustomerRows, buildSnapshotVersion } = createSnapshotRowHelpers({ getRowId, getRowUpdatedAt, normalizeString });
@@ -899,6 +892,13 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
     durableSnapshotReadPromise = null;
   }
 
+  async function refreshAfterImport() {
+    // Finish an older refresh before rebuilding from the committed import.
+    if (snapshotDataPromise) await snapshotDataPromise.catch(() => {});
+    invalidate();
+    return buildMailReadySnapshot({ limit: 1 });
+  }
+
   async function removeCustomers(customerIds = []) {
     const removedIds = new Set(
       (Array.isArray(customerIds) ? customerIds : [])
@@ -1164,6 +1164,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
 
   return {
     buildMailReadySnapshot,
+    refreshAfterImport,
     sendMailReadySnapshotArchiveResponse: createPremiumDatabaseSnapshotArchiveResponder({ buildSnapshot: buildMailReadySnapshot, nowMs, logger, source: SNAPSHOT_SOURCE }),
     invalidate,
     markCustomersMailReadyAfterAssetUpsert,
