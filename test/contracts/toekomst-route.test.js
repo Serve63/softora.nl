@@ -9,8 +9,8 @@ test('toekomst route serves the chooser with production links and available asse
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  assert.doesNotMatch(html,/127\.0\.0\.1|localhost|kreatives-preview|innovaware-preview/);
  assert.match(html,/href="\/chatbot-login"/);
- assert.match(html,/<section class="ai-feature" aria-label="AI-medewerker — Binnenkort"/);
- assert.match(html,/AI-MEDEWERKER/);
+ assert.match(html,/<section class="ai-feature" aria-label="AI-implementatie — Binnenkort"/);
+ assert.match(html,/AI-IMPLEMENTATIE/);
  assert.match(html,/src="\/assets\/entry\/ai-medewerker-box.webp"/);
  for(const match of html.matchAll(/(?:src|href)="(\/assets\/[^"?]+)/g)) assert.ok(fs.existsSync(path.join(root,match[1])),match[1]);
 });
@@ -47,4 +47,10 @@ test('new website choice links the published local design with Softora contact t
 test('tall desktop image rows stay capped for balanced spacing', () => {
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
  assert.match(css,/grid-template-rows:72px minmax\(170px,230px\) minmax\(155px,230px\) 100px/);
+});
+
+test("toekomst names the telephone and implementation offers", () => {
+ const html=fs.readFileSync(path.join(root,"assets/entry/toekomst.html"),"utf8");
+ assert.match(html,/<h2>AI-TELEFONIST<\/h2>/);
+ assert.match(html,/AI-IMPLEMENTATIE/);
 });
