@@ -228,7 +228,7 @@ def luna_search_one(company: dict, flags: list[str], validate: bool = True) -> b
         if not response.get("ok") or not isinstance(answer, dict) or str(answer.get("kvk_nummer")) != kvk:
             raise RuntimeError("Luna gaf geen geldig antwoord voor de juiste onderneming terug.")
         save_result(answer_path, {"answer": answer, "consulted_urls": response.get("consultedUrls") or [],
-                                  "cost_eur_cents": response.get("costEurCents")})
+                                  "cost_eur_cents": response.get("costEurCents"), "usage": response.get("usage")})
     if not path.exists():
         # The apply step only picks up a queue head whose mapped result exists.
         saved = json.loads(answer_path.read_text())
