@@ -113,14 +113,35 @@
     };
     return `<div class="detail-mail-lines">${lines.map((line) => `<div class="detail-mail-line${line.trim() ? '' : ' detail-mail-line-empty'}">${line.trim() ? link(line) : '&nbsp;'}</div>`).join('')}</div>`;
   }
+  // Signature addresses written entirely in capitals ("5056 LM BERKEL-ENSCHOT")
+  // are shown in normal letters with capitalized words; Dutch postcode letters
+  // stay capitals and a line with normal casing is kept exactly as written.
+  const ADDRESS_LOWERCASE_WORDS = new Set(['van', 'de', 'der', 'den', 'het', 'ten', 'ter', 'te', 'in', 'aan', 'op', 'bij', 'en', 'of', 'and']);
+  function formatAddressLine(value) {
+    const line = String(value ?? '');
+    const letters = line.replace(/[^\p{L}]/gu, '');
+    if (letters.length < 3 || letters !== letters.toUpperCase() || letters === letters.toLowerCase()) return line;
+    // The first word of the line, and of the place after a postcode, starts with a capital.
+    let atStart = true;
+    return line.replace(/[\p{L}\p{M}'’]+/gu, (word, offset) => {
+      const first = atStart;
+      atStart = false;
+      if (/^\p{Lu}{2}$/u.test(word) && /\d{4}\s?$/.test(line.slice(0, offset))) { atStart = true; return word; }
+      const lower = word.toLocaleLowerCase('nl');
+      if (/^['’]s$/.test(lower)) { atStart = true; return lower; }
+      if (!first && ADDRESS_LOWERCASE_WORDS.has(lower)) return lower;
+      const letter = lower.search(/\p{L}/u);
+      return letter < 0 ? lower : lower.slice(0, letter) + lower.charAt(letter).toLocaleUpperCase('nl') + lower.slice(letter + 1);
+    });
+  }
   function renderContact(contact) {
     const phones = [...new Set(contact.beforeLines || [])].map((line) => line.replace(/^Tel: /, ''));
-    const addresses = [...new Set(contact.addressLines || [])];
+    const addresses = [...new Set((contact.addressLines || []).map(formatAddressLine))];
     if (!phones.length && !addresses.length) return '';
     const field = (label, lines) => `<div class="detail-mail-contact-item"><dt>${label}:</dt><dd>${lines.map((line) => `<div>${escape(line)}</div>`).join('')}</dd></div>`;
     return `<address class="detail-mail-contact-card" aria-label="Contactgegevens uit handtekening"><dl class="detail-mail-contact-grid">${phones.length ? field('Telefoon', phones) : ''}${addresses.length ? field('Adres', addresses) : ''}</dl></address>`;
   }
-  const api = { renderBody, renderContact, VERSION, MODEL, labels, sourceBody, linesOf, validate, read };
+  const api = { renderBody, renderContact, formatAddressLine, VERSION, MODEL, labels, sourceBody, linesOf, validate, read };
   global.SoftoraMailboxAiPresentation = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
