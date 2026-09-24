@@ -69,12 +69,12 @@ html,body,html[data-softora-sidebar-content-frame="1"]:root,html[data-softora-si
 .latest-treated-panel .data-heading{padding:8px 13px}.latest-treated-panel h2{font-size:11px!important}.latest-treated-panel td,.latest-treated-panel th{padding:4px 9px;font-size:10px}.latest-treated-panel td strong{font-size:10px}.latest-treated-panel tbody tr:not(.empty-row){height:31px}.latest-treated-panel .company-status{font-size:8px!important;padding:3px 6px!important}
 }
 
-/* Compact dashboard footprint, with breathing room around the whole page. */
+/* Align the page heading with Dashboard's content top; keep space below the overview. */
 @media(min-width:701px){
-.app-shell{width:calc(100% - 80px);max-width:1320px;height:min(820px,calc(100dvh - 64px));min-height:0;margin:32px auto;padding:0;grid-template-rows:34px 100px 74px minmax(100px,.8fr) minmax(140px,1.2fr);gap:10px}
+.app-shell{width:calc(100% - 80px);max-width:1320px;height:min(820px,calc(100dvh - 32px));min-height:0;margin:0 auto 32px;padding:0;grid-template-rows:34px 100px 74px minmax(100px,.8fr) minmax(140px,1.2fr);gap:10px}
 }
 @media(min-width:701px) and (max-height:760px){
-.app-shell{height:calc(100dvh - 32px);margin:16px auto;gap:8px;grid-template-rows:34px 100px 74px minmax(90px,.8fr) minmax(120px,1.2fr)}
+.app-shell{height:calc(100dvh - 16px);margin:0 auto 16px;gap:8px;grid-template-rows:34px 100px 74px minmax(90px,.8fr) minmax(120px,1.2fr)}
 }
 
 /* Fixed lower edge keeps scrolling rows inside both cards. */

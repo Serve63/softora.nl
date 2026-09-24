@@ -116,7 +116,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijvendatabase<\/h1>/);
-  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924f/);
+  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924g-title-alignment/);
   assert.match(redesignSource, /\.planning-panel \.location-button\{grid-template-columns:13px minmax\(0,1fr\) auto;column-gap:6px;padding-left:12px\}/);
   assert.match(redesignSource, /\.planning-panel \.rank\{width:13px;height:13px;font-size:6px;line-height:1\}/);
   assert.match(pageSource, /<button id="kvk-upload-open" class="transfer-button" type="button" aria-label="Upload naar mailsysteem"[^>]*>Upload/);
@@ -497,7 +497,9 @@ test('kvk database balances activity and planning equally inside one desktop vie
   assert.match(compactStyleSource, /\.latest-treated-panel \.table-frame,[\s\S]*max-height:\s*none/);
   assert.match(compactStyleSource, /\.workspace-grid\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0/);
   assert.match(compactStyleSource, /\.planning-panel\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0/);
-  assert.ok(redesignStyleSource.includes('height:min(820px,calc(100dvh - 64px))'));
+  assert.ok(redesignStyleSource.includes('height:min(820px,calc(100dvh - 32px))'));
+  assert.match(redesignStyleSource, /@media\(min-width:701px\)\{\s*\.app-shell\{[^}]*margin:0 auto 32px/);
+  assert.match(redesignStyleSource, /@media\(min-width:701px\) and \(max-height:760px\)\{\s*\.app-shell\{[^}]*margin:0 auto 16px/);
   assert.match(redesignStyleSource, /@media\(min-width:701px\)\{\.app-shell\{grid-template-rows:60px 100px 74px repeat\(2,minmax\(100px,1fr\)\)/);
   assert.match(redesignStyleSource, /@media\(max-width:700px\)\{\.app-shell\{grid-template-rows:82px 145px 130px repeat\(2,minmax\(110px,1fr\)\)/);
 });
