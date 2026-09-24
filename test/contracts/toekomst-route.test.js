@@ -73,3 +73,15 @@ test('final chooser labels and direct product destinations stay intact', () => {
   assert.match(content,/SEO Solution/i);
  }
 });
+
+test('toekomst uses its matching office photos without changing shared page imagery', () => {
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
+ assert.match(html,/src="\/assets\/entry\/ai-telefonist-office.webp"/);
+ assert.match(css,/\.toekomst-ai \.meet-softora\{background-image:[^}]*meet-softora-office\.webp/);
+ for(const file of ['ai-telefonist-office.webp','meet-softora-office.webp']) {
+  const image=fs.readFileSync(path.join(root,'assets/entry',file));
+  assert.equal(image.toString('ascii',8,12),'WEBP');
+  assert.ok(image.length < 400000,'WebP should remain below 400 KB');
+ }
+});
