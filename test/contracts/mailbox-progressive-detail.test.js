@@ -37,7 +37,8 @@ function view(hooks = {}) {
   return { mail, controller, detail, classes, switchOwner: () => { scope = { owner: 'martijn', folder: 'outreach' }; controller.invalidate(); detail.innerHTML = 'Andere mailbox'; } };
 }
 
-test('complete incoming body and accepted sent text appear before slow provider enrichment finishes', async () => {
+test('complete incoming body and accepted sent text appear before slow provider enrichment finishes', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const timeline = deferred();
   const provider = deferred();
   let publishRoot;
@@ -61,6 +62,10 @@ test('complete incoming body and accepted sent text appear before slow provider 
   const opened = v.controller.open(v.mail.id).then((value) => { settled = true; return value; });
   await tick();
   await publishRoot();
+  assert.equal(v.classes.has('is-detail-pending'), true, 'a fast provider gets a moment to complete the conversation in one render');
+  assert.doesNotMatch(v.detail.innerHTML, /Complete incoming body/);
+  t.mock.timers.tick(1500);
+  await tick();
   assert.match(v.detail.innerHTML, /Complete incoming body/);
   assert.equal(v.classes.has('is-detail-pending'), false);
   assert.equal(settled, false);
@@ -90,7 +95,8 @@ test('late provider completion cannot publish across an owner change', async () 
   assert.equal(v.detail.innerHTML, 'Andere mailbox');
 });
 
-test('account-ready timeline can publish into an existing provider hydration without waiting or duplicating it', async () => {
+test('account-ready timeline can publish into an existing provider hydration without waiting or duplicating it', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const provider = deferred();
   let calls = 0;
   const v = view({ shouldHydrateThread: () => true, hydrateThread: () => { calls += 1; return provider.promise; } });
@@ -98,6 +104,8 @@ test('account-ready timeline can publish into an existing provider hydration wit
   const opening = v.controller.open(v.mail.id);
   await tick();
   assert.equal(calls, 1);
+  t.mock.timers.tick(1500);
+  await tick();
   // Account discovery completes after the cached conversation was opened.
   v.mail.threadMessages = [{ body: 'Exact accepted sent body', bodyLoaded: true }];
   const refresh = v.controller.open(v.mail.id, { skipBodyFetch: true, skipContactTimeline: true, preserveVisibleDetail: true });

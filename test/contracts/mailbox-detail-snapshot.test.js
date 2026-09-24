@@ -177,3 +177,23 @@ test('a read-only snapshot survives a slow body and AI read (~4 s) instead of sh
   const source = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-detail-stability.js'), 'utf8');
   assert.match(source, /const PARTIAL_RENDER_HOLD_MS = 10000;/);
 });
+
+test('clicking a conversation renders it once, complete, instead of body first and the thread a moment later', async () => {
+  const v = view({
+    savedView: '',
+    needsRootHydration: () => true,
+    async hydrateRoot({ mail, requestRender }) { mail.bodyLoading = true; await tick(); mail.body = 'Body'; mail.bodyLoaded = true; mail.bodyLoading = false; await requestRender(mail.id); },
+    async hydrateTimeline({ mail }) { await tick(); mail.threadMessages = [{ body: '' }]; },
+    shouldHydrateThread: () => true,
+    async hydrateThread({ mail }) { await tick(); mail.threadMessages[0].body = 'Earlier sent mail'; },
+  });
+  const rendered = [];
+  let html = '';
+  Object.defineProperty(v.detail, 'innerHTML', { get: () => html, set: (value) => { html = value; rendered.push(value); } });
+  const opened = v.controller.open(v.mail.id);
+  assert.equal(v.classes.has('is-detail-pending'), true);
+  await opened;
+  assert.deepEqual(rendered, ['Body|Earlier sent mail'], 'no "Body|laden" version that jumps when the thread arrives');
+  const source = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-detail-stability.js'), 'utf8');
+  assert.match(source, /const PENDING_PARTIAL_RENDER_DELAY_MS = 1500;/);
+});
