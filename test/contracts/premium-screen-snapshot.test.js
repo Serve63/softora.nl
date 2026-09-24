@@ -134,7 +134,7 @@ test('Klanten shows its snapshot instead of the loading overlay and releases it 
   assert.match(page, /if \(isLoading && window\.SoftoraCustomersScreenSnapshot\?\.isShowing\(\)\) return; window\.SoftoraCustomersScreenSnapshot\?\.release\(\); if \(!isLoading && state\.loadState === "ready"\) window\.SoftoraCustomersScreenSnapshot\?\.capture\(state\);/);
   assert.match(page, /isSnapshotShowing: function \(\) \{ return Boolean\(window\.SoftoraCustomersScreenSnapshot\?\.isShowing\(\)\); \}/);
   const adapterScript = page.indexOf('assets/premium-customers-screen-snapshot.js?v=20260924a');
-  assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924b') < adapterScript);
+  assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < adapterScript);
   assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924a') < adapterScript);
   assert.ok(page.indexOf('<!-- SOFTORA_CUSTOMERS_BOOTSTRAP -->') < adapterScript, 'the signed-in identity is known before restore');
   assert.ok(adapterScript < page.indexOf('const state = {'));
