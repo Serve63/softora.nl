@@ -88,7 +88,8 @@ class WorkerTests(unittest.TestCase):
         with patch.object(runner, 'run_cli', side_effect=[runner.ValidationFailure('checks incomplete'), '']), patch.object(runner, 'call', return_value={'ok': True, 'result': fixed}) as call:
             self.assertTrue(runner.research_one('searcher', company, {}, []))
             repair = call.call_args.args[1]['brief']['repair']
-            self.assertEqual(repair['previous_result'], old)
+            self.assertEqual(repair['previous_result']['kvk_nummer'], old['kvk_nummer'])
+            self.assertFalse(repair['previous_result']['checks_completed'])
             self.assertIn('checks incomplete', repair['validation_error'])
         self.assertEqual(len(list(runner.PENDING.glob('*.rejected-*.json'))), 1)
 
@@ -118,9 +119,9 @@ class WorkerTests(unittest.TestCase):
         contract = runner.api_brief({'result_schema_eenmaal': {'route_notes': {'social_bio': ''}}})
         rules = '\n'.join(contract['bindend'])
         for requirement in ('telefoonnummer EN email', 'operational_status operational',
-                            'entity_role specific', 'KVK-first', 'exacte gidsdetail',
-                            'wp-json/wp/v2/pages', 'streepjesvariant per woordgrens',
-                            'ONBRUIKBAAR_REVIEWED_V1', 'geen not_applicable'):
+                            'entity_role specific', 'doel-KVK', 'bedrijfsdetailbronnen',
+                            'exacte bron-URL', 'toolfouten',
+                            'ONBRUIKBAAR_REVIEWED_V1', 'not_applicable met eerlijke reden'):
             self.assertIn(requirement, rules)
         self.assertIsInstance(contract['result_schema']['route_notes']['social_bio'], dict)
 
@@ -146,7 +147,7 @@ class WorkerTests(unittest.TestCase):
         page = {'contacts': [{'kind': 'phone', 'value': '0612345678', 'href': 'tel:0612345678'}]}
         with patch.object(runner, 'result_page_evidence', return_value=[page]):
             with self.assertRaisesRegex(runner.ValidationFailure, '0612345678'):
-                runner.validate_saved_result(Path('unused'), result, [])
+                runner.validate_saved_result(runner.PENDING / 'candidate.json', result, [])
 
     def test_validation_feedback_does_not_drop_first_requirements(self):
         errors = 'first missing route\n' + 'detail\n' * 500 + 'last missing route'
