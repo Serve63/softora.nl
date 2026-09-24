@@ -56,6 +56,7 @@ Deze repo is agent-vriendelijk aan het worden, maar nog niet volledig opgesplits
 
 ## Wijzigen zonder regressies
 - Nieuwe pagina's en navigatie volgen [docs/platform-performance.md](docs/platform-performance.md); `check:platform-architecture` bewaakt registratie en voorkomt uitbreiding van legacy-documenten.
+- Personeelsschermen openen direct zonder zichtbaar laden: gebruik de bouwstenen uit "Direct zichtbare schermen" in [docs/platform-performance.md](docs/platform-performance.md) (versieprotocol, `premium-readmodel-store.js` voor lokale kopieën, `readLastKnown`, schermopnames). Onthouden inhoud is alleen-lezen tot de live data is verwerkt; browseropslag uitsluitend via `premium-readmodel-store.js`.
 - Begin nieuwe personeelspagina's met `templates/premium-personnel-page.html`. Die gebruikt `assets/fonts.css`, `assets/personnel-theme.css` en `assets/personnel-page-base.css`, de canonieke `data-sidebar-shell="canonical"` en `page-title`/`page-subtitle` klassen. De gedeelde `--bg-primary`, `--text-primary`, `--sidebar-page-title-size` en `--sidebar-shell-max-width` bepalen achtergrond, kleur, titel en breedte; maak daarvoor geen eigen paginaregels. `check:platform-architecture` controleert deze basis bij nieuwe `premium-*` en `personeel-*` pagina's met een personeelssidebar.
 - Verander bestaande routes niet zomaar; houd response-shapes stabiel.
 - Voeg nieuwe logica bij voorkeur toe via `server/routes`, `server/services`, `server/repositories`, `server/security`, `server/schemas`.

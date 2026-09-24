@@ -958,3 +958,14 @@ test('SEO experience and attribution changes preserve publication, source and co
   assert.match(quality, /missing-contextual-money-link/);
   assert.match(quality, /lead-cta-not-whatsapp/);
 });
+
+test('agent rules keep the instant-screen standard for personnel pages', () => {
+  const repoRoot = require('node:path').join(__dirname, '../..');
+  const agents = require('node:fs').readFileSync(require('node:path').join(repoRoot, 'AGENTS.md'), 'utf8');
+  const platform = require('node:fs').readFileSync(require('node:path').join(repoRoot, 'docs/platform-performance.md'), 'utf8');
+  assert.match(agents, /Personeelsschermen openen direct zonder zichtbaar laden/);
+  assert.match(agents, /browseropslag uitsluitend via `premium-readmodel-store\.js`/);
+  assert.match(platform, /## Direct zichtbare schermen \(geïmplementeerd, verplicht voor nieuwe functies\)/);
+  assert.match(platform, /Teruggezette of onthouden inhoud is alleen-lezen/);
+  assert.match(platform, /Checklist voor een nieuwe of gewijzigde personeelsfunctie/);
+});
