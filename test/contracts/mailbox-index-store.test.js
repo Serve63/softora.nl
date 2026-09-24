@@ -3005,3 +3005,10 @@ test('mailbox send identity migration strengthens keys without weakening NOT NUL
   assert.doesNotMatch(migration, /drop not null|alter column send_identity_key drop not null/i);
   assert.doesNotMatch(migration, /grant .*anon|grant .*authenticated/i);
 });
+
+test('an unavailable Instantly original from before evidence version 2 is audited again, a proven one never', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../server/services/mailbox-index-store.js'), 'utf8');
+  assert.match(source, /normalized\.providerOriginalBodyEvidenceKnown = payload\.providerOriginalBodyEvidenceKnown === true &&\n\s+\(payload\.providerOriginalBodyAvailable === true \|\| Number\(payload\.providerOriginalBodyEvidenceVersion\) >= 2\);/);
+  assert.match(source, /providerOriginalBodyEvidenceVersion: message\.providerOriginalBodyEvidenceKnown === true \? 2 : 0,/);
+  assert.equal(require('../../server/services/instantly-original-message-source').ORIGINAL_SOURCE_EVIDENCE_VERSION, 2);
+});
