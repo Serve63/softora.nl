@@ -147,8 +147,9 @@ test('the contact timeline is prefetched without touching the open conversation'
 test('the Mailbox wires the prefetch after its detail controller and warms after each complete render', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
   const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260924b');
-  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260924e'));
+  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260924f'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /afterCommit: \(mail, \{ changed \}\) => \{ mailboxPrefetch\?\.schedule\?\.\(\);/);
-  assert.match(source, /^mailboxPrefetch = window\.SoftoraMailboxPrefetch\?\.create\(\{ getMails: \(\) => getMailsForFolder\(activeFolder\), getActiveMail: \(\) => activeMail,/m);
+  // The outreach list holds grouped copies; the detail opens the stored message, so that one is warmed.
+  assert.match(source, /^mailboxPrefetch = window\.SoftoraMailboxPrefetch\?\.create\(\{ getMails: \(\) => getMailsForFolder\(activeFolder\)\.map\(\(item\) => findMailById\(item\.id\)\)\.filter\(Boolean\), getActiveMail: \(\) => activeMail,/m);
 });
