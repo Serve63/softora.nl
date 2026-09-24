@@ -46,7 +46,8 @@
     const seenPhones = new Set();
     const seenAddresses = new Set();
     const addAddress = (line) => {
-      const value = clean(line).replace(/^(?:adres|address|straat|street|postcode|plaats|city|land|country)\s*:\s*/i, '');
+      const stripped = clean(line).replace(/^(?:adres|address|straat|street|postcode|plaats|city|land|country)\s*:\s*/i, '');
+      const value = global.SoftoraMailboxAiPresentation?.formatAddressLine?.(stripped) ?? stripped;
       const key = value.toLowerCase().replace(/(\d{4})\s*([a-z]{2})\b/g, '$1$2');
       if (value && !seenAddresses.has(key)) { seenAddresses.add(key); addresses.push(value); }
     };

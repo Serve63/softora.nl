@@ -517,3 +517,23 @@ test('sent-copy proof survives AI removing signature lines inside that quote', (
   assert.match(campaign.getRootMessagePresentation(body,{...incoming,threadMessages:[]}).body,/eerdere concrete voorstel/);
   assert.equal(incoming.body,body);
 });
+
+test('signature addresses in capitals are shown in normal letters with capitalized words', () => {
+  const presentation = require('../../assets/premium-mailbox-ai-presentation.js');
+  const cases = {
+    'Torenakker 75': 'Torenakker 75',
+    '5056 LM BERKEL-ENSCHOT': '5056 LM Berkel-Enschot',
+    'THE NETHERLANDS': 'The Netherlands',
+    'VAN DER VALKSTRAAT 12A': 'Van der Valkstraat 12A',
+    "5211 AB 'S-HERTOGENBOSCH": "5211 AB 's-Hertogenbosch",
+    '5211AB DEN BOSCH': '5211AB Den Bosch',
+    'PLEIN 1 TE BEST': 'Plein 1 te Best',
+    'Stationsstraat 1': 'Stationsstraat 1',
+    NL: 'NL',
+  };
+  Object.entries(cases).forEach(([input, expected]) => assert.equal(presentation.formatAddressLine(input), expected, input));
+  const html = presentation.renderContact({ beforeLines: [], addressLines: ['Torenakker 75', '5056 LM BERKEL-ENSCHOT', 'THE NETHERLANDS'] });
+  assert.match(html, /<div>5056 LM Berkel-Enschot<\/div><div>The Netherlands<\/div>/);
+  const contactView = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../assets/premium-mailbox-contact-view.js'), 'utf8');
+  assert.match(contactView, /global\.SoftoraMailboxAiPresentation\?\.formatAddressLine\?\.\(stripped\) \?\? stripped/, 'the regular signature card uses the same formatting');
+});
