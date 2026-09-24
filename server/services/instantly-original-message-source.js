@@ -11,6 +11,7 @@ const SOFTORA_SOURCE_TEXT_KEYS = Object.freeze([
 ]);
 const OUTLOOK_FROM_HEADER_PATTERN = /^(?:van|from):\s*(.+)$/i;
 const OUTLOOK_SUBJECT_HEADER_PATTERN = /^(?:onderwerp|subject):/i;
+const QUOTED_BODY_AUDIT_VERSION = 'v1';
 
 function text(value) {
   return String(value || '').trim();
@@ -58,13 +59,14 @@ async function hydrateIndexedThreadMessageEvidence(options = {}) {
     text(message?.providerThreadId) === threadId &&
     email(message?.providerAccountEmail || message?.accountEmail) === accountEmail
   ));
-  const needsExactOriginalAudit = exactIndexedMessages.some((message) => (
-    message?.originalCampaignOutbound === true &&
-    (
-      message?.providerBodyHtmlEvidenceKnown !== true ||
-      message?.providerOriginalBodyEvidenceKnown !== true
-    )
-  ));
+  const needsExactOriginalAudit = needsQuotedBodyAudit(exactIndexedMessages) ||
+    exactIndexedMessages.some((message) => (
+      message?.originalCampaignOutbound === true &&
+      (
+        message?.providerBodyHtmlEvidenceKnown !== true ||
+        message?.providerOriginalBodyEvidenceKnown !== true
+      )
+    ));
   const exactProviderMessagesUnavailable = new Set();
   const rawMessageIds = new Set(
     rawMessages.map((message) => text(message?.id || message?.email_id || message?.uuid)).filter(Boolean)
@@ -105,7 +107,6 @@ function mergeActiveConversationAuditMessages(options = {}) {
   messages.forEach((message) => {
     if (
       text(message?.providerOwner).toLowerCase() !== selectedOwner ||
-      message?.originalCampaignOutbound !== true ||
       !text(message?.providerThreadId) ||
       !email(message?.providerAccountEmail)
     ) {
@@ -119,14 +120,34 @@ function mergeActiveConversationAuditMessages(options = {}) {
     ))) {
       threadMessages.push(message);
     }
-    if (
+    if (message.originalCampaignOutbound === true && (
       message.providerBodyHtmlEvidenceKnown !== true ||
       message.providerOriginalBodyEvidenceKnown !== true
-    ) {
+    )) {
       threadCandidates.set(key, message);
     }
   });
   return { indexedThreadMessages, threadCandidates };
+}
+
+function latestQuoteAuditReplyId(messages = [], sent = {}) {
+  const sentAt = Date.parse(sent.date || '');
+  if (!Number.isFinite(sentAt)) return '';
+  const latestReply = messages
+    .filter((message) => message?.folder !== 'sent' &&
+      text(message?.providerMessageId) && Date.parse(message.date || '') >= sentAt)
+    .sort((left, right) => Date.parse(right.date) - Date.parse(left.date))[0];
+  return latestReply
+    ? `${QUOTED_BODY_AUDIT_VERSION}:${text(latestReply.providerMessageId)}` : '';
+}
+
+function needsQuotedBodyAudit(messages = []) {
+  return messages.some((sent) => {
+    if (sent?.folder !== 'sent' || sent.originalCampaignOutbound !== true ||
+      sent.providerOriginalBodyAvailable === true) return false;
+    const latestReplyId = latestQuoteAuditReplyId(messages, sent);
+    return Boolean(latestReplyId && sent.providerQuotedBodyAuditReplyId !== latestReplyId);
+  });
 }
 
 function buildIndexedThreadAuditState(options = {}) {
@@ -156,7 +177,8 @@ function buildIndexedThreadAuditState(options = {}) {
         message.providerOriginalBodyEvidenceKnown !== true
       )
     ));
-    if (incoming && needsExactProviderBody && !threadCandidates.has(key)) {
+    if (incoming && (needsExactProviderBody || needsQuotedBodyAudit(messages)) &&
+      !threadCandidates.has(key)) {
       threadCandidates.set(key, incoming);
     }
   });
@@ -217,11 +239,19 @@ function bodyMatchesProviderCopy(providerBody, sourceBody) {
   return matchingTokens / providerTokens.length >= 0.9;
 }
 
-function getRawMessageBody(rawMessage = {}) {
+function getRawMessageBody(rawMessage = {}, preferLongerText = false) {
   const html = text(rawMessage.body?.html || rawMessage.body_html || rawMessage.email_html);
-  return parseProviderHtml(html).body || text(
+  const htmlBody = parseProviderHtml(html).body;
+  const textBody = text(
     rawMessage.body?.text || rawMessage.body_text || rawMessage.email_text
   );
+  // A provider may omit a collapsed quote from HTML while retaining it in text.
+  const htmlHasQuote = preferLongerText && htmlBody &&
+    quotedThread.findQuotedSegments(htmlBody).segments.length > 0;
+  const textHasQuote = preferLongerText && textBody &&
+    quotedThread.findQuotedSegments(textBody).segments.length > 0;
+  return textBody.length > htmlBody.length && textHasQuote && !htmlHasQuote
+    ? textBody : htmlBody || textBody;
 }
 
 function stripQuotePrefix(value) {
@@ -262,7 +292,7 @@ function extractQuotedOriginalBodyEvidence(rawMessages = [], options = {}) {
     ) {
       continue;
     }
-    const body = getRawMessageBody(rawMessage);
+    const body = getRawMessageBody(rawMessage, true);
     if (!body) continue;
     const parsed = quotedThread.findQuotedSegments(body);
     for (const segment of parsed.segments.filter((candidate) => candidate.marker === 'reply-header')) {
@@ -320,7 +350,7 @@ function extractQuotedOriginalBodyEvidence(rawMessages = [], options = {}) {
       ) {
         continue;
       }
-      const body = getRawMessageBody(rawMessage);
+      const body = getRawMessageBody(rawMessage, true);
       if (!body) continue;
       const lines = body.split(/\r?\n/);
       for (let index = 0; index < lines.length; index += 1) {
@@ -371,6 +401,12 @@ function buildStrictThreadQuotedMessageSource(rawMessage = {}, rawMessages = [],
       recipients.includes(sender) &&
       Number.isFinite(sentAt) && Number.isFinite(replyAt) && replyAt >= sentAt;
   });
+  const latestReply = [...replies].sort((left, right) => (
+    Date.parse(right.timestamp_email || right.timestamp_created || right.created_at) -
+    Date.parse(left.timestamp_email || left.timestamp_created || left.created_at)
+  ))[0];
+  const latestReplyId = text(latestReply?.id || latestReply?.email_id || latestReply?.uuid);
+  const auditedReplyId = latestReplyId ? `${QUOTED_BODY_AUDIT_VERSION}:${latestReplyId}` : '';
   const quote = extractQuotedOriginalBodyEvidence(replies, {
     accountEmail: sender, providerBody, sourceMessageId: sentId,
   });
@@ -380,10 +416,11 @@ function buildStrictThreadQuotedMessageSource(rawMessage = {}, rawMessages = [],
     .replace(/\s+/g, ' ').trim();
   if (!quote.senderEmail || !['standard-reply-header', 'outlook-original-message-header'].includes(quote.source) ||
     withoutEmoji(providerBody).length < 80 || withoutEmoji(providerBody) !== withoutEmoji(quote.body)) {
-    return { evidenceKnown: true, available: false, reason: 'quote-not-exact' };
+    return { evidenceKnown: true, available: false, auditedReplyId, reason: 'quote-not-exact' };
   }
   return { evidenceKnown: true, available: true, body: quote.body,
-    webdesignLinkEvidenceKnown: false, webdesignLinkUrl: '', reason: `exact-delivered-thread-quote:${quote.source}` };
+    webdesignLinkEvidenceKnown: false, webdesignLinkUrl: '', auditedReplyId,
+    reason: `exact-delivered-thread-quote:${quote.source}` };
 }
 
 function normalizeExactWebdesignUrl(value, expectedCustomerId) {
@@ -573,5 +610,7 @@ module.exports = {
   extractQuotedOriginalBody,
   extractLeadId,
   hydrateIndexedThreadMessageEvidence,
+  latestQuoteAuditReplyId,
   mergeActiveConversationAuditMessages,
+  needsQuotedBodyAudit,
 };
