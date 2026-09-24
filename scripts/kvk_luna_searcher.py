@@ -18,6 +18,15 @@ from kvk_api_validation import PROFILE
 ROUTES = ("identity", "search_engine", "website_basic", "website_deep", "visual_assets", "maps_profile",
           "social_search", "social_bio", "order_links", "directories", "entity_match", "final_crosscheck")
 SEARCH_URL = re.compile(r"(google|bing|duckduckgo)\.[a-z.]+/search|[?&](q|query|search)=", re.I)
+# Same contact patterns as the canonical validator, which refuses a result whose
+# notes mention a phone number or e-mail address that is neither kept nor rejected.
+CANON_PHONE_RE = re.compile(
+    r"(?:(?:\+|00)31[\s().-]*(?:0)?|0)(?:6|7[0-9]|8[578]|[1-5][0-9])"
+    r"[\s().-]*[0-9][\s().-]*[0-9][\s().-]*[0-9][\s().-]*[0-9]"
+    r"[\s().-]*[0-9][\s().-]*[0-9](?:[\s().-]*[0-9]){0,2}"
+)
+CANON_EMAIL_RE = re.compile(r"\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b", re.IGNORECASE)
+URL_RE = re.compile(r"https?://\S+")
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 Softora-Searcher-Verify"
 MAX_BYTES = 3_000_000
 
@@ -126,6 +135,53 @@ def lead_sources(answer: dict, consulted_urls: list[str], extra: list[str]) -> l
     return sources[:15]
 
 
+def withhold_unaccepted_contacts(result: dict, reference_url: str, identifiers: list[str]) -> None:
+    """Replace contacts Luna mentioned but that were not kept, and record them as rejected."""
+    keep_phone = phone_digits(result["telefoonnummer"]) if result["telefoonnummer"] else ""
+    keep_email = result["email"].casefold()
+    identifier_digits = [re.sub(r"\D", "", value) for value in identifiers if re.sub(r"\D", "", value)]
+    rejected: dict[str, dict[str, str]] = {"telefoonnummer": {}, "email": {}}
+
+    def phone(match):
+        raw = match.group(0)
+        digits = re.sub(r"\D", "", raw)
+        if any(digits in value or value in digits for value in identifier_digits) \
+                or (keep_phone and phone_digits(raw) == keep_phone):
+            return raw
+        rejected["telefoonnummer"].setdefault(digits, raw.strip())
+        return "[nummer niet overgenomen]"
+
+    def email(match):
+        raw = match.group(0)
+        if raw.casefold() == keep_email:
+            return raw
+        rejected["email"].setdefault(raw.casefold(), raw)
+        return "[e-mailadres niet overgenomen]"
+
+    def scrub(text: str) -> str:
+        parts = URL_RE.split(text)
+        urls = URL_RE.findall(text)
+        out = []
+        for index, part in enumerate(parts):
+            out.append(CANON_EMAIL_RE.sub(email, CANON_PHONE_RE.sub(phone, part)))
+            if index < len(urls):
+                out.append(urls[index])
+        return "".join(out)
+
+    result["conclusion_note"] = scrub(result["conclusion_note"])
+    result["field_evidence"] = {key: scrub(value) for key, value in result["field_evidence"].items()}
+    for source in result["sources"]:
+        source["note"], source["label"] = scrub(source["note"]), scrub(source["label"])
+    for stage in result["route_notes"].values():
+        stage["notes"] = scrub(stage["notes"])
+    note = "Door Luna genoemd, niet als contact van deze onderneming bevestigd of overgenomen."
+    result["contact_rejections"] = {
+        field: [{"value": value, "reason_code": "unverified_candidate", "url": reference_url, "note": note}
+                for value in values.values()]
+        for field, values in rejected.items()
+    }
+
+
 def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=fetch_page) -> dict:
     kvk = str(company["kvk_nummer"])
     if clean(answer.get("kvk_nummer")) != kvk:
@@ -175,7 +231,7 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
     conclusion = clean(answer.get("conclusie")) or "Luna Searcher v2."
     if dropped:
         conclusion += " Lokale controle: " + " ".join(dropped)
-    return {
+    result = {
         "kvk_nummer": kvk,
         "telefoonnummer": phone,
         "email": email,
@@ -198,3 +254,6 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
         "route_notes": route_notes,
         "validation_profile": PROFILE,
     }
+    reference = identity_url or (source_urls[0] if source_urls else "")
+    withhold_unaccepted_contacts(result, reference, [kvk, clean(company.get("vestigingsnummer"))])
+    return result

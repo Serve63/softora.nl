@@ -73,6 +73,24 @@ class LunaSearcherTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             canonical(answer(kvk_nummer='87654321'))
 
+    def test_mentioned_but_unkept_contacts_are_recorded_as_rejected(self):
+        result = canonical(answer(entity_role='parent_or_holding', telefoonnummer='020 123 4567',
+                                  conclusie='Holding. Nummer (013) 533 39 63 en post@andere.nl horen bij een ander bedrijf.'))
+        self.assertEqual(result['telefoonnummer'], '')
+        rejected = {field: [item['value'] for item in items] for field, items in result['contact_rejections'].items()}
+        self.assertIn('post@andere.nl', rejected['email'])
+        self.assertEqual(len(rejected['telefoonnummer']), 2)
+        self.assertNotIn('533 39 63', result['conclusion_note'])
+        self.assertNotIn('020 123 4567', result['conclusion_note'])
+        self.assertTrue(all(item['reason_code'] == 'unverified_candidate' and item['url']
+                            for items in result['contact_rejections'].values() for item in items))
+
+    def test_kept_contacts_urls_and_kvk_are_left_intact(self):
+        result = canonical(answer(conclusie='Bel 013 533 1678 of mail info@voorbeeld.nl; KVK 12345678.'))
+        self.assertEqual(result['contact_rejections'], {'telefoonnummer': [], 'email': []})
+        self.assertIn('013 533 1678', result['conclusion_note'])
+        self.assertIn('https://voorbeeld.nl/contact', result['field_evidence']['telefoonnummer'])
+
     def test_dutch_phone_notations_match(self):
         for value in ('+31 (0)13 533 1678', '0031135331678', '+31135331678', '013-533 16 78'):
             self.assertEqual(phone_digits(value), '0135331678')
