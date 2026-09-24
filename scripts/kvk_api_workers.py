@@ -245,6 +245,8 @@ def main() -> int:
         apply_lock = threading.Lock()
         threads = [threading.Thread(target=work, args=(role, apply_lock), daemon=True)
                    for role in ("searcher", "controller")]
+        from kvk_robot_v5 import main as robot_main
+        threads.append(threading.Thread(target=robot_main, daemon=True))
         for thread in threads:
             thread.start()
         for thread in threads:
