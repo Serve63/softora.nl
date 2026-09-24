@@ -1,0 +1,25 @@
+.toekomst-ai .page{height:auto;min-height:100svh}
+.toekomst-ai main{display:flex;flex-direction:column;max-height:none;margin:28px 0 44px;gap:24px;padding:0}
+.toekomst-ai .intro{padding:18px 0 24px}
+.ai-feature{position:relative;isolation:isolate;display:flex;align-items:center;min-height:300px;overflow:hidden;border-radius:16px;color:#fff5f8;background:radial-gradient(ellipse at 78% 45%,#8b225280,transparent 48%),linear-gradient(115deg,#21131e,#391529 62%,#20121c);border:1px solid #a75a7c70;box-shadow:0 20px 45px #43182d15}
+.ai-feature-copy{position:relative;z-index:2;padding:42px 48px;flex:1}
+.ai-feature-label{display:flex;align-items:center;gap:9px;font-size:8px;letter-spacing:2px;color:#e6abc6}
+.ai-feature-label>span{height:6px;width:6px;border-radius:50%;background:#f5accd;box-shadow:0 0 16px #f5accd}
+.ai-feature h2{font-size:clamp(45px,5.5vw,80px);font-weight:500;letter-spacing:-1.8px;margin:24px 0 14px;line-height:1}
+.ai-feature h2>span{color:#e796ba}
+.ai-feature p{font-size:14px;color:#e0c7d4;margin:0;line-height:1.7}
+.ai-feature-invite{display:inline-flex;align-items:center;gap:32px;margin-top:28px;font-size:11px;color:#fff}
+.ai-feature-invite>span{display:grid;place-items:center;width:32px;height:32px;border:1px solid #e6abc65c;border-radius:50%;font-size:20px;transition:background .2s,transform .2s}
+.ai-feature:hover .ai-feature-invite>span{background:#8b2252;transform:translate(3px,-3px)}
+.ai-feature-art{position:absolute;width:48%;height:100%;right:0;top:0;display:grid;place-items:center;pointer-events:none}
+.ai-core{width:175px;height:175px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#fff4f8,#f6c0d9 8%,#ac4a78 30%,#45162f 65%,#1d0c18 85%);box-shadow:inset -15px -12px 35px #150610,inset 3px 2px 10px #fff9,0 0 70px #c45c9060;transform:rotate(-18deg)}
+.ai-orbit{position:absolute;width:320px;height:230px;border:1px solid #e9a6c244;border-radius:50%;transform:rotate(-30deg)}
+.orbit-two{width:360px;height:170px;transform:rotate(38deg);border-color:#e9a6c227}
+.ai-art-label{position:absolute;bottom:27px;font-size:6px;letter-spacing:2px;color:#c995ae}
+.toekomst-ai .choices{height:auto;max-height:none;width:100%}
+.toekomst-ai .choice{height:300px}
+.toekomst-ai .meet-softora{height:auto;min-height:150px;margin:12px 0 0}
+@media(max-width:760px){.toekomst-ai main{margin:10px 0 30px;gap:18px}.toekomst-ai .intro{padding:20px 0}.ai-feature{min-height:400px;align-items:flex-end}.ai-feature-copy{padding:26px;flex:none;width:100%}.ai-feature h2{font-size:43px;letter-spacing:-1px;margin:17px 0 12px}.ai-feature-label{font-size:6px;letter-spacing:1.2px}.ai-feature p{font-size:12px}.ai-feature-art{width:100%;height:190px;top:0;opacity:.85}.ai-core{width:100px;height:100px}.ai-orbit{width:210px;height:140px}.orbit-two{width:235px;height:105px}.ai-art-label{display:none}.ai-feature-invite{margin-top:17px}.toekomst-ai .choice{height:285px}.toekomst-ai .choice:last-child{height:200px}.toekomst-ai .meet-softora{min-height:300px}}
+@media(prefers-reduced-motion:reduce){.ai-feature-invite>span{transition:none}}
+
+.ai-feature-invite{padding:9px 15px;border:1px solid #e6abc64d;border-radius:30px;color:#f3c4da;background:#ffffff08;font-size:9px;letter-spacing:1.8px}
