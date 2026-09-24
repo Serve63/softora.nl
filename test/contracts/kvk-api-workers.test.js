@@ -284,7 +284,12 @@ test('Searcher runs Luna 6 Max once with its own short brief and returns the pag
   assert.deepEqual(JSON.parse(body.input[1].content), { kvk_nummer: '12345678', bedrijfsnaam: 'Voorbeeld', adres: 'Straat 1', plaats: 'Tilburg' });
   assert.deepEqual(res.body.result, answer);
   assert.deepEqual(res.body.consultedUrls, ['https://voorbeeld.nl/contact', 'https://gids.nl/voorbeeld']);
-  assert.equal(res.body.costEurCents, 2);
+  // Opening a page carries no search fee: only tokens are charged here.
+  assert.equal(res.body.costEurCents, 1);
+  assert.deepEqual(res.body.usage, { inputTokens: 1000, outputTokens: 1000, searches: 0, pageOpens: 1 });
+  assert.equal(body.tools[0].search_context_size, 'low');
+  assert.match(body.input[0].content, /hoogstens 2 zoekacties/);
+  assert.match(body.input[0].content, /holding, beheer-bv of vastgoed-bv/);
 });
 
 test('dashboard state names the model that actually runs', async () => {
@@ -302,4 +307,12 @@ test('Searcher maps a saved Luna answer before the apply step looks for it', () 
   assert.ok(searcher.indexOf('to_canonical(') > 0);
   assert.ok(searcher.indexOf('to_canonical(') < searcher.indexOf('if not validate:'),
     'apply_ready_prefix skips a queue head whose mapped result does not exist yet');
+});
+
+test('only search actions carry the per-call search fee', () => {
+  const { toolUsage } = require('../../server/services/kvk-luna-searcher-prompt');
+  const call = (type) => ({ type: 'web_search_call', action: type ? { type } : undefined });
+  const data = { output: [call('search'), call('search'), call('open_page'), call('find_in_page'), call(undefined), { type: 'message' }] };
+  // An item without a recognisable action is charged as a search.
+  assert.deepEqual(toolUsage(data), { searches: 3, pageOpens: 2 });
 });

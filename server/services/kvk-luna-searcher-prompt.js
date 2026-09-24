@@ -23,6 +23,10 @@ const SEARCHER_INSTRUCTIONS = [
   '2. Heeft het bedrijf een eigen website: open de homepage en de contactpagina en kijk naar telefoon en e-mail in tekst, footer en mailto/tel-links.',
   '3. Ontbreekt iets: zoek in bedrijvengidsen en officiële socialprofielen, en zoek op naam + telefoon en naam + e-mail.',
   '4. Stop zodra telefoon, e-mail en website (of duidelijk geen website) vastliggen.',
+  'Kosten:',
+  '- Elke zoekactie kost geld; een concrete pagina openen niet. Doe hoogstens 2 zoekacties en zet in één zoekactie meerdere zoekvragen tegelijk (bijvoorbeeld het KVK-nummer, naam + plaats, naam + telefoon en naam + e-mail).',
+  '- Open daarna gevonden pagina\'s direct (eigen website, contactpagina, gidsprofiel) in plaats van opnieuw te zoeken. Raad een voor de hand liggend eigen domein gerust door het direct te openen.',
+  '- Blijkt het een holding, beheer-bv of vastgoed-bv zonder eigen klantactiviteit, of is het bedrijf gestopt: stop dan meteen en rapporteer dat.',
   'Regels:',
   '- Neem alleen gegevens over die je letterlijk op een geopende pagina over dit bedrijf zag. Verzin niets; liever leeg dan gegokt.',
   '- telefoon_bron_url en email_bron_url zijn de exacte pagina waar dat nummer of adres staat.',
@@ -57,6 +61,15 @@ function parseAnswer(text) {
   return JSON.parse(text.slice(start, end + 1));
 }
 
+const FREE_ACTIONS = new Set(['open_page', 'find_in_page', 'find']);
+
+// Search actions carry the per-call fee; opening or reading a page does not.
+function toolUsage(data) {
+  const calls = (data.output || []).filter((item) => item.type === 'web_search_call');
+  const pageOpens = calls.filter((item) => FREE_ACTIONS.has(item.action?.type)).length;
+  return { searches: calls.length - pageOpens, pageOpens };
+}
+
 // Every public page the provider actually retrieved, so cited URLs can be checked.
 function consultedUrls(data) {
   const urls = new Set();
@@ -69,4 +82,4 @@ function consultedUrls(data) {
   return [...urls].filter((url) => /^https?:\/\//i.test(url)).slice(0, 200);
 }
 
-module.exports = { SEARCHER_INSTRUCTIONS, searcherInput, parseAnswer, consultedUrls };
+module.exports = { SEARCHER_INSTRUCTIONS, searcherInput, parseAnswer, consultedUrls, toolUsage };
