@@ -8,7 +8,7 @@ precheck -> validate -> apply pipeline. No model key is stored locally.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import fcntl
 import json
@@ -29,6 +29,22 @@ PENDING = ROOT / "data" / "kvk_api_pending"
 COMPLETED = ROOT / "data" / "kvk_api_completed"
 LOCK = ROOT / "data" / "kvk_api_workers.lock"
 MODEL = "gpt-6-sol"
+MAX_REPAIR_ATTEMPTS = 3
+
+
+class ValidationFailure(RuntimeError):
+    pass
+
+
+class RemoteFailure(RuntimeError):
+    def __init__(self, path, status, message):
+        super().__init__(message)
+        self.path, self.status = path, status
+
+
+def transient_control_failure(error):
+    return isinstance(error, RemoteFailure) and error.path in ("/poll", "/report") and error.status in (0, 408, 429, 500, 502, 503, 504)
+
 ROLE_FLAGS = {
     "searcher": [],
     "controller-approved": ["--review-approved"],
@@ -49,7 +65,9 @@ def call(path: str, payload: dict, timeout: int = 45) -> dict:
             details = json.loads(error.read().decode('utf-8')).get('error', '')
         except (ValueError, UnicodeDecodeError):
             details = ''
-        raise RuntimeError(f"HTTP {error.code}: {details or error.reason}") from None
+        raise RemoteFailure(path, error.code, f"HTTP {error.code}: {details or error.reason}") from None
+    except (URLError, TimeoutError, OSError) as error:
+        raise RemoteFailure(path, 0, f"Verbinding onderbroken: {error}") from None
 
 
 def report(role: str, message: str, kvk: str = "", halt: bool = False) -> None:
@@ -67,7 +85,8 @@ def run_cli(script: str, *args: str, timeout: int = 900) -> str:
     )
     if process.returncode:
         details = (process.stderr + "\n" + process.stdout).strip()[-1400:]
-        raise RuntimeError(f"{script} stopte met code {process.returncode}: {details}")
+        error_type = ValidationFailure if script in ("contact_agent_precheck.py", "contact_validate_apply.py") else RuntimeError
+        raise error_type(f"{script} stopte met code {process.returncode}: {details}")
     return process.stdout
 
 
@@ -147,23 +166,74 @@ def is_enabled(role: str) -> bool:
     return bool(((state.get("workers") or {}).get(role) or {}).get("enabled"))
 
 
-def research_one(role: str, company: dict, brief: dict, flags: list[str]) -> bool:
+def research_one(role: str, company: dict, brief: dict, flags: list[str], validate: bool = True) -> bool:
     kvk = str(company["kvk_nummer"])
     path = pending_path(role, kvk, flags)
+    recovery_path = path.with_suffix(".recovery.json")
+    recovery = json.loads(recovery_path.read_text()) if recovery_path.exists() else {"attempts": 0}
+    previous = None
+    failure = ""
+    if path.exists() and not validate:
+        return True  # Full validation happens only when this company reaches the queue head.
     if path.exists():
-        return True  # Reuse paid results, even after a stop or process restart.
-    try:
-        result = call("/research", {"role": role, "company": company, "brief": brief}, timeout=720)
-    except HTTPError as error:
-        if error.code == 409:
-            return False  # No paid request: switch, count or shared budget gate denied it.
-        raise
-    if not result.get("ok") or not isinstance(result.get("result"), dict):
-        raise RuntimeError("API gaf geen volledig bedrijfsresultaat terug.")
-    if str(result["result"].get("kvk_nummer")) != kvk:
-        raise RuntimeError("API-resultaat hoort bij een ander bedrijf.")
-    save_result(path, result["result"])
-    return True
+        previous = json.loads(path.read_text())
+        try:
+            run_cli("contact_agent_precheck.py", str(path), *flags)
+            return True  # Only validated paid results are reusable.
+        except ValidationFailure as error:
+            failure = str(error)
+    while recovery["attempts"] < MAX_REPAIR_ATTEMPTS:
+        if not is_enabled(role):
+            return False
+        repair_brief = dict(brief)
+        if previous is not None:
+            repair_brief["repair"] = {"previous_result": previous, "validation_error": failure}
+            archive = path.with_suffix(f".rejected-{recovery['attempts']}.json")
+            if not archive.exists():
+                save_result(archive, previous)
+        recovery["attempts"] += 1
+        recovery["last_error"] = failure
+        save_result(recovery_path, recovery)
+        try:
+            response = call("/research", {"role": role, "company": company, "brief": repair_brief}, timeout=720)
+        except HTTPError as error:
+            if error.code == 409:
+                recovery["attempts"] -= 1
+                save_result(recovery_path, recovery)
+                return False
+            raise
+        result = response.get("result")
+        if not response.get("ok") or not isinstance(result, dict) or str(result.get("kvk_nummer")) != kvk:
+            raise RuntimeError("API gaf geen geldig resultaat voor de juiste onderneming terug.")
+        save_result(path, result)
+        previous = result
+        if not validate:
+            return True
+        try:
+            run_cli("contact_agent_precheck.py", str(path), *flags)
+            return True
+        except ValidationFailure as error:
+            failure = str(error)
+            recovery["last_error"] = failure
+            save_result(recovery_path, recovery)
+    raise ValidationFailure(f"{kvk}: na {MAX_REPAIR_ATTEMPTS} herstelpogingen nog onvolledig; bewijs bewaard. {failure[:160]}")
+
+
+def api_brief(packet: dict) -> dict:
+    return {
+        "planning_scope": packet.get("planning_scope"),
+        "bindend": [
+            "Onderzoek uitsluitend deze exacte onderneming met openbare webbronnen.",
+            "Verifieer naam, adres en KVK; neem geen contactgegevens van een ander bedrijf over.",
+            "Zoek de eigen website en contactpagina, sociale profielen en concrete gidsvermeldingen.",
+            "Bewijs elk ingevuld contactveld met een exacte bron-URL; vul ontbrekende gegevens niet in.",
+            "Noteer per route wat werkelijk is gedaan; gebruik blocked of not_applicable met reden waar nodig.",
+            "Gebruik de webtools; lokale bestanden en scripts zijn geen onderdeel van deze API-opdracht.",
+        ],
+        "result_schema": packet.get("result_schema_eenmaal"),
+        "review_approved": packet.get("review_approved"),
+        "review_unusable": packet.get("review_unusable"),
+    }
 
 
 def research_batch(role: str, packet: dict, flags: list[str], count: int) -> None:
@@ -171,16 +241,10 @@ def research_batch(role: str, packet: dict, flags: list[str], count: int) -> Non
     identities = [str(company["kvk_nummer"]) for company in companies]
     if len(identities) != len(set(identities)):
         raise RuntimeError("Wachtrij bevat dubbele bedrijven; onderzoek niet gestart.")
-    brief = {
-        "planning_scope": packet.get("planning_scope"),
-        "bindend": packet.get("bindend"),
-        "result_schema": packet.get("result_schema_eenmaal"),
-        "review_approved": packet.get("review_approved"),
-        "review_unusable": packet.get("review_unusable"),
-    }
+    brief = api_brief(packet)
     errors = []
     with ThreadPoolExecutor(max_workers=count) as pool:
-        futures = [pool.submit(research_one, role, company, brief, flags) for company in companies]
+        futures = [pool.submit(research_one, role, company, brief, flags, False) for company in companies]
         for future in as_completed(futures):
             try:
                 future.result()
@@ -198,6 +262,8 @@ def apply_ready_prefix(role: str, packet: dict, flags: list[str], apply_lock: th
         path = pending_path(role, kvk, flags)
         if not path.exists() or not is_enabled(role):
             break  # Never skip a missing queue head because another result finished first.
+        if not research_one(role, company, api_brief(packet), flags):
+            break
         if not apply_result(path, flags, apply_lock, role):
             break
         applied += 1
@@ -231,6 +297,10 @@ def work(role: str, apply_lock: threading.Lock) -> None:
                 report(role, "Wacht op budgetruimte of handmatige start; resultaten bewaard.")
                 time.sleep(10)
         except Exception as error:
+            if transient_control_failure(error):
+                print(f"KVK API {role}: tijdelijke verbindingstoring; opnieuw proberen.", flush=True)
+                time.sleep(15)
+                continue
             print(f"KVK API {role} gestopt: {error}", flush=True)
             try:
                 report(role, f"Gestopt: {str(error)[:145]}", halt=True)
