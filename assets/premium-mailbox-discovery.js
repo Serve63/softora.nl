@@ -589,6 +589,50 @@
       }
     }
 
+    // Background warm-up for a conversation that is not open yet: the same
+    // request and merge as loadContactTimeline, without touching the active
+    // timeline request or rendering. A later open finds the dossier complete.
+    async function prefetchContactTimeline(mail, { signal } = {}) {
+      if (!mail || (mail.contactTimelineLoaded && Number(mail.contactTimelineTotal) > 0 && !mail.contactTimelineNeedsRefresh)) return false;
+      if (mail.contactTimelineLoading || options.getActiveMail?.() === mail.id) return false;
+      const contactEmail = mail.externalContactEmail || resolveExternalContact(mail, options.getAccountEmails?.());
+      if (!contactEmail) return false;
+      const timelineAccounts = Array.from(new Set(
+        (options.getAccountEmails?.() || []).map(normalizeEmail).filter(Boolean)
+      ));
+      const rootAccount = getTimelineAccount(mail);
+      const timelineOwner = normalizePersonalOwner(options.getMessageOwner?.(mail));
+      const timelineScope = createContactTimelineScope(contactEmail, {
+        accountEmails: timelineAccounts, canonicalOwner: timelineOwner, getMessageOwner: options.getMessageOwner,
+      });
+      if (!rootAccount || !timelineAccounts.includes(rootAccount) || !timelineScope.valid || !timelineScope.matches(mail)) return false;
+      const params = new URLSearchParams({ contact: contactEmail, owner: timelineOwner, limit: '50' });
+      const timeout = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(timelineTimeoutMs) : null;
+      const requestSignal = signal && timeout && typeof AbortSignal.any === 'function' ? AbortSignal.any([signal, timeout]) : (signal || timeout);
+      try {
+        const response = await fetchImpl(`/api/mailbox/contact-timeline?${params}`, {
+          credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' },
+          ...(requestSignal ? { signal: requestSignal } : {}),
+        });
+        const data = await response.json().catch(() => ({}));
+        // Opened meanwhile: the regular load owns this conversation now.
+        if (!response.ok || data?.ok !== true || options.getActiveMail?.() === mail.id || mail.contactTimelineLoading) return false;
+        const incoming = (Array.isArray(data.messages) ? data.messages : []).map((message) => options.normalizeMessage?.(message) || message);
+        if (!incoming.length) return false;
+        const nextCursor = String(data.nextCursor || '');
+        mergeContactTimeline(mail, incoming, contactEmail, data.totalCount, {
+          accountEmails: timelineAccounts, canonicalOwner: timelineOwner, getMessageOwner: options.getMessageOwner,
+          linkedMessages: mail.threadMessages, pendingMessages: [], hasMore: Boolean(nextCursor), rejectedCountOffset: 0,
+        });
+        mail.contactTimelineNeedsRefresh = false;
+        mail.contactTimelineError = '';
+        mail.contactTimelineNextCursor = nextCursor;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
     async function prepareCompleteContactTimelineForHide(mail) {
       if (!mail || options.getActiveMail?.() !== mail.id) return false;
       const frozenId = String(mail.id);
@@ -757,6 +801,7 @@
       prepareCompleteContactTimelineForHide,
       isSearchActive,
       loadContactTimeline,
+      prefetchContactTimeline,
       loadMoreContactTimeline: (mail) => loadContactTimeline(mail, { append: true }),
       refreshActiveTimeline: (mail) => loadContactTimeline(mail, { force: true }),
       resetForScopeChange,
