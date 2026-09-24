@@ -233,6 +233,14 @@ test('API research uses available web tools and explicit evidence-preserving rep
  assert.match(runner,/MAX_REPAIR_ATTEMPTS = 3/);
  assert.match(runner,/if transient_control_failure\(error\):/);
  assert.doesNotMatch(runner,/"bindend": packet.get\("bindend"\)/);
+ assert.match(runner,/api-evidence-v2/);
+ assert.match(runner,/telefoonnummer EN email/);
+ assert.match(runner,/public_page_evidence/);
+ assert.match(runner,/validate_saved_result\(path, result, flags\)/);
+ const evidence=fs.readFileSync(path.join(root,'scripts/kvk_api_evidence.py'),'utf8');
+ assert.match(evidence,/api\.whatsapp\.com/);
+ assert.match(evidence,/require_public_url\(newurl\)/);
+ assert.match(evidence,/never copy it automatically/);
 });
 test('a failing budget status read does not discard settled paid research', async()=>{
  const client={rpc:async()=>({data:true}),from(){throw new Error('temporary status outage');}};
