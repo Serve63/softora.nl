@@ -294,7 +294,7 @@ function createHtmlPageCoordinator(options = {}) {
       ? (isMailboxBootstrap ? escapeSerializedJsonForInlineHtml(bootstrapData.serialized) : bootstrapData.serialized)
       : escapeJsonForInlineHtml(bootstrapData.data);
     const scriptTag = `<script id="${scriptId}" type="application/json">${serialized}</script>`;
-    const sessionBootstrapTag = '<script src="/assets/premium-page-bootstrap-session.js?v=20260723c"></script>';
+    const sessionBootstrapTag = '<script src="/assets/premium-page-bootstrap-session.js?v=20260924a"></script>';
     const bootstrapHtml = `${scriptTag}${sessionBootstrapTag}`;
 
     if (marker) {

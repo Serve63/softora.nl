@@ -5198,3 +5198,9 @@ test('eenvoudige afwijzing van Bert krijgt zonder betaalde modelaanvraag een vei
   assert.match(result.text, /Dankjewel voor je reactie/);
   assert.doesNotMatch(result.text, /preview|afspraak/i);
 });
+
+test('retired mailboxes are never synced or offered, even with configured credentials', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../server/services/mailbox.js'), 'utf8');
+  assert.match(source, /const RETIRED_MAILBOX_EMAILS = new Set\(\['zakelijk@theimpactbox\.co'\]\);/);
+  assert.match(source, /\]\.filter\(\(email\) => email && !RETIRED_MAILBOX_EMAILS\.has\(email\)\)\)/);
+});

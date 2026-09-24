@@ -41,7 +41,7 @@ test('gedeelde pagina-bootstrap dekt alle database-UI-state pagina’s', () => {
     );
     assert.match(
       pageSource,
-      /premium-ui-state-client\.js\?v=20260922a/,
+      /premium-ui-state-client\.js\?v=20260924a/,
       fileName
     );
   });

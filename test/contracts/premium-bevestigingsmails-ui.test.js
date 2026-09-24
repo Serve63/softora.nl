@@ -34,7 +34,7 @@ test('premium bevestigingsmails renders the current coldmailing dashboard shell 
   assert.match(pageSource, /<button class="btn-start" id="start-campaign-btn" onclick="startCampagne\(\)" data-secure-mail-send-pin>/);
   assert.doesNotMatch(pageSource, /<!-- SOFTORA_COLDCALLING_DASHBOARD_BOOTSTRAP -->/);
   assert.match(pageSource, /<!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->/);
-  assert.match(pageSource, /assets\/premium-ui-state-client\.js\?v=20260922a/);
+  assert.match(pageSource, /assets\/premium-ui-state-client\.js\?v=20260924a/);
 });
 
 test('premium bevestigingsmails laadt geen coldmail teller per afzender', () => {
