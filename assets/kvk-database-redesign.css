@@ -204,3 +204,7 @@ button,input,select,textarea{font-family:inherit}
 .planning-panel .location-button>.badge{grid-column:8;margin-left:9px}
 .latest-treated-panel td{width:12.5%}
 @media(max-width:700px){.planning-panel .location-button{min-width:1050px}}
+
+/* Compact signed activity: direction carries the color, period stays neutral. */
+.inventory-grid .stat-delta .stat-delta-number,.research-grid .stat-delta .stat-delta-number,.research-grid .stat-delta-flow.is-zero .stat-delta-added{color:var(--green)!important}
+.inventory-grid .stat-delta.is-negative .stat-delta-number,.research-grid .stat-delta.is-negative .stat-delta-number,.research-grid .stat-delta-flow .stat-delta-removed,.research-grid .stat-delta-flow.is-zero .stat-delta-removed{color:#b54747!important}

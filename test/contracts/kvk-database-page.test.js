@@ -116,7 +116,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /<script id="kvkSnapshot" type="application\/json">\{\}<\/script>/);
   assert.ok(Buffer.byteLength(pageSource, 'utf8') < 50_000, 'KVK paginashell mag geen datasnapshot bevatten');
   assert.match(pageSource, /<h1>Bedrijvendatabase<\/h1>/);
-  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924e/);
+  assert.match(pageSource, /kvk-database-redesign\.css\?v=20260924f/);
   assert.match(redesignSource, /\.planning-panel \.location-button\{grid-template-columns:13px minmax\(0,1fr\) auto;column-gap:6px;padding-left:12px\}/);
   assert.match(redesignSource, /\.planning-panel \.rank\{width:13px;height:13px;font-size:6px;line-height:1\}/);
   assert.match(pageSource, /<button class="transfer-button" type="button" aria-label="Upload naar mailsysteem" disabled>Upload/);
@@ -549,7 +549,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260914-fast-progress/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260923-delta-style/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260924-compact-delta/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260917-control-orange/);
   assert.match(pageSource, /id="companies-control-room-last60"><span class="stat-delta-added"[^>]*>\+—<\/span><span class="stat-delta-removed"[^>]*>−—<\/span>/);
   assert.match(metricsSource, /companies-successful-found/);
@@ -566,7 +566,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.match(metricsSource, /unusable_grade_activity/);
   assert.match(metricsSource, /unusableGrades\['3'\]/);
   assert.match(metricsSource, /deps\.window\.setInterval\(controller\.renderMetrics, 1000\)/);
-  assert.match(metricsSource, /count > 0 \? '\+' : ''/);
+  assert.match(metricsSource, /count >= 0 \? '\+' : ''/);
   assert.match(metricsSource, /classList\.toggle\('is-negative', count < 0\)/);
   assert.match(metricsStyles, /\.stat-delta-number/);
   assert.match(redesignStyles, /\.inventory-grid \.stat-delta,\.research-grid \.stat-delta\{display:flex!important/);
@@ -739,4 +739,15 @@ test('planning checks and progress align with phone and email columns', () => {
  assert.match(css, /\.location-statuses\{grid-column:5;padding-left:9px/);
  assert.match(css, /\.location-stage-progress\{grid-column:6;padding-left:9px/);
  assert.match(css, /\.latest-treated-panel td\{width:12.5%\}/);
+});
+
+test('activity deltas keep a sign at zero and use the short period label', () => {
+ const { renderLast60Delta } = require('../../assets/kvk-database-metrics');
+ for (const [value, expected] of [[0,'+0'],[7,'+7'],[-3,'-3']]) {
+ const number = {}, label = {}; const classes = {};
+ renderLast60Delta({querySelector: selector => selector === '.stat-delta-number' ? number : label, classList:{toggle:(key,value)=>{classes[key]=value;}}},value);
+ assert.equal(number.textContent, expected);
+ assert.equal(label.textContent,'60m');
+ assert.equal(classes['is-negative'],value<0);
+ }
 });
