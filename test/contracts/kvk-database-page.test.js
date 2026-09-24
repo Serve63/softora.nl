@@ -712,7 +712,7 @@ test('KVK header shows the disabled mail upload action without a settings back l
   assert.match(workerStyles, /min-height:32px/);
   assert.match(workerStyles, /'Oswald',sans-serif/);
   assert.match(workerStyles, /\.kvk-api-workers-dialog::backdrop\{background:transparent;backdrop-filter:none\}/);
-  assert.match(pageSource, /kvk-api-workers\.css\?v=20260924d/);
+  assert.match(pageSource, /kvk-api-workers\.css\?v=20260924c/);
   assert.doesNotMatch(pageSource, /id="kvk-worker-status"/);
   assert.match(pageSource, /id="companies-total">0<\/strong>\s*<\/div>\s*<div class="stat-delta"><span class="stat-delta-label">Alles gevonden<\/span>/);
   assert.ok(pageSource.indexOf('/assets/kvk-database-worker-status.js') < pageSource.indexOf('/assets/kvk-database.js'));
