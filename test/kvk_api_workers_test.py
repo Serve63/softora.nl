@@ -3,6 +3,7 @@ import importlib.util
 import sys
 import tempfile
 import threading
+import time
 import types
 import unittest
 from pathlib import Path
@@ -54,6 +55,68 @@ class WorkerTests(unittest.TestCase):
             runner.research_batch('searcher', packet, [], 1)
             self.assertEqual(runner.apply_ready_prefix('searcher', packet, [], threading.Lock()), 1)
             apply.assert_called_once()
+
+    def run_pipeline(self, companies, count, research_delay):
+        queue = [dict(company) for company in companies]
+        researched, applied, running, peak = [], [], [0], [0]
+        lock = threading.Lock()
+
+        def call(path, payload, **kwargs):
+            if path == '/poll':
+                return {'state': {'workers': {'searcher': {'enabled': bool(queue), 'count': count}}}}
+            if path == '/research':
+                with lock:
+                    running[0] += 1
+                    peak[0] = max(peak[0], running[0])
+                    researched.append(payload['company']['kvk_nummer'])
+                time.sleep(research_delay(payload['company']['kvk_nummer']))
+                with lock:
+                    running[0] -= 1
+                return {'ok': True, 'result': payload['company']}
+            return {'ok': True}
+
+        def next_packet(role, limit):
+            return ({'bedrijven': queue[:limit]}, []) if queue else None
+
+        def apply(path, flags, apply_lock, role):
+            kvk = queue[0]['kvk_nummer']
+            self.assertIn(kvk, path.name)  # only ever the current queue head
+            applied.append(queue.pop(0)['kvk_nummer'])
+            path.unlink()
+            return True
+
+        original_wait = runner.wait
+        with patch.object(runner, 'call', side_effect=call), patch.object(runner, 'next_packet', side_effect=next_packet), \
+                patch.object(runner, 'apply_result', side_effect=apply), patch.object(runner, 'report'), \
+                patch.object(kvk_luna_searcher, 'to_canonical', side_effect=lambda company, *_: company), \
+                patch.object(runner, 'wait', side_effect=lambda futures, **kw: original_wait(futures, timeout=0.05, return_when=runner.FIRST_COMPLETED)):
+            runner.run_searcher_pipeline(threading.Lock())
+        return researched, applied, peak[0]
+
+    def test_pipeline_applies_in_queue_order_while_slow_requests_keep_running(self):
+        companies = [{'kvk_nummer': f'{i:08}'} for i in range(1, 9)]
+        # The first company is slow; the others must not wait for it to be researched.
+        delay = lambda kvk: 0.4 if kvk == '00000001' else 0.02
+        researched, applied, peak = self.run_pipeline(companies, 3, delay)
+        self.assertEqual(applied, [company['kvk_nummer'] for company in companies])
+        self.assertEqual(sorted(researched), sorted(applied))  # every company paid exactly once
+        self.assertLessEqual(peak, 3)
+        self.assertEqual(peak, 3)
+
+    def test_pipeline_stops_on_a_failed_request_but_keeps_paid_peers(self):
+        companies = [{'kvk_nummer': f'{i:08}'} for i in range(1, 4)]
+        def delay(kvk):
+            if kvk == '00000002':
+                raise RuntimeError('provider failed')
+            return 0.05
+        with self.assertRaisesRegex(RuntimeError, 'provider failed'):
+            self.run_pipeline(companies, 3, delay)
+        self.assertEqual(len(list(runner.PENDING.glob('*.luna.json'))), 2)
+
+    def test_pipeline_never_exceeds_one_request_with_count_one(self):
+        companies = [{'kvk_nummer': f'{i:08}'} for i in range(1, 4)]
+        researched, applied, peak = self.run_pipeline(companies, 1, lambda kvk: 0.01)
+        self.assertEqual((applied, peak), (['00000001', '00000002', '00000003'], 1))
 
     def test_saved_paid_results_are_reused(self):
         company = self.packet['bedrijven'][0]
