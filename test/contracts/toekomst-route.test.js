@@ -43,3 +43,8 @@ test('new website choice links the published local design with Softora contact t
   assert.ok(fs.existsSync(path.join(root,'assets/website-showcase',m[1])),m[1]);
  }
 });
+
+test('tall desktop image rows stay capped for balanced spacing', () => {
+ const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
+ assert.match(css,/grid-template-rows:72px minmax\(170px,230px\) minmax\(155px,230px\) 100px/);
+});
