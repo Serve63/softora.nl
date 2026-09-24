@@ -5,9 +5,10 @@ const TABLE = 'softora_kvk_api_budget';
 const MODEL = 'gpt-6-luna';
 const MODEL_LABEL = 'Luna 6 Max';
 // Worst case per request (16 searches, 922K long-context cache-write input,
-// 16K output) stays below 45 cents; one euro leaves room without blocking budget.
+// 40K output) stays below 45 cents; one euro leaves room without blocking budget.
 const RESERVATION_CENTS = 100;
-const MAX_OUTPUT_TOKENS = 16000;
+// Max-effort reasoning counts toward this limit; 40K output costs at most 3 cents on Luna.
+const MAX_OUTPUT_TOKENS = 40000;
 const MAX_TOOL_CALLS = 16;
 const STALE_MS = 120000;
 const PRICE_REVIEW_DEADLINE = Date.parse('2026-10-23T00:00:00Z');
@@ -266,7 +267,12 @@ function createKvkApiWorkersService(deps = {}) {
         p_request_id: requestId, p_actual_eur_cents: actualCents,
       });
       if (settleError || settled !== true) throw Object.assign(new Error('Budgetafrekening onzeker; de werker stopt.'), { status: 503 });
-      if (data.status !== 'completed') throw Object.assign(new Error('OpenAI-antwoord was niet compleet; kosten zijn wel geregistreerd.'), { status: 502 });
+      if (data.status !== 'completed') {
+        const detail = { reason: data.incomplete_details?.reason || data.status || 'unknown',
+          input: data.usage?.input_tokens, output: data.usage?.output_tokens, ...toolUsage(data) };
+        console.error('[kvk-api-workers] incomplete', JSON.stringify({ requestId, responseId: data.id, ...detail }));
+        throw Object.assign(new Error(`OpenAI-antwoord was niet compleet (${JSON.stringify(detail)}); kosten zijn wel geregistreerd.`), { status: 502 });
+      }
       let result;
       try { result = parseAnswer(outputText(data)); }
       catch { throw Object.assign(new Error('OpenAI gaf geen geldig JSON; kosten zijn wel geregistreerd.'), { status: 502 }); }
