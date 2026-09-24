@@ -165,7 +165,7 @@ test('worker dialog shows real spend and only Aan or Uit for worker status', () 
 test('authenticated diagnostics perform only a free model read and redact the key', async () => {
   let calls = 0;
   const service = createKvkApiWorkersService({ kvkDatabaseSyncToken: 'sync-test', env: { OPENAI_API_KEY: 'sk-test-secret' },
-    fetchImpl: async (url, options) => { calls++; assert.match(url, /\/models\/gpt-6-sol$/); assert.equal(options.method, undefined);
+    fetchImpl: async (url, options) => { calls++; assert.match(url, /\/models\/gpt-6-luna$/); assert.equal(options.method, undefined);
       return { ok: false, status: 401, json: async () => ({ error: { code: 'invalid_api_key', message: 'Bad key sk-test-secret' } }) }; } });
   const bad = response();
   await service.poll({ headers: {}, body: { diagnose: true } }, bad);
@@ -188,7 +188,7 @@ test('definite upstream rejection releases the reservation while ambiguous failu
         const body = JSON.parse(options.body);
         assert.equal(body.tools[0].type, 'web_search');
         assert.equal(body.text, undefined, 'web search must not use incompatible JSON mode');
-        assert.equal(body.model, 'gpt-6-sol');
+        assert.equal(body.model, 'gpt-6-luna');
         assert.equal(body.reasoning.effort, 'max');
         return { ok: false, status, json: async () => ({ error: { code: 'rejected', message: 'Failure sk-test-secret' } }) };
       } });
@@ -221,12 +221,13 @@ test('actual search usage is billed even when the provider exceeds the requested
  const calls = [];
  const row = {limit_eur_cents:10000,spent_eur_cents:72,reserved_eur_cents:0};
  const client = {rpc:async(name,args)=>{calls.push({name,args});return {data:true};}, from:()=>({select:()=>({eq:()=>({single:async()=>({data:row})})})})};
- const service = createKvkApiWorkersService({getSupabaseClient:()=>client,kvkDatabaseSyncToken:'test',env:{OPENAI_API_KEY:'test'},now:()=>new Date('2026-09-24'),fetchImpl:async()=>({ok:true,json:async()=>({model:'gpt-6-sol',status:'completed',usage:{input_tokens:42842,output_tokens:3635},output:[...Array.from({length:9},()=>({type:'web_search_call'})),{content:[{type:'output_text',text:'{"kvk_nummer":"12345678"}'}]}]})})});
+ const service = createKvkApiWorkersService({getSupabaseClient:()=>client,kvkDatabaseSyncToken:'test',env:{OPENAI_API_KEY:'test'},now:()=>new Date('2026-09-24'),fetchImpl:async()=>({ok:true,json:async()=>({model:'gpt-6-luna',status:'completed',usage:{input_tokens:42842,output_tokens:3635},output:[...Array.from({length:9},()=>({type:'web_search_call'})),{content:[{type:'output_text',text:'{"kvk_nummer":"12345678"}'}]}]})})});
  const res = response();
  await service.research({headers:{authorization:'Bearer test'},body:{role:'searcher',company:{kvk_nummer:'12345678'},brief:{}}},res);
  assert.equal(res.statusCode,200);
  assert.equal(calls[1].name,'softora_kvk_api_settle');
- assert.equal(calls[1].args.p_actual_eur_cents,72);
+ // Luna: 42842 in x $0.25/M + 3635 out x $0.75/M + 9 searches x $0.01 = $0.1034.
+ assert.equal(calls[1].args.p_actual_eur_cents,11);
 });
 
 test('API research uses available web tools and explicit evidence-preserving repair instructions', () => {
@@ -253,7 +254,44 @@ test('API research uses available web tools and explicit evidence-preserving rep
 });
 test('a failing budget status read does not discard settled paid research', async()=>{
  const client={rpc:async()=>({data:true}),from(){throw new Error('temporary status outage');}};
- const service=createKvkApiWorkersService({getSupabaseClient:()=>client,kvkDatabaseSyncToken:'test',env:{OPENAI_API_KEY:'test'},now:()=>new Date('2026-09-24'),fetchImpl:async()=>({ok:true,json:async()=>({model:'gpt-6-sol',status:'completed',usage:{input_tokens:100,output_tokens:100},output_text:'{"kvk_nummer":"12345678"}'})})});
+ const service=createKvkApiWorkersService({getSupabaseClient:()=>client,kvkDatabaseSyncToken:'test',env:{OPENAI_API_KEY:'test'},now:()=>new Date('2026-09-24'),fetchImpl:async()=>({ok:true,json:async()=>({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:100},output_text:'{"kvk_nummer":"12345678"}'})})});
  const res=response();await service.research({headers:{authorization:'Bearer test'},body:{role:'searcher',company:{kvk_nummer:'12345678'},brief:{}}},res);
  assert.equal(res.statusCode,200);assert.equal(res.body.result.kvk_nummer,'12345678');assert.equal(res.body.budget,null);
+});
+
+test('Searcher runs Luna 6 Max once with its own short brief and returns the pages it retrieved', async () => {
+  const calls = [];
+  const client = { rpc: async (name, args) => { calls.push({ name, args }); return { data: true }; },
+    from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { limit_eur_cents: 10000, spent_eur_cents: 0, reserved_eur_cents: 0 } }) }) }) }) };
+  let body;
+  const answer = { kvk_nummer: '12345678', telefoonnummer: '0612345678' };
+  const service = createKvkApiWorkersService({ getSupabaseClient: () => client, kvkDatabaseSyncToken: 'test',
+    env: { OPENAI_API_KEY: 'test' }, now: () => new Date('2026-09-24'),
+    fetchImpl: async (_url, options) => { body = JSON.parse(options.body); return { ok: true, json: async () => ({
+      model: 'gpt-6-luna', status: 'completed', usage: { input_tokens: 1000, output_tokens: 1000 },
+      output: [{ type: 'web_search_call', action: { type: 'open_page', url: 'https://voorbeeld.nl/contact',
+        sources: [{ url: 'https://gids.nl/voorbeeld' }, { url: 'javascript:alert(1)' }] } },
+      { content: [{ type: 'output_text', text: `Resultaat:\n${JSON.stringify(answer)}` }] }] }) }; } });
+  const res = response();
+  await service.research({ headers: { authorization: 'Bearer test' }, body: { role: 'searcher',
+    company: { kvk_nummer: '12345678', bedrijfsnaam: 'Voorbeeld', adres: 'Straat 1', plaats: 'Tilburg' }, brief: {} } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(body.model, 'gpt-6-luna');
+  assert.equal(body.reasoning.effort, 'max');
+  assert.equal(calls[0].args.p_reserve_eur_cents, 100);
+  assert.match(body.input[0].content, /^Je bent de Searcher van Softora/);
+  assert.doesNotMatch(body.input[0].content, /previous_result|route_notes/);
+  assert.deepEqual(JSON.parse(body.input[1].content), { kvk_nummer: '12345678', bedrijfsnaam: 'Voorbeeld', adres: 'Straat 1', plaats: 'Tilburg' });
+  assert.deepEqual(res.body.result, answer);
+  assert.deepEqual(res.body.consultedUrls, ['https://voorbeeld.nl/contact', 'https://gids.nl/voorbeeld']);
+  assert.equal(res.body.costEurCents, 2);
+});
+
+test('dashboard state names the model that actually runs', async () => {
+  const { service } = settingsFixture();
+  const res = response();
+  await service.getStatus({}, res);
+  assert.equal(res.body.state.model, 'gpt-6-luna');
+  assert.equal(res.body.state.modelLabel, 'Luna 6 Max');
+  assert.equal(res.body.state.budget.reservationEur, 1);
 });
