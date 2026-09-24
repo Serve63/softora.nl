@@ -113,9 +113,12 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 
 /* MAIL DETAIL */
 .mail-detail { position: relative; flex: 1; min-width: 0; max-width: 100%; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+/* A prepared conversation renders within a few frames: the previous one stays up until then; only a real wait shows "E-mail laden…". */
 .mail-detail.is-detail-pending { cursor: wait; }
-.mail-detail.is-detail-pending > * { visibility: hidden; }
-.mail-detail.is-detail-pending::after { content: 'E-mail laden…'; position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; background: var(--bg); color: var(--text-light); font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+.mail-detail.is-detail-pending > * { animation: mail-detail-pending-hide 0s linear 150ms forwards; }
+@keyframes mail-detail-pending-hide { to { visibility: hidden; } }
+@keyframes mail-detail-pending-show { to { opacity: 1; } }
+.mail-detail.is-detail-pending::after { content: 'E-mail laden…'; position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; background: var(--bg); color: var(--text-light); font-size: 13px; font-weight: 600; letter-spacing: .01em;  opacity: 0; animation: mail-detail-pending-show 0s linear 150ms forwards; }
 .detail-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-light); }
 .detail-empty svg { width: 40px; height: 40px; opacity: .25; }
 .detail-empty p { font-size: 13px; }
