@@ -105,6 +105,15 @@ class LunaSearcherTests(unittest.TestCase):
                                       {'url': 'https://voorbeeld.nl/', 'wat_gezien': 'geparkeerd'}]))
         self.assertEqual([source['label'] for source in result['sources']], ['Bron', 'Bron', 'Zoekpagina'])
 
+    def test_each_page_is_fetched_once_even_when_cited_twice(self):
+        fetched = []
+        def fetch(url):
+            fetched.append(url)
+            return PAGES.get(url)
+        result = to_canonical(COMPANY, answer(), [], fetch)
+        self.assertEqual(result['lead_status'], 'usable')
+        self.assertEqual(sorted(fetched), ['https://voorbeeld.nl/', 'https://voorbeeld.nl/contact'])
+
     def test_dutch_phone_notations_match(self):
         for value in ('+31 (0)13 533 1678', '0031135331678', '+31135331678', '013-533 16 78'):
             self.assertEqual(phone_digits(value), '0135331678')

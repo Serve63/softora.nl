@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import html
 import re
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
@@ -31,7 +32,7 @@ USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 
 MAX_BYTES = 3_000_000
 
 
-def fetch_page(url: str, timeout: int = 15) -> str | None:
+def fetch_page(url: str, timeout: int = 8) -> str | None:
     """Public page text for verification, or None when it cannot be read."""
     try:
         # Cited URLs come from the model: only public addresses, also after redirects.
@@ -133,11 +134,12 @@ def lead_sources(answer: dict, consulted_urls: list[str], extra: list[str]) -> l
     for url in extra:
         add(url, "Bron van een gecontroleerd veld.", exact=True)
     # Pages Luna retrieved count as consulted sources when fewer were listed.
-    for url in consulted_urls:
+    # Pages the search tool retrieved are recorded checks too, also when they turned out
+    # unrelated; they only fill up to the three checks the database asks for.
+    for url in sorted(consulted_urls, key=lambda item: bool(SEARCH_URL.search(item))):
         if len(sources) >= 3:
             break
-        if not SEARCH_URL.search(url):
-            add(url, "Door Luna via de webzoektool geopend.", "Geraadpleegd")
+        add(url, "Door de webzoektool van Luna geraadpleegd; niet noodzakelijk over dit bedrijf.", "Geraadpleegd")
     return sources[:15]
 
 
@@ -193,6 +195,16 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
     if clean(answer.get("kvk_nummer")) != kvk:
         raise ValueError(f"Luna-antwoord hoort niet bij KVK {kvk}.")
     consulted = {url_key(url) for url in consulted_urls}
+    # Fetch every page to verify at once, each only once (phone and e-mail often share one).
+    website_url = clean(answer.get("website"))
+    if website_url and not urlsplit(website_url).scheme:
+        website_url = "https://" + website_url
+    wanted = {url for url in (clean(answer.get("telefoon_bron_url")), clean(answer.get("email_bron_url")),
+                              website_url if clean(answer.get("website_status")) != "no_website" else "")
+              if urlsplit(url).scheme in ("http", "https")}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        pages = dict(zip(wanted, pool.map(fetch, wanted)))
+    fetch = pages.get
     identity = answer.get("identiteit") if isinstance(answer.get("identiteit"), dict) else {}
     identity_url = clean(identity.get("bron_url"))
     identity_ok = identity.get("bevestigd") is True and bool(identity_url)

@@ -76,9 +76,10 @@ class WorkerTests(unittest.TestCase):
             return {'ok': True}
 
         def next_packet(role, limit):
+            self.queue_reads = getattr(self, 'queue_reads', 0) + 1
             return ({'bedrijven': queue[:limit]}, []) if queue else None
 
-        def apply(path, flags, apply_lock, role):
+        def apply(path, flags, apply_lock, role, **kwargs):
             kvk = queue[0]['kvk_nummer']
             self.assertIn(kvk, path.name)  # only ever the current queue head
             applied.append(queue.pop(0)['kvk_nummer'])
@@ -112,6 +113,13 @@ class WorkerTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'provider failed'):
             self.run_pipeline(companies, 3, delay)
         self.assertEqual(len(list(runner.PENDING.glob('*.luna.json'))), 2)
+
+    def test_pipeline_reads_the_queue_once_per_window_not_once_per_company(self):
+        companies = [{'kvk_nummer': f'{i:08}'} for i in range(1, 13)]
+        with patch.object(runner, 'SEARCHER_REFRESH_SECONDS', 3600):
+            researched, applied, peak = self.run_pipeline(companies, 2, lambda kvk: 0.01)
+        self.assertEqual(applied, [company['kvk_nummer'] for company in companies])
+        self.assertLessEqual(self.queue_reads, 7)  # 12 companies in windows of 6, not 12+ reads
 
     def test_pipeline_never_exceeds_one_request_with_count_one(self):
         companies = [{'kvk_nummer': f'{i:08}'} for i in range(1, 4)]
