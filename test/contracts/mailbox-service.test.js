@@ -5192,7 +5192,7 @@ test('eenvoudige afwijzing van Bert krijgt zonder betaalde modelaanvraag een vei
     accountEmail: 'servecreusen@softora.nl', to: 'bert@infratechnicalsupport.nl',
     subject: 'Re: Kleine vraag over jullie website', body: '',
     context: { from: 'Bert van Esch', email: 'bert@infratechnicalsupport.nl',
-      body: 'Goededag Ik heb geen ondersteuning nodig Dankjewel Van Esch infratechnical suppport Verzonden vanaf mijn Galaxy\n-------- Oorspronkelijk bericht --------Van: Servé Creusen Onderwerp: Kleine vraag over jullie website Kunnen we de preview bekijken?' },
+      body: 'GoededagIk heb geen ondersteuning nodigDankjewelVan Esch infratechnical suppportVerzonden vanaf mijn Galaxy\n-------- Oorspronkelijk bericht --------Van: Servé Creusen Onderwerp: Kleine vraag over jullie website Kunnen we de preview bekijken?' },
   });
   assert.equal(result.provider, 'local');
   assert.match(result.text, /Dankjewel voor je reactie/);
