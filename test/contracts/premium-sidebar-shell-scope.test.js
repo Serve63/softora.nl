@@ -1093,6 +1093,13 @@ test('websitegenerator layout gebruikt dezelfde sidebarbreedte als de premium sh
 
 test('Lead Radar shell gebruikt de gedeelde premium navigatie en iframe-opbouw', () => {
   const shellSource = readRepoFile('premium-lead-radar-shell.html');
+  const radarPage = readRepoFile('premium-lead-radar.html');
+  assert.match(radarPage, /assets\/personnel-theme\.css/);
+  assert.match(radarPage, /class="main-content lead-radar-app"/);
+  assert.match(radarPage, /class="topbar lead-radar-header"/);
+  assert.match(shellSource, /main\.lead-radar-shell__content \{ padding: 0 !important;/);
+  assert.doesNotMatch(radarPage, /SOFTORA ACQUISITIE/);
+  assert.match(readRepoFile('assets/lead-radar.css'), /margin: 0 auto !important/);
   const canonicalSource = readRepoFile('premium-personeel-dashboard.html');
   const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const sidebarLinksSource = readRepoFile('assets/premium-sidebar-links.js');
