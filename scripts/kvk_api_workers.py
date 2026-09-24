@@ -29,7 +29,7 @@ API_URL = os.environ.get("SOFTORA_KVK_API_WORKERS_URL", "https://www.softora.nl/
 PENDING = ROOT / "data" / "kvk_api_pending"
 COMPLETED = ROOT / "data" / "kvk_api_completed"
 LOCK = ROOT / "data" / "kvk_api_workers.lock"
-MODEL = "gpt-6-sol"
+MODEL_LABEL = "Luna 6 Max"
 MAX_REPAIR_ATTEMPTS = 3
 
 
@@ -134,6 +134,9 @@ def apply_result(path: Path, flags: list[str], apply_lock: threading.Lock, role:
             raise
     os.replace(archive_temp, destination)
     path.unlink(missing_ok=True)
+    answer = path.with_suffix(".luna.json")
+    if answer.exists():
+        os.replace(answer, destination.with_suffix(".luna.json"))
     marker = path.with_name(f"{path.name}.precheck-ok.json")
     if marker.exists():
         os.replace(marker, destination.with_name(f"{destination.name}.precheck-ok.json"))
@@ -149,7 +152,7 @@ class Heartbeat:
     def run(self) -> None:
         while not self.stop.wait(30):
             try:
-                report(self.role, f"{MODEL} Max onderzoekt {self.kvk}", self.kvk)
+                report(self.role, f"{MODEL_LABEL} onderzoekt {self.kvk}", self.kvk)
             except Exception:
                 pass  # Server budget gate independently rejects stale heartbeats.
 
@@ -203,7 +206,44 @@ def validate_saved_result(path, result, flags):
         raise ValidationFailure(failure)
 
 
+def luna_search_one(company: dict, flags: list[str], validate: bool = True) -> bool:
+    """Exactly one paid Luna request per company; later steps only reuse the saved answer."""
+    from kvk_luna_searcher import to_canonical
+    kvk = str(company["kvk_nummer"])
+    path = pending_path("searcher", kvk, flags)
+    answer_path = path.with_suffix(".luna.json")
+    if not answer_path.exists():
+        if path.exists():
+            # A result from the retired contract is never relabelled as Luna work.
+            os.replace(path, path.with_suffix(f".retired-{int(time.time())}.json"))
+        if not is_enabled("searcher"):
+            return False
+        try:
+            response = call("/research", {"role": "searcher", "company": company, "brief": {}}, timeout=720)
+        except HTTPError as error:
+            if error.code == 409:
+                return False
+            raise
+        answer = response.get("result")
+        if not response.get("ok") or not isinstance(answer, dict) or str(answer.get("kvk_nummer")) != kvk:
+            raise RuntimeError("Luna gaf geen geldig antwoord voor de juiste onderneming terug.")
+        save_result(answer_path, {"answer": answer, "consulted_urls": response.get("consultedUrls") or [],
+                                  "cost_eur_cents": response.get("costEurCents")})
+    if not validate:
+        return True
+    saved = json.loads(answer_path.read_text())
+    if not path.exists():
+        save_result(path, to_canonical(company, saved["answer"], saved.get("consulted_urls") or []))
+    try:
+        run_cli("contact_agent_precheck.py", str(path), *flags)
+    except ValidationFailure as error:
+        raise ValidationFailure(f"{kvk}: Luna-antwoord bewaard, maar de database weigert het: {str(error)[-300:]}") from None
+    return True
+
+
 def research_one(role: str, company: dict, brief: dict, flags: list[str], validate: bool = True) -> bool:
+    if role == "searcher":
+        return luna_search_one(company, flags, validate)
     kvk = str(company["kvk_nummer"])
     path = pending_path(role, kvk, flags)
     recovery_path = path.with_suffix(".recovery.json")

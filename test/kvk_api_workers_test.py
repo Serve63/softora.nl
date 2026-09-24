@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
 import kvk_api_evidence as evidence
+import kvk_luna_searcher
 sys.modules['start_database_fill_control'] = types.SimpleNamespace(post_json=None, resolve_token=None)
 spec = importlib.util.spec_from_file_location('runner', Path(__file__).parents[1] / 'scripts/kvk_api_workers.py')
 runner = importlib.util.module_from_spec(spec)
@@ -40,14 +41,37 @@ class WorkerTests(unittest.TestCase):
             return {'ok': True, 'result': payload['company']}
         with patch.object(runner, 'call', side_effect=call):
             runner.research_batch('searcher', self.packet, [], 3)
-        self.assertEqual(len(list(runner.PENDING.glob('contact_agent_results_api_searcher_initial_????????.json'))), 3)
+        self.assertEqual(len(list(runner.PENDING.glob('contact_agent_results_api_searcher_initial_????????.luna.json'))), 3)
 
     def test_saved_paid_results_are_reused(self):
         company = self.packet['bedrijven'][0]
-        runner.save_result(runner.pending_path('searcher', company['kvk_nummer'], []), company)
-        with patch.object(runner, 'call') as call:
+        path = runner.pending_path('searcher', company['kvk_nummer'], [])
+        runner.save_result(path.with_suffix('.luna.json'), {'answer': company, 'consulted_urls': []})
+        with patch.object(runner, 'call') as call, patch.object(kvk_luna_searcher, 'to_canonical', return_value=company):
             self.assertTrue(runner.research_one('searcher', company, {}, []))
             call.assert_not_called()
+        self.assertTrue(path.exists())
+
+    def test_searcher_pays_once_and_never_buys_a_repair(self):
+        company = self.packet['bedrijven'][0]
+        with patch.object(runner, 'run_cli', side_effect=runner.ValidationFailure('database weigert')), \
+                patch.object(kvk_luna_searcher, 'to_canonical', return_value=company), \
+                patch.object(runner, 'call', return_value={'ok': True, 'result': company}) as call:
+            for _ in range(2):
+                with self.assertRaisesRegex(runner.ValidationFailure, 'Luna-antwoord bewaard'):
+                    runner.research_one('searcher', company, {}, [])
+            self.assertEqual(call.call_count, 1)
+            self.assertEqual(call.call_args.args[1]['brief'], {})
+
+    def test_result_from_the_retired_contract_is_not_relabelled_as_luna(self):
+        company = self.packet['bedrijven'][0]
+        path = runner.pending_path('searcher', company['kvk_nummer'], [])
+        runner.save_result(path, dict(company, model='sol'))
+        with patch.object(runner, 'call', return_value={'ok': True, 'result': company}) as call:
+            self.assertTrue(runner.research_one('searcher', company, {}, [], False))
+            call.assert_called_once()
+        self.assertFalse(path.exists())
+        self.assertEqual(len(list(runner.PENDING.glob('*.retired-*.json'))), 1)
 
     def test_apply_never_skips_missing_queue_head(self):
         company = self.packet['bedrijven'][1]
@@ -64,7 +88,7 @@ class WorkerTests(unittest.TestCase):
         with patch.object(runner, 'call', side_effect=call):
             with self.assertRaises(RuntimeError):
                 runner.research_batch('searcher', self.packet, [], 3)
-        self.assertEqual(len(list(runner.PENDING.glob('contact_agent_results_api_searcher_initial_????????.json'))), 2)
+        self.assertEqual(len(list(runner.PENDING.glob('contact_agent_results_api_searcher_initial_????????.luna.json'))), 2)
 
     def test_stopped_role_does_not_apply_saved_results(self):
         company = self.packet['bedrijven'][0]
@@ -81,12 +105,12 @@ class WorkerTests(unittest.TestCase):
 
     def test_invalid_saved_result_is_repaired_with_evidence_and_validation_error(self):
         company = self.packet['bedrijven'][0]
-        path = runner.pending_path('searcher', company['kvk_nummer'], [])
+        path = runner.pending_path('controller', company['kvk_nummer'], [])
         old = dict(company, checks_completed=False)
         runner.save_result(path, old)
         fixed = dict(company, checks_completed=True)
         with patch.object(runner, 'run_cli', side_effect=[runner.ValidationFailure('checks incomplete'), '']), patch.object(runner, 'call', return_value={'ok': True, 'result': fixed}) as call:
-            self.assertTrue(runner.research_one('searcher', company, {}, []))
+            self.assertTrue(runner.research_one('controller', company, {}, []))
             repair = call.call_args.args[1]['brief']['repair']
             self.assertEqual(repair['previous_result']['kvk_nummer'], old['kvk_nummer'])
             self.assertFalse(repair['previous_result']['checks_completed'])
@@ -98,7 +122,7 @@ class WorkerTests(unittest.TestCase):
         with patch.object(runner, 'run_cli', side_effect=runner.ValidationFailure('incomplete')), patch.object(runner, 'call', return_value={'ok':True,'result':company}) as call:
             for _ in range(2):
                 with self.assertRaises(runner.ValidationFailure):
-                    runner.research_one('searcher', company, {}, [])
+                    runner.research_one('controller', company, {}, [])
             self.assertEqual(call.call_count, runner.MAX_REPAIR_ATTEMPTS)
 
     def test_transient_poll_failure_does_not_disable_worker_but_paid_uncertainty_stops(self):
