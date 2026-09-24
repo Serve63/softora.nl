@@ -1268,3 +1268,24 @@ test('customers page bootstrap backfills verantwoordelijke for stored rows from 
   assert.equal(payload.customers.length, 1);
   assert.equal(payload.customers[0].verantwoordelijk, 'Martijn');
 });
+
+test('dashboard customer bootstrap misses are logged once per reason instead of silently', async () => {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  try {
+    const { createCustomersPageBootstrapService: create } = require('../../server/services/customers-page-bootstrap');
+    const readOptions = [];
+    const service = create({
+      getUiStateValues: async () => ({ values: {}, source: 'supabase' }),
+      listDashboardCustomers: async (options) => { readOptions.push(options); return null; },
+    });
+    const first = await service.buildCustomersBootstrapPayload({ includeCustomers: true, preferDashboardCustomers: true });
+    await service.buildCustomersBootstrapPayload({ includeCustomers: true, preferDashboardCustomers: true });
+    assert.equal(first.source, 'unavailable');
+    assert.equal(warnings.filter((line) => line.includes('[CustomersBootstrap][dashboard-customers-miss] rows-null')).length, 1);
+    assert.equal(readOptions[0].suppressTransientReadFailureLog, false, 'the underlying read failure is logged too');
+  } finally {
+    console.warn = originalWarn;
+  }
+});
