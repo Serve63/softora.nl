@@ -1054,6 +1054,9 @@
           },
       fromBootstrap: Boolean(fromBootstrap),
     };
+    // The page bootstrap stores bodies without their AI presentation; the
+    // detail fetches it before the first render instead of showing raw text.
+    if (fromBootstrap) result.messages.forEach((message) => { if (message && message.aiPresentation === undefined) message.aiPresentationUnknown = true; });
     writeSessionMailboxSnapshot({ ...data, owner, messages: result.messages, sync: result.sync }, owner);
     return result;
   }

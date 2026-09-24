@@ -201,7 +201,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
-  assert.match(page, /assets\/premium-mailbox\.js\?v=20260924b/);
+  assert.match(page, /assets\/premium-mailbox\.js\?v=20260924c/);
   assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260907b/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260826a/);
@@ -213,23 +213,23 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-owner-preference\.js\?v=20260822a/);
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
-  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260921c/);
+  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260924a/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20260908a/);
   assert.match(page, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
   assert.match(page, /assets\/premium-mailbox-compose-send-state\.js\?v=20260831b/);
   assert.match(page, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20260908a/);
   assert.match(page, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827b/);
-  assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260921c/);
+  assert.match(page, /assets\/premium-mailbox-index\.js\?v=20260924a/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260924a/);
   assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20260910a') < page.indexOf('premium-mailbox-signature.js?v=20260921b'));
   assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-contact-view.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
   assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260921c') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
-  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260921c'));
+  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20260924a'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260924a'));
-  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260924a') < page.indexOf('premium-mailbox-index.js?v=20260921c'));
+  assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260924a') < page.indexOf('premium-mailbox-index.js?v=20260924a'));
   assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-browser-storage.js?v=20260828b'));
   assert.ok(page.indexOf('premium-browser-storage.js?v=20260828b') < page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c'));
   assert.ok(page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c') < page.indexOf('premium-mailbox-compose-send-state.js?v=20260831b'));
@@ -4662,10 +4662,10 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260924b/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20260924c/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20260910a/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260921c/);
-  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260921c/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20260924a/);
+  assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260924a/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
   const loads = [];
@@ -4763,7 +4763,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260924a/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260924b/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20260924c/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -9993,7 +9993,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
   assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260907b/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20260924b/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20260924c/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);
@@ -10164,7 +10164,7 @@ test('geopende mail staat als één rustig mailblok met antwoordactie na het ont
 
   assert.match(stabilitySource, /options\.setActiveMail\?\.\(mail\.id\);[\s\S]*options\.select\?\.\(mail\.id\);[\s\S]*options\.onSelect\?\.\(mail, openOptions\);[\s\S]*options\.renderList\?\.\(\{ openLatest: false \}\);[\s\S]*setPending\(mail\.id, \{ keepVisible: keepDetailVisible \}\);/);
   assert.match(scriptSource, /onSelect: \(mail, openOptions\) => \{ if \(mail\.unread\) window\.SoftoraMailboxUiState\.markReadOnOpen\(/);
-  assert.match(scriptSource, /needsRootHydration: \(mail, openOptions\) => \(openOptions\.forceRootHydration \|\| !mail\.bodyLoaded \|\| mail\.recipientRoutingNeedsHydration\) && !openOptions\.skipBodyFetch/);
+  assert.match(scriptSource, /needsRootHydration: \(mail, openOptions\) => \(openOptions\.forceRootHydration \|\| !mail\.bodyLoaded \|\| \(mail\.aiPresentationUnknown === true && mail\.aiPresentation === undefined\) \|\| mail\.recipientRoutingNeedsHydration\) && !openOptions\.skipBodyFetch/);
   assert.match(readIndexScript(), /function hasUnverifiedLegacyMedia\(message\)/);
   assert.match(readIndexScript(), /bodyLoaded:[\s\S]*Boolean\(message\.body\)[\s\S]*!legacyMediaNeedsHydration/);
   assert.match(readIndexScript(), /mail\.bodyImagesTruncated = false;/);
