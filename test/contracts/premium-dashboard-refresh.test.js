@@ -99,6 +99,8 @@ test('Dashboard readiness rejects placeholder KPIs even when both reads complete
         kpiRecurringRevenue: { innerText: '€227' },
         kpiTotalClients: { innerText: '--' },
         kpiActiveOrders: { querySelector: () => ({ textContent: '0' }) },
+        dashboardAiChatToggle: { dataset: { softoraActionBound: 'true' } },
+        aiManagementConfigSave: { dataset: { softoraActionBound: 'true' } },
     };
     env.root.document.getElementById = id => values[id] || null;
     env.root.document.querySelector = () => ({ querySelectorAll: () => [] });
@@ -175,4 +177,26 @@ test('recovery is bounded and stops when disposed', async () => {
     assert.equal(calls, 5);
     env.controller.dispose();
     assert.equal(env.timers.size, 0);
+});
+
+test('Dashboard with complete server data publishes readiness once its controls are bound', async () => {
+    const env = setup({ loadOrders: async () => true, loadCustomers: async () => true });
+    env.state.ordersHydrated = true;
+    env.state.customersHydrated = true;
+    const chat = { dataset: {} }, save = { dataset: {} };
+    env.root.document.getElementById = id => ({ dashboardAiChatToggle: chat, aiManagementConfigSave: save }[id] || null);
+    env.root.document.querySelector = () => ({ querySelectorAll: () => [] });
+    let published = 0;
+    env.root.SoftoraScreenReadiness = { async markReady() { published += 1; return true; }, markDegraded() {} };
+    env.controller.mount();
+    await flush();
+    assert.equal(published, 0, 'readiness is not published before the controls are bound');
+    const pending = [...env.timers.values()].find(timer => timer.ms === 50);
+    assert.ok(pending, 'a short retry is scheduled instead of failing readiness');
+    chat.dataset.softoraActionBound = 'true';
+    save.dataset.softoraActionBound = 'true';
+    pending.fn();
+    await flush();
+    assert.equal(published, 1);
+    env.controller.dispose();
 });
