@@ -144,6 +144,8 @@
     return account && messageId ? JSON.stringify([account, messageId]) : '';
   }
 
+  const PARTIAL_RENDER_HOLD_MS = 3000;
+
   function createController(options = {}) {
     const stability = create();
     let committedId = '';
@@ -151,6 +153,20 @@
     let committedHtml = '';
     let committedMessageIdentity = '';
     let committedScope = null;
+    // Optional screen snapshot of the detail (premium-mailbox-detail-snapshot):
+    // shown read-only on the first open and replaced by the final live commit.
+    const snapshot = options.snapshot || null;
+    let snapshotView = '';
+
+    function snapshotViewOf(mail, scope) {
+      return [scope.folder, scope.owner, scope.account, String(mail?.id || '')].join('|');
+    }
+
+    function releaseSnapshot() {
+      if (!snapshot?.isShowing?.()) return;
+      snapshot.release?.();
+      snapshotView = '';
+    }
 
     function getDetail() {
       return options.getDetailElement?.() || null;
@@ -190,6 +206,7 @@
     function commit(mail) {
       const detail = getDetail();
       if (!detail || !mail) return false;
+      releaseSnapshot();
       const html = String(options.renderHtml?.(mail) || '');
       const id = String(mail.id || '');
       const visibilityKey = String(options.getVisibilityKey?.(mail) || id);
@@ -266,7 +283,7 @@
       if (options.shouldHydrateThread?.(currentMail, openOptions)) {
         await options.hydrateThread?.({ ...payload, mail: currentMail });
       }
-      await publish(runContext);
+      await publish(runContext, true);
       return isSelectionCurrent() && options.getMail?.(mail.id) === mail ? mail : null;
     }
 
@@ -298,9 +315,27 @@
           )
         )
       );
-      const keepDetailVisible = Boolean(
+      const view = snapshotViewOf(mail, scope);
+      let showsSnapshot = Boolean(snapshot?.isShowing?.() && snapshotView === view);
+      if (!showsSnapshot) releaseSnapshot();
+      if (!showsSnapshot && !committedId && snapshot?.restore?.(view)) {
+        snapshotView = view;
+        showsSnapshot = true;
+      }
+      const keepDetailVisible = showsSnapshot || Boolean(
         preserveVisibleDetail && !detail?.classList?.contains?.('is-detail-pending')
       );
+      // While this message is already on screen, only the final, fully
+      // hydrated render replaces it: no intermediate body-only version. A slow
+      // provider may not keep a read-only snapshot up for long, though.
+      let holdPartialRenders = keepDetailVisible;
+      if (holdPartialRenders) {
+        const fallback = setTimeout(() => {
+          holdPartialRenders = false;
+          if (activeContext) void publish(activeContext);
+        }, PARTIAL_RENDER_HOLD_MS);
+        fallback?.unref?.();
+      }
       const pendingMarker = setPending(mail.id, { keepVisible: keepDetailVisible });
       const isSelectionCurrent = () => Boolean(
         options.isTokenCurrent?.(token) !== false &&
@@ -312,9 +347,10 @@
       let publication = Promise.resolve();
       let activeContext = null;
       const bodyReady = () => mail.bodyLoaded === true && !mail.bodyTruncated && mail.bodyLoading !== true;
-      const publish = (runContext) => {
+      const publish = (runContext, final = false) => {
         // A complete stored body is readable independently of slow provider
         // enrichment. Keep image preparation and selection fences per commit.
+        if (holdPartialRenders && !final) return publication;
         if (!bodyReady() || !runContext.isCurrent() || !isSelectionCurrent()) return publication;
         publication = publication.then(async () => {
           if (!runContext.isCurrent() || !isSelectionCurrent()) return;
@@ -344,10 +380,18 @@
             ? options.prepare?.(hydratedMail, openOptions, runContext)
             : null
         ),
-        commit: ({ value }) => {
+        commit: ({ value, error }) => {
           const currentMail = value || options.getMail?.(mail.id);
           if (!isSelectionCurrent() || currentMail !== mail) return false;
-          return commit(currentMail) || published;
+          const changed = commit(currentMail) || published;
+          if (snapshot && !error && bodyReady() && options.shouldCaptureSnapshot?.(currentMail) === true) {
+            const id = String(currentMail.id || '');
+            snapshot.capture?.(view, () => (
+              committedId === id && String(options.getActiveMail?.() || '') === id &&
+              sameScope(options.getScope?.(), scope) && !getDetail()?.classList?.contains?.('is-detail-pending')
+            ));
+          }
+          return changed;
         },
         onError: options.onError,
       }).finally(() => {
@@ -357,6 +401,7 @@
 
     function invalidate() {
       stability.invalidate();
+      releaseSnapshot();
       committedId = '';
       committedVisibilityKey = '';
       committedHtml = '';

@@ -29,6 +29,7 @@
         const elements = Array.isArray(config.elements) ? config.elements : [];
         const inertIds = Array.isArray(config.inertIds) ? config.inertIds : [];
         const maxAgeMs = Number(config.maxAgeMs) || DEFAULT_MAX_AGE_MS;
+        const maxChars = Number(config.maxChars) || 0;
         const doc = config.document || global.document;
         const store = config.store || global.SoftoraReadModelStore;
         const now = config.now || Date.now;
@@ -98,13 +99,16 @@
             if (doc.documentElement) doc.documentElement.removeAttribute("data-softora-screen-snapshot");
         }
 
-        // Call after a render that shows complete, verified data.
-        function capture(view) {
+        // Call after a render that shows complete, verified data. isValid is
+        // checked again right before reading, so a screen that changed in the
+        // meantime is never stored under this view.
+        function capture(view, captureOptions) {
+            const isValid = captureOptions && typeof captureOptions.isValid === "function" ? captureOptions.isValid : null;
             if (showing || captureScheduled || !store || typeof store.writeSync !== "function") return;
             captureScheduled = true;
             whenIdle(function () {
                 captureScheduled = false;
-                if (showing) return;
+                if (showing || (isValid && !isValid())) return;
                 const identity = identityOf();
                 if (!identity) return;
                 const parts = [];
@@ -113,6 +117,7 @@
                     if (!element) return;
                     parts.push(read(element, spec));
                 }
+                if (maxChars && JSON.stringify(parts).length > maxChars) return;
                 try {
                     store.writeSync(key, identity, { format: SNAPSHOT_FORMAT, view: String(view || ""), savedAt: now(), parts: parts });
                 } catch (_error) { /* A full or blocked storage only costs the next instant open. */ }
