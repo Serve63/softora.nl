@@ -60,21 +60,27 @@ test('prefetch warms the next conversations in order and never touches the open 
   ], 'the open conversation is left to the detail load; a body-less one gets no thread fetch');
   assert.equal(mails[1].threadMessages[0].bodyLoadError, '', 'a failed warm-up leaves no error that blocks the retry on click');
 
-  // A click cancels the warm-up that is still running.
+  // Frequent renders of the open conversation neither restart nor abort a running warm-up.
   calls.length = 0;
-  let releaseTimeline;
-  const running = create({
-    delayMs: 0, getMails: () => mails, getActiveMail: () => active,
+  const releases = [];
+  const scheduled = [];
+  const steadyMails = [{ id: 'x' }, { id: 'y' }, { id: 'z' }];
+  const steady = create({
+    delayMs: 0, schedule: (callback) => { scheduled.push(callback); return scheduled.length; }, cancel: () => {},
+    getMails: () => steadyMails, getActiveMail: () => 'y',
     index: { async prefetchRootBodies() {} },
-    discovery: { prefetchContactTimeline: (mail) => { calls.push(['timeline', mail.id]); return new Promise((resolve) => { releaseTimeline = resolve; }); } },
+    discovery: { prefetchContactTimeline: (mail) => { calls.push(mail.id); return new Promise((resolve) => releases.push(resolve)); } },
   });
-  const warming = running.warmNow();
+  steady.schedule();
+  steady.schedule();
+  assert.equal(scheduled.length, 1, 'one pending warm-up');
+  scheduled[0]();
   await tick();
-  running.stop();
-  active = 'a';
-  releaseTimeline();
-  await warming;
-  assert.deepEqual(calls, [['timeline', 'a']]);
+  steady.schedule();
+  assert.equal(scheduled.length, 1, 'a render while warming only asks for another pass');
+  while (releases.length) { releases.shift()(); await tick(); }
+  await tick();
+  assert.deepEqual(calls, ['z', 'x'], 'the conversation below the open one first, each only once');
 });
 
 test('prefetched root bodies end in the same state as a detail load, and only when complete', async () => {
@@ -140,7 +146,7 @@ test('the contact timeline is prefetched without touching the open conversation'
 
 test('the Mailbox wires the prefetch after its detail controller and warms after each complete render', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
-  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260924a');
+  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260924b');
   assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260924e'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /afterCommit: \(mail, \{ changed \}\) => \{ mailboxPrefetch\?\.schedule\?\.\(\);/);

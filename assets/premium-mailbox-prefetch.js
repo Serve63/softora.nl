@@ -18,13 +18,25 @@
     let generation = 0;
     let timer = null;
     let controller = null;
+    let running = false;
+    let rerun = false;
+    const warmed = new WeakSet();
 
     const isActive = (mail) => String(options.getActiveMail?.() || '') === String(mail?.id || '');
+
+    // The conversations right below the open one first (the likely next
+    // click), then the top of the list.
+    function pickMails() {
+      const list = (options.getMails?.() || []).filter(Boolean);
+      const activeIndex = list.findIndex(isActive);
+      const ordered = [...(activeIndex >= 0 ? list.slice(activeIndex + 1, activeIndex + 1 + max) : []), ...list.slice(0, max)];
+      return [...new Set(ordered)].filter((mail) => !isActive(mail) && !warmed.has(mail)).slice(0, max);
+    }
 
     async function warm(run) {
       const current = () => run === generation;
       const signal = controller?.signal;
-      const mails = (options.getMails?.() || []).filter((mail) => mail && !isActive(mail)).slice(0, max);
+      const mails = pickMails();
       if (!mails.length) return;
       try {
         await options.index?.prefetchRootBodies?.({
@@ -49,18 +61,33 @@
             priorErrors.forEach((prior, message) => { if (!prior && message?.bodyLoadError) message.bodyLoadError = ''; });
           }
         } catch (_) { /* Best effort: the detail load remains the source of truth. */ }
+        // Attempted once per loaded message object; a failure is left to the click.
+        if (current()) warmed.add(mail);
       }
       if (current()) options.images?.prewarm?.(mails, max);
     }
 
+    async function runWarm() {
+      running = true;
+      try {
+        do {
+          rerun = false;
+          await warm(generation);
+        } while (rerun);
+      } finally {
+        running = false;
+      }
+    }
+
+    // Renders of the open conversation (refreshes, images, AI) happen often;
+    // they must not restart or abort a warm-up that is making progress.
     function scheduleWarm() {
-      stop();
-      const run = generation;
-      controller = typeof AbortController === 'function' ? new AbortController() : null;
+      if (running) { rerun = true; return; }
+      if (timer) return;
+      if (!controller) controller = typeof AbortController === 'function' ? new AbortController() : null;
       timer = schedule(() => {
         timer = null;
-        if (run !== generation) return;
-        void warm(run);
+        void runWarm();
       }, delayMs);
     }
 
@@ -72,7 +99,7 @@
       controller = null;
     }
 
-    return { schedule: scheduleWarm, stop, warmNow: () => { stop(); const run = generation; controller = typeof AbortController === 'function' ? new AbortController() : null; return warm(run); } };
+    return { schedule: scheduleWarm, stop, warmNow: () => { stop(); controller = typeof AbortController === 'function' ? new AbortController() : null; return runWarm(); } };
   }
 
   const api = Object.freeze({ create });
