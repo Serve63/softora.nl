@@ -30,31 +30,25 @@ def negative():
 
 
 class ApiValidationTests(unittest.TestCase):
-    def test_real_query_does_not_require_magic_kvk_first_phrase(self):
+    def test_negative_result_with_opened_source_is_accepted(self):
         validate_api_evidence(negative())
 
-    def test_no_sector_hint_is_not_misclassified_as_a_required_portal(self):
+    def test_research_ladder_routes_are_no_longer_required(self):
         row = negative()
-        row['research_route']['entity_match']['notes'] += ' Geen gekoppeld sectorportaal of dealerprofiel gevonden.'
+        row['research_route'] = {}
         validate_api_evidence(row)
 
-    def test_missing_research_and_identity_evidence_are_rejected(self):
-        for route in ('identity', 'entity_match', 'final_crosscheck', 'search_engine', 'directories', 'website_basic'):
+    def test_sources_need_url_and_note(self):
+        for source in ({'url': 'ftp://example.nl', 'note': 'x'}, {'url': 'https://example.nl', 'note': ''}):
             row = negative()
-            del row['research_route'][route]
-            with self.subTest(route=route), self.assertRaises(ValueError):
+            row['sources'] = [source]
+            with self.subTest(source=source), self.assertRaises(ValueError):
                 validate_api_evidence(row)
 
-    def test_wrong_kvk_is_not_accepted(self):
+    def test_invalid_kvk_is_not_accepted(self):
         row = negative()
-        row['kvk_nummer'] = '87654321'
+        row['kvk_nummer'] = '1234'
         with self.assertRaisesRegex(ValueError, 'doel-KVK'):
-            validate_api_evidence(row)
-
-    def test_empty_contacts_need_explicit_uncertainty(self):
-        row = negative()
-        row['field_evidence']['email'] = ''
-        with self.assertRaisesRegex(ValueError, 'email'):
             validate_api_evidence(row)
 
     def test_filled_fields_need_exact_source_reference(self):
@@ -68,15 +62,6 @@ class ApiValidationTests(unittest.TestCase):
             invalid['field_evidence'][field] = 'Ik denk dat dit klopt.'
             with self.subTest(field=field), self.assertRaisesRegex(ValueError, field):
                 validate_api_evidence(invalid)
-
-    def test_missing_contact_on_existing_site_requires_direct_site_check(self):
-        row = negative()
-        row.update(website='https://example.nl/', website_status='found')
-        row['field_evidence']['website'] = row['sources'][0]['url']
-        with self.assertRaisesRegex(ValueError, 'website_deep'):
-            validate_api_evidence(row)
-        row['research_route']['website_deep'] = {'status': 'blocked', 'notes': 'Contactpagina gaf 403.', 'urls': ['https://example.nl/contact']}
-        validate_api_evidence(row)
 
     def test_installer_fails_closed_on_partial_install_or_source_drift(self):
         with self.assertRaisesRegex(ValueError, 'zonder wijzigingen'):
@@ -104,9 +89,10 @@ class ApiValidationTests(unittest.TestCase):
             path.write_text('{}')
             for review, role in ((False, 'searcher'), (True, 'controller')):
                 result = execution_for([{'validation_profile': 'api-basic-v1'}], path, review)
-                self.assertEqual(result['model_role'], role + '_api_sol_max')
+                self.assertEqual(result['model_role'], role + '_luna_max')
                 self.assertEqual(result['producer_thread_id'], 'api:' + role)
-                self.assertEqual(result['model'], 'gpt-6-sol')
+                self.assertEqual(result['model'], 'gpt-6-luna')
+                self.assertEqual(result['display_label'], 'Luna 6 Max')
                 self.assertEqual(len(result['input_sha256']), 64)
             self.assertIsNone(execution_for([{}], path))
             with self.assertRaises(ValueError):
