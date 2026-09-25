@@ -513,7 +513,8 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(res.statusCode, 202);
   assert.equal(res.body.ok, true);
   assert.equal(res.body.job.status, 'queued');
-  assert.equal(res.body.job.variant, 'v1-prompt-only');
+  // A job without a variant (bulk batches) and a legacy V1 request both run as V2.
+  assert.equal(res.body.job.variant, 'v2-visual-dna');
 
   const job = await waitForJobDone(coordinator, 'job_1234567890123');
   assert.equal(job.status, 'done', job.error || 'webdesign job did not finish');
@@ -531,8 +532,10 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(photoMap['customer-1'].mockupQualityStatus, 'checked');
   assert.deepEqual(JSON.parse(values.softora_database_photos_removed_v1), []);
   assert.equal(pipelineCalls[0].options.imageSize, '1024x1536');
-  assert.equal(pipelineCalls[0].options.disableReferenceImages, true);
-  assert.equal(pipelineCalls[0].options.referenceImageMode, 'prompt-only');
+  assert.equal(pipelineCalls[0].options.disableReferenceImages, false);
+  assert.equal(pipelineCalls[0].options.referenceImageMode, 'homepage-screenshot');
+  assert.equal(pipelineCalls[0].options.requireReferenceImages, true);
+  assert.equal(pipelineCalls[0].options.body.variant, 'v2-visual-dna');
   assert.equal(pipelineCalls[0].options.body.source, 'premium-database');
   assert.deepEqual(snapshotPromotions, [['customer-1']]);
   assert.equal(pipelineCalls[0].options.body.softoraOutreachProfile, undefined);
@@ -545,6 +548,7 @@ test('premium database webdesign jobs generate and persist a customer photo in t
       premiumAuth: { email: 'contact.venvisuals@gmail.com', userId: 'user-2' },
       body: {
         jobId: 'job_venvisual_123456789',
+        variant: 'v1-prompt-only',
         websiteUrl: 'venvisuals.nl',
         customer: {
           id: 'customer-venvisual',
@@ -560,6 +564,8 @@ test('premium database webdesign jobs generate and persist a customer photo in t
   assert.equal(martijnRes.statusCode, 202);
   const martijnJob = await waitForJobDone(coordinator, 'job_venvisual_123456789');
   assert.equal(martijnJob.status, 'done');
+  assert.equal(martijnJob.variant, 'v2-visual-dna');
+  assert.equal(pipelineCalls[1].options.referenceImageMode, 'homepage-screenshot');
   assert.equal(pipelineCalls[1].options.body.softoraOutreachProfile, undefined);
   assert.equal(pipelineCalls[1].options.body.senderProfile, undefined);
   assert.equal(pipelineCalls[1].options.body.outreachProfile, undefined);
@@ -1645,7 +1651,7 @@ test('premium database webdesign jobs store trimmed webdesign photos before mock
   assert.equal(mockupMetadata.height, 1000);
   assert.equal(uploadedPhotos[0].legacyMeta.generationPolicy, 'customer-website-only-v2');
   assert.equal(uploadedPhotos[0].legacyMeta.generationJobId, 'job_trim12345678');
-  assert.equal(uploadedPhotos[0].legacyMeta.generationVariant, 'v1-prompt-only');
+  assert.equal(uploadedPhotos[0].legacyMeta.generationVariant, 'v2-visual-dna');
   assert.equal(uploadedPhotos[0].legacyMeta.webdesignCanvasRepair.type, 'trimmed_uniform_side_gutters');
 });
 

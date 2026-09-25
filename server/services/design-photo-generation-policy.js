@@ -1,24 +1,21 @@
-const WEBDESIGN_VARIANT_V1 = 'v1-prompt-only';
 const WEBDESIGN_VARIANT_V2 = 'v2-visual-dna';
 const WEBDESIGN_GENERATION_POLICY = 'customer-website-only-v2';
 const { OUTBOUND_SENDER_PROFILE_KEYS } = require('./outbound-sender-identity');
 
-function normalizeWebdesignVariant(value) {
-  return String(value || '').trim().toLowerCase() === WEBDESIGN_VARIANT_V2
-    ? WEBDESIGN_VARIANT_V2
-    : WEBDESIGN_VARIANT_V1;
+// V2 (homepage-screenshot + huiskleurcontrole) is the only webdesign generator.
+// Stored jobs that still say 'v1-prompt-only' or have no variant run as V2 too.
+function normalizeWebdesignVariant() {
+  return WEBDESIGN_VARIANT_V2;
 }
 
-function buildWebdesignPipelineOptions({ variant: inputVariant, source, company = '', domain = '' }) {
-  const variant = normalizeWebdesignVariant(inputVariant);
-  const usesHomepageScreenshot = variant === WEBDESIGN_VARIANT_V2;
+function buildWebdesignPipelineOptions({ source, company = '', domain = '' }) {
   return {
     allowScanFallback: true,
     imageSize: '1024x1536',
-    disableReferenceImages: !usesHomepageScreenshot,
-    referenceImageMode: usesHomepageScreenshot ? 'homepage-screenshot' : 'prompt-only',
-    requireReferenceImages: usesHomepageScreenshot,
-    body: { source, action: 'webdesign', variant, company, domain },
+    disableReferenceImages: false,
+    referenceImageMode: 'homepage-screenshot',
+    requireReferenceImages: true,
+    body: { source, action: 'webdesign', variant: WEBDESIGN_VARIANT_V2, company, domain },
   };
 }
 
@@ -88,7 +85,6 @@ function markMissingDesignPhotosAuthoritative(photoMap, rowsByCustomerId, hasRea
 }
 
 module.exports = {
-  WEBDESIGN_VARIANT_V1,
   WEBDESIGN_VARIANT_V2,
   buildWebdesignGenerationProvenance,
   isAssignedWebdesignSenderAllowed,
