@@ -10,6 +10,15 @@ function removeFrameworkPresets(css) {
     .replace(/--(?:swiper-theme-color|wp-admin-theme-color[a-z0-9-]*)\s*:[^;}{]+;?/gi, '');
 }
 
+// Site-generated CSS (Elementor kit, uploads) carries the real brand. Framework and starter-theme
+// defaults, such as Hello Elementor's pink #c36 links, are never brand evidence and are not fetched.
+function selectBrandStylesheetUrls(urls = [], max = 8) {
+  const priority = (url) => /\/uploads\/|custom/i.test(url) ? 3
+    : /\/plugins\/|\/wp-includes\/|bootstrap|swiper|\/themes\/hello-elementor\//i.test(url) ? 0
+      : /\/themes\/|(?:main|style)\.css/i.test(url) ? 2 : 1;
+  return urls.filter((url) => priority(url) > 0).sort((a, b) => priority(b) - priority(a)).slice(0, max);
+}
+
 function extractColorTokensFromCss(textRaw) {
   const text = String(textRaw || '');
   if (!text) return [];
@@ -131,6 +140,7 @@ function extractCssBrandPalette(cssSources = [], preferredColors = []) {
 
   for (const cssText of cssSources.map(removeFrameworkPresets)) {
     for (const color of extractColorTokensFromCss(cssText)) {
+      if (!parseCssColorToRgb(color)) continue; // fully transparent values are not a brand colour
       const current = counts.get(color) || 0;
       const neutralPenalty = isLikelyNeutralCssColor(color) ? 0 : 2;
       counts.set(color, current + 1 + neutralPenalty);
@@ -177,4 +187,4 @@ function extractCssBrandColorEvidence(cssSources = []) {
   return [...evidence.values()].filter(v => parseCssColorToRgb(v.color)).slice(0, 60);
 }
 
-module.exports = { extractCssVariableColorHints, extractCssBrandPalette, parseCssColorToRgb, extractCssBrandColorEvidence };
+module.exports = { extractCssVariableColorHints, extractCssBrandPalette, parseCssColorToRgb, extractCssBrandColorEvidence, selectBrandStylesheetUrls };
