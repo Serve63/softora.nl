@@ -180,6 +180,35 @@ test('ai tools coordinator forwards database controls without leaking outreach i
   assert.equal(capturedScan.senderProfile, undefined);
 });
 
+test('ai tools coordinator refuses maintenance and parked websites before any paid generation', async () => {
+  let generated = 0;
+  const scanFor = (scan) => async (url) => ({ normalizedUrl: url, finalUrl: url, scan: { host: 'bouw.test', ...scan } });
+  const generateWebsitePreviewImageWithAi = async () => { generated += 1; return { dataUrl: 'data:image/png;base64,abcd' }; };
+  const placeholders = [
+    { title: 'Gepland onderhoud', bodyTextSample: 'Deze website ondergaat momenteel ingeroosterd onderhoud. Onze excuses voor het ongemak.' },
+    { title: 'Coming soon', bodyTextSample: 'We are launching soon.' },
+    { title: 'bouw.test', bodyTextSample: 'Deze domeinnaam is geregistreerd via een hostingpartij.' },
+  ];
+  for (const scan of placeholders) {
+    const { coordinator } = createFixture({ fetchWebsitePreviewScanFromUrl: scanFor(scan), generateWebsitePreviewImageWithAi });
+    await assert.rejects(
+      () => coordinator.runWebsitePreviewGeneratePipeline('https://bouw.test', { referenceImageMode: 'homepage-screenshot' }),
+      { status: 422, code: 'WEBDESIGN_PLACEHOLDER_WEBSITE' }
+    );
+  }
+  assert.equal(generated, 0);
+
+  // A garage offering "gepland onderhoud" on a normal, content-rich page is a real business.
+  const garage = createFixture({
+    fetchWebsitePreviewScanFromUrl: scanFor({
+      title: 'Garage Jansen | APK en onderhoud',
+      bodyTextSample: `Plan uw gepland onderhoud of APK online. ${'Wij onderhouden alle merken auto’s in de regio. '.repeat(12)}`,
+    }),
+    generateWebsitePreviewImageWithAi: async () => ({ dataUrl: 'data:image/png;base64,abcd' }),
+  });
+  assert.equal((await garage.coordinator.runWebsitePreviewGeneratePipeline('https://garage.test', {})).ok, true);
+});
+
 test('ai tools coordinator requires actual V2 screenshots and excludes direct website visuals', async () => {
   let capturedScan = null;
   const { coordinator } = createFixture({
