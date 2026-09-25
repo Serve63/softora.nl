@@ -121,6 +121,12 @@ test('content growth actions have an explicit machine-readable event plan', () =
     events.map((event) => [event.path, event.eventAt, event.publicationKind, event.status]),
     [
       [
+        '/kennisbank/wat-is-bedrijfssoftware-op-maat',
+        '2026-09-25',
+        'substantial_refresh',
+        'scheduled',
+      ],
+      [
         '/kennisbank/wat-is-interne-linkstructuur',
         '2026-09-23',
         'other_growth_action',

@@ -29,6 +29,25 @@ const { extractInternalLinksFromHtml } = require('../../server/services/seo-mach
 
 const repoRoot = path.resolve(__dirname, '../..');
 
+test('bedrijfssoftware-uitleg begrenst een procesopdracht zonder automatische SEO-opvulling', () => {
+  const item = getSeoContentItem('kennisbank', 'wat-is-bedrijfssoftware-op-maat');
+  const html = buildSeoContentArticleHtml(item);
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.growthEventAt, '2026-09-25');
+  assert.equal(item.sections.length, 6);
+  assert.deepEqual(item.faq, []);
+  assert.match(html, /fictief uitlegvoorbeeld, geen klantcase/);
+  assert.match(html, /leidende bron/);
+  assert.match(html, /zonder dezelfde werkopdracht dubbel aan te maken/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(html, /href="\/vergelijkingen\/maatwerk-software-vs-standaard-software"/);
+  assert.doesNotMatch(html, /Voor zoekintentie uitleg|Welke content en interne links erbij horen|Hoe weet ik of de pagina goed genoeg is/);
+  const support = buildSeoContentArticleHtml(getSeoContentItem('vergelijkingen', 'maatwerk-software-vs-standaard-software'));
+  assert.match(support, /Leg eerst vast wie mag beslissen, welke registratie leidend is en wat er bij een fout gebeurt/);
+  assert.match(support, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
+});
+
 function extractCssRuleBlock(css, selector) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = css.match(new RegExp(`\\n${escapedSelector}\\s*\\{([^}]*)\\}`));
