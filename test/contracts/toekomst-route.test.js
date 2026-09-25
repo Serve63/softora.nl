@@ -9,14 +9,11 @@ test('toekomst route serves the chooser with production links and available asse
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  assert.doesNotMatch(html,/127\.0\.0\.1|localhost|kreatives-preview|innovaware-preview/);
  assert.match(html,/href="\/chatbot-login"/);
- assert.match(html,/<section class="ai-feature" aria-label="AI-implementatie in je bedrijf — Binnenkort"/);
- assert.match(html,/AI-IMPLEMENTATIE/);
- assert.match(html,/src="\/assets\/entry\/ai-medewerker-box.webp"/);
  for(const match of html.matchAll(/(?:src|href)="(\/assets\/[^"?]+)/g)) assert.ok(fs.existsSync(path.join(root,match[1])),match[1]);
 });
 test('desktop chooser allocates space to all sections without clipping overflow', () => {
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
- assert.match(css,/grid-template-rows:204px minmax\(130px,1fr\) minmax\(155px,1fr\) minmax\(130px,1fr\)/);
+ assert.match(css,/grid-template-rows:204px minmax\(300px,2fr\) minmax\(130px,1fr\)/);
  assert.match(css,/\.toekomst-ai \.intro\{padding:112px 0 16px/);
  assert.match(css,/\.toekomst-ai \.intro\{padding-top:100px\}/);
  assert.match(css,/height:100svh;min-height:640px/);
@@ -51,10 +48,9 @@ test('desktop banners retain equal grid tracks within a bounded chooser', () => 
  assert.match(css,/max-height:800px;margin:0 0 auto/);
 });
 
-test("toekomst names the telephone and implementation offers", () => {
+test("toekomst names the telephone offer", () => {
  const html=fs.readFileSync(path.join(root,"assets/entry/toekomst.html"),"utf8");
  assert.match(html,/<h2>AI-TELEFONIST<\/h2>/);
- assert.match(html,/AI-IMPLEMENTATIE/);
 });
 
 test('toekomst uses SEO Solution consistently', () => {
@@ -67,7 +63,6 @@ test('toekomst uses SEO Solution consistently', () => {
 test('final chooser labels and direct product destinations stay intact', () => {
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  for(const route of ['nieuwe-website','seo-login','chatbot-login','voicesoftware']) assert.match(html,new RegExp('<a class="choice" href="/'+route+'"'));
- assert.match(html,/<h2>AI-IMPLEMENTATIE IN JE BEDRIJF<span>\.<\/span><\/h2>/);
  assert.doesNotMatch(html,/<a[^>]*class="ai-feature"/);
  for(const file of ['assets/entry/toekomst.html','assets/seo-login/index.html']) {
   const content=fs.readFileSync(path.join(root,file),'utf8');
@@ -88,13 +83,11 @@ test('toekomst uses its matching office photos without changing shared page imag
  }
 });
 
-test('AI implementation uses a wide desktop composition and preserves the mobile artwork', () => {
+test('toekomst removes the upcoming AI banner and restores tall desktop cards', () => {
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
- assert.match(html,/<source media="\(min-width:761px\)" srcset="\/assets\/entry\/ai-medewerker-box-wide.webp">/);
- assert.match(html,/<img class="ai-feature-image" src="\/assets\/entry\/ai-medewerker-box.webp"/);
- const image=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker-box-wide.webp'));
- assert.equal(image.toString('ascii',8,12),'WEBP');
- assert.ok(image.length < 400000);
+ assert.doesNotMatch(html,/ai-feature|AI-IMPLEMENTATIE|AI die meewerkt|BINNENKORT|ai-medewerker-box/);
+ const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
+ assert.match(css,/grid-template-rows:204px minmax\(300px,2fr\) minmax\(130px,1fr\)/);
 });
 
 test('toekomst service cards omit the numbered badges', () => {
