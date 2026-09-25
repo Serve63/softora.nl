@@ -16,7 +16,9 @@ test('toekomst route serves the chooser with production links and available asse
 });
 test('desktop chooser allocates space to all sections without clipping overflow', () => {
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
- assert.match(css,/grid-template-rows:120px minmax\(130px,1fr\) minmax\(155px,1fr\) minmax\(130px,1fr\)/);
+ assert.match(css,/grid-template-rows:204px minmax\(130px,1fr\) minmax\(155px,1fr\) minmax\(130px,1fr\)/);
+ assert.match(css,/\.toekomst-ai \.intro\{padding:112px 0 16px/);
+ assert.match(css,/\.toekomst-ai \.intro\{padding-top:100px\}/);
  assert.match(css,/height:100svh;min-height:640px/);
  assert.doesNotMatch(css,/\.toekomst-ai (?:body|\.page)\{[^}]*overflow:hidden/);
 });
