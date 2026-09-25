@@ -1018,6 +1018,38 @@ test('ai remote service fetches and normalizes website preview scan metadata inc
   assert.deepEqual(result.scan.fontHints, ['Oswald', 'Inter']);
 });
 
+test('ai remote service reads the Elementor kit brand colours instead of Hello Elementor defaults', async () => {
+  // Mirrors prumedia.nl: five inline blocks, a pink #c36 starter-theme default and the real kit further down.
+  const cssByUrl = {
+    'https://merk.test/wp-content/themes/hello-elementor/assets/css/theme.css': 'a{color:#c36}a:hover{color:#336}button{border:1px solid #c36;color:#c36}',
+    'https://merk.test/wp-content/plugins/elementor/assets/css/frontend.min.css': '.elementor-button{background-color:#69727d}.alert-danger{color:#d9534f}',
+    'https://merk.test/wp-content/uploads/elementor/css/post-240.css': '.elementor-kit-240{--e-global-color-primary:#C7C7F4;--e-global-color-secondary:#392063;--e-global-color-accent:#0D0716;--e-global-color-text:#FFFFFF}.elementor-kit-240 button{background-color:var(--e-global-color-primary)}',
+  };
+  const fetched = [];
+  const { service } = createService({
+    fetchTextWithTimeout: async (url) => {
+      fetched.push(url);
+      const css = cssByUrl[url];
+      return {
+        response: { ok: true, status: 200, url, headers: { get: (name) => (String(name || '').toLowerCase() === 'content-type' ? (css ? 'text/css' : 'text/html') : '') } },
+        text: css || `<html><head>
+          ${Array.from({ length: 5 }, (_, index) => `<style>.inline-${index}{margin:0}</style>`).join('')}
+          ${Object.keys(cssByUrl).map((href) => `<link rel="stylesheet" href="${href}">`).join('')}
+          </head><body><h1>Merk</h1></body></html>`,
+      };
+    },
+  });
+
+  const result = await service.fetchWebsitePreviewScanFromUrl('https://merk.test');
+
+  assert.ok(fetched.includes('https://merk.test/wp-content/uploads/elementor/css/post-240.css'));
+  assert.ok(!fetched.some((url) => /hello-elementor|\/plugins\//.test(url)));
+  assert.deepEqual(result.scan.brandPalette.slice(0, 3), ['#c7c7f4', '#392063', '#0d0716']);
+  assert.ok(!result.scan.brandPalette.includes('#c36'));
+  assert.ok(result.scan.brandColorEvidence.some((item) => item.color === '#c7c7f4'));
+  assert.ok(!result.scan.brandColorEvidence.some((item) => item.color === '#c36'));
+});
+
 test('ai remote service rejects server redirects to private metadata urls', async () => {
   const calls = [];
   const { service } = createService({

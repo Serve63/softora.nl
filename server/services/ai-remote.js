@@ -1,6 +1,6 @@
 const { isOpenAiSafetyBlockedError: isOpenAiSafetyRejectionData, buildOpenAiImageFailureDiagnostic } = require('./openai-image-errors');
 const brandColorGuard = require('./website-brand-color-guard');
-const { extractCssVariableColorHints, extractCssBrandPalette, extractCssBrandColorEvidence } = require('./website-brand-colors');
+const { extractCssVariableColorHints, extractCssBrandPalette, extractCssBrandColorEvidence, selectBrandStylesheetUrls } = require('./website-brand-colors');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const {
   normalizeWebsitePreviewReferenceImage: normalizeWebsitePreviewReferenceImageDefault,
@@ -184,9 +184,7 @@ function createAiRemoteService(deps = {}) {
       out.push(normalized);
       if (out.length >= 32) break;
     }
-    const priority = url => /\/themes\/|\/uploads\/elementor\/css\/post-|custom|(?:main|style)\.css/i.test(url) ? 2
-      : /\/plugins\/|\/wp-includes\/|bootstrap|swiper/i.test(url) ? 0 : 1;
-    return out.sort((a, b) => priority(b) - priority(a)).slice(0, 8);
+    return selectBrandStylesheetUrls(out);
   }
 
   function buildWebsitePreviewDocumentFetchProfiles() {
@@ -873,7 +871,7 @@ function createAiRemoteService(deps = {}) {
   }
 
   async function fetchWebsitePreviewCssSources(htmlRaw, pageUrlRaw) {
-    const inlineCssSources = extractInlineStyleBlocksFromHtml(htmlRaw);
+    const stylesheetCssSources = [];
     const stylesheetUrls = extractStylesheetUrlsFromHtml(htmlRaw, pageUrlRaw);
 
     for (const stylesheetUrl of stylesheetUrls) {
@@ -892,13 +890,14 @@ function createAiRemoteService(deps = {}) {
         await assertWebsitePreviewFetchedUrlIsPublic(response, safeUrl);
         const cssText = String(text || '').trim();
         if (!cssText) continue;
-        inlineCssSources.push(cssText);
+        stylesheetCssSources.push(cssText);
       } catch (_) {
         /* ignore stylesheet fetch failures; html scan is still primary */
       }
     }
 
-    return inlineCssSources.slice(0, 8);
+    // Ranked site stylesheets first so short inline blocks can never push the brand kit out.
+    return [...stylesheetCssSources, ...extractInlineStyleBlocksFromHtml(htmlRaw)].slice(0, 12);
   }
 
   async function requestOpenAiWebsitePreviewImageGeneration({
