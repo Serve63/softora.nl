@@ -28,7 +28,7 @@ async function deliverWebdesignImage(job, {
   let payload;
   try {
     payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, buildWebdesignPipelineOptions({
-      variant: job.variant, source: 'premium-database',
+      source: 'premium-database',
       company: job.customer.bedrijf, domain: job.customer.dom,
     }));
   } catch (error) {
