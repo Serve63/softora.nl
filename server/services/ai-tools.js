@@ -1,4 +1,5 @@
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
+const { detectPlaceholderWebsiteScan, buildPlaceholderWebsiteError } = require('./website-preview-placeholder');
 function createAiToolsCoordinator(deps = {}) {
   const {
     normalizeString = (value) => String(value || '').trim(),
@@ -125,6 +126,8 @@ function createAiToolsCoordinator(deps = {}) {
       if (!options.allowScanFallback || usesHomepageScreenshot) throw error;
       fetched = buildDatabasePreviewFallbackScan(inputUrl, body);
     }
+    const placeholder = detectPlaceholderWebsiteScan(fetched.scan);
+    if (placeholder.placeholder) throw buildPlaceholderWebsiteError(placeholder.signal);
     const homepageScreenshotUrls = usesHomepageScreenshot
       ? buildHomepageScreenshotReferenceUrls(fetched.finalUrl || fetched.normalizedUrl || inputUrl)
       : [];
