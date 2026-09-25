@@ -19,7 +19,19 @@
 
     function defaultConfirmDelete(customer) {
         if (typeof global.confirm !== "function") return true;
-        return global.confirm("Weet je zeker dat je " + getCustomerLabel(customer) + " wilt verwijderen?");
+        return global.confirm(getCustomerLabel(customer) + " helemaal verwijderen uit het mailsysteem?\n\nDe lead zelf wordt verwijderd, niet alleen het design.");
+    }
+
+    function isInstantlyCustomer(customer) {
+        return normalizeString(customer && customer.lastColdmailProvider).toLowerCase() === "instantly" ||
+            Boolean(normalizeString(customer && (customer.instantlyLeadId || customer.instantlyCampaignId)));
+    }
+
+    function defaultConfirmRemoveDesign(customer) {
+        if (typeof global.confirm !== "function") return true;
+        const label = getCustomerLabel(customer);
+        return global.confirm("Alleen het design van " + label + " verwijderen?\n\nDe lead blijft bewaard en komt terug onder Beschikbaar." +
+            (isInstantlyCustomer(customer) ? "\n\nLet op: " + label + " staat al in Instantly en de mail linkt naar dit design." : ""));
     }
 
     function ensureStyles() {
@@ -42,6 +54,10 @@
         const renderPage = typeof options.renderPage === "function" ? options.renderPage : function () {};
         const toast = typeof options.toast === "function" ? options.toast : function () {};
         const confirmDeleteLead = typeof options.confirmDeleteLead === "function" ? options.confirmDeleteLead : defaultConfirmDelete;
+        // Rows with a design: the × removes only the design, never the whole lead by surprise.
+        const removeDesign = typeof options.removeCustomerDesign === "function" ? options.removeCustomerDesign : null;
+        const hasCustomerDesign = typeof options.hasCustomerDesign === "function" ? options.hasCustomerDesign : function () { return false; };
+        const confirmRemoveDesign = typeof options.confirmRemoveDesign === "function" ? options.confirmRemoveDesign : defaultConfirmRemoveDesign;
         const removingIds = new Set();
 
         ensureStyles();
@@ -55,6 +71,7 @@
                 return normalizeString(item && item.id) === normalizedId;
             });
             if (!existing) return;
+            if (removeDesign && hasCustomerDesign(existing)) return removeCustomerDesign(normalizedId);
             if (!deleteCustomerLead && typeof persistCustomerList !== "function") {
                 setStatusMessage("Lead verwijderen is tijdelijk niet beschikbaar.", "error");
                 return;
@@ -138,7 +155,22 @@
             }
         }
 
+        async function removeCustomerDesign(customerId) {
+            const normalizedId = normalizeString(customerId);
+            const existing = normalizedId && state && Array.isArray(state.klanten) ? state.klanten.find(function (item) {
+                return normalizeString(item && item.id) === normalizedId;
+            }) : null;
+            if (!existing || !removeDesign || removingIds.has(normalizedId) || !confirmRemoveDesign(existing)) return;
+            removingIds.add(normalizedId);
+            try {
+                await removeDesign(normalizedId);
+            } finally {
+                removingIds.delete(normalizedId);
+            }
+        }
+
         return {
+            removeCustomerDesign: removeCustomerDesign,
             removeCustomerLead: removeCustomerLead
         };
     }
