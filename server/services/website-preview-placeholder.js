@@ -42,4 +42,35 @@ function buildPlaceholderWebsiteError(signal) {
   return error;
 }
 
-module.exports = { detectPlaceholderWebsiteScan, buildPlaceholderWebsiteError };
+// A social profile or link page as "website" makes the design copy the platform itself
+// (an Instagram-branded homepage for Archive Studio). Only the business's own site is usable.
+const PLATFORM_HOSTS = [
+  'instagram.com', 'facebook.com', 'fb.com', 'linkedin.com', 'tiktok.com', 'twitter.com', 'x.com',
+  'youtube.com', 'youtu.be', 'linktr.ee', 'pinterest.com', 'pinterest.nl', 'wa.me', 'whatsapp.com', 'g.page', 'maps.app.goo.gl',
+];
+
+function detectPlatformWebsiteUrl(...urls) {
+  for (const url of urls) {
+    let host = '';
+    try {
+      host = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(String(url || '')) ? String(url) : `https://${url}`).hostname.toLowerCase();
+    } catch (_error) {
+      continue;
+    }
+    const platform = PLATFORM_HOSTS.find((item) => host === item || host.endsWith(`.${item}`)) ||
+      (/^(?:www\.)?google\.[a-z.]+$/.test(host) && /\/maps\b/i.test(String(url)) ? 'google maps' : '');
+    if (platform) return platform;
+  }
+  return '';
+}
+
+function buildPlatformWebsiteError(platform) {
+  const error = new Error(
+    `De opgegeven website is een ${platform}-pagina, niet de eigen website van het bedrijf. Er is geen webdesign gemaakt; vul eerst de echte website in.`
+  );
+  error.status = 422; // Not retryable: the lead needs its real website first.
+  error.code = 'WEBDESIGN_PLATFORM_WEBSITE';
+  return error;
+}
+
+module.exports = { detectPlaceholderWebsiteScan, buildPlaceholderWebsiteError, detectPlatformWebsiteUrl, buildPlatformWebsiteError };

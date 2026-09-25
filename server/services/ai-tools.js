@@ -1,5 +1,5 @@
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
-const { detectPlaceholderWebsiteScan, buildPlaceholderWebsiteError } = require('./website-preview-placeholder');
+const { detectPlaceholderWebsiteScan, buildPlaceholderWebsiteError, detectPlatformWebsiteUrl, buildPlatformWebsiteError } = require('./website-preview-placeholder');
 function createAiToolsCoordinator(deps = {}) {
   const {
     normalizeString = (value) => String(value || '').trim(),
@@ -119,6 +119,8 @@ function createAiToolsCoordinator(deps = {}) {
     const body = options.body && typeof options.body === 'object' ? options.body : {};
     const referenceImageMode = normalizeString(options.referenceImageMode || '').toLowerCase();
     const usesHomepageScreenshot = referenceImageMode === HOMEPAGE_SCREENSHOT_REFERENCE_MODE;
+    const platform = detectPlatformWebsiteUrl(inputUrl);
+    if (platform) throw buildPlatformWebsiteError(platform);
     let fetched;
     try {
       fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
@@ -126,6 +128,8 @@ function createAiToolsCoordinator(deps = {}) {
       if (!options.allowScanFallback || usesHomepageScreenshot) throw error;
       fetched = buildDatabasePreviewFallbackScan(inputUrl, body);
     }
+    const redirectedPlatform = detectPlatformWebsiteUrl(fetched.finalUrl);
+    if (redirectedPlatform) throw buildPlatformWebsiteError(redirectedPlatform);
     const placeholder = detectPlaceholderWebsiteScan(fetched.scan);
     if (placeholder.placeholder) throw buildPlaceholderWebsiteError(placeholder.signal);
     const homepageScreenshotUrls = usesHomepageScreenshot
