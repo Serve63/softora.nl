@@ -1,4 +1,4 @@
-const { buildWebdesignPipelineOptions, WEBDESIGN_VARIANT_V2 } = require('./design-photo-generation-policy');
+const { buildWebdesignPipelineOptions } = require('./design-photo-generation-policy');
 const { randomUUID } = require('crypto');
 
 function createWebsitePreviewBatchCoordinator(deps = {}) {
@@ -349,7 +349,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
           if (!recorded) throw new Error('De opdracht kon niet veilig worden opgeslagen. Er is geen foto gegenereerd.');
           const payload = await withTimeout(
             aiToolsCoordinator.runWebsitePreviewGeneratePipeline(item.url, buildWebdesignPipelineOptions({
-              variant: WEBDESIGN_VARIANT_V2, source: 'premium-websitegenerator', domain: item.hostname,
+              source: 'premium-websitegenerator', domain: item.hostname,
             })),
             ITEM_TIMEOUT_MS,
             'Generatie duurt langer dan verwacht. Controleer de bibliotheek voordat je opnieuw genereert.'

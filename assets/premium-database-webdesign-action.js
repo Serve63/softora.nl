@@ -23,7 +23,7 @@
     const PHOTO_READY_SELECTOR = ".photo-drop[data-has-photo=\"true\"], .photo-drop--mockup[data-has-photo=\"true\"]";
 
     function normalizeString(value) { return String(value || "").trim(); }
-    function normalizeVariant(value) { return normalizeString(value).toLowerCase() === "v2-visual-dna" ? "v2-visual-dna" : "v1-prompt-only"; }
+    function normalizeVariant() { return "v2-visual-dna"; }
 
     function ensureStyles() {
         if (!global.document || global.document.getElementById(STYLE_ID)) return;
@@ -734,7 +734,7 @@
             }
         }
 
-        async function generateForCustomer(customerId) { const target = getCustomerById(customerId), picker = global.SoftoraDatabaseWebdesignVariantPicker; if (!picker || typeof picker.choose !== "function") { setStatusMessage("De V2-webdesigngenerator kon niet worden geladen. Ververs de pagina en probeer opnieuw.", "error", true); return { started: false, failed: true }; } const variant = await picker.choose(); if (normalizeVariant(variant) !== "v2-visual-dna") { setStatusMessage("De V2-webdesigngenerator kon niet veilig worden gestart. Ververs de pagina en probeer opnieuw.", "error", true); return { started: false, failed: true }; } return startJobForTarget(target, { quiet: false, deferRender: false, pollDelay: 0, variant: "v2-visual-dna" }); }
+        async function generateForCustomer(customerId) { const target = getCustomerById(customerId), picker = global.SoftoraDatabaseWebdesignVariantPicker; if (!picker || typeof picker.choose !== "function") { setStatusMessage("De V2-webdesigngenerator kon niet worden geladen. Ververs de pagina en probeer opnieuw.", "error", true); return { started: false, failed: true }; } const variant = await picker.choose(); if (normalizeString(variant).toLowerCase() !== "v2-visual-dna") { setStatusMessage("De V2-webdesigngenerator kon niet veilig worden gestart. Ververs de pagina en probeer opnieuw.", "error", true); return { started: false, failed: true }; } return startJobForTarget(target, { quiet: false, deferRender: false, pollDelay: 0, variant: "v2-visual-dna" }); }
 
         async function generateBatchForCustomers(customers, batchOptions) {
             const targets = (Array.isArray(customers) ? customers : []).filter(Boolean), total = targets.length;

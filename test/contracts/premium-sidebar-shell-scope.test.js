@@ -254,7 +254,7 @@ test('premium database consistency assets stay outside the static sidebar', () =
   assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260924-readmodel') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui') > asideEnd);
   assert.match(source, /assets\/premium-database-mail-ready-menu\.css\?v=20260914-provider/);
-  assert.ok(source.indexOf('assets/premium-database-webdesign-variant-picker.js?v=20260726a') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-webdesign-variant-picker.js?v=20260925-v2-only') > asideEnd);
 });
 
 test('premium klanten opslagasset blijft buiten de statische sidebar', () => {
@@ -1366,7 +1366,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-system-mail-count\.js\?v=20260924-stable-metrics/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260924-readmodel/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(source, /premium-database-webdesign-action\.js\?v=20260923-quiet-completions/);
+  assert.match(source, /premium-database-webdesign-action\.js\?v=20260925-v2-only/);
   assert.match(source, /premium-database-table-helpers\.js\?v=20260923-owner/);
   assert.match(source, /const count = databaseTableHelpers\.getPhotoHeaderCount\(customers, \{ showPhotoColumn: showPhotoColumn, activeStatus: state\.activeStatus,/);
 });
