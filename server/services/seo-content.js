@@ -4,6 +4,7 @@ const { SEO_CONTENT_QUALITY_V2_ITEMS } = require('./seo-content-quality-v2');
 const { WEBSITE_PROPOSAL_CONTENT_ITEM } = require('./seo-content-website-proposal');
 const { SOFTWARE_PROPOSAL_CONTENT_ITEM } = require('./seo-content-software-proposal');
 const { CRM_COST_CONTENT_ITEM } = require('./seo-content-crm-kosten');
+const { BUSINESS_SOFTWARE_EXPLAINER } = require('./seo-content-business-software-explainer');
 const { buildSeoImageObject, buildSeoImagePreviewMeta, getSeoImageSitemapEntries } = require('./seo-content-image-search');
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
@@ -332,56 +333,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI automatisering voor het MKB', href: '/blog/ai-automatisering-mkb-waar-beginnen' }),
     ]),
   }),
-  Object.freeze({
-    collection: 'kennisbank',
-    slug: 'wat-is-bedrijfssoftware-op-maat',
-    title: 'Wat is bedrijfssoftware op maat?',
-    description:
-      'Een duidelijke uitleg van bedrijfssoftware op maat, wanneer het zinvol is en hoe je voorkomt dat software onnodig complex wordt.',
-    category: 'Bedrijfssoftware',
-    intent: 'Uitleg',
-    publishedAt: '2026-05-19',
-    updatedAt: '2026-05-19',
-    readTime: '5 min',
-    summary:
-      'Bedrijfssoftware op maat is software die precies aansluit op je processen, rollen en data in plaats van andersom.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'De heldere uitleg',
-        paragraphs: Object.freeze([
-          'Bedrijfssoftware op maat is een digitaal systeem dat wordt gebouwd rondom de manier waarop jouw bedrijf werkt. Het kan gaan om een dashboard, CRM, planningstool, klantportaal, database, offertemodule of een combinatie daarvan.',
-          Object.freeze({
-            text: 'Het verschil met standaard software is dat je niet hoeft te werken volgens vaste schermen en beperkingen van een pakket. De software volgt je proces, mits dat proces duidelijk genoeg is om te vertalen naar logica, schermen en gegevens. Vergelijk maatwerk, standaard en een hybride route daarom per procesonderdeel voordat je een volledig systeem kiest.',
-            links: Object.freeze([
-              Object.freeze({
-                anchor: 'maatwerk, standaard en een hybride route',
-                href: '/vergelijkingen/maatwerk-software-vs-standaard-software',
-              }),
-            ]),
-          }),
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Wanneer maatwerk logisch wordt',
-        paragraphs: Object.freeze([
-          'Maatwerk wordt interessant wanneer standaard software te veel omwegen veroorzaakt. Bijvoorbeeld wanneer medewerkers informatie dubbel invoeren, klantdata verspreid staat over meerdere tools of belangrijke rapportages handmatig worden gemaakt.',
-          'Ook groei kan een reden zijn. Als een bedrijf meer aanvragen, klanten of interne taken krijgt, worden kleine handmatige stappen ineens duur. Een goed systeem haalt die herhaling eruit en maakt de belangrijkste informatie sneller zichtbaar.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Zo houd je maatwerk beheersbaar',
-        paragraphs: Object.freeze([
-          'Goede maatwerk software begint niet met zoveel mogelijk functies. Het begint met de kernflow: welke informatie komt binnen, wie moet iets doen, welke status hoort erbij en wanneer is het klaar?',
-          'Vanuit die kern kun je uitbreiden met automatisering, rollen, rapportages en koppelingen. Zo blijft het systeem bruikbaar en wordt het geen groot project dat niemand durft aan te passen.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
-      Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
-      Object.freeze({ label: 'AI automatisering voor het MKB', href: '/blog/ai-automatisering-mkb-waar-beginnen' }),
-    ]),
-  }),
+  BUSINESS_SOFTWARE_EXPLAINER,
   Object.freeze({
     collection: 'blog',
     slug: 'website-laten-maken-mkb-paginas',

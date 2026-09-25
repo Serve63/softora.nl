@@ -143,7 +143,7 @@ const SOFTWARE_CHOICE_CONTENT_ITEM = Object.freeze({
       paragraphs: Object.freeze([
         'Maak gedurende twee werkweken een workaroundlog. Noteer per gebeurtenis de processtap, betrokken rol, extra handeling, wachttijd, herstelwerk en gevolg voor klant of team. Een losse voorkeur voor een ander scherm is zwak bewijs. Terugkerende dubbele invoer, onzichtbare uitzonderingen, gemiste opvolging of handmatige reconciliatie laten beter zien waar de huidige route structureel niet past.',
         Object.freeze({
-          text: 'Scheid daarbij systeemproblemen van procesproblemen. Onduidelijk eigenaarschap, verschillende definities of ontbrekende acceptatiecriteria verdwijnen niet door nieuwe software. Zet de gewenste kernscenario’s daarom naast de kosten van bouw, licenties en interne inzet. De uitleg over bedrijfssoftware op maat helpt om proces, rollen, gegevens en systeemgrenzen eerst concreet te maken.',
+          text: 'Scheid daarbij systeemproblemen van procesproblemen. Onduidelijk eigenaarschap, verschillende definities of ontbrekende acceptatiecriteria verdwijnen niet door nieuwe software. Zet de gewenste kernscenario’s daarom naast de kosten van bouw, licenties en interne inzet. Leg eerst vast wie mag beslissen, welke registratie leidend is en wat er bij een fout gebeurt. Gebruik daarvoor de procesbeschrijving bij de uitleg over bedrijfssoftware op maat voordat je een oplossing kiest.',
           links: Object.freeze([
             Object.freeze({
               anchor: 'bedrijfssoftware op maat',
