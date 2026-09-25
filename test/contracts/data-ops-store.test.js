@@ -838,6 +838,42 @@ test('data ops store persists the selected webdesign generation variant', async 
   assert.equal(upsertRows[0].row.payload.variant, 'v2-visual-dna');
 });
 
+test('data ops store keeps the selected variant in durable webdesign batch targets', async () => {
+  let savedRow;
+  const store = createSoftoraDataOpsStore({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({
+      from(table) {
+        assert.equal(table, 'softora_webdesign_jobs');
+        return {
+          upsert(row) {
+            savedRow = row;
+            return Promise.resolve({ data: row, error: null });
+          },
+        };
+      },
+    }),
+    logger: { error() {} },
+  });
+
+  const result = await store.upsertWebdesignBatchChunk({
+    id: 'webdesign_batch_v2_chunk_00000',
+    batchId: 'webdesign_batch_v2',
+    ownerKey: 'owner',
+    index: 0,
+    status: 'queued',
+    targets: [{
+      index: 0,
+      variant: 'v2-visual-dna',
+      websiteUrl: 'https://voorbeeld.test/',
+      customer: { id: 'customer-v2', bedrijf: 'Voorbeeld' },
+    }],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(savedRow.payload.targets[0].variant, 'v2-visual-dna');
+});
+
 function createSupabaseClientRecorder(currentCustomerIds = []) {
   const recorder = {
     upsertRows: [],
