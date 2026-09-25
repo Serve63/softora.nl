@@ -423,7 +423,7 @@
 
         function buildTargetPayload(target) {
             if (!buildJobPayload) return target || {};
-            const payload = buildJobPayload(target, "");
+            const payload = buildJobPayload(target, "", "v2-visual-dna");
             delete payload.jobId;
             return payload;
         }

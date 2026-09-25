@@ -748,7 +748,7 @@ test('premium database webdesign bulk batches process targets through a persiste
     dataOpsStore: store,
     aiToolsCoordinator: {
       runWebsitePreviewGeneratePipeline: async (url, options) => {
-        pipelineCalls.push({ url, company: options.body.company });
+        pipelineCalls.push({ url, company: options.body.company, variant: options.body.variant, referenceImageMode: options.referenceImageMode });
         return { image: { dataUrl: TINY_PNG_DATA_URL, fileName: `${options.body.company}-preview.png` } };
       },
     },
@@ -770,6 +770,7 @@ test('premium database webdesign bulk batches process targets through a persiste
         offset: 0,
         targets: Array.from({ length: 5 }, (_, index) => ({
           websiteUrl: `https://bedrijf-${index}.test`,
+          variant: 'v2-visual-dna',
           customer: { id: `customer-${index}`, bedrijf: `Bedrijf ${index}`, dom: `bedrijf-${index}.test` },
         })),
       },
@@ -804,6 +805,7 @@ test('premium database webdesign bulk batches process targets through a persiste
   assert.equal(latest.made, 5);
   assert.equal(latest.failed, 0);
   assert.equal(pipelineCalls.length, 5);
+  assert.ok(pipelineCalls.every((call) => call.variant === 'v2-visual-dna' && call.referenceImageMode === 'homepage-screenshot'));
 });
 
 test('premium database webdesign bulk keeps the default active queue bounded for Supabase stability', async () => {
