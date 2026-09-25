@@ -2128,7 +2128,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         nextAttemptAt: Math.max(0, Number(item.nextAttemptAt || 0) || 0) || null,
         updatedAt: Math.max(0, Number(item.updatedAt || 0) || 0) || null,
         finishedAt: Math.max(0, Number(item.finishedAt || 0) || 0) || null,
-        websiteUrl: normalizeString(item.websiteUrl || '').slice(0, 500),
+        websiteUrl: normalizeString(item.websiteUrl || '').slice(0, 500), variant: normalizeString(item.variant || '').slice(0, 40),
         customer: item.customer && typeof item.customer === 'object' ? item.customer : {},
       }));
   }

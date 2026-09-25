@@ -1777,7 +1777,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       nextAttemptAt: Math.max(0, Number(raw.nextAttemptAt || 0) || 0) || null,
       updatedAt: Math.max(0, Number(raw.updatedAt || 0) || 0) || now(),
       finishedAt: Math.max(0, Number(raw.finishedAt || 0) || 0) || null,
-      websiteUrl,
+      websiteUrl, variant: normalizeWebdesignVariant(raw.variant),
       customer,
     };
   }
@@ -2043,7 +2043,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         const result = await startJob({
           ownerKey: batch.ownerKey,
           customer: target.customer,
-          websiteUrl: target.websiteUrl,
+          websiteUrl: target.websiteUrl, variant: target.variant,
           batchId: batch.id,
           batchTargetIndex: target.index,
         });

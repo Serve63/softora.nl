@@ -3086,7 +3086,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260817a/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260925-v2/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260925-v2-only/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
@@ -3095,6 +3095,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(webdesignActionScriptSource, /DEFAULT_SINGLE_VARIANT/);
   assert.match(webdesignActionScriptSource, /ids\.size\?ids\.has\(normalizeString\(job\.jobId\)\):isRestoredPendingJob\(job\)/);
   assert.match(webdesignBulkScriptSource, /const BULK_POLL_INTERVAL_MS = 1200;/);
+  assert.match(webdesignBulkScriptSource, /buildJobPayload\(target, "", "v2-visual-dna"\)/);
   assert.match(webdesignBulkScriptSource, /const WORKER_KICK_INTERVAL_MS = 8000;/);
   assert.match(webdesignActionScriptSource, /const pendingJobs = new Map\(\);/);
   assert.doesNotMatch(webdesignActionScriptSource, /keepalive: true/);
