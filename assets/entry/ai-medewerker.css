@@ -35,8 +35,8 @@
 @media(min-width:761px){
  .toekomst-ai .page{height:100svh;min-height:640px}
  .toekomst-ai header{height:58px}
- .toekomst-ai main{display:grid;flex:1;grid-template-rows:120px minmax(130px,1fr) minmax(155px,1fr) minmax(130px,1fr);gap:18px;min-height:0;max-height:800px;margin:0 0 auto;padding:0 0 14px}
- .toekomst-ai .intro{padding:48px 0 12px;align-self:start}
+ .toekomst-ai main{display:grid;flex:1;grid-template-rows:204px minmax(130px,1fr) minmax(155px,1fr) minmax(130px,1fr);gap:18px;min-height:0;max-height:800px;margin:0 0 auto;padding:0 0 14px}
+ .toekomst-ai .intro{padding:112px 0 16px;align-self:start}
  .toekomst-ai h1{font-size:clamp(38px,5.2svh,56px)}
  .toekomst-ai .ai-feature{min-height:0;height:100%}
  .toekomst-ai .ai-feature-copy{padding:18px 32px;max-width:72%}
@@ -59,7 +59,8 @@
 .toekomst-ai .meet-softora{background-image:linear-gradient(90deg,#21121dc2,#21121d6b 52%,#21121d30),url('/assets/entry/meet-softora-office.webp')}
 @media(min-width:761px){.toekomst-ai .ai-feature-image{object-position:center 47%}}
 
-@media(min-width:761px) and (max-height:680px){.toekomst-ai main{grid-template-rows:120px minmax(110px,1fr) minmax(135px,1fr) minmax(110px,1fr);gap:10px}}
-@media(max-width:760px){.toekomst-ai .intro{padding-top:56px}}
+@media(min-width:761px) and (max-height:800px){.toekomst-ai main{grid-template-rows:192px minmax(116px,1fr) minmax(134px,1fr) minmax(116px,1fr);gap:10px}.toekomst-ai .intro{padding:112px 0 8px}}
+@media(min-width:761px) and (max-height:680px){.toekomst-ai main{grid-template-rows:176px minmax(94px,1fr) minmax(120px,1fr) minmax(94px,1fr);gap:8px}.toekomst-ai .intro{padding:112px 0 0}.toekomst-ai .ai-feature-copy{padding:8px 24px}.toekomst-ai .ai-feature h2{margin:4px 0}.toekomst-ai .ai-feature-invite{margin-top:4px}}
+@media(max-width:760px){.toekomst-ai .intro{padding-top:100px}}
 
 .toekomst-ai .choice{justify-content:flex-end}
