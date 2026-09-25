@@ -2667,7 +2667,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260925-v2-only/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260925-v2-only/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260925-design-remove/);
   assert.doesNotMatch(webdesignVariantPickerScriptSource, /v1-prompt-only|V1_VARIANT/);
   assert.doesNotMatch(webdesignActionScriptSource, /v1-prompt-only/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
@@ -2839,7 +2839,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(leadDeleteScriptSource, /async function removeCustomerLead\(customerId\)/);
   assert.match(leadDeleteScriptSource, /const deleteCustomerLead = typeof options\.deleteCustomerLead === "function" \? options\.deleteCustomerLead : null;/);
   assert.match(leadDeleteScriptSource, /const confirmDeleteLead = typeof options\.confirmDeleteLead === "function" \? options\.confirmDeleteLead : defaultConfirmDelete;/);
-  assert.match(leadDeleteScriptSource, /Weet je zeker dat je/);
+  assert.match(leadDeleteScriptSource, /helemaal verwijderen uit het mailsysteem?/);
   assert.match(leadDeleteScriptSource, /if \(!confirmDeleteLead\(existing\)\) return;/);
   assert.match(leadDeleteScriptSource, /if \(deleteCustomerLead\) \{/);
   assert.match(leadDeleteScriptSource, /const result = await deleteCustomerLead\(normalizedId\);/);
@@ -2847,11 +2847,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(leadDeleteScriptSource, /global\[ACTION_PROPERTY\] = removeCustomerLead;/);
   assert.match(leadDeleteScriptSource, /target\.closest\("\.lead-delete-button"\)/);
   assert.match(leadDeleteScriptSource, /action\(button\.getAttribute\("data-delete-lead-id"\)\)/);
-  assert.match(pageSource, /assets\/premium-database-lead-delete\.js\?v=20260716a/);
+  assert.match(pageSource, /assets\/premium-database-lead-delete\.js\?v=20260925-design-remove/);
   assert.match(pageSource, /function deleteCustomerLead\(customerId\)/);
   assert.match(pageSource, /\/api\/premium-database\/delete-lead/);
   assert.match(pageSource, /JSON\.stringify\(\{ customerId: normalizeString\(customerId\), confirm: true \}\)/);
-  assert.match(pageSource, /SoftoraDatabaseLeadDelete\.createController\(\{ state, deleteCustomerLead, persistCustomerList, persistCustomerPhotos, sortCustomers, closePanel, closeModal, setStatusMessage, renderPage: scheduleRenderPage, toast \}\)/);
+  assert.match(pageSource, /SoftoraDatabaseLeadDelete\.createController\(\{ state, deleteCustomerLead, removeCustomerDesign: removeWebsitePhotoForCustomer, hasCustomerDesign: function \(customer\) \{[^}]*\}, persistCustomerList, persistCustomerPhotos, sortCustomers, closePanel, closeModal, setStatusMessage, renderPage: scheduleRenderPage, toast \}\)/);
   assert.match(webdesignActionScriptSource, /data-has-photo=\\"/);
   assert.match(pageSource, /function openWebsitePhotoPreview\(customerId, kind\)/);
   assert.match(pageSource, /function prepareWebsitePhotoForStorage\(dataUrl, fileName\)/);
@@ -2928,7 +2928,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   );
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260917-source/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260925-v2-only/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260925-design-remove/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260914-provider/);
@@ -3087,7 +3087,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260925-v2/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260925-v2-only/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260925-design-remove/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeString\(variant\)\.toLowerCase\(\) !== "v2-visual-dna"/);
@@ -3129,7 +3129,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
   assert.match(pageSource, /assets\/premium-database-instantly-status\.js\?v=20260923-current-campaigns/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260925-v2-only/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260925-design-remove/);
   assert.doesNotMatch(webdesignActionScriptSource, /webdesigns klaar en naar Mailklaar verplaatst|Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(webdesignActionScriptSource, /costReporter\.consume\(customerIds\)/);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \}; const databaseSortedLists = window\.SoftoraDatabaseSortedLists\.create/);
@@ -3210,7 +3210,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /if \(nodes\.addActionsMenu\) nodes\.addActionsMenu\.addEventListener\("click", function \(event\) \{ const actionButton = event\.target\.closest\("\.add-actions-item"\); if \(!actionButton\) return; closeAddActions\(\); if \(actionButton === nodes\.manualAddButton\) \{ openModal\(\); return; \} if \(actionButton === nodes\.deepSearchButton\) void databaseDeepSearchController\.open\(\); \}\);/);
   assert.match(pageSource, /website: normalizeString\(nodes\.modalDomain\.value\) \|\| dom,/);
   assert.match(pageSource, /openEditCustomerModal\(editButton\.getAttribute\("data-edit-id"\)\)/);
-  assert.match(pageSource, /removeWebsitePhotoForCustomer\(removePhotoButton\.getAttribute\("data-remove-photo-id"\)\)/);
+  assert.match(pageSource, /databaseLeadDeleteController\.removeCustomerDesign\(removePhotoButton\.getAttribute\("data-remove-photo-id"\)\)/);
   assert.doesNotMatch(pageSource, /const row = event\.target\.closest\("tr\[data-id\]"\);[\s\S]*openPanel\(row\.getAttribute\("data-id"\)\);/);
   assert.doesNotMatch(pageSource, /tbody tr \{[^}]*cursor: pointer;/);
   assert.match(pageSource, /nodes\.tbody\.addEventListener\("drop"/);
@@ -3691,7 +3691,52 @@ test('premium database webdesign action renders stored inline photos as ready wi
   assert.doesNotMatch(html, /photo-diamond|photo-cinematic|photo-video|data-company-website-video-id/);
   assert.match(html, /class="lead-delete-button"/);
   assert.match(html, /data-delete-lead-id="customer-1"/);
+  assert.match(html, /class="lead-delete-button"[^>]*aria-label="Design verwijderen"/);
   assert.ok(html.indexOf('class="lead-delete-button"') > html.indexOf('class="photo-compare-link"'));
+});
+
+test('premium database row × removes only the design when the lead has one, and never the lead itself', async () => {
+  const deleteClient = loadDatabaseLeadDeleteClient();
+  const calls = [];
+  const state = { klanten: [{ id: 'lead-413', bedrijf: 'PruMedia', lastColdmailProvider: 'instantly' }, { id: 'lead-414', bedrijf: 'Zonder Design' }] };
+  const confirms = [];
+  const controller = deleteClient.createController({
+    state,
+    deleteCustomerLead: async (customerId) => { calls.push(['server-delete', customerId]); return { ok: true }; },
+    removeCustomerDesign: async (customerId) => { calls.push(['design-remove', customerId]); },
+    hasCustomerDesign: (customer) => customer.id === 'lead-413',
+    confirmRemoveDesign: (customer) => { confirms.push(['design', customer.id]); return true; },
+    confirmDeleteLead: (customer) => { confirms.push(['lead', customer.id]); return true; },
+    sortCustomers: (customers) => customers,
+    renderPage() {},
+    toast() {},
+  });
+
+  await controller.removeCustomerLead('lead-413');
+  assert.deepEqual(calls, [['design-remove', 'lead-413']]);
+  assert.deepEqual(state.klanten.map((customer) => customer.id), ['lead-413', 'lead-414']);
+
+  await controller.removeCustomerLead('lead-414');
+  assert.deepEqual(calls, [['design-remove', 'lead-413'], ['server-delete', 'lead-414']]);
+  assert.deepEqual(confirms, [['design', 'lead-413'], ['lead', 'lead-414']]);
+
+  const cancelled = deleteClient.createController({
+    state: { klanten: [{ id: 'lead-500', bedrijf: 'Blijft' }] },
+    removeCustomerDesign: async () => calls.push(['unexpected-design-remove']),
+    hasCustomerDesign: () => true,
+    confirmRemoveDesign: () => false,
+    deleteCustomerLead: async () => calls.push(['unexpected-server-delete']),
+  });
+  await cancelled.removeCustomerLead('lead-500');
+  await cancelled.removeCustomerDesign('lead-500');
+  assert.equal(calls.length, 2);
+
+  const pageSource = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
+  assert.match(pageSource, /removeCustomerDesign: removeWebsitePhotoForCustomer, hasCustomerDesign: function \(customer\)/);
+  assert.match(pageSource, /void databaseLeadDeleteController\.removeCustomerDesign\(removePhotoButton\.getAttribute\("data-remove-photo-id"\)\)/);
+  const leadDeleteSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-lead-delete.js'), 'utf8');
+  assert.match(leadDeleteSource, /helemaal verwijderen uit het mailsysteem/);
+  assert.match(leadDeleteSource, /staat al in Instantly en de mail linkt naar dit design/);
 });
 
 test('premium database lead delete uses the small server delete route instead of reposting all customers', async () => {

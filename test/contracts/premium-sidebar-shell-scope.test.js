@@ -248,7 +248,7 @@ test('premium database consistency assets stay outside the static sidebar', () =
   const source = readRepoFile('premium-database.html');
   const asideEnd = source.indexOf('</aside>');
   assert.ok(asideEnd > 0);
-  assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260716a') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260925-design-remove') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20260924-readmodel-version') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-table-helpers.js?v=20260923-owner') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260924-readmodel') > asideEnd);
@@ -1366,7 +1366,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-system-mail-count\.js\?v=20260924-stable-metrics/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260924-readmodel/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(source, /premium-database-webdesign-action\.js\?v=20260925-v2-only/);
+  assert.match(source, /premium-database-webdesign-action\.js\?v=20260925-design-remove/);
   assert.match(source, /premium-database-table-helpers\.js\?v=20260923-owner/);
   assert.match(source, /const count = databaseTableHelpers\.getPhotoHeaderCount\(customers, \{ showPhotoColumn: showPhotoColumn, activeStatus: state\.activeStatus,/);
 });
