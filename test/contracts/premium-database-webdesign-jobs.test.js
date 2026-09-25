@@ -2487,3 +2487,26 @@ test('premium database webdesign jobs never store or automatically retry a rejec
   assert.equal(values.softora_database_photos_v1, undefined);
   assert.equal(values.softora_database_photo_data_v1_customer_brand_0, undefined);
 });
+
+test('premium database webdesign job errors never gain array-index digit noise from normalizeString fallbacks', async () => {
+  const message = 'Deze website lijkt in onderhoud, in aanbouw of geparkeerd ("gepland onderhoud"). Er is geen webdesign gemaakt; probeer het later opnieuw.';
+  const values = {};
+  const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    logger: { error() {}, warn() {} }, processJobsInline: true,
+    // Production helper: the second argument is a fallback, so .map(normalizeString) would leak indices.
+    normalizeString: require('../../server/services/runtime-primitives').normalizeString,
+    aiToolsCoordinator: { runWebsitePreviewGeneratePipeline: async () => {
+      throw Object.assign(new Error(message), { status: 422, code: 'WEBDESIGN_PLACEHOLDER_WEBSITE' });
+    } },
+    getUiStateValues: async () => ({ values }),
+    setUiStateValues: async (patch) => { Object.assign(values, patch); return { values }; },
+  });
+  const req = { premiumAuth: { email: 'owner@softora.nl', userId: 'owner' }, body: {
+    jobId: 'job_digitnoise123', websiteUrl: 'https://bouw.test', customer: { id: 'customer-noise', bedrijf: 'Bouw' },
+  } };
+  await coordinator.startJobResponse(req, createResponseRecorder());
+  const result = createResponseRecorder();
+  await coordinator.getJobResponse({ ...req, params: { jobId: req.body.jobId } }, result);
+  assert.equal(result.body.job.status, 'error');
+  assert.equal(result.body.job.error, message);
+});
