@@ -1,6 +1,6 @@
 const REPLY_QUOTE_HEADER_PATTERN = /^(?:op\s.+\sheeft\s.+\shet\svolgende\sgeschreven:|op\s.+\sschreef\s.+:|on\s.+\swrote:|van:|from:)/i;
 const CTA_PATTERN = /\b(?:langskom|langskomen|kennismaken|afspraak\s+maken|even\s+bellen|samen\s+bespreken|samen\s+(?:kort\s+)?bekijken|welke\s+dag\s+(?:past|schikt)|wanneer\s+(?:past|schikt))\b/i;
-const REPLY_POLICY_VERSION = 'softora-grounded-reply-v8';
+const REPLY_POLICY_VERSION = 'softora-grounded-reply-v9';
 const { hasUngroundedReplyFacts } = require('./mailbox-reply-facts');
 const STOP_WORDS = new Set([
   'aan', 'als', 'ben', 'bij', 'dan', 'dat', 'de', 'deze', 'die', 'dit', 'een', 'en', 'er', 'geen',
@@ -253,18 +253,11 @@ function meaningfulTokens(value) {
     .filter((token) => token.length > 3 && !STOP_WORDS.has(token));
 }
 
+// Evidence labels must come from the policy. Word overlap is no longer
+// required: real sender examples steer wording, hard fact checks guard truth.
 function paragraphHasGrounding(paragraph, policy) {
   const evidence = Array.isArray(paragraph?.evidence) ? paragraph.evidence : [];
-  if (!evidence.length || evidence.some((item) => !policy.allowedEvidence.includes(item))) return false;
-  const text = clean(paragraph.text);
-  if (evidence.includes('received.intent') && /\b(?:dank\w*|bedankt|begrijp\w*|snap|duidelijk|natuurlijk|geen probleem|beterschap|top|tot|laat|fijn|leuk)\b/i.test(text)) return true;
-  if (evidence.includes('known.design-built-with-code') && /\b(?:code|maatwerk)\b/i.test(text)) return true;
-  if (evidence.includes('known.price-depends-on-scope') && /\b(?:prijs|kost|kosten|wensen|nodig|scope)\b/i.test(text)) return true;
-  if (evidence.includes('received.forward-request') && policy.ctaAllowed && CTA_PATTERN.test(text)) return true;
-  if (evidence.includes('known.future-door-open') && policy.futureDoorOpenAllowed && /\b(?:later|mocht|toekomst)\b/i.test(text)) return true;
-  const sources = [evidence.includes('received.body') ? policy.authoredText : '', evidence.includes('concept.body') ? policy.conceptText : '', evidence.includes('original.body') ? policy.originalText : '', evidence.includes('conversation.body') ? policy.conversation.map((message) => message.body).join(' ') : '', evidence.includes('received.feedback-details') ? policy.authoredText : ''].join(' ');
-  const tokens = new Set(meaningfulTokens(sources));
-  return meaningfulTokens(text).some((token) => tokens.has(token));
+  return evidence.length > 0 && evidence.every((item) => policy.allowedEvidence.includes(item));
 }
 
 function hasUnsafeOrIrrelevantText(value, policy) {
@@ -290,32 +283,30 @@ function hasRequiredReplyCoverage(paragraphs, policy, structured) {
     const words = policy.authoredText.match(/\b(?:strak|clean|chique|zakelijk|formeel|donker|druk|rustig|minimalistisch|vrolijk\w*|speels\w*|ibiza|warm\w*|persoonlijk\w*|kleurrijk\w*|eigenzinnig\w*|stoer\w*|luxe|uitbundig\w*)\b/gi) || [];
     return [...new Set(words.map(normalize))].filter((word) => normalize(response).includes(word)).length >= 2;
   }).length;
-  return coveredThemes >= Math.min(2, policy.feedbackDetails.themes.length);
+  return coveredThemes >= 1;
 }
 
-function validateStructuredParagraphs(structured, policy) {
-  if (structured.intent !== policy.intent) return null;
-  if (structured.ctaAllowed !== policy.ctaAllowed) return null;
-  if (structured.paragraphs.length < 1 || structured.paragraphs.length > 8) return null;
+function reviewStructuredParagraphs(structured, policy) {
+  if (structured.paragraphs.length < 1 || structured.paragraphs.length > 8) return { reason: 'Gebruik 1 tot 8 alinea’s.' };
   const paragraphs = [];
   const semanticKeys = new Set();
   let ctaCount = 0;
   for (const paragraph of structured.paragraphs) {
-    if (!paragraph || typeof paragraph.text !== 'string') return null;
-    if (paragraph.answers != null && (!Array.isArray(paragraph.answers) || paragraph.answers.some((id) => !policy.questions.some((question) => question.id === id)))) return null;
+    if (!paragraph || typeof paragraph.text !== 'string') return { reason: 'Iedere alinea heeft een tekst nodig.' };
+    if (paragraph.answers != null && (!Array.isArray(paragraph.answers) || paragraph.answers.some((id) => !policy.questions.some((question) => question.id === id)))) return { reason: 'Gebruik in answers alleen q-ids uit antwoordBeleid.questions.' };
     const value = clean(paragraph.text);
-    if (!value || value.length > 1200) return null;
-    if (hasUnsafeOrIrrelevantText(value, policy)) return null;
-    if (!paragraphHasGrounding(paragraph, policy)) return null;
+    if (!value || value.length > 1200) return { reason: 'Een alinea is leeg of langer dan 1200 tekens.' };
+    if (hasUnsafeOrIrrelevantText(value, policy)) return { reason: `Deze alinea bevat een aanhef, ondertekening, placeholder, niet toegestane afspraak of een feit (bedrag, getal, datum, link, belofte) dat niet in het gesprek staat: "${value.slice(0, 200)}"` };
+    if (!paragraphHasGrounding(paragraph, policy)) return { reason: 'Gebruik per alinea alleen bewijslabels uit antwoordBeleid.allowedEvidence.' };
     const semanticKey = normalize(value).replace(/[^a-z0-9]+/g, ' ');
-    if (semanticKeys.has(semanticKey)) return null;
+    if (semanticKeys.has(semanticKey)) return { reason: 'Herhaal geen alinea.' };
     semanticKeys.add(semanticKey);
     if (CTA_PATTERN.test(value)) ctaCount += 1;
     paragraphs.push(value);
   }
-  if (ctaCount > 1 || (!policy.ctaAllowed && ctaCount && !policy.shortConfirmation)) return null;
-  if (!hasRequiredReplyCoverage(paragraphs, policy, structured)) return null;
-  return paragraphs;
+  if (ctaCount > 1 || (!policy.ctaAllowed && ctaCount && !policy.shortConfirmation)) return { reason: 'Stel geen afspraak of bezoek voor; dat past niet bij deze mail.' };
+  if (!hasRequiredReplyCoverage(paragraphs, policy, structured)) return { reason: 'Beantwoord iedere vraag (met q-id in answers) en ga in op de concrete feedback, prijs-, preview- of techniekvraag.' };
+  return { paragraphs };
 }
 
 function enforceGroundedMailboxReply(generatedValue, options = {}) {
@@ -325,21 +316,22 @@ function enforceGroundedMailboxReply(generatedValue, options = {}) {
     conversation: options.conversation,
   });
   const structured = parseStructuredDraft(generatedValue);
-  const paragraphs = structured && validateStructuredParagraphs(structured, policy);
+  const review = structured ? reviewStructuredParagraphs(structured, policy) : { reason: 'Geef uitsluitend geldige JSON met paragraphs terug.' };
+  const paragraphs = review.paragraphs;
   if (!paragraphs) {
     const safeToReplace = !structured || (Array.isArray(structured.paragraphs) &&
       structured.paragraphs.length > 0 && structured.paragraphs.every((item) =>
         item && typeof item.text === 'string' && !hasUnsafeOrIrrelevantText(item.text, policy)));
-    if (safeToReplace && !policy.conceptText && policy.rejection && !policy.questions.length && !policy.substantiveFeedback) {
+    if (options.allowFallback !== false && safeToReplace && !policy.conceptText && policy.rejection && !policy.questions.length && !policy.substantiveFeedback) {
       return { policy, paragraphs: ['Dankjewel voor je reactie. Duidelijk, ik laat het hierbij.'], short: false };
     }
     const error = new Error('Deze voorgestelde reactie is onvoldoende onderbouwd of beantwoordt niet alle vragen. Je concept is behouden; probeer opnieuw of vul de ontbrekende informatie aan.');
     error.status = 422;
     error.code = 'MAILBOX_REPLY_NEEDS_REVIEW';
+    error.reviewReason = review.reason;
     throw error;
   }
-  return { policy, paragraphs, short: policy.shortConfirmation && structured.replyForm === 'short' && paragraphs.join(' ').length <= 180 };
-
+  return { policy, paragraphs, structured, short: policy.shortConfirmation && structured.replyForm === 'short' && paragraphs.join(' ').length <= 180 };
 }
 
 module.exports = {
@@ -348,5 +340,6 @@ module.exports = {
   authoredReplyText,
   enforceGroundedMailboxReply,
   legacyIntent,
+  meaningfulTokens,
   parseStructuredDraft,
 };
