@@ -209,6 +209,25 @@ test('ai tools coordinator refuses maintenance and parked websites before any pa
   assert.equal((await garage.coordinator.runWebsitePreviewGeneratePipeline('https://garage.test', {})).ok, true);
 });
 
+test('ai tools coordinator refuses social profiles as the business website before scanning or generating', async () => {
+  const calls = [];
+  const { coordinator } = createFixture({
+    fetchWebsitePreviewScanFromUrl: async (url) => {
+      calls.push(['scan', url]);
+      return { normalizedUrl: url, finalUrl: url.includes('redirect') ? 'https://www.facebook.com/merk' : url, scan: { host: 'merk.test', title: 'Merk' } };
+    },
+    generateWebsitePreviewImageWithAi: async () => { calls.push(['generate']); return { dataUrl: 'data:image/png;base64,abcd' }; },
+  });
+  for (const url of ['https://www.instagram.com/archive_studio_official/', 'facebook.com/CafeBellevueChaam', 'https://www.google.com/maps/place/merk']) {
+    await assert.rejects(() => coordinator.runWebsitePreviewGeneratePipeline(url, { referenceImageMode: 'homepage-screenshot' }), { status: 422, code: 'WEBDESIGN_PLATFORM_WEBSITE' });
+  }
+  assert.deepEqual(calls, []);
+  await assert.rejects(() => coordinator.runWebsitePreviewGeneratePipeline('https://merk.test/redirect', {}), { code: 'WEBDESIGN_PLATFORM_WEBSITE' });
+  assert.deepEqual(calls, [['scan', 'https://merk.test/redirect']]);
+  // The business's own domain stays allowed, even with a social-looking path.
+  assert.equal((await coordinator.runWebsitePreviewGeneratePipeline('https://www.mavicocktailbar.nl/instagram', {})).ok, true);
+});
+
 test('ai tools coordinator requires actual V2 screenshots and excludes direct website visuals', async () => {
   let capturedScan = null;
   const { coordinator } = createFixture({
