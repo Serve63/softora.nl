@@ -745,7 +745,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       error?.data?.error?.message,
       error?.data?.error?.detail,
       error?.data?.detail,
-    ].map(normalizeString).filter(Boolean).join(' ');
+    ].map((value) => normalizeString(value)).filter(Boolean).join(' ');
     const messageDelay = clampRetryDelayMs(parseRetryMessageMs(detail));
     if (messageDelay > 0) return messageDelay;
 
@@ -796,7 +796,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       error?.data?.detail,
       error?.data?.safety_violations,
       error?.data?.safetyViolations,
-    ].map(normalizeString).filter(Boolean).join(' ');
+    ].map((value) => normalizeString(value)).filter(Boolean).join(' ');
   }
 
   function isHardOpenAiWebdesignErrorText(value) {
@@ -1136,7 +1136,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const values = state && state.values && typeof state.values === 'object' ? state.values : {};
     const existingMap = safeParseJsonObject(values[photoKey]);
     const remainingRemovalIds = safeParseJsonArray(values[photoRemovalKey])
-      .map(normalizeString)
+      .map((value) => normalizeString(value))
       .filter(Boolean)
       .filter((id) => id !== customer.id);
     const photoDataKey = buildDataKey(customer.id);
