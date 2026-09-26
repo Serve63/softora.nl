@@ -182,13 +182,17 @@ test('hartelijke ondertekening met lege regels gaat vóór bedrijfsnaam, ook met
 
 test('natuurlijke afwijzing blijft exact behouden zonder verplichte toekomstzin of emoji', () => {
   const input = 'We zijn tevreden met onze huidige website en hebben geen behoefte aan een nieuw ontwerp.';
-  const body = 'Helemaal begrijpelijk. Fijn dat jullie tevreden zijn met de website. Dan laat ik het hierbij!';
+  const body = 'Bedankt dat je de moeite hebt genomen om te reageren! Fijn dat jullie tevreden zijn met de website. Dan laat ik het hierbij!';
   assert.equal(respond(input, [body], { firstName: 'Lisa' }), `Beste Lisa,\n\n${body}\n\nMet vriendelijke groet,\nServé Creusen`);
+  assert.equal(
+    respond(input, ['Helemaal begrijpelijk. Fijn dat jullie tevreden zijn met de website.'], { firstName: 'Lisa' }),
+    'Beste Lisa,\n\nBedankt dat je de moeite hebt genomen om te reageren! Dat snap ik. Fijn dat jullie tevreden zijn met de website.\n\nMet vriendelijke groet,\nServé Creusen'
+  );
 });
 
 test('warmte blijft behouden: nul, een andere of meerdere passende smileys worden niet herschreven', () => {
   for (const emoji of ['', '😁', '😊', ':)', '😁 😊']) {
-    const body = `Dankjewel voor je reactie! ${emoji}`.trim();
+    const body = `Bedankt dat je de moeite hebt genomen om te reageren! ${emoji}`.trim();
     assert.ok(respond('Dank voor je bericht.', [body]).includes(body));
     assert.equal((respond('Dank voor je bericht.', [body]).match(/😁/gu) || []).length, emoji.includes('😁') ? 1 : 0);
   }
@@ -239,7 +243,7 @@ test('geen budget en een platformvraag worden beide behandeld zonder bezoekvoors
   const policy = analyzeMailboxReplyContext(input);
   assert.equal(policy.technicalQuestion, true);
   assert.equal(policy.ctaAllowed, false);
-  const body = 'Helemaal begrijpelijk dat er nu geen budget is. Ik bouw het ontwerp op maat met code. Als jullie al in Webflow hebben geïnvesteerd, hoeft dat niet meteen allemaal vervangen te worden.';
+  const body = 'Ik snap goed dat er nu geen budget is. Ik bouw het ontwerp op maat met code. Als jullie al in Webflow hebben geïnvesteerd, hoeft dat niet meteen allemaal vervangen te worden.';
   assert.ok(respond(input, [body]).includes(body));
   rejectsReply(input, 'Ik gebruik ook Webflow en kan even langskomen.');
 });
@@ -344,7 +348,7 @@ test('Galaxy-antwoord van Bert wordt als afwijzing gelezen en levert ook bij ong
   assert.equal(policy.questions.length, 0);
   assert.equal(policy.ctaAllowed, false);
   const answer = enforceMailboxReplyProfile('ongeldige AI-uitvoer', { inboundText: inbound, firstName: 'Bert', accountEmail: 'servecreusen@softora.nl' });
-  assert.match(answer, /Dankjewel voor je reactie/);
+  assert.match(answer, /Bedankt dat je de moeite hebt genomen om te reageren/);
   assert.doesNotMatch(answer, /preview|afspraak|ontwerp/i);
 });
 

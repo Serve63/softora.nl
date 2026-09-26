@@ -867,13 +867,15 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   const composeAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose.js?v=20260908a');
   assert.doesNotMatch(pageSource, /<button[^>]+(?:spellcheck-compose|undo-spelling)/);
   assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie/);
+  assert.match(pageSource, /<textarea id="c-body"[^>]*><\/textarea><div class="compose-body-loading" id="c-body-loading" role="status"[^>]*hidden><span class="compose-body-spinner"/);
+  assert.match(pageSource, /\.compose-body-spinner \{[^}]*animation: mailbox-refresh-spin/);
   assert.match(pageSource, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260924c/);
   const browserStorageAssetIndex = pageSource.indexOf('assets/premium-browser-storage.js?v=20260828b');
   const attachmentDigestAssetIndex = pageSource.indexOf('assets/premium-mailbox-attachment-digest.js?v=20260828c');
   const sendStateAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-send-state.js?v=20260831b');
   const sendResilienceAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-send-resilience.js?v=20260908a');
   const acceptedSendAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-accepted-send.js?v=20260827b');
-  const composeControllerAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-controller.js?v=20260908a');
+  const composeControllerAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-controller.js?v=20260926a');
   assert.ok(composeAssetIndex >= 0, 'compose asset met actuele cachebuster ontbreekt');
   assert.ok(browserStorageAssetIndex >= 0, 'browser-storage asset ontbreekt');
   assert.ok(attachmentDigestAssetIndex >= 0, 'attachment-digest asset ontbreekt');

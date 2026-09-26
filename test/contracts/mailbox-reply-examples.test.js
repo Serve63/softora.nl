@@ -173,7 +173,7 @@ test('voorgestelde reactie gebruikt GPT-6 Luna op max via de Responses API', asy
     accountEmail: 'serve@softora.nl', to: 'klant@example.test', subject: 'Re: Kleine vraag over jullie website', body: '',
     context: { from: 'Klant', email: 'klant@example.test', body: 'We hebben geen interesse.' },
   });
-  assert.match(result.text, /Helemaal helder, dankjewel voor je reactie\./);
+  assert.match(result.text, /Helemaal helder, bedankt dat je de moeite hebt genomen om te reageren\./);
   assert.equal(calls[0].url, 'https://api.openai.com/v1/responses');
   assert.equal(calls[0].payload.model, 'gpt-6-luna');
   assert.deepEqual(calls[0].payload.reasoning, { effort: 'max' });
@@ -222,4 +222,30 @@ test('eerdere antwoorden bepalen de aanpak, zonder zinnen letterlijk over te nem
   assert.match(prompt, /niet volgens je eigen idee van wat logisch is/);
   assert.match(prompt, /kopieer geen zinnen letterlijk/);
   assert.doesNotMatch(prompt, /zo dicht mogelijk/);
+});
+
+test('aanhef gebruikt nooit "Sent" uit een Sent from my iPhone-voettekst', () => {
+  const reply = JSON.stringify({ intent: 'rejection', ctaAllowed: false, aanhefNaam: 'Sent', paragraphs: [{ text: 'Helemaal duidelijk, ik haal de conceptpagina offline.', evidence: ['received.body'] }] });
+  const inboundText = 'Haal die pagina maar offline.\n\nSent from my iPhone';
+  const originalSentMail = { body: 'Goedendag,\nIk kwam jullie site tegen.' };
+  assert.match(enforceMailboxReplyProfile(reply, { inboundText, originalSentMail }), /^Goedendag,\n/);
+  const signed = JSON.stringify({ intent: 'rejection', ctaAllowed: false, aanhefNaam: 'Toine', paragraphs: [{ text: 'Dankjewel voor je reactie.', evidence: ['received.body'] }] });
+  assert.match(enforceMailboxReplyProfile(signed, { inboundText: 'We bouwen zelf verder.\n\nToine\nOisterwijk in Concert', originalSentMail }), /^Goedendag Toine,/);
+  assert.match(enforceMailboxReplyProfile(signed, { inboundText: 'Toine vindt het mooi, maar we bouwen zelf verder.', originalSentMail }), /^Goedendag,\n/);
+});
+
+test('eerste antwoord bedankt altijd voor de moeite en zegt nooit "helemaal begrijpelijk"', () => {
+  const originalSentMail = { body: 'Goedendag,\nIk kwam jullie site tegen.' };
+  const reply = (text) => JSON.stringify({ intent: 'rejection', ctaAllowed: false, aanhefNaam: '', paragraphs: [{ text, evidence: ['received.body'] }] });
+  const inboundText = 'Leuk voorbeeld, maar we bouwen de website zelf.';
+  const replaced = enforceMailboxReplyProfile(reply('Dankjewel voor je reactie! Leuk om te horen dat je het voorbeeld leuk vindt. Helemaal begrijpelijk dat jullie de website zelf willen blijven bouwen.'), { inboundText, originalSentMail });
+  assert.match(replaced, /\n\nBedankt dat je de moeite hebt genomen om te reageren! Leuk om te horen/);
+  assert.match(replaced, /Ik snap goed dat jullie de website zelf/);
+  assert.doesNotMatch(replaced, /helemaal begrijpelijk|Dankjewel voor je reactie/i);
+  const prepended = enforceMailboxReplyProfile(reply('Helemaal duidelijk, ik haal de conceptpagina offline.'), { inboundText, originalSentMail });
+  assert.match(prepended, /\n\nBedankt dat je de moeite hebt genomen om te reageren! Helemaal duidelijk/);
+  const kept = enforceMailboxReplyProfile(reply('Duidelijk. In ieder geval bedankt dat je de moeite hebt genomen om te reageren.'), { inboundText, originalSentMail });
+  assert.equal((kept.match(/moeite/g) || []).length, 1);
+  const followUp = enforceMailboxReplyProfile(reply('Helemaal duidelijk.'), { inboundText, originalSentMail, conversation: [{ folder: 'inbox', body: 'Eerdere reactie' }] });
+  assert.doesNotMatch(followUp, /moeite/);
 });
