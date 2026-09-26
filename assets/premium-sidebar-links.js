@@ -54,7 +54,7 @@
     }
 
     const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set([
-        "leads", "coldcalling", "qr_code",
+        "leads", "coldcalling", "qr_code", "lead_radar", "ads_facebook", "ads_google",
         "ads_linkedin",
         "ads_pinterest",
         "ads_twitter",
