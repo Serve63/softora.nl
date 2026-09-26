@@ -324,7 +324,8 @@
       withWebsiteObserver.observe(withWebsiteTotal, { childList: true, characterData: true, subtree: true });
       controller.withWebsiteObserver = withWebsiteObserver;
     }
-    deps.window.setInterval(controller.renderMetrics, 1000);
+    // Wait while the user selects text, so a re-render never clears the selection.
+    deps.window.setInterval(() => { if (!deps.window.SoftoraKvkSelectionPause?.isSelecting()) controller.renderMetrics(); }, 1000);
     deps.window.setInterval(() => { void controller.refreshCanonicalCounts(); }, CANONICAL_REFRESH_INTERVAL_MS);
     deps.window.addEventListener('focus', () => {
       controller.renderMetrics();

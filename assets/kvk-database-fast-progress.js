@@ -62,7 +62,8 @@
   }
 
   global.SoftoraKvkFastProgress = { mergeProgress, overlaySnapshot, refresh, REFRESH_MS };
-  global.setInterval(refresh, REFRESH_MS);
+  // Wait while the user selects text, so a refresh never clears the selection.
+  global.setInterval(() => { if (!global.SoftoraKvkSelectionPause?.isSelecting()) refresh(); }, REFRESH_MS);
   global.addEventListener('focus', refresh);
   global.document.addEventListener('visibilitychange', refresh);
   refresh();
