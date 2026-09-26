@@ -1,5 +1,18 @@
 const { randomUUID } = require('crypto');
 
+let cachedSharp = null;
+
+async function createPreviewThumbnailDataUrl(dataUrl) {
+  const match = /^data:image\/[a-z0-9.+-]+;base64,(.+)$/i.exec(String(dataUrl || ''));
+  if (!match) return '';
+  if (!cachedSharp) cachedSharp = require('sharp');
+  const buffer = await cachedSharp(Buffer.from(match[1], 'base64'), { limitInputPixels: 45_000_000 })
+    .resize({ width: 420, withoutEnlargement: true })
+    .webp({ quality: 70 })
+    .toBuffer();
+  return `data:image/webp;base64,${buffer.toString('base64')}`;
+}
+
 function createWebsitePreviewLibraryCoordinator(deps = {}) {
   const {
     logger = console,
@@ -10,6 +23,8 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     fetchSupabaseRowsByStateKeyPrefixViaRest = async () => ({ ok: false, body: null }),
     upsertSupabaseRowViaRest = async () => ({ ok: false, body: null }),
     deleteSupabaseRowByStateKeyViaRest = async () => ({ ok: false, body: null }),
+    fetchSupabaseRowByKeyViaRest = async () => ({ ok: false, body: null }),
+    createThumbnailDataUrl = createPreviewThumbnailDataUrl,
     supabaseStateKey = '',
     storageRetrySleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   } = deps;
@@ -22,6 +37,14 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
   const maxDataUrlChars = Math.floor(12 * 1024 * 1024);
   /** Houd de lijstrespons klein genoeg voor serverless/browser-limieten. */
   const maxListDataUrlChars = Math.floor(3.2 * 1024 * 1024);
+  const maxThumbDataUrlChars = 400 * 1024;
+  // The list never downloads full screenshots; only metadata and the small thumbnail.
+  const listSelectColumns = [
+    'state_key', 'updated_at', 'id:payload->>id', 'url:payload->>url', 'hostname:payload->>hostname',
+    'fileName:payload->>fileName', 'width:payload->>width', 'height:payload->>height',
+    'createdAt:payload->>createdAt', 'thumbDataUrl:payload->>thumbDataUrl',
+  ].join(',');
+  const idSelectColumns = 'state_key,type:payload->>type,id:payload->>id';
 
   function buildOwnerSlug(req) {
     const email = normalizeString(req?.premiumAuth?.email || '').toLowerCase();
@@ -56,13 +79,20 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     );
   }
 
+  function readThumbDataUrl(value) {
+    const thumb = String(value || '');
+    return thumb.startsWith('data:image/') && thumb.length <= maxThumbDataUrlChars ? thumb : '';
+  }
+
   function mapSupabaseRowToClientEntry(row) {
-    const payload = row?.payload && typeof row.payload === 'object' ? row.payload : {};
+    // Rows come either with a full payload or with flattened light list columns.
+    const payload = row?.payload && typeof row.payload === 'object' ? row.payload : (row || {});
     const key = normalizeString(row?.state_key || '');
     const entryId = normalizeString(payload.id || '') || key.split(':').pop() || '';
     return {
       id: entryId,
       dataUrl: String(payload.dataUrl || ''),
+      thumbDataUrl: readThumbDataUrl(payload.thumbDataUrl),
       url: String(payload.url || ''),
       hostname: String(payload.hostname || ''),
       fileName: String(payload.fileName || ''),
@@ -97,15 +127,48 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
   }
 
   async function fetchStoredPreviewRowById(entryId, selectColumns = 'state_key,payload,updated_at') {
-    const result = await fetchAllRowsByPrefix(buildGlobalKeyPrefix(), selectColumns);
+    // Find the key with a tiny id-only query, then download just that one row.
+    const result = await fetchAllRowsByPrefix(buildGlobalKeyPrefix(), idSelectColumns);
     if (!result.ok) return { ok: false, result, row: null };
 
-    const row = (Array.isArray(result.body) ? result.body : []).find((candidate) => {
-      const payload = candidate?.payload && typeof candidate.payload === 'object' ? candidate.payload : {};
+    const match = (Array.isArray(result.body) ? result.body : []).find((candidate) => {
+      const payload = candidate?.payload && typeof candidate.payload === 'object' ? candidate.payload : candidate || {};
       return payload.type === 'website_preview_library' && normalizeString(payload.id) === entryId;
     });
+    if (!match) return { ok: true, result, row: null };
 
-    return { ok: true, result, row: row || null };
+    const rowResult = await fetchSupabaseRowByKeyViaRest(
+      normalizeString(match.state_key), selectColumns, libraryStorageOptions
+    );
+    if (!rowResult.ok) return { ok: false, result: rowResult, row: null };
+    const row = Array.isArray(rowResult.body) ? rowResult.body[0] : null;
+    return { ok: true, result: rowResult, row: row || null };
+  }
+
+  async function safeCreateThumbnail(dataUrl) {
+    try {
+      return readThumbDataUrl(await createThumbnailDataUrl(dataUrl));
+    } catch (error) {
+      logger.error('[WebsitePreviewLibrary][Thumbnail]', error?.message || error);
+      return '';
+    }
+  }
+
+  /** Oudere items krijgen hun thumbnail bij de eerste volledige opvraag. */
+  async function backfillThumbnail(row, entry) {
+    if (entry.thumbDataUrl || !row?.state_key || !row?.payload) return entry;
+    const thumbDataUrl = await safeCreateThumbnail(entry.dataUrl);
+    if (!thumbDataUrl) return entry;
+    try {
+      await upsertSupabaseRowViaRest({
+        state_key: row.state_key,
+        payload: { ...row.payload, thumbDataUrl },
+        updated_at: row.updated_at || entry.createdAt,
+      }, libraryStorageOptions);
+    } catch (error) {
+      logger.error('[WebsitePreviewLibrary][ThumbnailBackfill]', error?.message || error);
+    }
+    return { ...entry, thumbDataUrl };
   }
 
   async function listLibraryResponse(req, res) {
@@ -118,7 +181,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     }
 
     try {
-      const result = await fetchAllRowsByPrefix(buildGlobalKeyPrefix());
+      const result = await fetchAllRowsByPrefix(buildGlobalKeyPrefix(), listSelectColumns);
       if (!result.ok) {
         logger.error(
           '[WebsitePreviewLibrary][List]',
@@ -133,21 +196,17 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
 
       const rawRows = Array.isArray(result.body) ? result.body : [];
       const entries = [];
-      let dataUrlChars = 0;
+      let thumbChars = 0;
       let omittedLargeItems = 0;
 
       for (const row of rawRows) {
-        const entry = mapSupabaseRowToClientEntry(row);
-        if (!entry.id || !entry.dataUrl || !entry.dataUrl.startsWith('data:image/')) continue;
+        const { dataUrl: _fullImage, ...entry } = mapSupabaseRowToClientEntry(row);
+        if (!entry.id) continue;
 
-        const nextSize = entry.dataUrl.length;
-        if (nextSize > maxListDataUrlChars || dataUrlChars + nextSize > maxListDataUrlChars) {
-          entries.push({ ...entry, dataUrl: '', imageDeferred: true });
-          continue;
-        }
-
-        entries.push(entry);
-        dataUrlChars += nextSize;
+        const nextSize = entry.thumbDataUrl.length;
+        const thumbDataUrl = nextSize && thumbChars + nextSize <= maxListDataUrlChars ? entry.thumbDataUrl : '';
+        thumbChars += thumbDataUrl.length;
+        entries.push({ ...entry, dataUrl: '', thumbDataUrl, imageDeferred: true });
       }
 
       return res.status(200).json({
@@ -220,6 +279,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
       const width = Math.max(16, Math.min(4096, Number(bodyObj.width) || 1024));
       const height = Math.max(16, Math.min(8192, Number(bodyObj.height) || 1536));
       const now = new Date().toISOString();
+      const thumbDataUrl = await safeCreateThumbnail(dataUrl);
 
       const row = {
         state_key: stateKey,
@@ -227,6 +287,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
           type: 'website_preview_library',
           id: entryId,
           dataUrl,
+          thumbDataUrl,
           url,
           hostname,
           fileName,
@@ -320,7 +381,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
     }
 
     try {
-      const verify = await fetchStoredPreviewRowById(entryId, 'state_key,payload');
+      const verify = await fetchStoredPreviewRowById(entryId, idSelectColumns);
       if (!verify.ok) {
         logger.error(
           '[WebsitePreviewLibrary][DeleteVerify]',
@@ -340,7 +401,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
         });
       }
 
-      const payload = verify.row?.payload;
+      const payload = verify.row;
       if (!payload || payload.type !== 'website_preview_library' || normalizeString(payload.id) !== entryId) {
         return res.status(404).json({
           ok: false,
@@ -402,7 +463,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
         });
       }
 
-      const entry = mapSupabaseRowToClientEntry(row);
+      let entry = mapSupabaseRowToClientEntry(row);
       if (!entry.id || !entry.dataUrl || !entry.dataUrl.startsWith('data:image/')) {
         return res.status(404).json({
           ok: false,
@@ -411,6 +472,7 @@ function createWebsitePreviewLibraryCoordinator(deps = {}) {
         });
       }
 
+      entry = await backfillThumbnail(row, entry);
       return res.status(200).json({ ok: true, entry });
     } catch (error) {
       logger.error('[WebsitePreviewLibrary][GetCrash]', error?.message || error);

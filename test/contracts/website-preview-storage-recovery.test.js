@@ -53,7 +53,10 @@ test('generated photo survives unrelated database cooldown and uncertain first w
   assert.equal(listed.code, 200);
   assert.equal(listed.body.entries.length, 1);
   assert.equal(listed.body.entries[0].id, status.body.job.items[0].libraryEntryId);
-  assert.equal(listed.body.entries[0].dataUrl, 'data:image/png;base64,AAAA');
+  assert.equal(listed.body.entries[0].dataUrl, '');
+  const detail = response();
+  await library.getLibraryEntryResponse({ ...req, params: { id: listed.body.entries[0].id } }, detail);
+  assert.equal(detail.body.entry.dataUrl, 'data:image/png;base64,AAAA');
   assert.equal(RELIABLE_UI_STATE_READ_OPTIONS_BY_SCOPE.website_preview_batches.ignoreSupabaseRestFailureCooldown, true);
 });
 
