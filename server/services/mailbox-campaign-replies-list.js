@@ -13,6 +13,10 @@ const {
   createMailboxCampaignContentVersionReader,
   createMailboxCampaignVersionCache,
 } = require('./mailbox-campaign-version-cache');
+const {
+  createMailboxCampaignSharedCache,
+  isMailboxCampaignSharedCacheEnabled,
+} = require('./mailbox-campaign-shared-cache');
 
 function createMailboxCampaignRepliesList({
   mailboxCampaignRepliesService,
@@ -22,9 +26,11 @@ function createMailboxCampaignRepliesList({
   getUiStateValues,
   mailboxIndexStore,
   getSupabaseClient,
+  env = {},
   logger,
   campaignVersionCache = createMailboxCampaignVersionCache({
     readContentVersion: createMailboxCampaignContentVersionReader({ getSupabaseClient }),
+    sharedStore: isMailboxCampaignSharedCacheEnabled(env) ? createMailboxCampaignSharedCache({ getSupabaseClient }) : null,
     logger,
   }),
   normalizeString,
