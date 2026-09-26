@@ -11,7 +11,7 @@ const SOFTORA_SOURCE_TEXT_KEYS = Object.freeze([
 ]);
 const OUTLOOK_FROM_HEADER_PATTERN = /^(?:van|from):\s*(.+)$/i;
 const OUTLOOK_SUBJECT_HEADER_PATTERN = /^(?:onderwerp|subject):/i;
-const QUOTED_BODY_AUDIT_VERSION = 'v1';
+const QUOTED_BODY_AUDIT_VERSION = 'v2';
 // Instantly rotates Softora's sending accounts per sender profile, so the
 // lead's softora_sender_email (the profile default) may differ from the
 // account that actually sent it. Accounts of the same profile are the same
@@ -330,7 +330,9 @@ function extractQuotedOriginalBodyEvidence(rawMessages = [], options = {}) {
       }
     }
 
-    for (const segment of parsed.segments.filter((candidate) => candidate.marker !== 'reply-header')) {
+    // A reply header can wrap a forwarded original from a different sender.
+    // Inspect its envelope too; the strict caller still requires an exact body match.
+    for (const segment of parsed.segments) {
       const lines = segment.displayLines;
       const outlookFromIndex = lines.findIndex((line) => {
         const match = stripQuotePrefix(line).match(OUTLOOK_FROM_HEADER_PATTERN);

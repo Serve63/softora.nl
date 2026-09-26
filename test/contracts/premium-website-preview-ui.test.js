@@ -101,7 +101,12 @@ test('premium websitegenerator removes the legacy openen button but keeps downlo
   assert.doesNotMatch(source, />Openen</);
   assert.match(source, /Download PNG/);
   assert.match(source, /function createLibraryCardElement\(entry\) \{/);
-  assert.match(source, /card\.addEventListener\('click', \(\) => openLibraryEntry\(id\)\);/);
+  assert.doesNotMatch(source, /card\.addEventListener\('(click|keydown)'/);
+  assert.doesNotMatch(source, /card\.setAttribute\('(role|tabindex)'/);
+  assert.match(source, /removeBtn\.className = 'library-card-remove'/);
+  assert.match(source, /removeBtn\.textContent = '×'/);
+  assert.match(source, /link\.download = buildWebsitePreviewDownloadName\(full.url, full.hostname, full.fileName\)/);
+  assert.match(source, /if \(!isSafeLibraryDataUrl\(full\?\.dataUrl\)\) full = await fetchLibraryEntryById\(id\)/);
   assert.match(source, /removeBtn\.addEventListener\('click', \(event\) => \{[\s\S]*void removeLibraryEntry\(id, event\);/);
   assert.match(source, /reconcileWebsitePreviewCards\(grid, items, createLibraryCardElement\)/);
   assert.doesNotMatch(source, /onclick="openLibraryEntry\(/);
@@ -271,4 +276,15 @@ test('completed webdesign hides the status bar while running and failed jobs kee
 test('preview title stays on one line beside the download button', () => {
   assert.match(websiteGeneratorHtmlSource, /\.preview-label > span\s*\{[^}]*white-space: nowrap;[^}]*letter-spacing: \.1px;/);
   assert.match(websiteGeneratorHtmlSource, /\.preview-actions\s*\{[^}]*flex-shrink: 0;/);
+});
+
+
+test('library actions and download-name scripts invalidate cached browser versions together', () => {
+  assert.match(websiteGeneratorHtmlSource, /premium-websitegenerator-ui-state\.js\?v=20260926-download-names/);
+  assert.match(websiteGeneratorHtmlSource, /premium-websitegenerator\.js\?v=20260926-library-domain/);
+});
+
+
+test('library displays the site name without the www prefix', () => {
+  assert.ok(websiteGeneratorScriptSource.includes("const host = String(entry.hostname || '—').replace(/^www\\./i, '');"));
 });

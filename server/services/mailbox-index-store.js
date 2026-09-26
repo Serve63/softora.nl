@@ -1017,6 +1017,15 @@ function createMailboxIndexStore(deps = {}) {
     return result.data || null;
   }
 
+  // Same live-lease definition as softora_claim_mailbox_sync_lock, which caps
+  // concurrent mailbox syncs at three. Returns null when it cannot be read.
+  async function countActiveSyncLeases() {
+    const result = await run('count-active-sync-leases', (client) => client
+      .from(MAILBOX_INDEX_TABLES.syncState).select('sync_key', { count: 'exact', head: true })
+      .eq('status', 'syncing').not('lock_token', 'is', null).gt('lock_expires_at', isoNow()));
+    return result.ok && Number.isInteger(result.count) ? result.count : null;
+  }
+
   const {
     acquireSyncLock,
     acquireSyncLockForProtocol,
@@ -1096,6 +1105,7 @@ function createMailboxIndexStore(deps = {}) {
     BODY_RETENTION_NEWEST_COUNT,
     MAILBOX_INDEX_TABLES,
     acquireSyncLock,
+    countActiveSyncLeases,
     acquireSyncLockForProtocol,
     buildMessageKey,
     buildMessageRow,
