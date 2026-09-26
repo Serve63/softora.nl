@@ -1,3 +1,4 @@
+const { buildInstantlyReplyBody } = require('./instantly-reply-body');
 const DEFAULT_API_BASE_URL = 'https://api.instantly.ai/api/v2';
 const { parseProviderHtml } = require('./mailbox-provider-rich-body');
 const {
@@ -1064,7 +1065,7 @@ function createInstantlyMailboxService(deps = {}) {
         eaccount: account,
         reply_to_uuid: stored.providerMessageId,
         subject: cleanSubject,
-        body: { text: cleanText },
+        body: buildInstantlyReplyBody(cleanText),
         cc_address_email_list: ccAddresses.join(','),
         bcc_address_email_list: bccAddresses.join(','),
       },
