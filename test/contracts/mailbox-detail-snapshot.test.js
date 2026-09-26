@@ -130,7 +130,7 @@ test('the Mailbox wires the detail snapshot before its page script and only capt
   const adapter = page.indexOf('assets/premium-mailbox-detail-snapshot.js?v=20260924a');
   assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < adapter);
   assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924b') < adapter);
-  assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20260924g'));
+  assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20260927a'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /snapshot: window\.SoftoraMailboxDetailSnapshot, shouldCaptureSnapshot: \(mail\) => String\(getMailsForFolder\(activeFolder\)\[0\]\?\.id \?\? ''\) === String\(mail\.id\)/);
   const snapshotAdapter = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-detail-snapshot.js'), 'utf8');
@@ -198,10 +198,20 @@ test('clicking a conversation renders it once, complete, instead of body first a
   assert.match(source, /const PENDING_PARTIAL_RENDER_DELAY_MS = 1500;/);
 });
 
-test('"E-mail laden…" only appears when opening really takes longer than a few frames', () => {
+test('switching conversations keeps the complete previous content without a loading overlay', async () => {
   const page = fs.readFileSync(path.join(__dirname, '../../premium-mailbox.html'), 'utf8');
-  assert.match(page, /\.mail-detail\.is-detail-pending > \* \{ animation: mail-detail-pending-hide 0s linear 150ms forwards; \}/);
-  assert.match(page, /@keyframes mail-detail-pending-hide \{ to \{ visibility: hidden; \} \}/);
-  assert.match(page, /\.mail-detail\.is-detail-pending::after \{ content: 'E-mail laden…';[^}]* opacity: 0; animation: mail-detail-pending-show 0s linear 150ms forwards; \}/);
-  assert.doesNotMatch(page, /\.mail-detail\.is-detail-pending > \* \{ visibility: hidden; \}/);
+  assert.doesNotMatch(page, /mail-detail-pending-hide|mail-detail-pending-show|content: 'E-mail laden/);
+  const body = deferred();
+  const v = view({ savedView: '', needsRootHydration: () => true,
+    async hydrateRoot({ mail }) { await body.promise; mail.body = 'Next complete conversation'; mail.bodyLoaded = true; },
+  });
+  v.detail.innerHTML = 'Previous complete conversation';
+  const opened = v.controller.open(v.mail.id);
+  await tick();
+  assert.equal(v.detail.innerHTML, 'Previous complete conversation');
+  assert.equal(v.classes.has('is-detail-pending'), true, 'the existing inert safety fence remains active until commit');
+  body.resolve();
+  await opened;
+  assert.equal(v.detail.innerHTML, 'Next complete conversation|');
+  assert.equal(v.classes.has('is-detail-pending'), false);
 });
