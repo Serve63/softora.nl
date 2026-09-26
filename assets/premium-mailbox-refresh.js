@@ -8,6 +8,19 @@
   const REFRESH_MAX_ATTEMPTS = 2;
   const REFRESH_RETRY_BASE_DELAY_MS = 500;
   const RECOVERY_REFRESH_INTERVAL_MS = 60 * 1000;
+  // A provider check that stored nothing new may reuse the visible list; a full
+  // list rebuild still runs at least this often for changes outside the sync.
+  const UNCHANGED_LIST_REUSE_MS = 5 * 60 * 1000;
+
+  function isUnchangedProviderSync(entry) {
+    if (!entry || entry.url !== '/api/mailbox/sync' || entry.data?.ok !== true) return false;
+    const results = entry.data.results;
+    return Array.isArray(results) && results.length > 0 && results.every((result) => (
+      result?.ok === true && Number(result.synced) === 0 && Number(result.upserted) === 0 &&
+      result.resetDetected !== true && result.rebuildPending !== true &&
+      result.activated !== true && result.historyBackfill !== true
+    ));
+  }
 
   function formatRefreshAge(lastRefreshAt, currentTime = Date.now()) {
     if (!Number.isFinite(Number(lastRefreshAt)) || Number(lastRefreshAt) <= 0) return '';
@@ -104,7 +117,7 @@
       if (!freshnessByScope.has(key)) {
         const remembered = Number(rememberedFreshness[key]);
         const lastSuccessfulAt = Number.isFinite(remembered) && remembered > 0 && remembered <= getNow() ? remembered : 0;
-        freshnessByScope.set(key, { status: 'idle', lastSuccessfulAt, lastErrorAt: 0 });
+        freshnessByScope.set(key, { status: 'idle', lastSuccessfulAt, lastErrorAt: 0, lastListLoadedAt: 0 });
       }
       return freshnessByScope.get(key);
     }
@@ -356,6 +369,11 @@
               Array.isArray(entry.data.results) && entry.data.results.length > 0 &&
               entry.data.results.every((result) => result?.ok === true && result.stored === 0)
             ))) continue;
+            if (!listUpdated && state.lastListLoadedAt && getNow() - state.lastListLoadedAt < UNCHANGED_LIST_REUSE_MS &&
+              batchFulfilled.length === batchSettled.length && batchFulfilled.every(isUnchangedProviderSync)) {
+              listUpdated = true;
+              continue;
+            }
             const batchListUpdated = await boundedOperation((listSignal) => loadMessages({
               signal: listSignal,
               showLoader: false,
@@ -373,6 +391,7 @@
             }
             listUpdated = true;
             listRefreshFailed = false;
+            state.lastListLoadedAt = getNow();
           }
           const fulfilled = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
           const rejected = settled.filter((entry) => entry.status === 'rejected');

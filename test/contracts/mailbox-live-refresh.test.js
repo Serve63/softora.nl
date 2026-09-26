@@ -857,6 +857,39 @@ test('Instantly zonder wijzigingen vermijdt alleen een overbodige tweede geslaag
   }
 });
 
+test('mailboxsync zonder nieuwe mail hergebruikt een recente lijst en herbouwt na vijf minuten volledig', async () => {
+  const unchanged = { ok: true, account: 'serve@softora.nl', folder: 'inbox', synced: 0, upserted: 0,
+    historyBackfill: false, rebuildPending: false, activated: false, resetDetected: false };
+  for (const [syncResult, instantlyStored, ageMs, expectedLoads] of [
+    [unchanged, 0, 60_000, 0],
+    [unchanged, 1, 60_000, 1],
+    [unchanged, 0, 5 * 60_000, 1],
+    [{ ...unchanged, synced: 1, upserted: 1 }, 0, 60_000, 1],
+    [{ ...unchanged, resetDetected: true }, 0, 60_000, 1],
+    [{ ...unchanged, rebuildPending: true }, 0, 60_000, 1],
+    [{ ...unchanged, ok: false }, 0, 60_000, 1],
+    [{ ok: true }, 0, 60_000, 1],
+  ]) {
+    let now = 1_000_000;
+    let loads = 0;
+    const controller = refreshModule.create({
+      autoStart: false, getFolder: () => 'outreach', getOwner: () => 'serve', now: () => now,
+      fetch: async (url) => successfulResponse(url.includes('instantly')
+        ? { ok: true, results: [{ ok: true, stored: instantlyStored }] }
+        : { ok: true, results: [syncResult] }),
+      loadMessages: async () => { loads += 1; return true; },
+      setTimeout: () => 1, clearTimeout() {},
+    });
+    assert.equal(await controller.refresh(), true);
+    assert.ok(loads >= 1, 'de eerste controle bouwt de lijst altijd volledig op');
+    loads = 0;
+    now += ageMs;
+    assert.equal(await controller.refresh({ manual: true }), true);
+    assert.equal(loads, expectedLoads);
+    controller.destroy();
+  }
+});
+
 test('hangende responsebody valt onder dezelfde timeout en maakt de verversknop weer vrij', async () => {
   const timeouts = [];
   const signals = [];
