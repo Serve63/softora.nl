@@ -11,6 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
+    <link rel="stylesheet" href="assets/premium-word.css?v=20260926a">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -64,202 +65,6 @@
             justify-content: flex-start;
         }
 
-        .word-shell {
-            width: 100%;
-            max-width: none;
-            margin: 0;
-            display: grid;
-            gap: 1rem;
-        }
-
-        .page-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 2rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-            line-height: 1;
-            margin-bottom: 0.3rem;
-        }
-
-        .page-subtitle {
-            font-size: 0.9rem;
-            font-weight: 300;
-            line-height: 1.4;
-            color: var(--text-tertiary);
-        }
-
-        .word-app {
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            box-shadow: 0 14px 40px rgba(20, 18, 34, 0.05);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            min-height: calc(100vh - 8rem);
-            background: #f3f4f6;
-        }
-
-        .word-ribbon {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0.35rem 0.75rem;
-            padding: 0.55rem 0.75rem;
-            background: linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%);
-            border-bottom: 1px solid #d1d5db;
-        }
-
-        .word-status {
-            padding: 0.7rem 0.9rem;
-            border-bottom: 1px solid #fed7aa;
-            background: #fff7ed;
-            color: #7c2d12;
-            font-size: 0.82rem;
-            line-height: 1.45;
-        }
-
-        .word-status[hidden] {
-            display: none;
-        }
-
-        .ribbon-group {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0.25rem;
-            padding-right: 0.75rem;
-            margin-right: 0.25rem;
-            border-right: 1px solid #e5e7eb;
-        }
-
-        .ribbon-group:last-child {
-            border-right: 0;
-            margin-right: 0;
-            padding-right: 0;
-        }
-
-        .ribbon-btn {
-            font: inherit;
-            font-size: 0.8rem;
-            min-width: 2rem;
-            height: 2rem;
-            padding: 0 0.45rem;
-            border: 1px solid transparent;
-            border-radius: 6px;
-            background: #fff;
-            color: var(--text-primary);
-            cursor: pointer;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-        }
-
-        .ribbon-btn:hover {
-            border-color: #c4c9d1;
-            background: #f9fafb;
-        }
-
-        .ribbon-btn:active {
-            background: #e5e7eb;
-        }
-
-        .ribbon-btn:disabled {
-            opacity: 0.45;
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-
-        .ribbon-select {
-            font: inherit;
-            font-size: 0.78rem;
-            height: 2rem;
-            padding: 0 0.35rem;
-            border-radius: 6px;
-            border: 1px solid #d1d5db;
-            background: #fff;
-            color: var(--text-primary);
-        }
-
-        .ribbon-color {
-            width: 2rem;
-            height: 2rem;
-            padding: 0;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            cursor: pointer;
-            background: #fff;
-        }
-
-        .ribbon-label {
-            font-size: 0.65rem;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--text-tertiary);
-            margin-right: 0.25rem;
-        }
-
-        .word-page-outer {
-            flex: 1;
-            overflow: auto;
-            padding: 1.5rem 1rem 2.5rem;
-            background: #e5e7eb;
-        }
-
-        .word-page {
-            max-width: 51rem;
-            min-height: 72rem;
-            margin: 0 auto;
-            background: #fff;
-            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.12);
-            padding: 3rem 3.25rem 4rem;
-            color: #111827;
-        }
-
-        .word-editor {
-            min-height: 64rem;
-            outline: none;
-            font-size: 11pt;
-            line-height: 1.55;
-        }
-
-        .word-editor:empty::before {
-            content: attr(data-placeholder);
-            color: #9ca3af;
-            pointer-events: none;
-        }
-
-        .word-editor h1 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            margin: 0.5rem 0 0.75rem;
-        }
-
-        .word-editor h2 {
-            font-size: 1.35rem;
-            font-weight: 600;
-            margin: 0.5rem 0 0.6rem;
-        }
-
-        .word-editor h3 {
-            font-size: 1.12rem;
-            font-weight: 600;
-            margin: 0.4rem 0 0.5rem;
-        }
-
-        .word-editor p {
-            margin: 0 0 0.65rem;
-        }
-
-        .word-editor ul,
-        .word-editor ol {
-            margin: 0 0 0.65rem;
-            padding-left: 1.75rem;
-        }
-
-        .word-editor a {
-            color: #2563eb;
-            text-decoration: underline;
-        }
-
         @media (max-width: 900px) {
             .sidebar {
                 position: static;
@@ -273,14 +78,6 @@
                 padding: 1rem;
             }
 
-            .word-app {
-                min-height: 76vh;
-            }
-
-            .word-page {
-                min-height:50rem;
-                padding: 1.5rem 1.25rem 2rem;
-            }
         }
     </style>
 </head>
@@ -360,63 +157,222 @@
             <section class="word-shell">
                 <header>
                     <h1 class="page-title">Word</h1>
-                    <p class="page-subtitle">Rijke tekstopmaak op een documentpagina. Automatisch opgeslagen.</p>
+                    <p class="page-subtitle">Schrijf, maak op en exporteer documenten. Alles wordt automatisch online opgeslagen.</p>
                 </header>
 
-                <div class="word-app">
+                <div class="word-app" id="wordApp">
+                    <div class="word-docbar">
+                        <span class="word-doc-icon" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+                        <div class="word-doc-meta">
+                            <input type="text" class="word-title-input" id="wordTitle" value="Naamloos document" maxlength="120" aria-label="Documentnaam" spellcheck="false">
+                            <span class="word-save-state" id="wordSaveState" data-state="loading" role="status" aria-live="polite">Laden…</span>
+                        </div>
+                        <div class="word-docbar-actions">
+                            <button type="button" class="word-action" id="wordToggleOutline" aria-pressed="false" title="Navigatiepaneel met koppen"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg><span class="word-action-text">Navigatie</span></button>
+                            <button type="button" class="word-action" id="wordFindOpen" title="Zoeken en vervangen (Ctrl/⌘ F)"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="word-action-text">Zoeken</span></button>
+                            <button type="button" class="word-action" id="wordRestoreBackup" title="Nog geen eerdere versies" disabled><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg><span class="word-action-text">Versies</span></button>
+                            <button type="button" class="word-action" id="wordNew" title="Nieuw leeg document"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6M9 14h6"/></svg><span class="word-action-text">Nieuw</span></button>
+                            <button type="button" class="word-action" id="wordImport" title="Word-, HTML- of tekstbestand openen"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg><span class="word-action-text">Openen</span></button>
+                            <input type="file" id="wordImportFile" accept=".docx,.html,.htm,.txt,.md,text/plain,text/html,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+                            <div class="word-menu-wrap">
+                                <button type="button" class="word-action word-action--primary" id="wordExportButton" aria-haspopup="menu" aria-expanded="false" aria-controls="wordExportMenu"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg><span class="word-action-text">Downloaden</span></button>
+                                <div class="word-menu" id="wordExportMenu" role="menu" hidden>
+                                    <button type="button" class="word-menu-item" role="menuitem" data-export="doc"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m8.5 12 1.2 5 1.3-4 1.3 4 1.2-5"/></svg><span>Word-document<small>Openen en verder bewerken in Microsoft Word</small></span></button>
+                                    <button type="button" class="word-menu-item" role="menuitem" data-export="pdf"><svg class="i" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="7" rx="1"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/></svg><span>PDF of afdrukken<small>Kies "Opslaan als PDF" in het printvenster</small></span></button>
+                                    <button type="button" class="word-menu-item" role="menuitem" data-export="html"><svg class="i" viewBox="0 0 24 24"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m14 4-4 16"/></svg><span>Webpagina (.html)<small>Met opmaak, voor e-mail of website</small></span></button>
+                                    <button type="button" class="word-menu-item" role="menuitem" data-export="txt"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Platte tekst (.txt)<small>Alleen de tekst, zonder opmaak</small></span></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="word-status" id="wordStatus" hidden role="status" aria-live="polite"></div>
+
                     <div class="word-ribbon" id="wordRibbon" role="toolbar" aria-label="Document opmaak">
                         <div class="ribbon-group">
-                            <button type="button" class="ribbon-btn" data-cmd="bold" title="Vet"><strong>B</strong></button>
-                            <button type="button" class="ribbon-btn" data-cmd="italic" title="Cursief"><em>I</em></button>
-                            <button type="button" class="ribbon-btn" data-cmd="underline" title="Onderstrepen"><span style="text-decoration:underline">U</span></button>
-                            <button type="button" class="ribbon-btn" data-cmd="strikeThrough" title="Doorhalen"><span style="text-decoration:line-through">S</span></button>
+                            <button type="button" class="ribbon-btn" data-cmd="undo" data-label="Ongedaan maken" data-shortcut="mod+Z"><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+                            <button type="button" class="ribbon-btn" data-cmd="redo" data-label="Opnieuw" data-shortcut="mod+shift+Z"><svg class="i" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
                         </div>
+                        <span class="ribbon-sep" aria-hidden="true"></span>
                         <div class="ribbon-group">
-                            <button type="button" class="ribbon-btn" data-cmd="formatBlock" data-val="p" title="Normaal">Normaal</button>
-                            <button type="button" class="ribbon-btn" data-cmd="formatBlock" data-val="h1" title="Kop 1">H1</button>
-                            <button type="button" class="ribbon-btn" data-cmd="formatBlock" data-val="h2" title="Kop 2">H2</button>
-                            <button type="button" class="ribbon-btn" data-cmd="formatBlock" data-val="h3" title="Kop 3">H3</button>
+                            <select class="ribbon-select ribbon-select--style" id="wordBlockStyle" aria-label="Stijl" title="Stijl">
+                                <option value="p">Normale tekst</option>
+                                <option value="h1">Kop 1</option>
+                                <option value="h2">Kop 2</option>
+                                <option value="h3">Kop 3</option>
+                                <option value="h4">Kop 4</option>
+                                <option value="blockquote">Citaat</option>
+                                <option value="pre">Code</option>
+                            </select>
+                            <select class="ribbon-select ribbon-select--font" id="wordFontFamily" aria-label="Lettertype" title="Lettertype">
+                                <option value="Calibri, Carlito, 'Segoe UI', Arial, sans-serif">Calibri</option>
+                                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                                <option value="Inter, 'Segoe UI', sans-serif">Inter</option>
+                                <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+                                <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                                <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                                <option value="Georgia, serif">Georgia</option>
+                                <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                                <option value="Garamond, 'EB Garamond', serif">Garamond</option>
+                                <option value="'Courier New', Courier, monospace">Courier New</option>
+                            </select>
+                            <select class="ribbon-select ribbon-select--size" id="wordFontSize" aria-label="Tekengrootte" title="Tekengrootte">
+                                <option value="8">8</option>
+                                <option value="9">9</option>
+                                <option value="10">10</option>
+                                <option value="11" selected>11</option>
+                                <option value="12">12</option>
+                                <option value="14">14</option>
+                                <option value="16">16</option>
+                                <option value="18">18</option>
+                                <option value="20">20</option>
+                                <option value="24">24</option>
+                                <option value="28">28</option>
+                                <option value="36">36</option>
+                                <option value="48">48</option>
+                                <option value="72">72</option>
+                            </select>
                         </div>
+                        <span class="ribbon-sep" aria-hidden="true"></span>
                         <div class="ribbon-group">
-                            <button type="button" class="ribbon-btn" data-cmd="insertUnorderedList" title="Lijst">• Lijst</button>
-                            <button type="button" class="ribbon-btn" data-cmd="insertOrderedList" title="Genummerd">1. Lijst</button>
+                            <button type="button" class="ribbon-btn" data-cmd="bold" data-label="Vet" data-shortcut="mod+B"><span class="glyph"><strong>B</strong></span></button>
+                            <button type="button" class="ribbon-btn" data-cmd="italic" data-label="Cursief" data-shortcut="mod+I"><span class="glyph"><em>I</em></span></button>
+                            <button type="button" class="ribbon-btn" data-cmd="underline" data-label="Onderstrepen" data-shortcut="mod+U"><span class="glyph" style="text-decoration:underline">U</span></button>
+                            <button type="button" class="ribbon-btn" data-cmd="strikeThrough" data-label="Doorhalen"><span class="glyph" style="text-decoration:line-through">S</span></button>
+                            <button type="button" class="ribbon-btn" data-cmd="superscript" data-label="Superscript"><span class="glyph glyph-small">x²</span></button>
+                            <button type="button" class="ribbon-btn" data-cmd="subscript" data-label="Subscript"><span class="glyph glyph-small">x₂</span></button>
+                            <label class="ribbon-color" title="Tekstkleur" id="wordForeColorLabel" style="color:#c0262d"><span class="glyph" aria-hidden="true">A</span><span class="ribbon-color-bar" aria-hidden="true"></span><input type="color" id="wordForeColor" value="#c0262d" aria-label="Tekstkleur"></label>
+                            <label class="ribbon-color" title="Markeren" id="wordHiliteColorLabel" style="color:#fde047"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="color:#3a3f4d;margin-top:-4px"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg><span class="ribbon-color-bar" aria-hidden="true"></span><input type="color" id="wordHiliteColor" value="#fde047" aria-label="Markeerkleur"></label>
+                            <button type="button" class="ribbon-btn" data-cmd="removeFormat" data-label="Opmaak wissen" data-shortcut="mod+\"><svg class="i" viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M5 20h6"/><path d="M13 4 8 20"/><path d="m15 15 5 5"/><path d="m20 15-5 5"/></svg></button>
                         </div>
+                        <span class="ribbon-sep" aria-hidden="true"></span>
                         <div class="ribbon-group">
-                            <button type="button" class="ribbon-btn" data-cmd="justifyLeft" title="Links uitlijnen">Links</button>
-                            <button type="button" class="ribbon-btn" data-cmd="justifyCenter" title="Centreren">Midden</button>
-                            <button type="button" class="ribbon-btn" data-cmd="justifyRight" title="Rechts uitlijnen">Rechts</button>
+                            <button type="button" class="ribbon-btn" data-cmd="justifyLeft" data-label="Links uitlijnen"><svg class="i" viewBox="0 0 24 24"><path d="M21 6H3M15 12H3M17 18H3"/></svg></button>
+                            <button type="button" class="ribbon-btn" data-cmd="justifyCenter" data-label="Centreren"><svg class="i" viewBox="0 0 24 24"><path d="M21 6H3M17 12H7M19 18H5"/></svg></button>
+                            <button type="button" class="ribbon-btn" data-cmd="justifyRight" data-label="Rechts uitlijnen"><svg class="i" viewBox="0 0 24 24"><path d="M21 6H3M21 12H9M21 18H7"/></svg></button>
+                            <button type="button" class="ribbon-btn" data-cmd="justifyFull" data-label="Uitvullen"><svg class="i" viewBox="0 0 24 24"><path d="M21 6H3M21 12H3M21 18H3"/></svg></button>
+                            <select class="ribbon-select ribbon-select--line" id="wordLineHeight" aria-label="Regelafstand" title="Regelafstand">
+                                <option value="" hidden>↕ —</option>
+                                <option value="1">↕ 1,0</option>
+                                <option value="1.15">↕ 1,15</option>
+                                <option value="1.5">↕ 1,5</option>
+                                <option value="2">↕ 2,0</option>
+                                <option value="2.5">↕ 2,5</option>
+                            </select>
                         </div>
+                        <span class="ribbon-sep" aria-hidden="true"></span>
                         <div class="ribbon-group">
-                            <span class="ribbon-label">Tekst</span>
-                            <input type="color" class="ribbon-color" id="wordForeColor" value="#111827" title="Tekstkleur" aria-label="Tekstkleur">
-                            <span class="ribbon-label">Markeer</span>
-                            <input type="color" class="ribbon-color" id="wordHiliteColor" value="#fef08a" title="Markeren" aria-label="Markeerkleur">
+                            <button type="button" class="ribbon-btn" data-cmd="insertUnorderedList" data-label="Opsommingstekens" data-shortcut="mod+shift+8"><svg class="i" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1.2" fill="currentColor"/><circle cx="4" cy="12" r="1.2" fill="currentColor"/><circle cx="4" cy="18" r="1.2" fill="currentColor"/></svg></button>
+                            <button type="button" class="ribbon-btn" data-cmd="insertOrderedList" data-label="Nummering" data-shortcut="mod+shift+7"><svg class="i" viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11"/><path d="M4 4h1v4"/><path d="M4 8h2"/><path d="M6 20H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></button>
+                            <button type="button" class="ribbon-btn" data-cmd="outdent" data-label="Inspringing verkleinen" data-shortcut="shift+Tab"><svg class="i" viewBox="0 0 24 24"><path d="M21 12H11M21 18H11M21 6H11"/><path d="m7 8-4 4 4 4"/></svg></button>
+                            <button type="button" class="ribbon-btn" data-cmd="indent" data-label="Inspringing vergroten" data-shortcut="Tab"><svg class="i" viewBox="0 0 24 24"><path d="M21 12H11M21 18H11M21 6H11"/><path d="m3 8 4 4-4 4"/></svg></button>
                         </div>
+                        <span class="ribbon-sep" aria-hidden="true"></span>
                         <div class="ribbon-group">
-                            <button type="button" class="ribbon-btn" id="wordRestoreBackup" title="Nog geen Word-backup beschikbaar" disabled>Backup</button>
+                            <button type="button" class="ribbon-btn" data-cmd="link" data-label="Link invoegen" data-shortcut="mod+K"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></button>
+                            <button type="button" class="ribbon-btn" data-cmd="table" id="wordTableButton" data-label="Tabel invoegen" aria-haspopup="true" aria-expanded="false"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></button>
+                            <button type="button" class="ribbon-btn" data-cmd="insertHorizontalRule" data-label="Horizontale lijn"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M7 6h10M7 18h10" opacity="0.35"/></svg></button>
                         </div>
                     </div>
-                    <div class="word-page-outer">
-                        <div class="word-page">
-                            <div
-                                id="wordEditor"
-                                class="word-editor"
-                                contenteditable="true"
-                                spellcheck="true"
-                                data-placeholder="Begin met typen. Gebruik de werkbalk voor vet, koppen, lijsten en meer."
-                                aria-label="Word document"
-                            ></div>
+
+                    <div class="word-contextbar" id="wordTableBar" hidden role="toolbar" aria-label="Tabel">
+                        <span class="word-contextbar-label">Tabel</span>
+                        <button type="button" class="word-chip" data-table-action="row-above">+ Rij boven</button>
+                        <button type="button" class="word-chip" data-table-action="row-below">+ Rij onder</button>
+                        <button type="button" class="word-chip" data-table-action="col-left">+ Kolom links</button>
+                        <button type="button" class="word-chip" data-table-action="col-right">+ Kolom rechts</button>
+                        <button type="button" class="word-chip" data-table-action="header">Kopregel aan/uit</button>
+                        <button type="button" class="word-chip word-chip--danger" data-table-action="row-delete">Rij verwijderen</button>
+                        <button type="button" class="word-chip word-chip--danger" data-table-action="col-delete">Kolom verwijderen</button>
+                        <button type="button" class="word-chip word-chip--danger" data-table-action="table-delete">Tabel verwijderen</button>
+                    </div>
+
+                    <div class="word-contextbar" id="wordFindBar" hidden role="search" aria-label="Zoeken en vervangen">
+                        <input type="text" class="word-find-input" id="wordFindInput" placeholder="Zoeken in document" aria-label="Zoeken">
+                        <span class="word-find-count" id="wordFindCount" aria-live="polite"></span>
+                        <button type="button" class="ribbon-btn" id="wordFindPrev" title="Vorige (Shift+Enter)"><svg class="i" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>
+                        <button type="button" class="ribbon-btn" id="wordFindNext" title="Volgende (Enter)"><svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+                        <label class="word-find-option"><input type="checkbox" id="wordFindCase"> Hoofdlettergevoelig</label>
+                        <input type="text" class="word-find-input" id="wordReplaceInput" placeholder="Vervangen door" aria-label="Vervangen door">
+                        <button type="button" class="word-chip" id="wordReplaceOne">Vervangen</button>
+                        <button type="button" class="word-chip" id="wordReplaceAll">Alles vervangen</button>
+                        <span class="word-contextbar-spacer"></span>
+                        <button type="button" class="ribbon-btn" id="wordFindClose" title="Sluiten (Esc)" aria-label="Zoeken sluiten"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+                    </div>
+
+                    <div class="word-workspace">
+                        <aside class="word-outline" id="wordOutline" hidden aria-label="Navigatie">
+                            <div class="word-outline-title">Navigatie</div>
+                            <ul class="word-outline-list" id="wordOutlineList"></ul>
+                        </aside>
+                        <div class="word-page-outer" id="wordPageOuter">
+                            <div class="word-page" id="wordPage">
+                                <div
+                                    id="wordEditor"
+                                    class="word-editor"
+                                    contenteditable="true"
+                                    spellcheck="true"
+                                    data-placeholder="Begin met typen…"
+                                    aria-label="Word document"
+                                    role="textbox"
+                                    aria-multiline="true"
+                                ></div>
+                            </div>
                         </div>
+                    </div>
+
+                    <footer class="word-statusbar">
+                        <span id="wordCounts">0 woorden · 0 tekens</span>
+                        <span id="wordPages">Pagina 1 van 1</span>
+                        <span class="word-statusbar-spacer"></span>
+                        <span>Taal: Nederlands</span>
+                        <span class="word-zoom">
+                            <button type="button" class="ribbon-btn" id="wordZoomOut" aria-label="Uitzoomen">−</button>
+                            <input type="range" id="wordZoom" min="50" max="200" step="10" value="100" aria-label="Zoom">
+                            <button type="button" class="ribbon-btn" id="wordZoomIn" aria-label="Inzoomen">+</button>
+                            <span class="word-zoom-label" id="wordZoomLabel">100%</span>
+                        </span>
+                    </footer>
+
+                    <div class="word-table-picker" id="wordTablePicker" hidden>
+                        <div class="word-table-grid" id="wordTableGrid"></div>
+                        <div class="word-table-label" id="wordTableLabel">Tabel invoegen</div>
                     </div>
                 </div>
+
+                <dialog class="word-dialog" id="wordLinkDialog" aria-labelledby="wordLinkDialogTitle">
+                    <form method="dialog" id="wordLinkForm">
+                        <h2 id="wordLinkDialogTitle">Link invoegen</h2>
+                        <label>Tekst om weer te geven<input type="text" id="wordLinkText" autocomplete="off"></label>
+                        <label>Adres (website, e-mail of telefoon)<input type="text" id="wordLinkUrl" placeholder="bijv. softora.nl of naam@bedrijf.nl" autocomplete="off"></label>
+                        <p class="word-dialog-error" id="wordLinkError"></p>
+                        <div class="word-dialog-actions">
+                            <button type="button" class="word-action word-action--link" id="wordLinkRemove" hidden>Link verwijderen</button>
+                            <button type="button" class="word-action" id="wordLinkCancel">Annuleren</button>
+                            <button type="submit" class="word-action word-action--primary">Opslaan</button>
+                        </div>
+                    </form>
+                </dialog>
+
+                <dialog class="word-dialog word-dialog--wide" id="wordBackupDialog" aria-labelledby="wordBackupDialogTitle">
+                    <div class="word-dialog-body">
+                        <h2 id="wordBackupDialogTitle">Eerdere versies</h2>
+                        <p class="word-dialog-hint">Softora bewaart automatisch eerdere versies van dit document. Terugzetten is veilig: je huidige tekst wordt eerst zelf als versie bewaard.</p>
+                        <ul class="word-version-list" id="wordBackupList"></ul>
+                        <div class="word-dialog-actions">
+                            <button type="button" class="word-action" id="wordBackupClose">Sluiten</button>
+                        </div>
+                    </div>
+                </dialog>
+                <div class="word-toast" id="wordToast" role="status" aria-live="polite"></div>
             </section>
             </div>
         </main>
     </div>
 
     <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
+    <script src="assets/premium-word-tools.js?v=20260926a"></script>
     <script src="assets/premium-ui-state-client.js?v=20260924a"></script>
-    <script src="assets/premium-word.js?v=20260616a"></script>
+    <script src="assets/premium-word.js?v=20260926a"></script>
 </body>
 </html>
