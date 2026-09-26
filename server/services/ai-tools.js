@@ -137,6 +137,7 @@ function createAiToolsCoordinator(deps = {}) {
       : [];
     const generationScan = {
       ...fetched.scan,
+      designConcept: options.designConcept,
       imageSize: normalizeString(options.imageSize || ''),
       disableReferenceImages: !usesHomepageScreenshot && options.disableReferenceImages === true,
       referenceImageMode,
