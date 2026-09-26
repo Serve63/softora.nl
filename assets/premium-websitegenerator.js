@@ -706,7 +706,7 @@ async function startBackgroundBatchScan(urls) {
     credentials: 'same-origin',
     cache: 'no-store',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ urls }),
+    body: JSON.stringify({ urls, designCount: 3 }),
   });
   const data = await response.json().catch(() => ({}));
   if (response.status === 401) {
@@ -786,7 +786,7 @@ const pollWebsitePreviewBatch = singleWebsitePreviewRequest(async function () {
       clearWebsitePreviewBatchPoll();
       const n = Number(payload.job.total || 0) || 0;
       if (payload.job.status === 'done') {
-        showToast(n === 1 ? 'URL verwerkt' : `${n} URL's verwerkt`);
+        showToast(`${payload.job.items.filter((item) => item.status === 'done').length} van ${n} designs klaar`);
       } else if (payload.job.error) {
         showToast(String(payload.job.error));
       }
@@ -840,17 +840,19 @@ async function renderBatchJobProgress(job) {
     if (!it) continue;
     const st = String(it.status || '').trim();
     const host = String(it.hostname || '').trim() || 'site';
+    const conceptNames = { editorial: 'Editorial', minimal: 'Minimalistisch', expressive: 'Expressief' };
+    const designLabel = it.designConcept ? `Design ${idx + 1} · ${conceptNames[it.designConcept] || it.designConcept}` : host;
     if (st === 'pending') {
       const row = document.createElement('div');
       row.className = 'preview-pending-row';
       row.style.cssText = 'padding:12px 0;font-size:13px;color:var(--text-mid)';
       row.append(document.createTextNode('Wachtend — '));
-      appendWebsiteGeneratorTextElement(row, 'strong', '', host);
+      appendWebsiteGeneratorTextElement(row, 'strong', '', designLabel);
       stack.appendChild(row);
     } else if (st === 'running') {
-      stack.appendChild(createBatchLoadingRow(host));
+      stack.appendChild(createBatchLoadingRow(designLabel));
     } else if (st === 'error') {
-      stack.appendChild(createPreviewMessageZone(host, String(it.error || 'Onbekende fout')));
+      stack.appendChild(createPreviewMessageZone(designLabel, String(it.error || 'Onbekende fout')));
     } else if (st === 'done') {
       const entryId = String(it.libraryEntryId || '').trim();
       let entry = entryId ? entries.find((e) => String(e.id) === entryId) : null;
@@ -860,7 +862,7 @@ async function renderBatchJobProgress(job) {
       if (entry && isSafeLibraryDataUrl(entry.dataUrl)) {
         const blockId = newPreviewBlockId();
         const w = Number(entry.width) || WEBSITE_PREVIEW_IMAGE_WIDTH;
-        stack.appendChild(createPreviewZoneElement(blockId, entry.hostname || host, w, false, Number(entry.height) || WEBSITE_PREVIEW_IMAGE_HEIGHT));
+        stack.appendChild(createPreviewZoneElement(blockId, designLabel, w, false, Number(entry.height) || WEBSITE_PREVIEW_IMAGE_HEIGHT));
         wirePreviewBlock(
           blockId,
           entry.dataUrl,

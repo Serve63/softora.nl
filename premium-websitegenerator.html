@@ -106,7 +106,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
   border: 1px solid var(--border);
   border-radius: 6px;
 }
-.scan-previews-stack { display: flex; flex-direction: column; gap: 28px; }
+.scan-previews-stack { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 28px; }
 .preview-loading-row {
   padding: 28px 20px;
   text-align: center;
@@ -395,7 +395,7 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
   <div id="scan-output" class="workspace">
     <div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-      <p>Voer één URL in en klik op &quot;AI Genereren&quot;. Per keer wordt één preview gemaakt.</p>
+      <p>Voer één URL in en klik op &quot;AI Genereren&quot;. Je krijgt drie verschillende designs om te vergelijken. Download jouw favoriet.</p>
     </div>
   </div>
 </div>
