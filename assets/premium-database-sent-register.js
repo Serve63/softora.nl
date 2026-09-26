@@ -46,5 +46,5 @@
         updateLoadMore(all.length, visible.length);
         return true;
     }
-    root.SoftoraDatabaseSentRegister = { accept, rows, render, markFailed: function () { failed = true; } };
+    root.SoftoraDatabaseSentRegister = { accept, rows, render, isReady: function () { return Boolean(snapshot); }, markFailed: function () { failed = true; } };
 }(typeof window !== 'undefined' ? window : globalThis));

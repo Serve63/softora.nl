@@ -504,7 +504,7 @@ test('premium database keeps bootstrap rows hidden until the canonical inventory
   assert.doesNotMatch(pageSource, /function serializeCustomerList/);
   assert.match(pageSource, /function customerListsDiffer\(nextCustomers\) \{ return state\.klanten !== nextCustomers; \}/);
   assert.match(pageSource, /function applyCustomerList\(nextCustomers, forceRender, alreadyCanonical, deferRender\) \{ const reconciledCustomers = alreadyCanonical \? nextCustomers : window\.SoftoraDatabaseMailReadySnapshot\.reconcileCustomerList\(state, nextCustomers\);/);
-  assert.match(pageSource, /applyCustomerList\(sortedCustomers, false, true, deferRender\); void currentCampaignMediaController\.refresh\(\); window\.performance\?\.mark\?\.\("softora:database:applied"\);/);
+  assert.match(pageSource, /applyCustomerList\(sortedCustomers, false, true, deferRender\); if \(deferRender\) await currentCampaignMediaController\.refresh\(\); else void currentCampaignMediaController\.refresh\(\); window\.performance\?\.mark\?\.\("softora:database:applied"\);/);
   assert.match(mailReadySnapshotSource, /config\.applyCustomerList\(hasCanonicalCustomers \? mergeWithCanonicalSnapshots[\s\S]*combinedSnapshotCustomers, false, hasCanonicalCustomers, deferBootRender\);/);
   assert.match(pageSource, /mailReady: raw && raw\.mailReady === true, mailReadySnapshot: raw && raw\.mailReadySnapshot === true, availableSnapshot: raw && raw\.availableSnapshot === true,/);
 });
@@ -692,7 +692,7 @@ test('premium database registers a complete CSV in the separate Instantly queue'
     telefoon: '0131234567',
   }]);
   assert.equal(importer.BATCH_SIZE, 200);
-  assert.match(pageSource, /assets\/premium-database-instantly-queue-import\.js\?v=20260914c/);
+  assert.match(pageSource, /assets\/premium-database-instantly-queue-import\.js\?v=20260927a/);
   assert.match(importerSource, /ENDPOINT = "\/api\/outreach\/provider-queue\/register"/);
   assert.match(importerSource, /button\.textContent = "Uploaden"/);
   assert.match(importerSource, /const pills = document\.querySelector\('\.status-filter-group--shared \.status-filter-pills'\)/);
@@ -2336,7 +2336,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /if \(blockForMailReadyPending\) \{[\s\S]*setDatabaseTableBodyHtml\(""\); return; \}/);
   assert.doesNotMatch(pageSource, /mailReadyPending && showPhotoColumn \? null : getPhotoHeaderCount/);
   assert.match(pageSource, /const visibleResultCount = window\.SoftoraDatabaseMailReadySnapshot\.getDisplayCount\(state, visibleCustomers\.length\);/);
-  assert.match(pageSource, /const canonicalInventoryStatus = window\.SoftoraDatabaseMailReadySnapshot\.getCanonicalInventoryStatus\(state\);/);
+  assert.match(pageSource, /const canonicalInventoryStatus = preparing \? "loading" : window\.SoftoraDatabaseMailReadySnapshot\.getCanonicalInventoryStatus\(state\);/);
   assert.match(pageSource, /if \(canonicalInventoryStatus !== "ready"\) \{[\s\S]*getCanonicalResultCountText\(state, 0\)[\s\S]*setDatabaseTableBodyHtml\("<tr><td colspan=\\"8\\"><div class=\\"tbl-empty\\">" \+ escapeHtml\(inventoryMessage\)/);
   assert.match(pageSource, /const resultCountText = blockForMailReadyPending \? "-- resultaten" : window\.SoftoraDatabaseMailReadySnapshot\.getCanonicalResultCountText\(state, visibleResultCount\);/);
   assert.match(pageSource, /nodes\.photoHeaderCount\.textContent = "\(--\)";/);
@@ -2586,7 +2586,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /Volgende locatie doorzoeken/);
   assert.doesNotMatch(pageSource, /AI werkt de huidige plek automatisch af/);
   assert.doesNotMatch(pageSource, /100 bedrijven toevoegen/);
-  assert.doesNotMatch(pageSource, />Uploaden</);
+  assert.match(pageSource, /id="instantlyQueueImportButton"[^>]*>Uploaden<\/button>/);
   assert.doesNotMatch(pageSource, />Google Sheet koppelen</);
   assert.doesNotMatch(pageSource, /id="addWebdesignButton"/);
   assert.match(pageSource, /<input type="text" id="q" aria-label="Zoek bedrijf in mailsysteem" placeholder="Zoeken…">/);
@@ -3236,7 +3236,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260923-ready-sync"><\/script><script src="assets\/premium-database-boot\.js\?v=20260923-provider-readmodel"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260915-haaren-order-1"><\/script><script src="assets\/premium-readmodel-store\.js\?v=20260924c"><\/script><script src="assets\/premium-readmodel-client\.js\?v=20260924a"><\/script><script src="assets\/premium-screen-snapshot\.js\?v=20260924b"><\/script><script src="assets\/premium-database-screen-snapshot\.js\?v=20260924a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260924-stable-metrics"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260923-ready-sync"><\/script><script src="assets\/premium-database-boot\.js\?v=20260923-provider-readmodel"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260927a"><\/script><script src="assets\/premium-readmodel-store\.js\?v=20260924c"><\/script><script src="assets\/premium-readmodel-client\.js\?v=20260924a"><\/script><script src="assets\/premium-screen-snapshot\.js\?v=20260927a"><\/script><script src="assets\/premium-database-screen-snapshot\.js\?v=20260927a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260924-stable-metrics"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
@@ -3294,7 +3294,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /syncKey: CUSTOMER_DB_SYNC_KEY/);
   assert.doesNotMatch(pageSource, /const availableImportController = window\.SoftoraDatabaseAvailableImport\.createController\(\{ state: state, importController: databaseImportController, setStatusMessage: setStatusMessage \}\); availableImportController\.bind\(\);/);
   assert.doesNotMatch(pageSource, /function renderAvailableImportControls\(\) \{/);
-  assert.match(pageSource, /function renderPage\(\) \{ renderTable\(\); \}/);
+  assert.match(pageSource, /function renderPage\(\) \{ renderTable\(\); window\.SoftoraDatabaseScreenSnapshot\?\.capture\(state\); \}/);
   assert.match(pageSource, /function mapCsvRowToCustomer\(headers, row, index, options\) \{/);
   assert.match(pageSource, /const defaultStatus = normalizeDatabaseStatus\(options && options\.defaultStatus \|\| "benaderbaar"\);/);
   assert.match(availableImportScriptSource, /actions\.id = "databaseImportActions";/);

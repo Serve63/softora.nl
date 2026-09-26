@@ -106,7 +106,8 @@
             const isValid = captureOptions && typeof captureOptions.isValid === "function" ? captureOptions.isValid : null;
             if (showing || captureScheduled || !store || typeof store.writeSync !== "function") return;
             captureScheduled = true;
-            whenIdle(function () {
+            const schedule = captureOptions && captureOptions.immediate === true ? function (callback) { callback(); } : whenIdle;
+            schedule(function () {
                 captureScheduled = false;
                 if (showing || (isValid && !isValid())) return;
                 const identity = identityOf();

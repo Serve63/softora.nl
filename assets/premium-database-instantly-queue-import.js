@@ -86,7 +86,9 @@
     function createControls() {
         const instantlyButton = document.querySelector('.status-filter-group--sent [data-s="instantly"]');
         const pills = document.querySelector('.status-filter-group--shared .status-filter-pills');
-        if (!pills || !instantlyButton || document.getElementById("instantlyQueueImportButton")) return null;
+        if (!pills || !instantlyButton) return null;
+        const existing = document.getElementById("instantlyQueueImportButton");
+        if (existing) return { button: existing, input: document.getElementById("instantlyQueueImportFile"), status: document.getElementById("instantlyQueueImportStatus"), instantlyButton };
         const button = document.createElement("button");
         button.id = "instantlyQueueImportButton";
         button.type = "button";
