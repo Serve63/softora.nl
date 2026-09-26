@@ -7056,14 +7056,18 @@ test("sent list removes the result count column completely", () => {
 });
 
 test('informational database banners stay hidden while actionable errors remain visible', () => {
-  const source = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
-  const body = source.match(/function setStatusMessage\(message, tone, autoClear\) \{([\s\S]*?)\n        \}/)[1];
+  const { show } = require('../../assets/premium-database-status-message');
   const banner = { textContent: '', dataset: {}, classList: { remove() { this.visible = false; }, add() { this.visible = true; } } };
-  const show = vm.runInNewContext('(function (state, nodes, message, tone, autoClear) {' + body + '})', {});
-  show({}, { statusBanner: banner }, 'FrosIT · €0,04', 'info', false);
+  show({}, banner, 'FrosIT · €0,04', 'info', false);
   assert.equal(banner.textContent, '');
   assert.equal(banner.classList.visible, false);
-  show({}, { statusBanner: banner }, 'Upload mislukt', 'error', false);
+  show({}, banner, 'Upload mislukt', 'error', false);
   assert.equal(banner.textContent, 'Upload mislukt');
   assert.equal(banner.classList.visible, true);
+  show({}, banner, 'Aandacht nodig', 'warning', false);
+  assert.equal(banner.textContent, 'Aandacht nodig');
+  assert.equal(banner.classList.visible, true);
+  show({}, banner, 'Volgende informatiemelding', 'info', false);
+  assert.equal(banner.textContent, '');
+  assert.equal(banner.classList.visible, false);
 });

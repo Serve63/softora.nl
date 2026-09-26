@@ -248,6 +248,7 @@ test('premium database consistency assets stay outside the static sidebar', () =
   const source = readRepoFile('premium-database.html');
   const asideEnd = source.indexOf('</aside>');
   assert.ok(asideEnd > 0);
+  assert.ok(source.indexOf('assets/premium-database-status-message.js?v=20260926') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260925-design-remove') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20260924-readmodel-version') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-table-helpers.js?v=20260923-owner') > asideEnd);
