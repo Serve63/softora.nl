@@ -178,3 +178,25 @@ test('voorgestelde reactie gebruikt GPT-6 Luna op max-denkstand zonder temperatu
   assert.match(composition, /MAILBOX_REWRITE_OPENAI_MODEL \|\| 'gpt-6-luna'/);
   assert.match(composition, /MAILBOX_REWRITE_REASONING_EFFORT \|\| 'max'/);
 });
+
+test('kritiek wordt nooit goed nieuws en kromme afsluiters leiden tot een herkansing', () => {
+  const inboundText = 'Het ontwerp past niet bij ons. De mockup straalt te veel AI uit, op desktop komt het iets beter over.';
+  const reply = (text) => JSON.stringify({ intent: 'rejection', ctaAllowed: false, paragraphs: [{ text, evidence: ['received.body'] }] });
+  const refuses = (text, reason) => assert.throws(
+    () => enforceMailboxReplyProfile(reply(text), { inboundText, allowFallback: false }),
+    (error) => error.code === 'MAILBOX_REPLY_NEEDS_REVIEW' && reason.test(error.reviewReason)
+  );
+  refuses('Ook goed om te horen dat de mockup voor jullie gevoel te veel ‘AI’ uitstraalt.', /Kritiek is geen goed nieuws/);
+  refuses('Ik laat het hierbij verder gewoon los voor jullie.', /geen natuurlijk Nederlands/);
+  refuses('Ik laat het hierbij verder helemaal aan jullie kant.', /geen natuurlijk Nederlands/);
+  assert.match(enforceMailboxReplyProfile(reply('Ik snap wat je bedoelt met de AI-uitstraling, daar heb ik echt wat aan. Veel succes verder!'), { inboundText }), /Ik snap wat je bedoelt/);
+  assert.match(enforceMailboxReplyProfile(reply('Goed om te horen dat het op desktop al iets beter overkomt.'), { inboundText }), /beter overkomt/);
+});
+
+test('eerdere antwoorden bepalen de aanpak, zonder zinnen letterlijk over te nemen', () => {
+  const prompt = buildMailboxReplySystemPrompt({ senderName: 'Servé Creusen', hasExamples: true });
+  assert.match(prompt, /hoe hij met dit soort mails omgaat/);
+  assert.match(prompt, /niet volgens je eigen idee van wat logisch is/);
+  assert.match(prompt, /kopieer geen zinnen letterlijk/);
+  assert.doesNotMatch(prompt, /zo dicht mogelijk/);
+});

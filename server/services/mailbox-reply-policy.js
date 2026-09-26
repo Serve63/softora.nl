@@ -260,6 +260,17 @@ function paragraphHasGrounding(paragraph, policy) {
   return evidence.length > 0 && evidence.every((item) => policy.allowedEvidence.includes(item));
 }
 
+// Phrasing Servé would never use: welcoming criticism as good news, or
+// translated-sounding sign-offs. A hit makes the model retry with the reason.
+const CRITICISM_AS_GOOD_NEWS_PATTERN = /\b(?:goed|fijn|leuk|mooi|prettig)\s+om\s+te\s+(?:horen|lezen)\b[^.!?]{0,160}\b(?:te\s+(?:veel|weinig|druk|donker|licht|algemeen|strak|zakelijk|generiek)|niet|geen|mist|ontbreekt|kritiek|minder|ai)\b/i;
+const UNNATURAL_SIGNOFF_PATTERN = /\blos\s+voor\s+(?:jullie|je|jou|u)\b|\blaat\s+(?:ik\s+)?(?:het|dit|dat)\s+(?:hierbij\s+)?(?:verder\s+)?(?:gewoon\s+)?los\b|\bhelemaal\s+aan\s+jullie\s+kant\b/i;
+
+function unnaturalPhrasingReason(value) {
+  if (CRITICISM_AS_GOOD_NEWS_PATTERN.test(value)) return `Kritiek is geen goed nieuws: noem kritiek nooit "goed/fijn/leuk om te horen". Erken het met bijvoorbeeld "ik snap wat je bedoelt" of "terecht punt": "${value.slice(0, 200)}"`;
+  if (UNNATURAL_SIGNOFF_PATTERN.test(value)) return `Deze zin is geen natuurlijk Nederlands. Sluit af zoals Servé, bijvoorbeeld "In ieder geval bedankt dat je de moeite hebt genomen om te reageren." of "Veel succes verder!": "${value.slice(0, 200)}"`;
+  return '';
+}
+
 function hasUnsafeOrIrrelevantText(value, policy) {
   const text = clean(value);
   if (!text || /^(?:beste|hoi|hallo|geachte|goedendag)\b/i.test(text)) return true;
@@ -296,6 +307,8 @@ function reviewStructuredParagraphs(structured, policy) {
     if (paragraph.answers != null && (!Array.isArray(paragraph.answers) || paragraph.answers.some((id) => !policy.questions.some((question) => question.id === id)))) return { reason: 'Gebruik in answers alleen q-ids uit antwoordBeleid.questions.' };
     const value = clean(paragraph.text);
     if (!value || value.length > 1200) return { reason: 'Een alinea is leeg of langer dan 1200 tekens.' };
+    const phrasingReason = unnaturalPhrasingReason(value);
+    if (phrasingReason) return { reason: phrasingReason };
     if (hasUnsafeOrIrrelevantText(value, policy)) return { reason: `Deze alinea bevat een aanhef, ondertekening, placeholder, niet toegestane afspraak of een feit (bedrag, getal, datum, link, belofte) dat niet in het gesprek staat: "${value.slice(0, 200)}"` };
     if (!paragraphHasGrounding(paragraph, policy)) return { reason: 'Gebruik per alinea alleen bewijslabels uit antwoordBeleid.allowedEvidence.' };
     const semanticKey = normalize(value).replace(/[^a-z0-9]+/g, ' ');
@@ -323,7 +336,7 @@ function enforceGroundedMailboxReply(generatedValue, options = {}) {
       structured.paragraphs.length > 0 && structured.paragraphs.every((item) =>
         item && typeof item.text === 'string' && !hasUnsafeOrIrrelevantText(item.text, policy)));
     if (options.allowFallback !== false && safeToReplace && !policy.conceptText && policy.rejection && !policy.questions.length && !policy.substantiveFeedback) {
-      return { policy, paragraphs: ['Dankjewel voor je reactie. Duidelijk, ik laat het hierbij.'], short: false };
+      return { policy, paragraphs: ['Dankjewel voor je reactie, helemaal duidelijk. Veel succes verder!'], short: false };
     }
     const error = new Error('Deze voorgestelde reactie is onvoldoende onderbouwd of beantwoordt niet alle vragen. Je concept is behouden; probeer opnieuw of vul de ontbrekende informatie aan.');
     error.status = 422;
