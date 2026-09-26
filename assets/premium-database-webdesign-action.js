@@ -879,7 +879,7 @@
             if (provider === "instantly") return true;
             return Boolean(normalizeString(customer.instantlyLeadId || customer.instantlyCampaignId || customer.instantlyStatus || customer.instantlySyncedAt || customer.instantlyLastEventAt || customer.instantlyEmailSentAt));
         }
-        function isInstantlyConfirmedSent(customer) { return global.SoftoraDatabaseInstantlyStatus.isConfirmedSent(customer); } function isInstantlyQueuedCustomer(customer) { return global.SoftoraDatabaseInstantlyStatus.isCurrentCampaignPrepared(customer, normalizeDatabaseStatus); } function isInstantlyReadyCustomer(customer) { return isInstantlyQueuedCustomer(customer); }
+        function isInstantlyConfirmedSent(customer) { return global.SoftoraDatabaseInstantlyStatus.isConfirmedSent(customer); } function isInstantlyQueuedCustomer(customer) { return global.SoftoraDatabaseInstantlyStatus.isCurrentCampaignPrepared(customer, normalizeDatabaseStatus); } function isInstantlyReadyCustomer(customer) { return isInstantlyQueuedCustomer(customer) || global.SoftoraDatabaseInstantlyStatus.isReadyForUpload(customer, normalizeDatabaseStatus); }
         function hasPendingInstantlyQueue(customer) {
             return normalizeString(customer && customer.instantlyQueueStatus).toLowerCase() === "registered";
         }
