@@ -127,19 +127,11 @@ function createLibraryCardElement(entry) {
   const when = entry.createdAt
     ? new Date(entry.createdAt).toLocaleString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '';
-  const host = String(entry.hostname || '—');
+  const host = String(entry.hostname || '—').replace(/^www\./i, '');
 
   const card = document.createElement('div');
   card.className = 'library-card';
   card.dataset.libraryId = id;
-  card.setAttribute('role', 'button');
-  card.setAttribute('tabindex', '0');
-  card.addEventListener('click', () => openLibraryEntry(id));
-  card.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    openLibraryEntry(id);
-  });
 
   const thumbWrap = document.createElement('div');
   thumbWrap.className = 'library-thumb-wrap';
@@ -154,7 +146,7 @@ function createLibraryCardElement(entry) {
       void fetchLibraryEntryById(id).then((full) => {
         const src = [full?.thumbDataUrl, full?.dataUrl].find(isSafeLibraryDataUrl);
         if (!src) {
-          thumbWrap.textContent = 'Klik om de afbeelding te openen';
+          thumbWrap.textContent = 'Voorbeeld niet beschikbaar';
           return;
         }
         thumbWrap.replaceChildren(createLibraryThumbImage(src));
@@ -179,17 +171,40 @@ function createLibraryCardElement(entry) {
   actions.className = 'library-card-actions';
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
-  removeBtn.className = 'btn outline';
-  removeBtn.style.padding = '6px 12px';
-  removeBtn.style.fontSize = '10px';
-  removeBtn.textContent = 'Verwijderen';
+  removeBtn.className = 'library-card-remove';
+  removeBtn.textContent = '×';
+  removeBtn.title = 'Verwijderen';
+  removeBtn.setAttribute('aria-label', `Verwijder webdesign voor ${host}`);
   removeBtn.addEventListener('click', (event) => {
     void removeLibraryEntry(id, event);
   });
-  actions.appendChild(removeBtn);
+  const downloadBtn = document.createElement('button');
+  downloadBtn.type = 'button';
+  downloadBtn.className = 'btn outline';
+  downloadBtn.append(createDownloadIconElement(), document.createTextNode(' Download PNG'));
+  downloadBtn.addEventListener('click', async () => {
+    if (downloadBtn.disabled) return;
+    downloadBtn.disabled = true;
+    try {
+      let full = loadLibraryEntries().find((item) => item.id === id);
+      if (!isSafeLibraryDataUrl(full?.dataUrl)) full = await fetchLibraryEntryById(id);
+      if (!isSafeLibraryDataUrl(full?.dataUrl)) {
+        showToast('Download niet beschikbaar. Probeer het opnieuw.');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = full.dataUrl;
+      link.download = buildWebsitePreviewDownloadName(full.url, full.hostname, full.fileName);
+      link.click();
+      showToast('Webdesign gedownload');
+    } finally {
+      downloadBtn.disabled = false;
+    }
+  });
+  actions.appendChild(downloadBtn);
   meta.appendChild(actions);
 
-  card.append(thumbWrap, meta);
+  card.append(thumbWrap, meta, removeBtn);
   return card;
 }
 

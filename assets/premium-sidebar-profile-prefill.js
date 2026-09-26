@@ -138,7 +138,15 @@
         anchor.removeAttribute("role");
         anchor.removeAttribute("data-sidebar-href");
         anchor.removeAttribute("data-sidebar-nav-init");
-        anchor.innerHTML = link.icon;
+        var sharedLinks = window.SoftoraPremiumSidebarLinks;
+        var isLocked = sharedLinks ? sharedLinks.COMING_SOON_KEYS.indexOf(link.key) !== -1 : link.key === "lead_radar";
+        if (isLocked) {
+            anchor.className += " sidebar-link--coming-soon";
+            anchor.setAttribute("aria-disabled", "true");
+            anchor.setAttribute("tabindex", "-1");
+        }
+        var existingLock = isLocked && anchor.querySelector(".sidebar-link-lock");
+        anchor.innerHTML = isLocked && sharedLinks ? '<span class="sidebar-link-lock" aria-hidden="true">' + sharedLinks.COMING_SOON_LOCK_SVG + '</span>' : existingLock ? existingLock.outerHTML : link.icon;
         var label = document.createElement("span");
         label.className = "sidebar-link-text";
         label.textContent = link.label;
