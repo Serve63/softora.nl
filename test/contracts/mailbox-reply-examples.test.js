@@ -193,10 +193,10 @@ test('kritiek wordt nooit goed nieuws en kromme afsluiters leiden tot een herkan
   assert.match(enforceMailboxReplyProfile(reply('Goed om te horen dat het op desktop al iets beter overkomt.'), { inboundText }), /beter overkomt/);
 });
 
-test('eerdere antwoorden zijn een stijlindruk, geen sjabloon om over te nemen', () => {
+test('eerdere antwoorden bepalen de aanpak, zonder zinnen letterlijk over te nemen', () => {
   const prompt = buildMailboxReplySystemPrompt({ senderName: 'Servé Creusen', hasExamples: true });
-  assert.match(prompt, /alleen als indruk van hoe hij schrijft/);
-  assert.match(prompt, /Kopieer geen zinnen of vaste opbouw/);
-  assert.match(prompt, /denk zelf na over wat deze klant schrijft/);
+  assert.match(prompt, /hoe hij met dit soort mails omgaat/);
+  assert.match(prompt, /niet volgens je eigen idee van wat logisch is/);
+  assert.match(prompt, /kopieer geen zinnen letterlijk/);
   assert.doesNotMatch(prompt, /zo dicht mogelijk/);
 });
