@@ -32,12 +32,38 @@ function createMailboxReplyRewrite(deps = {}) {
     truncateText,
   } = deps;
 
+  // Reasoning effort (up to "max") is only fully supported on the Responses
+  // API, the same route the KVK workers use for gpt-6-luna.
+  function buildRequest({ baseUrl, model, messages, temperature, effort }) {
+    if (!effort) return { url: `${baseUrl}/chat/completions`, body: { model, temperature, messages } };
+    return {
+      url: `${baseUrl}/responses`,
+      body: {
+        model,
+        reasoning: { effort },
+        store: false,
+        input: messages.map(({ role, content }) => ({ role: role === 'system' ? 'developer' : role, content })),
+      },
+    };
+  }
+
+  function readGeneratedText(data) {
+    if (Array.isArray(data?.choices)) return extractOpenAiTextContent(data.choices[0]?.message?.content);
+    return (Array.isArray(data?.output) ? data.output : [])
+      .filter((item) => item?.type === 'message')
+      .flatMap((item) => (Array.isArray(item.content) ? item.content : []))
+      .filter((part) => part?.type === 'output_text')
+      .map((part) => part.text || '')
+      .join('');
+  }
+
   async function requestCompletion({ model, messages, temperature }) {
     const baseUrl = normalizeString(openAiApiBaseUrl) || 'https://api.openai.com/v1';
     const apiKey = normalizeString(typeof getOpenAiApiKey === 'function' ? getOpenAiApiKey() : '');
     const effort = normalizeString(reasoningEffort).toLowerCase();
+    const request = buildRequest({ baseUrl, model, messages, temperature, effort });
     const { response, data } = await fetchJsonWithTimeout(
-      `${baseUrl}/chat/completions`,
+      request.url,
       {
         method: 'POST',
         headers: {
@@ -45,19 +71,24 @@ function createMailboxReplyRewrite(deps = {}) {
           Authorization: `Bearer ${apiKey}`,
           ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl: baseUrl }),
         },
-        // Reasoning models steer with reasoning_effort instead of temperature.
-        body: JSON.stringify(effort ? { model, reasoning_effort: effort, messages } : { model, temperature, messages }),
+        body: JSON.stringify(request.body),
       },
       effort ? REASONING_REWRITE_TIMEOUT_MS : REWRITE_TIMEOUT_MS
     );
     if (!response.ok) {
-      const error = new Error(`OpenAI mailtekst verbeteren mislukt (${response.status})`);
+      // Only the provider's error code/param: never its message or our payload.
+      const code = [data?.error?.code, data?.error?.param].filter((value) => /^[a-zA-Z0-9_.-]{1,80}$/.test(value || '')).join(' ');
+      const error = new Error(`OpenAI mailtekst verbeteren mislukt (${response.status}${code ? ` ${code}` : ''})`);
       error.status = response.status;
       error.data = data;
       throw error;
     }
-    const content = data?.choices?.[0]?.message?.content;
-    return { data, text: truncateText(normalizeString(extractOpenAiTextContent(content)), 8000) };
+    if (!Array.isArray(data?.choices) && data?.status && data.status !== 'completed') {
+      const error = new Error(`OpenAI gaf geen volledig antwoord (${data.status}).`);
+      error.status = 502;
+      throw error;
+    }
+    return { data, text: truncateText(normalizeString(readGeneratedText(data)), 8000) };
   }
 
   async function loadReplyExamples(payload, accountEmail) {

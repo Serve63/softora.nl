@@ -153,30 +153,53 @@ test('voorbeelden met inloggegevens gaan nooit mee en contactgegevens worden afg
   assert.match(migration, /like '%kleine vraag over jullie website%'/);
 });
 
-test('voorgestelde reactie gebruikt GPT-6 Luna op max-denkstand zonder temperature', async () => {
+test('voorgestelde reactie gebruikt GPT-6 Luna op max via de Responses API', async () => {
   const calls = [];
+  const replyJson = JSON.stringify({ intent: 'rejection', ctaAllowed: false, paragraphs: [{ text: 'Helemaal helder, dankjewel voor je reactie.', evidence: ['received.body'] }] });
   const service = createMailboxService({
     getOpenAiApiKey: () => 'openai-key',
     openAiModel: 'gpt-6-luna',
     openAiReasoningEffort: 'max',
     mailboxReplyExamples: { findReplyExamples: async () => [] },
-    fetchJsonWithTimeout: async (_url, options, timeout) => {
-      calls.push({ payload: JSON.parse(options.body), timeout });
-      return { response: { ok: true }, data: { choices: [{ message: { content: JSON.stringify({ intent: 'rejection', ctaAllowed: false, paragraphs: [{ text: 'Helemaal helder, dankjewel voor je reactie.', evidence: ['received.body'] }] }) } }] } };
+    fetchJsonWithTimeout: async (url, options, timeout) => {
+      calls.push({ url, payload: JSON.parse(options.body), timeout });
+      return { response: { ok: true }, data: { status: 'completed', output: [
+        { type: 'reasoning', summary: [] },
+        { type: 'message', content: [{ type: 'output_text', text: replyJson }] },
+      ] } };
     },
-    extractOpenAiTextContent: (content) => String(content || ''),
   });
-  await service.rewriteDraft({
+  const result = await service.rewriteDraft({
     accountEmail: 'serve@softora.nl', to: 'klant@example.test', subject: 'Re: Kleine vraag over jullie website', body: '',
     context: { from: 'Klant', email: 'klant@example.test', body: 'We hebben geen interesse.' },
   });
+  assert.match(result.text, /Helemaal helder, dankjewel voor je reactie\./);
+  assert.equal(calls[0].url, 'https://api.openai.com/v1/responses');
   assert.equal(calls[0].payload.model, 'gpt-6-luna');
-  assert.equal(calls[0].payload.reasoning_effort, 'max');
+  assert.deepEqual(calls[0].payload.reasoning, { effort: 'max' });
+  assert.equal(calls[0].payload.store, false);
   assert.equal('temperature' in calls[0].payload, false);
+  assert.deepEqual(calls[0].payload.input.map((item) => item.role), ['developer', 'user']);
   assert.equal(calls[0].timeout, 300000);
   const composition = fs.readFileSync(path.join(__dirname, '../../server/services/server-app-runtime-feature-composition-builders.js'), 'utf8');
   assert.match(composition, /MAILBOX_REWRITE_OPENAI_MODEL \|\| 'gpt-6-luna'/);
   assert.match(composition, /MAILBOX_REWRITE_REASONING_EFFORT \|\| 'max'/);
+});
+
+test('een OpenAI-fout noemt alleen code en param, en een onvolledig antwoord wordt geen concept', async () => {
+  const make = (data, ok = true, status = 200) => createMailboxService({
+    getOpenAiApiKey: () => 'openai-key',
+    openAiReasoningEffort: 'max',
+    logger: { error() {} },
+    mailboxReplyExamples: { findReplyExamples: async () => [] },
+    fetchJsonWithTimeout: async () => ({ response: { ok, status }, data }),
+  });
+  const args = { accountEmail: 'serve@softora.nl', to: 'k@example.test', subject: 'Re: x', body: '', context: { body: 'Wat kost het?' } };
+  await assert.rejects(
+    make({ error: { code: 'unsupported_value', param: 'reasoning.effort', message: 'geheime details' } }, false, 400).rewriteDraft(args),
+    (error) => error.message === 'OpenAI mailtekst verbeteren mislukt (400 unsupported_value reasoning.effort)'
+  );
+  await assert.rejects(make({ status: 'incomplete', output: [] }).rewriteDraft(args), /geen volledig antwoord \(incomplete\)/);
 });
 
 test('kritiek wordt nooit goed nieuws en kromme afsluiters leiden tot een herkansing', () => {

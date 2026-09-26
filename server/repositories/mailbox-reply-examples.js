@@ -1,6 +1,7 @@
 'use strict';
 
-const REPLY_EXAMPLES_READ_TIMEOUT_MS = 8_000;
+// The outreach contact scope takes ~1s warm but can be slow on a cold database.
+const REPLY_EXAMPLES_READ_TIMEOUT_MS = 20_000;
 
 // Reads real sent replies to outreach contacts, paired with the customer mail
 // they answered (see supabase migration 20260925090000_mailbox_reply_examples).
