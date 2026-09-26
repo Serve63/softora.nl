@@ -277,3 +277,9 @@ test('preview title stays on one line beside the download button', () => {
   assert.match(websiteGeneratorHtmlSource, /\.preview-label > span\s*\{[^}]*white-space: nowrap;[^}]*letter-spacing: \.1px;/);
   assert.match(websiteGeneratorHtmlSource, /\.preview-actions\s*\{[^}]*flex-shrink: 0;/);
 });
+
+
+test('library actions and download-name scripts invalidate cached browser versions together', () => {
+  assert.match(websiteGeneratorHtmlSource, /premium-websitegenerator-ui-state\.js\?v=20260926-download-names/);
+  assert.match(websiteGeneratorHtmlSource, /premium-websitegenerator\.js\?v=20260926-library-actions/);
+});
