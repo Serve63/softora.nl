@@ -114,6 +114,14 @@ test('robot writes only its own usable finds, via the guarded import, never via 
   assert.match(workers, /variants = \["searcher"\] if role == "searcher" else \["controller-unusable"\]/);
 });
 
+test('robot and searchers never research the same company twice', () => {
+  const robot = fs.readFileSync(path.join(root, 'scripts/kvk_robot_v5.py'), 'utf8');
+  const workers = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
+  assert.match(robot, /skip = completed \| searcher_claims\(\)/);
+  assert.match(workers, /if kvk in in_flight or path\.exists\(\) or robot_busy\(kvk\):/);
+  assert.match(workers, /if already_researched\(kvk\):\n\s+# The Robot found this company[^\n]*\n\s+discard_superseded\(path, kvk\)\n\s+return True/);
+});
+
 test('worker dialog shows real spend and only Aan or Uit for worker status', () => {
   const js = fs.readFileSync(path.join(root, 'assets/kvk-api-workers.js'), 'utf8');
   const css = fs.readFileSync(path.join(root, 'assets/kvk-database-redesign.css'), 'utf8');
