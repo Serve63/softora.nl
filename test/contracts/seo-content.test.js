@@ -29,6 +29,31 @@ const { extractInternalLinksFromHtml } = require('../../server/services/seo-mach
 
 const repoRoot = path.resolve(__dirname, '../..');
 
+test('lead scoring separates fit, engagement and unknowns without generic SEO padding', () => {
+  const item = getSeoContentItem('kennisbank', 'wat-is-lead-scoring');
+  const html = buildSeoContentArticleHtml(item);
+  assert.equal(item.qualityVersion, 2);
+  assert.equal(item.growthEventKind, 'substantial_refresh');
+  assert.equal(item.growthEventAt, '2026-09-26');
+  assert.equal(item.publishedAt, '2026-07-01');
+  assert.equal(item.sections.length, 6);
+  assert.deepEqual(item.faq, []);
+  assert.match(html, /geen koopkanspercentage/);
+  assert.match(html, /A3 is niet hetzelfde als C1/);
+  assert.match(html, /geen klantcase, bewezen conversiemodel of universele norm/);
+  assert.match(html, /Onbekend is niet ongeschikt/);
+  assert.match(html, /bron en datum/);
+  assert.match(html, /hoge score is geen toestemming om een bericht te sturen/);
+  assert.match(html, /href="\/crm-systeem-op-maat"/);
+  assert.match(html, /href="\/kennisbank\/wat-is-leadkwalificatie"/);
+  assert.match(html, /href="\/blog\/crm-taken-reminders-automatiseren-mkb"/);
+  assert.doesNotMatch(html, /Voor zoekintentie uitleg|Welke content en interne links erbij horen|Hoe weet ik of de pagina goed genoeg is/);
+  const support = buildSeoContentArticleHtml(getSeoContentItem('blog', 'crm-taken-reminders-automatiseren-mkb'));
+  assert.match(support, /Gebruik <a href="\/kennisbank\/wat-is-lead-scoring">lead scoring<\/a> om de volgorde van opvolging uit te leggen/);
+  assert.match(support, /href="\/blog\/crm-adoptie-medewerkers-mkb"/);
+  assert.match(support, /href="\/branches\/adviesbureaus"/);
+});
+
 test('bedrijfssoftware-uitleg begrenst een procesopdracht zonder automatische SEO-opvulling', () => {
   const item = getSeoContentItem('kennisbank', 'wat-is-bedrijfssoftware-op-maat');
   const html = buildSeoContentArticleHtml(item);
