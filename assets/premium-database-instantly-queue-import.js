@@ -186,6 +186,6 @@
     }
 
     if (typeof module !== "undefined" && module.exports) {
-        module.exports = { BATCH_SIZE: BATCH_SIZE, EXPECTED_HEADERS: EXPECTED_HEADERS, mapRows: mapRows, parseCsv: parseCsv };
+        module.exports = { bind: bind, BATCH_SIZE: BATCH_SIZE, EXPECTED_HEADERS: EXPECTED_HEADERS, mapRows: mapRows, parseCsv: parseCsv };
     }
 })(typeof window !== "undefined" ? window : globalThis);

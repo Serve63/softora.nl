@@ -178,10 +178,19 @@ test('static upload controls bind without insertion or sending any request', () 
   elements.instantlyQueueImportFile.click = () => { filePickerOpened = true; };
   const document = { readyState: 'complete', querySelector: () => ({}), getElementById: (id) => elements[id],
     createElement() { throw new Error('static controls must not be replaced'); } };
-  require('node:vm').runInNewContext(fs.readFileSync(path.join(repoRoot, 'assets/premium-database-instantly-queue-import.js'), 'utf8'), {
-    window: { location: { href: 'https://www.softora.nl/premium-database' } }, document, URL,
-    fetch() { throw new Error('binding is read-only'); },
-  });
+  const { bind } = require('../../assets/premium-database-instantly-queue-import');
+  const previousDocument = globalThis.document;
+  const previousLocation = globalThis.location;
+  try {
+    globalThis.document = document;
+    globalThis.location = { href: 'https://www.softora.nl/premium-database' };
+    bind();
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+    if (previousLocation === undefined) delete globalThis.location;
+    else globalThis.location = previousLocation;
+  }
   assert.equal(typeof listeners['instantlyQueueImportFile:change'], 'function');
   listeners['instantlyQueueImportButton:click']();
   assert.equal(filePickerOpened, true);
