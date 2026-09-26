@@ -192,3 +192,11 @@ test('kritiek wordt nooit goed nieuws en kromme afsluiters leiden tot een herkan
   assert.match(enforceMailboxReplyProfile(reply('Ik snap wat je bedoelt met de AI-uitstraling, daar heb ik echt wat aan. Veel succes verder!'), { inboundText }), /Ik snap wat je bedoelt/);
   assert.match(enforceMailboxReplyProfile(reply('Goed om te horen dat het op desktop al iets beter overkomt.'), { inboundText }), /beter overkomt/);
 });
+
+test('eerdere antwoorden zijn een stijlindruk, geen sjabloon om over te nemen', () => {
+  const prompt = buildMailboxReplySystemPrompt({ senderName: 'Servé Creusen', hasExamples: true });
+  assert.match(prompt, /alleen als indruk van hoe hij schrijft/);
+  assert.match(prompt, /Kopieer geen zinnen of vaste opbouw/);
+  assert.match(prompt, /denk zelf na over wat deze klant schrijft/);
+  assert.doesNotMatch(prompt, /zo dicht mogelijk/);
+});

@@ -11,7 +11,7 @@ const MAILBOX_REPLY_STYLE = [
   'Accepteer een duidelijke nee zonder druk. Een korte uitnodiging voor later is optioneel; niet standaard op elke afwijzing plakken. Bij een stopverzoek geen uitnodiging.',
   'Erken concrete kritiek zonder verdediging of overdreven excuses. Neem geen uitstraling, plaatsnaam of productdetail over uit een ander voorbeeld.',
   'Kritiek is nooit “goed”, “fijn” of “leuk om te horen”; dat klinkt alsof je blij bent met kritiek. Zeg bijvoorbeeld “ik snap wat je bedoelt met …”, “terecht punt” of “daar heb ik echt wat aan”. “Goed om te horen” past alleen bij iets positiefs.',
-  'Schrijf zinnen zoals Servé ze zelf zou zeggen. Geen kromme of vertaald klinkende zinnen zoals “ik laat het hierbij verder los voor jullie”. Een afwijzing sluit hij af met bijvoorbeeld “In ieder geval bedankt dat je de moeite hebt genomen om te reageren.” of “Veel succes verder!”.',
+  'Schrijf zinnen zoals Servé ze zelf zou zeggen. Geen kromme of vertaald klinkende zinnen zoals “ik laat het hierbij verder los voor jullie”. Een afwijzing kan hij bijvoorbeeld afsluiten met “In ieder geval bedankt dat je de moeite hebt genomen om te reageren.” of “Veel succes verder!”, maar varieer: gebruik geen vaste afsluiter en schrijf wat bij deze mail past.',
   'Behoud persoonlijkheid terwijl je spelling en interpunctie corrigeert. Maak de tekst niet ambtelijk of glad commercieel.',
 ].join('\n');
 
