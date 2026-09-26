@@ -4759,7 +4759,7 @@ test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-fresh
   assert.equal(intervals.length, 0);
   assert.equal(ageLabel.textContent, 'Nog niet gecontroleerd');
   assert.equal(await controller.refresh({ manual: true }), true);
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist');
   assert.equal(requests.length, 2);
   assert.equal(requests[0].url, '/api/mailbox/sync');
   assert.deepEqual(JSON.parse(requests[0].options.body), {
@@ -4783,13 +4783,13 @@ test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-fresh
   assert.equal(timeouts.at(-1).delay, 0);
   nowMs += 1 * 1000;
   intervals[0].handler();
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist');
   nowMs += 28 * 1000;
   intervals[0].handler();
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist');
   nowMs += 91 * 1000;
   intervals[0].handler();
-  assert.equal(ageLabel.textContent, '2 min geleden gecontroleerd');
+  assert.equal(ageLabel.textContent, '2 min geleden');
   assert.equal(typeof button.clickHandler, 'function');
   controller.destroy();
 });

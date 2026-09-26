@@ -68,6 +68,8 @@ function createFixture(overrides = {}) {
         if (idx >= 0) rowsByPrefix.splice(idx, 1);
         return { ok: true };
       }),
+    createThumbnailDataUrl:
+      overrides.createThumbnailDataUrl || (async () => 'data:image/webp;base64,THUMB'),
     supabaseStateKey: 'core',
   });
 
@@ -290,6 +292,7 @@ test('website preview library coordinator keeps list responses small when stored
   assert.equal(res.body.entries[0].dataUrl, '');
   assert.equal(res.body.entries[0].imageDeferred, true);
   assert.equal(res.body.entries[1].hostname, 'small.example.nl');
+  assert.equal(res.body.entries[1].dataUrl, '');
   assert.equal(res.body.omittedLargeItems, 0);
   assert.ok(JSON.stringify(res.body).length < 3.2 * 1024 * 1024);
   const detail = createResponseRecorder();
@@ -303,4 +306,84 @@ test('website preview library coordinator delete validates uuid id', async () =>
   const res = createResponseRecorder();
   await coordinator.deleteLibraryResponse({ params: { id: 'nope' }, premiumAuth: { email: 'a@b.nl' } }, res);
   assert.equal(res.statusCode, 400);
+});
+
+test('website preview library list only selects light columns and returns stored thumbnails', async () => {
+  const selects = [];
+  const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const { coordinator } = createFixture({
+    fetchSupabaseRowsByStateKeyPrefixViaRest: async (_prefix, _limit, selectColumns) => {
+      selects.push(selectColumns);
+      return {
+        ok: true,
+        body: [{
+          state_key: `core:website_preview_lib:demo:${id}`,
+          updated_at: '2026-01-01T12:00:00.000Z',
+          id, url: 'https://thumb.example.nl/', hostname: 'thumb.example.nl', fileName: 't.png',
+          width: '1024', height: '1536', createdAt: '2026-01-01T12:00:00.000Z',
+          thumbDataUrl: 'data:image/webp;base64,SMALL',
+        }],
+      };
+    },
+  });
+
+  const res = createResponseRecorder();
+  await coordinator.listLibraryResponse({ premiumAuth: { email: 'demo@user.nl' } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.doesNotMatch(selects[0], /(^|,)payload(,|$)/);
+  assert.doesNotMatch(selects[0], /dataUrl:payload->>dataUrl/);
+  assert.equal(res.body.entries[0].thumbDataUrl, 'data:image/webp;base64,SMALL');
+  assert.equal(res.body.entries[0].dataUrl, '');
+  assert.equal(res.body.entries[0].width, 1024);
+});
+
+test('website preview library saves a small thumbnail next to the full image', async () => {
+  const { coordinator, rowsByPrefix } = createFixture();
+  const res = createResponseRecorder();
+  await coordinator.saveLibraryResponse(
+    { body: { dataUrl: 'data:image/png;base64,FULL', url: 'https://softora.nl/' }, premiumAuth: { email: 'a@b.nl' } },
+    res
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(rowsByPrefix[0].payload.thumbDataUrl, 'data:image/webp;base64,THUMB');
+  assert.equal(rowsByPrefix[0].payload.dataUrl, 'data:image/png;base64,FULL');
+});
+
+test('website preview library loads one entry by key and backfills a missing thumbnail', async () => {
+  const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const keyLookups = [];
+  const upserts = [];
+  const stateKey = `core:website_preview_lib:demo:${id}`;
+  const fullRow = {
+    state_key: stateKey,
+    updated_at: '2026-01-01T12:00:00.000Z',
+    payload: { type: 'website_preview_library', id, dataUrl: 'data:image/png;base64,FULL', url: 'https://x.nl/' },
+  };
+  const { coordinator } = createFixture({
+    fetchSupabaseRowsByStateKeyPrefixViaRest: async (_prefix, _limit, selectColumns) => {
+      assert.doesNotMatch(selectColumns, /(^|,)payload(,|$)/);
+      return { ok: true, body: [{ state_key: stateKey, type: 'website_preview_library', id }] };
+    },
+    fetchSupabaseRowByKeyViaRest: async (key) => {
+      keyLookups.push(key);
+      return { ok: true, body: [fullRow] };
+    },
+    upsertSupabaseRowViaRest: async (row) => {
+      upserts.push(row);
+      return { ok: true };
+    },
+  });
+
+  const res = createResponseRecorder();
+  await coordinator.getLibraryEntryResponse({ params: { id } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(keyLookups, [stateKey]);
+  assert.equal(res.body.entry.thumbDataUrl, 'data:image/webp;base64,THUMB');
+  assert.equal(upserts.length, 1);
+  assert.equal(upserts[0].payload.dataUrl, 'data:image/png;base64,FULL');
+  assert.equal(upserts[0].payload.thumbDataUrl, 'data:image/webp;base64,THUMB');
+  assert.equal(upserts[0].updated_at, '2026-01-01T12:00:00.000Z');
 });
