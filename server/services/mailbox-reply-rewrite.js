@@ -11,6 +11,8 @@ const {
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 
 const REWRITE_TIMEOUT_MS = 65000;
+// Deep reasoning (e.g. "max") can take minutes; the API function allows 800s.
+const REASONING_REWRITE_TIMEOUT_MS = 300000;
 
 // "Voorgestelde reactie" and "Verwoord dit beter" for the mailbox composer.
 function createMailboxReplyRewrite(deps = {}) {
@@ -19,6 +21,7 @@ function createMailboxReplyRewrite(deps = {}) {
     getOpenAiApiKey,
     openAiApiBaseUrl,
     openAiModel,
+    reasoningEffort = '',
     fetchJsonWithTimeout,
     extractOpenAiTextContent,
     resolveRewriteIdentity,
@@ -32,6 +35,7 @@ function createMailboxReplyRewrite(deps = {}) {
   async function requestCompletion({ model, messages, temperature }) {
     const baseUrl = normalizeString(openAiApiBaseUrl) || 'https://api.openai.com/v1';
     const apiKey = normalizeString(typeof getOpenAiApiKey === 'function' ? getOpenAiApiKey() : '');
+    const effort = normalizeString(reasoningEffort).toLowerCase();
     const { response, data } = await fetchJsonWithTimeout(
       `${baseUrl}/chat/completions`,
       {
@@ -41,9 +45,10 @@ function createMailboxReplyRewrite(deps = {}) {
           Authorization: `Bearer ${apiKey}`,
           ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl: baseUrl }),
         },
-        body: JSON.stringify({ model, temperature, messages }),
+        // Reasoning models steer with reasoning_effort instead of temperature.
+        body: JSON.stringify(effort ? { model, reasoning_effort: effort, messages } : { model, temperature, messages }),
       },
-      REWRITE_TIMEOUT_MS
+      effort ? REASONING_REWRITE_TIMEOUT_MS : REWRITE_TIMEOUT_MS
     );
     if (!response.ok) {
       const error = new Error(`OpenAI mailtekst verbeteren mislukt (${response.status})`);
@@ -76,7 +81,7 @@ function createMailboxReplyRewrite(deps = {}) {
       error.status = 400;
       throw error;
     }
-    const model = normalizeString(openAiModel) || 'gpt-5.5-pro';
+    const model = normalizeString(openAiModel) || 'gpt-6-sol';
     const { resolvedAccountEmail, accountSenderName } = await resolveRewriteIdentity({ context, accountEmail, recipientEmail: to, isReply: hasReplyContext });
     const payloadOptions = {
       accountEmail: resolvedAccountEmail,

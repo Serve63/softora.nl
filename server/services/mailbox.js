@@ -2033,7 +2033,7 @@ function createMailboxService(deps = {}) {
     return truncateText(sanitizeMailboxDisplayText(normalizeString(value)), maxLength);
   }
   const { rewriteDraft } = createMailboxReplyRewrite({
-    env, getOpenAiApiKey, openAiApiBaseUrl, openAiModel, fetchJsonWithTimeout, extractOpenAiTextContent, resolveRewriteIdentity,
+    env, getOpenAiApiKey, openAiApiBaseUrl, openAiModel, reasoningEffort: deps.openAiReasoningEffort, fetchJsonWithTimeout, extractOpenAiTextContent, resolveRewriteIdentity,
     replyExamples: deps.mailboxReplyExamples || createMailboxReplyExamples({ isSupabaseConfigured, getSupabaseClient, logger }),
     cleanPromptText, normalizeEmail, normalizeString, truncateText,
   });
