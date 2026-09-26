@@ -530,7 +530,7 @@ function createMailboxService(deps = {}) {
     mailboxCampaignRepliesService,
     instantlyMailboxService,
     filterVisibleMailboxMessages,
-    setUiStateValues, getUiStateValues, mailboxIndexStore, getSupabaseClient,
+    setUiStateValues, getUiStateValues, mailboxIndexStore, getSupabaseClient, env,
     logger,
     normalizeString,
     truncateText,
