@@ -17,7 +17,9 @@
         { id: "generatePhotosButton", hidden: true },
         { id: "photoHeaderResultsLabel", text: true },
         { id: "loadMoreWrap", hidden: true },
-        { id: "loadMoreSummary", text: true }
+        { id: "loadMoreSummary", text: true },
+        { id: "mailReadySoftoraCount", text: true },
+        { id: "mailReadyInstantlyCount", text: true }
     ]);
     const INERT_IDS = Object.freeze(["tbody", "loadMoreWrap", "generatePhotosButton"]);
 
@@ -38,6 +40,7 @@
     function createAdapter(options = {}) {
         const create = options.create || global.SoftoraScreenSnapshot?.create;
         const sentReady = options.sentReady || function () { return global.SoftoraDatabaseSentRegister?.isReady?.() === true; };
+        const sentPending = options.sentPending || function () { return global.SoftoraDatabaseSentRegister?.isPending?.() === true; };
         const snapshots = new Map();
         const statuses = new Set(["beschikbaar", "benaderbaar", "instantly-ready", "instantly-queued", "instantly-wachtlijst", "benaderd", "instantly", "verstuurd"]);
         let active = null, activeView = "", legacy = null;
@@ -58,7 +61,7 @@
             let current = instance(state);
             if (!current?.restore(view)) {
                 if (!create) return false;
-                legacy = legacy || create({ key: "premium-database:v1", elements: ELEMENTS, inertIds: INERT_IDS });
+                legacy = legacy || create({ key: "premium-database:v1", elements: ELEMENTS.slice(0, -2), inertIds: INERT_IDS });
                 if (!legacy.restore(view)) return false;
                 current = legacy;
             }
@@ -74,7 +77,8 @@
             viewOf, restore, release,
             isShowing: function () { return Boolean(active?.isShowing()); },
             hold: function (state) {
-                if (complete(state) || state.dataUnavailable || state.photoRestoreFailed) return false;
+                if (state.dataUnavailable || state.photoRestoreFailed ||
+                    (!isPreparing(state) && !(state.activeStatus === "verstuurd" && sentPending()))) return false;
                 return restore(state);
             },
             capture: function (state) {
