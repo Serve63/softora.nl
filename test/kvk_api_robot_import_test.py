@@ -1,10 +1,13 @@
 import sqlite3
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
+# The Robot imports the worker module, which needs the local control helper; tests never call it.
+sys.modules.setdefault('start_database_fill_control', types.SimpleNamespace(post_json=None, resolve_token=None))
 import kvk_robot_import as robot_import
 
 SCHEMA = '''
@@ -87,6 +90,30 @@ class RobotLeavesSearcherWorkAloneTests(unittest.TestCase):
             with patch.object(robot, 'PENDING', pending):
                 self.assertEqual(robot.searcher_claims(), {'00000001', '00000002'})
 
+
+class RobotKeepsRunningTests(unittest.TestCase):
+    def test_a_short_dashboard_hiccup_does_not_switch_the_robot_off(self):
+        import kvk_robot_v5 as robot
+        from unittest.mock import patch
+        polls, halted = [], []
+
+        def enabled():
+            polls.append(1)
+            if len(polls) == 1:
+                raise sys.modules['kvk_api_workers'].RemoteFailure('/poll', 503, 'HTTP 503')
+            raise KeyboardInterrupt  # ends the endless loop for this test
+
+        def report(role, message, kvk='', halt=False):
+            if halt and 'gereed' not in message:
+                halted.append(message)
+
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(robot, 'QUEUE', Path(directory)), patch.object(robot, 'enabled', side_effect=enabled), \
+                patch.object(robot, 'report', side_effect=report), patch.object(robot.time, 'sleep'):
+            with self.assertRaises(KeyboardInterrupt):
+                robot.main()
+        self.assertEqual(len(polls), 2)  # it kept going after the hiccup
+        self.assertEqual(halted, [])     # and never switched itself off
 
 if __name__ == '__main__':
     unittest.main()

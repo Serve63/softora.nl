@@ -17,7 +17,7 @@ import sqlite3
 import subprocess
 import time
 from pathlib import Path
-from kvk_api_workers import PENDING, ROOT, call, report, run_cli, save_result
+from kvk_api_workers import PENDING, ROOT, call, report, run_cli, save_result, transient_control_failure
 from kvk_robot_import import import_find, publish_live, robot_find
 
 QUEUE = ROOT / 'data' / 'shadow' / 'robot-v5-dashboard'
@@ -98,10 +98,15 @@ def research(identity):
         child = subprocess.Popen(command, cwd=ROOT, stdout=log, stderr=log, start_new_session=True)
         try:
             while child.poll() is None:
-                if not enabled():
-                    terminate(child)
-                    return False
-                report('robot', f'Onderzoekt {identity["bedrijfsnaam"][:95]}', kvk)
+                try:
+                    if not enabled():
+                        terminate(child)
+                        return False
+                    report('robot', f'Onderzoekt {identity["bedrijfsnaam"][:95]}', kvk)
+                except Exception as error:
+                    if not transient_control_failure(error):
+                        raise
+                    # The running company continues through a short dashboard hiccup.
                 time.sleep(5)
             if child.returncode:
                 raise RuntimeError(f'Robot v5 stopte bij {kvk}; voortgang en foutlog bewaard.')
@@ -162,6 +167,10 @@ def main():
                 research(identity)
             except Exception as error:
                 print(str(error), flush=True)
+                if transient_control_failure(error):
+                    # A short dashboard hiccup must not switch the Robot off; the company is retried.
+                    time.sleep(15)
+                    continue
                 try:
                     report('robot', str(error)[:180], halt=True)
                 except Exception:
