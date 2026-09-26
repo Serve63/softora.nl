@@ -206,3 +206,39 @@ test('unavailable job storage prevents provider calls', async () => {
   await coordinator.getBatchResponse(createPremiumRequest({ params: { jobId: res.body.jobId } }), poll);
   assert.equal(poll.body.job.status, 'error');
 });
+
+test('three concepts keep distinct prompts and downloads after reload, including partial failure', async () => {
+  const shared = createSharedUiStateFixture();
+  const calls = [];
+  const saved = [];
+  const deps = {
+    ...shared,
+    processJobsInline: true,
+    aiToolsCoordinator: { runWebsitePreviewGeneratePipeline: async (url, options) => {
+      calls.push(options.designConcept);
+      if (options.designConcept === 'minimal') throw new Error('Provider unavailable');
+      return { image: { dataUrl: 'data:image/png;base64,AAAA' } };
+    } },
+    websitePreviewLibraryCoordinator: { persistPreviewLibraryEntry: async (_owner, entry) => {
+      saved.push(entry);
+      return { ok: true, entry: { id: `entry-${saved.length}` } };
+    } },
+  };
+  const coordinator = createWebsitePreviewBatchCoordinator(deps);
+  const response = createResponseRecorder();
+  await coordinator.startBatchResponse(createPremiumRequest({ body: { urls: ['example.com'], designCount: 3 } }), response);
+  assert.equal(response.body.total, 3);
+  assert.deepEqual(calls, ['editorial', 'minimal', 'expressive']);
+  assert.deepEqual(saved.map(entry => entry.fileName), ['example.com-design-editorial.png', 'example.com-design-expressive.png']);
+  const reloaded = createWebsitePreviewBatchCoordinator(deps);
+  const status = createResponseRecorder();
+  await reloaded.getBatchResponse(createPremiumRequest({ params: { jobId: response.body.jobId } }), status);
+  assert.deepEqual(status.body.job.items.map(item => item.designConcept), calls);
+  assert.deepEqual(status.body.job.items.map(item => item.status), ['done', 'error', 'done']);
+  assert.equal(calls.length, 3);
+  const { createWebsiteGenerationHelpers } = require('../../server/services/website-generation');
+  const helpers = createWebsiteGenerationHelpers();
+  const prompts = calls.map(designConcept => helpers.buildWebsitePreviewPromptFromScan({ host: 'example.com', designConcept }));
+  assert.equal(new Set(prompts).size, 3);
+  for (const prompt of prompts) assert.match(prompt, /ONTWERPRICHTING/);
+});

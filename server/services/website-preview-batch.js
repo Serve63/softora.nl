@@ -102,6 +102,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     return {
       url,
       hostname,
+      designConcept: normalizeString(source.designConcept || ''),
       status: normalizeItemStatus(source.status),
       error: normalizeString(source.error || '') || null,
       libraryEntryId: normalizeString(source.libraryEntryId || '') || null,
@@ -143,6 +144,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       items: job.items.map((item) => ({
         url: item.url,
         hostname: item.hostname,
+        designConcept: item.designConcept || '',
         status: item.status,
         error: item.error || null,
         libraryEntryId: item.libraryEntryId || null,
@@ -247,6 +249,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       items: job.items.map((item) => ({
         url: item.url,
         hostname: item.hostname,
+        designConcept: item.designConcept || '',
         status: item.status,
         error: item.error || null,
         libraryEntryId: item.libraryEntryId || null,
@@ -350,6 +353,7 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
           const payload = await withTimeout(
             aiToolsCoordinator.runWebsitePreviewGeneratePipeline(item.url, buildWebdesignPipelineOptions({
               source: 'premium-websitegenerator', domain: item.hostname,
+              designConcept: item.designConcept,
             })),
             ITEM_TIMEOUT_MS,
             'Generatie duurt langer dan verwacht. Controleer de bibliotheek voordat je opnieuw genereert.'
@@ -361,7 +365,9 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
           }
 
           const host = String(payload?.site?.host || item.hostname || '').trim() || item.hostname;
-          const fileName = String(img?.fileName || `${host || 'site'}-preview.png`).trim();
+          const fileName = item.designConcept
+            ? `${host}-design-${item.designConcept}.png`
+            : String(img?.fileName || `${host || 'site'}-preview.png`).trim();
           const saveResult = await persist(stub, {
             dataUrl,
             url: item.url,
@@ -432,7 +438,8 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
     }
 
     const jobId = randomUUID();
-    const items = urls.map((url) => {
+    const concepts = body.designCount === 3 ? ['editorial', 'minimal', 'expressive'] : [''];
+    const items = urls.flatMap((url) => concepts.map((designConcept) => {
       let hostname = '';
       try {
         hostname = new URL(url).hostname;
@@ -442,11 +449,12 @@ function createWebsitePreviewBatchCoordinator(deps = {}) {
       return {
         url,
         hostname,
+        designConcept,
         status: 'pending',
         error: null,
         libraryEntryId: null,
       };
-    });
+    }));
 
     const job = {
       id: jobId,
