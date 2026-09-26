@@ -27,9 +27,26 @@ class WorkerTests(unittest.TestCase):
         self.enabled = patch.object(runner, 'is_enabled', return_value=True)
         self.cli.start()
         self.enabled.start()
+        # A test must never start a real Codex run. Research goes through the patched
+        # `call('/research', ...)` fake below, which the tests configure per case.
+        def fake_research(company, _instructions, feedback=''):
+            self.feedback = feedback
+            return runner.call('/research', {'role': 'searcher', 'company': company, 'brief': {}})['result'], []
+        def fake_control(company, brief, _instructions):
+            return runner.call('/research', {'role': 'controller', 'company': company, 'brief': brief})['result']
+        self.real_codex_run, self.real_codex_research = runner.codex_run, runner.codex_research
+        self.real_instructions_for = runner.instructions_for
+        self.codex = [patch.object(runner, 'codex_run', side_effect=AssertionError('echte Codex-run in een test')),
+                      patch.object(runner, 'codex_research', side_effect=fake_research),
+                      patch.object(runner, 'codex_control', side_effect=fake_control),
+                      patch.object(runner, 'instructions_for', return_value='INSTRUCTIES')]
+        for patcher in self.codex:
+            patcher.start()
         self.packet = {'bedrijven': [{'kvk_nummer': f'{i:08}'} for i in range(1, 4)]}
 
     def tearDown(self):
+        for patcher in self.codex:
+            patcher.stop()
         self.cli.stop()
         self.enabled.stop()
         self.pending.stop()
@@ -121,22 +138,22 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(applied, [company['kvk_nummer'] for company in companies])
         self.assertLessEqual(self.queue_reads, 7)  # 12 companies in windows of 6, not 12+ reads
 
-    def test_codex_searcher_uses_the_same_instructions_and_never_calls_the_paid_api(self):
+    def test_codex_searcher_uses_the_server_instructions_and_never_calls_the_paid_api(self):
         company = {'kvk_nummer': '00000001', 'bedrijfsnaam': 'Voorbeeld B.V.', 'plaats': 'Tilburg'}
         answer = {'kvk_nummer': '00000001', 'telefoonnummer': ''}
         with patch.object(runner, 'codex_research', return_value=(answer, ['https://voorbeeld.nl/'])) as codex, \
                 patch.object(runner, 'call') as call, \
                 patch.object(kvk_luna_searcher, 'to_canonical', side_effect=lambda company, *_: company):
-            self.assertTrue(runner.luna_search_one(company, [], False, 'codex', 'INSTRUCTIES'))
+            self.assertTrue(runner.luna_search_one(company, [], False))
             call.assert_not_called()
-        codex.assert_called_once_with(company, 'INSTRUCTIES')
+        codex.assert_called_once_with(company, 'INSTRUCTIES', '')
         saved = runner.json.loads(runner.pending_path('searcher', '00000001', []).with_suffix('.luna.json').read_text())
         self.assertEqual((saved['engine'], saved['consulted_urls']), ('codex', ['https://voorbeeld.nl/']))
 
     def test_codex_answer_for_another_company_is_refused(self):
         with patch.object(runner, 'codex_research', return_value=({'kvk_nummer': '99999999'}, [])):
             with self.assertRaisesRegex(RuntimeError, 'juiste onderneming'):
-                runner.luna_search_one({'kvk_nummer': '00000001'}, [], False, 'codex', 'INSTRUCTIES')
+                runner.luna_search_one({'kvk_nummer': '00000001'}, [], False)
 
     def test_codex_run_passes_the_prompt_and_reads_opened_pages(self):
         events = '\n'.join([
@@ -152,27 +169,57 @@ class WorkerTests(unittest.TestCase):
             self.assertIn('"kvk_nummer": "00000001"', kwargs['input'])
             Path(command[command.index('-o') + 1]).write_text('Antwoord: {"kvk_nummer":"00000001"}')
             return types.SimpleNamespace(returncode=0, stdout=events, stderr='')
-        with patch.object(runner.subprocess, 'run', side_effect=run):
+        with patch.object(runner.subprocess, 'run', side_effect=run), patch.object(runner, 'codex_run', self.real_codex_run), \
+                patch.object(runner, 'codex_research', self.real_codex_research):
             answer, urls = runner.codex_research({'kvk_nummer': '00000001'}, 'INSTRUCTIES')
         self.assertEqual((answer, urls), ({'kvk_nummer': '00000001'}, ['https://voorbeeld.nl/contact']))
 
-    def test_codex_pipeline_takes_engine_and_instructions_from_the_dashboard(self):
-        seen = []
-        def call(path, payload, **kwargs):
-            if path == '/poll':
-                return {'state': {'workers': {'searcher': {'enabled': not seen, 'count': 1, 'engine': 'codex'}}},
-                        'searcherInstructions': 'INSTRUCTIES'}
-            return {'ok': True}
-        def search(company, flags, validate, engine, instructions):
-            seen.append((engine, instructions))
-            return True
-        with patch.object(runner, 'call', side_effect=call), patch.object(runner, 'report'), \
-                patch.object(runner, 'next_packet', return_value=({'bedrijven': [{'kvk_nummer': '00000001'}]}, [])), \
-                patch.object(runner, 'luna_search_one', side_effect=search), \
-                patch.object(runner, 'SEARCHER_REFRESH_SECONDS', 0), \
-                patch.object(runner.time, 'sleep'):
-            runner.run_searcher_pipeline(threading.Lock())
-        self.assertEqual(seen, [('codex', 'INSTRUCTIES')])
+    def test_worker_instructions_come_from_the_server_poll(self):
+        runner.INSTRUCTIONS.clear()
+        polled = {'state': {}, 'searcherInstructions': 'ZOEK', 'controllerInstructions': 'CONTROLEER'}
+        with patch.object(runner, 'call', return_value=polled) as call, \
+                patch.object(runner, 'instructions_for', self.real_instructions_for):
+            self.assertEqual(runner.instructions_for('searcher'), 'ZOEK')
+            self.assertEqual(runner.instructions_for('controller'), 'CONTROLEER')
+            call.assert_called_once_with('/poll', {})
+        runner.INSTRUCTIONS.clear()
+        with patch.object(runner, 'call', return_value={'state': {}}), \
+                patch.object(runner, 'instructions_for', self.real_instructions_for):
+            with self.assertRaisesRegex(RuntimeError, 'Instructies voor controller ontbreken'):
+                runner.instructions_for('controller')
+
+    def test_controller_runs_through_codex_and_is_marked_as_codex_work(self):
+        company = self.packet['bedrijven'][0]
+        result = dict(company, checks_completed=True)
+        with patch.object(runner, 'codex_control', return_value=result) as control, patch.object(runner, 'call') as call:
+            self.assertTrue(runner.research_one('controller', company, {'contract': 'x'}, [], False))
+            call.assert_not_called()
+        control.assert_called_once_with(company, {'contract': 'x'}, 'INSTRUCTIES')
+        path = runner.pending_path('controller', company['kvk_nummer'], [])
+        self.assertEqual(runner.json.loads(path.with_suffix('.engine.json').read_text()), {'engine': 'codex'})
+
+    def test_refused_searcher_answer_is_researched_again_with_the_reason(self):
+        company = self.packet['bedrijven'][0]
+        path = runner.pending_path('searcher', company['kvk_nummer'], [])
+        runner.save_result(path.with_suffix('.luna.json'), {'answer': company, 'consulted_urls': []})
+        runner.save_result(path, company)
+        refused = runner.ValidationFailure('minimaal 3 bronnen')
+        with patch.object(runner, 'apply_result', side_effect=refused), patch.object(runner, 'report'):
+            self.assertFalse(runner.apply_searcher_head(self.packet, [], threading.Lock()))
+        self.assertFalse(path.exists())
+        self.assertTrue(path.with_suffix('.rejected-1.luna.json').exists())
+        with patch.object(runner, 'call', return_value={'ok': True, 'result': company}), \
+                patch.object(kvk_luna_searcher, 'to_canonical', side_effect=lambda company, *_: company):
+            self.assertTrue(runner.luna_search_one(company, [], False))
+        self.assertIn('minimaal 3 bronnen', self.feedback)
+        with patch.object(runner, 'apply_result', side_effect=refused), patch.object(runner, 'report'):
+            self.assertFalse(runner.apply_searcher_head(self.packet, [], threading.Lock()))
+            with patch.object(runner, 'call', return_value={'ok': True, 'result': company}), \
+                    patch.object(kvk_luna_searcher, 'to_canonical', side_effect=lambda company, *_: company):
+                runner.luna_search_one(company, [], False)
+            # After the allowed retries the worker stops and says why instead of looping forever.
+            with self.assertRaisesRegex(runner.ValidationFailure, 'nieuwe Codex-pogingen'):
+                runner.apply_searcher_head(self.packet, [], threading.Lock())
 
     def test_pipeline_never_exceeds_one_request_with_count_one(self):
         companies = [{'kvk_nummer': f'{i:08}'} for i in range(1, 4)]
@@ -194,7 +241,7 @@ class WorkerTests(unittest.TestCase):
                 patch.object(kvk_luna_searcher, 'to_canonical', return_value=company), \
                 patch.object(runner, 'call', return_value={'ok': True, 'result': company}) as call:
             for _ in range(2):
-                with self.assertRaisesRegex(runner.ValidationFailure, 'Luna-antwoord bewaard'):
+                with self.assertRaisesRegex(runner.ValidationFailure, 'Codex-antwoord bewaard'):
                     runner.research_one('searcher', company, {}, [])
             self.assertEqual(call.call_count, 1)
             self.assertEqual(call.call_args.args[1]['brief'], {})

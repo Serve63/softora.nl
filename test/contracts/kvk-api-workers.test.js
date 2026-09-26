@@ -41,36 +41,6 @@ test('KVK API budget starts at exactly 100 EUR with both workers off', () => {
   assert.match(sql, /revoke execute on function public\.softora_kvk_api_reserve/);
 });
 
-test('missing API key prevents enabling paid workers', async () => {
-  const row = { id: true, limit_eur_cents: 10000, spent_eur_cents: 0, reserved_eur_cents: 0,
-    searcher_enabled: false, controller_enabled: false };
-  const client = { from() { return { select() { return { eq() { return { single: async () => ({ data: row }) }; } }; } }; } };
-  const service = createKvkApiWorkersService({ getSupabaseClient: () => client, env: {} });
-  const res = response();
-  await service.setEnabled({ body: { searcherEnabled: true, controllerEnabled: false } }, res);
-  assert.equal(res.statusCode, 503);
-  assert.match(res.body.error, /API-sleutel ontbreekt/);
-});
-
-test('worker research cannot call OpenAI after reservation is denied', async () => {
-  let fetchCalls = 0;
-  const client = { rpc: async () => ({ data: false, error: null }) };
-  const service = createKvkApiWorkersService({
-    getSupabaseClient: () => client,
-    kvkDatabaseSyncToken: 'test-token',
-    env: { OPENAI_API_KEY: 'unprinted-test-value' },
-    fetchImpl: async () => { fetchCalls += 1; throw new Error('must not be called'); },
-    now: () => new Date('2026-09-23T21:30:00Z'),
-  });
-  const res = response();
-  await service.research({
-    headers: { authorization: 'Bearer test-token' },
-    body: { role: 'searcher', company: { kvk_nummer: '12345678' }, brief: { result_schema: {} } },
-  }, res);
-  assert.equal(res.statusCode, 409);
-  assert.equal(fetchCalls, 0);
-});
-
 function settingsFixture(overrides = {}) {
   const row = { id: true, limit_eur_cents: 10000, spent_eur_cents: 0, reserved_eur_cents: 0,
     searcher_enabled: false, controller_enabled: false, searcher_count: 1, controller_count: 1, ...overrides };
@@ -125,15 +95,6 @@ test('Robot v5 can be enabled without an API key or paid budget reservation', as
   assert.equal(res.body.state.workers.robot.enabled, true);
 });
 
-test('robot cannot enter the paid research endpoint', async () => {
-  let touched = false;
-  const service = createKvkApiWorkersService({ kvkDatabaseSyncToken: 'robot-test', getSupabaseClient() { touched = true; } });
-  const res = response();
-  await service.research({ headers: { authorization: 'Bearer robot-test' }, body: { role: 'robot', company: { kvk_nummer: '12345678' }, brief: {} } }, res);
-  assert.equal(res.statusCode, 400);
-  assert.equal(touched, false);
-});
-
 test('robot control keeps evidence review separate from approved inventory', () => {
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
   const runner = fs.readFileSync(path.join(root, 'scripts/kvk_robot_v5.py'), 'utf8');
@@ -162,144 +123,11 @@ test('worker dialog shows real spend and only Aan or Uit for worker status', () 
   assert.match(css, /width:12px;height:12px;padding:0;border:1px solid #d8bdcb/);
 });
 
-test('authenticated diagnostics perform only a free model read and redact the key', async () => {
-  let calls = 0;
-  const service = createKvkApiWorkersService({ kvkDatabaseSyncToken: 'sync-test', env: { OPENAI_API_KEY: 'sk-test-secret' },
-    fetchImpl: async (url, options) => { calls++; assert.match(url, /\/models\/gpt-6-luna$/); assert.equal(options.method, undefined);
-      return { ok: false, status: 401, json: async () => ({ error: { code: 'invalid_api_key', message: 'Bad key sk-test-secret' } }) }; } });
-  const bad = response();
-  await service.poll({ headers: {}, body: { diagnose: true } }, bad);
-  assert.equal(bad.statusCode, 401); assert.equal(calls, 0);
-  const good = response();
-  await service.poll({ headers: { authorization: 'Bearer sync-test' }, body: { diagnose: true } }, good);
-  assert.equal(good.body.diagnostics.available, false); assert.equal(calls, 1);
-  assert.doesNotMatch(JSON.stringify(good.body), /sk-test-secret/);
-});
-
-test('definite upstream rejection releases the reservation while ambiguous failures retain it', async () => {
-  for (const status of [400, 401, 403, 404, 422, 429, 500, 502, 503]) {
-    const rpcCalls = [];
-    const updates = [];
-    const client = { rpc: async (name, args) => { rpcCalls.push({ name, args }); return { data: true }; },
-      from() { return { update(value) { updates.push(value); return { eq: async () => ({ error: null }) }; } }; } };
-    const service = createKvkApiWorkersService({ kvkDatabaseSyncToken: 'sync-test', env: { OPENAI_API_KEY: 'sk-test-secret' },
-      now: () => new Date('2026-09-24T12:00:00Z'), getSupabaseClient: () => client,
-      fetchImpl: async (_url, options) => {
-        const body = JSON.parse(options.body);
-        assert.equal(body.tools[0].type, 'web_search');
-        assert.equal(body.text, undefined, 'web search must not use incompatible JSON mode');
-        assert.equal(body.model, 'gpt-6-luna');
-        assert.equal(body.reasoning.effort, 'max');
-        return { ok: false, status, json: async () => ({ error: { code: 'rejected', message: 'Failure sk-test-secret' } }) };
-      } });
-    const res = response();
-    await service.research({ headers: { authorization: 'Bearer sync-test' }, body: {
-      role: 'searcher', company: { kvk_nummer: '12345678' }, brief: {} } }, res);
-    assert.equal(res.statusCode, 502);
-    assert.equal(rpcCalls.length, status < 500 ? 2 : 1);
-    if (status < 500) assert.equal(rpcCalls[1].args.p_actual_eur_cents, 0);
-    assert.equal(updates[0].searcher_enabled, false);
-    assert.doesNotMatch(res.body.error, /sk-test-secret/);
-  }
-});
-
 test('expired in-flight slots preserve the shared money reservation', () => {
  const sql = fs.readFileSync(path.join(root, 'supabase/migrations/20260924124059_kvk_api_stale_slot_recovery.sql'), 'utf8');
  assert.match(sql, /created_at > now\(\) - interval '15 minutes'/);
  assert.match(sql, /spent_eur_cents \+ reserved_eur_cents \+ p_reserve_eur_cents <= limit_eur_cents/);
  assert.doesNotMatch(sql, /reserved_eur_cents = reserved_eur_cents -/);
-});
-
-test('uncertain usage reports metering metadata without company content', () => {
- const source = fs.readFileSync(path.join(root, 'server/services/kvk-api-workers.js'), 'utf8');
- assert.match(source, /uncertain usage/);
- assert.match(source, /responseId: data.id/);
- assert.match(source, /input: data.usage\?\.input_tokens/);
-});
-
-test('actual search usage is billed even when the provider exceeds the requested tool count', async () => {
- const calls = [];
- const row = {limit_eur_cents:10000,spent_eur_cents:72,reserved_eur_cents:0};
- const client = {rpc:async(name,args)=>{calls.push({name,args});return {data:true};}, from:()=>({select:()=>({eq:()=>({single:async()=>({data:row})})})})};
- const service = createKvkApiWorkersService({getSupabaseClient:()=>client,kvkDatabaseSyncToken:'test',env:{OPENAI_API_KEY:'test'},now:()=>new Date('2026-09-24'),fetchImpl:async()=>({ok:true,json:async()=>({model:'gpt-6-luna',status:'completed',usage:{input_tokens:42842,output_tokens:3635},output:[...Array.from({length:9},()=>({type:'web_search_call'})),{content:[{type:'output_text',text:'{"kvk_nummer":"12345678"}'}]}]})})});
- const res = response();
- await service.research({headers:{authorization:'Bearer test'},body:{role:'searcher',company:{kvk_nummer:'12345678'},brief:{}}},res);
- assert.equal(res.statusCode,200);
- assert.equal(calls[1].name,'softora_kvk_api_settle');
- // Luna: 42842 in x $0.25/M + 3635 out x $0.75/M + 9 searches x $0.01 = $0.1034.
- assert.equal(calls[1].args.p_actual_eur_cents,11);
-});
-
-test('API research uses available web tools and explicit evidence-preserving repair instructions', () => {
- const source=fs.readFileSync(path.join(root,'server/services/kvk-api-workers.js'),'utf8');
- assert.match(source,/geen lokale scripts of bestanden/);
- assert.match(source,/behoud bewezen gegevens uit previous_result/);
- assert.match(source,/zet nooit alleen een voltooiingsvlag om/);
- assert.match(source,/const MAX_TOOL_CALLS = 16/);
- const runner=fs.readFileSync(path.join(root,'scripts/kvk_api_workers.py'),'utf8');
- assert.match(runner,/MAX_REPAIR_ATTEMPTS = 3/);
- assert.match(runner,/if transient_control_failure\(error\):/);
- assert.doesNotMatch(runner,/"bindend": packet.get\("bindend"\)/);
- assert.match(runner,/"contract": PROFILE/);
- const validation=fs.readFileSync(path.join(root,'scripts/kvk_api_validation.py'),'utf8');
- assert.match(validation,/api-basic-v1/);
- assert.match(validation,/validate_api_evidence/);
- assert.match(runner,/telefoonnummer EN email/);
- assert.match(runner,/public_page_evidence/);
- assert.match(runner,/validate_saved_result\(path, result, flags\)/);
- const evidence=fs.readFileSync(path.join(root,'scripts/kvk_api_evidence.py'),'utf8');
- assert.match(evidence,/api\.whatsapp\.com/);
- assert.match(evidence,/require_public_url\(newurl\)/);
- assert.match(evidence,/never copy it automatically/);
-});
-test('a failing budget status read does not discard settled paid research', async()=>{
- const client={rpc:async()=>({data:true}),from(){throw new Error('temporary status outage');}};
- const service=createKvkApiWorkersService({getSupabaseClient:()=>client,kvkDatabaseSyncToken:'test',env:{OPENAI_API_KEY:'test'},now:()=>new Date('2026-09-24'),fetchImpl:async()=>({ok:true,json:async()=>({model:'gpt-6-luna',status:'completed',usage:{input_tokens:100,output_tokens:100},output_text:'{"kvk_nummer":"12345678"}'})})});
- const res=response();await service.research({headers:{authorization:'Bearer test'},body:{role:'searcher',company:{kvk_nummer:'12345678'},brief:{}}},res);
- assert.equal(res.statusCode,200);assert.equal(res.body.result.kvk_nummer,'12345678');assert.equal(res.body.budget,null);
-});
-
-test('Searcher runs Luna 6 Max once with its own short brief and returns the pages it retrieved', async () => {
-  const calls = [];
-  const client = { rpc: async (name, args) => { calls.push({ name, args }); return { data: true }; },
-    from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: { limit_eur_cents: 10000, spent_eur_cents: 0, reserved_eur_cents: 0 } }) }) }) }) };
-  let body;
-  const answer = { kvk_nummer: '12345678', telefoonnummer: '0612345678' };
-  const service = createKvkApiWorkersService({ getSupabaseClient: () => client, kvkDatabaseSyncToken: 'test',
-    env: { OPENAI_API_KEY: 'test' }, now: () => new Date('2026-09-24'),
-    fetchImpl: async (_url, options) => { body = JSON.parse(options.body); return { ok: true, json: async () => ({
-      model: 'gpt-6-luna', status: 'completed', usage: { input_tokens: 1000, output_tokens: 1000 },
-      output: [{ type: 'web_search_call', action: { type: 'open_page', url: 'https://voorbeeld.nl/contact',
-        sources: [{ url: 'https://gids.nl/voorbeeld' }, { url: 'javascript:alert(1)' }] } },
-      { content: [{ type: 'output_text', text: `Resultaat:\n${JSON.stringify(answer)}` }] }] }) }; } });
-  const res = response();
-  await service.research({ headers: { authorization: 'Bearer test' }, body: { role: 'searcher',
-    company: { kvk_nummer: '12345678', bedrijfsnaam: 'Voorbeeld', adres: 'Straat 1', plaats: 'Tilburg' }, brief: {} } }, res);
-  assert.equal(res.statusCode, 200);
-  assert.equal(body.model, 'gpt-6-luna');
-  assert.equal(body.reasoning.effort, 'max');
-  assert.equal(calls[0].args.p_reserve_eur_cents, 100);
-  assert.match(body.input[0].content, /^Je bent de Searcher van Softora/);
-  assert.doesNotMatch(body.input[0].content, /previous_result|route_notes/);
-  assert.deepEqual(JSON.parse(body.input[1].content), { kvk_nummer: '12345678', bedrijfsnaam: 'Voorbeeld', adres: 'Straat 1', plaats: 'Tilburg' });
-  assert.deepEqual(res.body.result, answer);
-  assert.deepEqual(res.body.consultedUrls, ['https://voorbeeld.nl/contact', 'https://gids.nl/voorbeeld']);
-  // Opening a page carries no search fee: only tokens are charged here.
-  assert.equal(res.body.costEurCents, 1);
-  assert.deepEqual(res.body.usage, { inputTokens: 1000, outputTokens: 1000, searches: 0, pageOpens: 1 });
-  assert.equal(body.tools[0].search_context_size, 'low');
-  assert.match(body.input[0].content, /hoogstens 2 zoekacties/);
-  assert.match(body.input[0].content, /holding, beheer-bv of vastgoed-bv/);
-  assert.match(body.input[0].content, /nooit op alleen het KVK-nummer/);
-});
-
-test('dashboard state names the model that actually runs', async () => {
-  const { service } = settingsFixture();
-  const res = response();
-  await service.getStatus({}, res);
-  assert.equal(res.body.state.model, 'gpt-6-luna');
-  assert.equal(res.body.state.modelLabel, 'Luna 6 Max');
-  assert.equal(res.body.state.budget.reservationEur, 1);
 });
 
 test('Searcher maps a saved Luna answer before the apply step looks for it', () => {
@@ -310,38 +138,11 @@ test('Searcher maps a saved Luna answer before the apply step looks for it', () 
     'apply_ready_prefix skips a queue head whose mapped result does not exist yet');
 });
 
-test('only search actions carry the per-call search fee', () => {
-  const { toolUsage } = require('../../server/services/kvk-luna-searcher-prompt');
-  const call = (type) => ({ type: 'web_search_call', action: type ? { type } : undefined });
-  const data = { output: [call('search'), call('search'), call('open_page'), call('find_in_page'), call(undefined), { type: 'message' }] };
-  // An item without a recognisable action is charged as a search.
-  assert.deepEqual(toolUsage(data), { searches: 3, pageOpens: 2 });
-});
-
 test('Luna Searcher records mentioned but unkept contacts as rejected for the canonical validator', () => {
   const mapper = fs.readFileSync(path.join(root, 'scripts/kvk_luna_searcher.py'), 'utf8');
   assert.match(mapper, /def withhold_unaccepted_contacts/);
   assert.match(mapper, /"reason_code": "unverified_candidate"/);
   assert.match(mapper, /withhold_unaccepted_contacts\(result, reference/);
-});
-
-test('an incomplete Luna answer is settled and reports why it stopped', async () => {
-  const calls = [];
-  const client = { rpc: async (name, args) => { calls.push({ name, args }); return { data: true }; } };
-  const service = createKvkApiWorkersService({ getSupabaseClient: () => client, kvkDatabaseSyncToken: 'test',
-    env: { OPENAI_API_KEY: 'test' }, now: () => new Date('2026-09-24'),
-    fetchImpl: async (_url, options) => {
-      assert.equal(JSON.parse(options.body).max_output_tokens, 40000);
-      return { ok: true, json: async () => ({ model: 'gpt-6-luna', status: 'incomplete',
-        incomplete_details: { reason: 'max_output_tokens' }, usage: { input_tokens: 20000, output_tokens: 40000 },
-        output: [{ type: 'web_search_call', action: { type: 'search' } }] }) };
-    } });
-  const res = response();
-  await service.research({ headers: { authorization: 'Bearer test' }, body: { role: 'searcher', company: { kvk_nummer: '12345678' }, brief: {} } }, res);
-  assert.equal(res.statusCode, 502);
-  assert.equal(calls[1].name, 'softora_kvk_api_settle');
-  assert.match(res.body.error, /max_output_tokens/);
-  assert.match(res.body.error, /"searches":1/);
 });
 
 test('Searcher refills a finished worker at once instead of waiting for the slowest of a batch', () => {
@@ -377,53 +178,65 @@ test('Luna Searcher fills a missing contact only from this company\'s own struct
   assert.match(mapper, /if len\(matches\) != 1:/);
 });
 
-test('dashboard lets the searchers run via the API or via Codex', () => {
+test('workers dialog has no API budget or API choice; every worker runs via Codex', () => {
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
-  assert.match(page, /<select id="kvk-api-searcher-engine"[^>]*>\s*<option value="api">API<\/option>\s*<option value="codex">Codex<\/option>/);
+  assert.doesNotMatch(page, /kvk-api-workers-budget|Besteed bedrag|kvk-api-searcher-engine/);
   const script = fs.readFileSync(path.join(root, 'assets/kvk-api-workers.js'), 'utf8');
-  assert.match(script, /update\('searcher', \{ engine: engine\.value \}\)/);
+  assert.doesNotMatch(script, /budget|apiKeyConfigured|engine/);
+  assert.match(script, /control\.button\.disabled = busy;/);
 });
 
-test('Codex searchers start without an API key or budget and receive the same instructions', async () => {
-  const { SEARCHER_INSTRUCTIONS } = require('../../server/services/kvk-luna-searcher-prompt');
-  const { service, row, writes } = settingsFixture({ spent_eur_cents: 10000 });
-  const res = response();
-  await service.setEnabled({ body: { role: 'searcher', engine: 'codex' } }, res);
-  assert.equal(res.statusCode, 200);
-  assert.deepEqual(writes, [{ searcher_engine: 'codex' }]);
-  assert.equal(res.body.state.workers.searcher.engine, 'codex');
-  const start = response();
-  await service.setEnabled({ body: { role: 'searcher', enabled: true } }, start);
-  assert.equal(start.statusCode, 200);
-  assert.equal(row.searcher_enabled, true);
-  // The controller still uses the paid API and stays blocked without a key.
-  const controller = response();
-  await service.setEnabled({ body: { role: 'controller', enabled: true } }, controller);
-  assert.equal(controller.statusCode, 503);
-  const polled = response();
-  await createKvkApiWorkersService({ getSupabaseClient: () => ({ from() { return {
-    select() { return { eq() { return { single: async () => ({ data: { ...row } }) }; } }; },
-  }; } }), env: {}, kvkDatabaseSyncToken: 'token' }).poll({ headers: { authorization: 'Bearer token' }, body: {} }, polled);
-  assert.equal(polled.body.searcherInstructions, SEARCHER_INSTRUCTIONS);
-  assert.equal(polled.body.state.workers.searcher.engine, 'codex');
-});
-
-test('searcher engine only switches while off and only to API or Codex', async () => {
-  const running = settingsFixture({ searcher_enabled: true });
-  const res = response();
-  await running.service.setEnabled({ body: { role: 'searcher', engine: 'codex' } }, res);
-  assert.equal(res.statusCode, 409);
-  assert.deepEqual(running.writes, []);
-  for (const body of [{ role: 'searcher', engine: 'gemini' }, { role: 'controller', engine: 'codex' }]) {
-    const invalid = settingsFixture();
-    const rejected = response();
-    await invalid.service.setEnabled({ body }, rejected);
-    assert.equal(rejected.statusCode, 400);
-    assert.deepEqual(invalid.writes, []);
+test('searchers and controllers start without an API key, even with the old budget used up', async () => {
+  const { service, row } = settingsFixture({ spent_eur_cents: 10000, reserved_eur_cents: 3600 });
+  for (const role of ['searcher', 'controller']) {
+    const res = response();
+    await service.setEnabled({ body: { role, enabled: true } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(row[`${role}_enabled`], true);
   }
-  const { service } = settingsFixture();
   const state = response();
   await service.getStatus({}, state);
-  assert.equal(state.body.state.workers.searcher.engine, 'api');
-  assert.equal(state.body.state.workers.controller.engine, undefined);
+  assert.equal(state.body.state.modelLabel, 'Codex Luna 6 Max');
+  assert.equal(state.body.state.budget, undefined);
+  assert.equal(state.body.state.apiKeyConfigured, undefined);
+});
+
+test('the paid research endpoint never calls OpenAI anymore', async () => {
+  let fetchCalls = 0;
+  const service = createKvkApiWorkersService({ kvkDatabaseSyncToken: 'token',
+    env: { OPENAI_API_KEY: 'sk-test' }, fetchImpl: async () => { fetchCalls += 1; return {}; },
+    getSupabaseClient: () => { throw new Error('no database access expected'); } });
+  const denied = response();
+  await service.research({ headers: {}, body: {} }, denied);
+  assert.equal(denied.statusCode, 401);
+  const res = response();
+  await service.research({ headers: { authorization: 'Bearer token' },
+    body: { role: 'searcher', company: { kvk_nummer: '12345678' }, brief: {} } }, res);
+  assert.equal(res.statusCode, 410);
+  assert.equal(fetchCalls, 0);
+  const source = fs.readFileSync(path.join(root, 'server/services/kvk-api-workers.js'), 'utf8');
+  assert.doesNotMatch(source, /api\.openai\.com|OPENAI_API_KEY|softora_kvk_api_reserve/);
+});
+
+test('the local Codex workers receive searcher and controller instructions from the server', async () => {
+  const { SEARCHER_INSTRUCTIONS, CONTROLLER_INSTRUCTIONS } = require('../../server/services/kvk-luna-searcher-prompt');
+  assert.match(CONTROLLER_INSTRUCTIONS, /Controleer precies dit eerder onderzochte KVK-bedrijf/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /previous_result/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /result_schema/);
+  // The controller builds on the Searcher: open its cited pages first, search only for gaps.
+  assert.match(CONTROLLER_INSTRUCTIONS, /luna_claim/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /Doe dan geen zoekacties/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /routes die de Searcher niet gebruikte/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /hoogstens 2 zoekacties/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /alleen concreet tegenbewijs mag het weghalen/);
+  const { row } = settingsFixture();
+  const polled = response();
+  await createKvkApiWorkersService({ kvkDatabaseSyncToken: 'token', getSupabaseClient: () => ({ from() { return {
+    select() { return { eq() { return { single: async () => ({ data: { ...row } }) }; } }; },
+  }; } }) }).poll({ headers: { authorization: 'Bearer token' }, body: {} }, polled);
+  assert.equal(polled.body.searcherInstructions, SEARCHER_INSTRUCTIONS);
+  assert.equal(polled.body.controllerInstructions, CONTROLLER_INSTRUCTIONS);
+  const runner = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
+  assert.doesNotMatch(runner, /call\("\/research"/);
+  assert.match(runner, /"--ignore-user-config", "--ephemeral"/);
 });
