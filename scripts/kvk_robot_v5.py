@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Dashboard-controlled Robot v5. Evidence stays in its review queue, never auto-approved.
+"""Dashboard-controlled Robot v5 that runs its own round ahead of the Searchers.
 
 Follows the current planning's open companies in order. Completed evidence is
 reused on restart; an interrupted company is retried before taking another.
-No model, paid API, old Brabant runner or production import is called here.
+A usable find (phone and e-mail) goes straight into the database so the
+Searchers skip it; anything the Robot did not find is left for the Searchers.
+No model or paid API is called here.
 """
 from __future__ import annotations
 import fcntl
@@ -15,8 +17,10 @@ import subprocess
 import time
 from pathlib import Path
 from kvk_api_workers import ROOT, call, report, run_cli, save_result
+from kvk_robot_import import import_find, publish_live, robot_find
 
 QUEUE = ROOT / 'data' / 'shadow' / 'robot-v5-dashboard'
+DB = ROOT / 'data' / 'nederland_bedrijven.sqlite'
 ENGINE = ROOT / 'experiments' / 'robot-v5-deterministic-20260919' / 'run_shadow.py'
 PYTHON = ROOT / '.venv-robot-zero' / 'bin' / 'python'
 FIELDS = ('id', 'kvk_nummer', 'bedrijfsnaam', 'plaats', 'straatnaam', 'huisnummer', 'postcode', 'vestigingsnummer')
@@ -91,14 +95,32 @@ def research(identity):
                 raise RuntimeError(f'Robot v5 stopte bij {kvk}; voortgang en foutlog bewaard.')
         finally:
             terminate(child)
-    terminal = attempt / 'terminal-results.json'
-    results = json.loads(terminal.read_text())
-    if not any(str(item.get('kvk_nummer') or item.get('kvk')) == kvk for item in results.get('results', [])):
-        raise RuntimeError('Robotresultaat bevat niet het verwachte KVK-nummer.')
-    save_result(checkpoint, {'kvk_nummer': kvk, 'run_dir': str(attempt), 'review_required': True,
-                             'completed_at': time.time()})
-    report('robot', f'{len(list(QUEUE.glob("*/completed.json")))} onderzocht · resultaten ter controle', kvk)
+    result_for(attempt, kvk)  # refuses a run that does not describe this company
+    save_result(checkpoint, {'kvk_nummer': kvk, 'run_dir': str(attempt), 'completed_at': time.time()})
+    import_completed(checkpoint)
     return True
+
+
+def result_for(run_dir, kvk):
+    results = json.loads((Path(run_dir) / 'terminal-results.json').read_text()).get('results', [])
+    item = next((item for item in results if str(item.get('kvk_nummer') or item.get('kvk')) == kvk), None)
+    if item is None:
+        raise RuntimeError('Robotresultaat bevat niet het verwachte KVK-nummer.')
+    return item
+
+
+def import_completed(checkpoint):
+    """Write a finished company's usable find to the database once; report the running totals."""
+    state = json.loads(checkpoint.read_text())
+    if 'imported' not in state:
+        find = robot_find(result_for(state['run_dir'], str(state['kvk_nummer'])))
+        state['imported'] = bool(find) and import_find(DB, find)
+        save_result(checkpoint, state)
+        if state['imported']:
+            publish_live(ROOT)
+    done = list(QUEUE.glob('*/completed.json'))
+    found = sum(1 for path in done if json.loads(path.read_text()).get('imported'))
+    report('robot', f'{len(done)} onderzocht · {found} gevonden en in de database', str(state['kvk_nummer']))
 
 
 def main():
@@ -117,6 +139,10 @@ def main():
                 if not enabled():
                     time.sleep(5)
                     continue
+                # Results finished before finds were imported are written first.
+                for checkpoint in QUEUE.glob('*/completed.json'):
+                    if 'imported' not in json.loads(checkpoint.read_text()):
+                        import_completed(checkpoint)
                 identity = next_identity()
                 if identity is None:
                     report('robot', 'Actuele planning onderzocht; wacht op verwerking van de resultaten.', halt=True)
