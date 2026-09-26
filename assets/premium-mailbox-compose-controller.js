@@ -19,6 +19,7 @@
     let spellingRequest = null;
     let spellingUndo = null;
     let rewriteRequestActive = false;
+    let lastSuggestion = '';
     let sendRequestActive = false;
     let attachmentDragDepth = 0;
     const configuredSpellingTimeout = Number(options.spellingTimeoutMs);
@@ -324,6 +325,7 @@
       composeGeneration += 1;
       abortSpellingRequest();
       spellingUndo = null;
+      lastSuggestion = '';
       clearAttachmentDragState();
       if (!optionsOverride.keepContext) {
         setReplyContext(null);
@@ -340,6 +342,7 @@
       composeGeneration += 1;
       abortSpellingRequest();
       spellingUndo = null;
+      lastSuggestion = '';
       clearAttachmentDragState();
       documentRef?.getElementById('compose-overlay')?.classList.remove('open');
       options.composeWindow?.reset?.();
@@ -420,6 +423,10 @@
       const bodyField = documentRef?.getElementById('c-body');
       const draft = String(bodyField?.value || '').trim();
       const isSuggestedReply = Boolean(replyContext && replyContext.mode !== 'new-message');
+      // "Opnieuw voorstellen" on an untouched suggestion asks for a different
+      // variant; an edited text is treated as the employee's own concept.
+      const regenerate = isSuggestedReply && Boolean(lastSuggestion) && draft === lastSuggestion;
+      let suggested = false;
       if (!draft && !isSuggestedReply) {
         options.toast('Typ eerst je mailtekst');
         return;
@@ -447,7 +454,8 @@
             account: replyAccount,
             to: fieldValue('c-to'),
             subject: fieldValue('c-subject'),
-            body: draft,
+            body: regenerate ? '' : draft,
+            ...(regenerate ? { previousSuggestion: lastSuggestion } : {}),
             senderProfile,
             context: buildRewriteContext(),
           }),
@@ -460,7 +468,12 @@
         if (!rewritten) throw new Error('Geen verbeterde tekst ontvangen');
         bodyField.value = rewritten;
         updateSpellingButton();
-        options.compose.complete(rewriteBtn);
+        if (isSuggestedReply) {
+          lastSuggestion = rewritten;
+          suggested = true;
+        } else {
+          options.compose.complete(rewriteBtn);
+        }
         options.toast(isSuggestedReply ? 'Reactie voorgesteld' : 'Tekst verbeterd');
       } catch (error) {
         options.toast(global.SoftoraMailboxError?.normalize?.(
@@ -471,7 +484,7 @@
         rewriteRequestActive = false;
         options.compose.finish(
           rewriteBtn,
-          originalLabel || (isSuggestedReply ? 'Voorgestelde reactie' : 'Verwoord dit beter')
+          suggested ? 'Opnieuw voorstellen' : (originalLabel || (isSuggestedReply ? 'Voorgestelde reactie' : 'Verwoord dit beter'))
         );
         if (sendBtn) sendBtn.disabled = false;
         updateSpellingButton();

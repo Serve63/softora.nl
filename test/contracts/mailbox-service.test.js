@@ -5161,13 +5161,15 @@ test('campaign mailbox sync fetches a historical sent reply linked to an indexed
   });
 });
 
-test('reply quality failure returns 422 without canned text, retries or mail sends', async () => {
+test('reply quality failure retries once with the reason, then returns 422 without canned text or mail sends', async () => {
   let calls = 0;
+  const requests = [];
   const service = createMailboxService({
     getOpenAiApiKey: () => 'openai-test-key',
     logger: { error() {} },
-    fetchJsonWithTimeout: async () => {
+    fetchJsonWithTimeout: async (_url, options) => {
       calls += 1;
+      requests.push(JSON.parse(options.body));
       return { response: { ok: true }, data: { choices: [{ message: { content: 'Bedankt, ik kom dinsdag wel langs.' } }] } };
     },
   });
@@ -5176,7 +5178,9 @@ test('reply quality failure returns 422 without canned text, retries or mail sen
     account: 'serve@softora.nl', to: 'klant@example.test', subject: 'Re: Vraag', body: 'Bestaand concept',
     context: { from: 'Lisa', body: 'Geen interesse. Wat kost zoiets eigenlijk?' },
   } }, res);
-  assert.equal(calls, 1);
+  assert.equal(calls, 2);
+  assert.match(requests[1].messages.at(-1).content, /Dit antwoord is geweigerd: Geef uitsluitend geldige JSON/);
+  assert.equal(requests[1].messages.at(-2).role, 'assistant');
   assert.equal(res.statusCode, 422);
   assert.equal(res.body.ok, false);
   assert.equal(res.body.text, undefined);

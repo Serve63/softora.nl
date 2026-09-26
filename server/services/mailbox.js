@@ -58,14 +58,8 @@ const {
   safeParseJsonObject,
 } = require('./data-ops-serialization');
 const { fitWebdesignPreviewForEmail } = require('./coldmail-image-frame');
-const { buildOpenAiContextHeaders } = require('./openai-request-context');
-const {
-  buildSimpleRejectionReply,
-  buildMailboxDraftRewriteSystemPrompt,
-  buildMailboxReplyPromptPayload,
-  buildMailboxReplySystemPrompt,
-  enforceMailboxReplyProfile,
-} = require('./mailbox-reply-prompt');
+const { createMailboxReplyRewrite } = require('./mailbox-reply-rewrite');
+const { createMailboxReplyExamples } = require('./mailbox-reply-examples');
 const {
   WEBDESIGN_EMAIL_MOCKUP_CAPTION: COLDMAIL_MOCKUP_CAPTION,
   WEBDESIGN_EMAIL_TEMPLATE_VERSION,
@@ -2038,94 +2032,11 @@ function createMailboxService(deps = {}) {
   function cleanPromptText(value, maxLength = 6000) {
     return truncateText(sanitizeMailboxDisplayText(normalizeString(value)), maxLength);
   }
-  async function rewriteDraft({ accountEmail, to, subject, body, context, senderProfile }) {
-    const draft = cleanPromptText(body, 8000);
-    const hasReplyContext = Boolean(
-      context && typeof context === 'object' && (cleanPromptText(context.body, 6000) || cleanPromptText(context.preview, 600))
-    );
-    if (!draft && !hasReplyContext) {
-      const error = new Error('Typ eerst je mailtekst.');
-      error.status = 400;
-      throw error;
-    }
-    const model = normalizeString(openAiModel) || 'gpt-5.5-pro';
-    const { resolvedAccountEmail, accountSenderName } = await resolveRewriteIdentity({ context, accountEmail, recipientEmail: to, isReply: hasReplyContext });
-    const payload = buildMailboxReplyPromptPayload({
-      accountEmail: resolvedAccountEmail,
-      senderName: accountSenderName,
-      to,
-      subject,
-      body: draft,
-      context,
-      senderProfile,
-      isReply: hasReplyContext,
-      cleanPromptText,
-      normalizeEmail,
-    });
-    const shortcut = hasReplyContext && buildSimpleRejectionReply(payload, resolvedAccountEmail);
-    if (shortcut) return { text: shortcut, model: 'policy', usage: null, provider: 'local' };
-    const apiKey = normalizeString(typeof getOpenAiApiKey === 'function' ? getOpenAiApiKey() : '');
-    if (!apiKey) {
-      const error = new Error('OpenAI API-key ontbreekt.');
-      error.status = 503;
-      throw error;
-    }
-    const systemPrompt = hasReplyContext
-      ? buildMailboxReplySystemPrompt({ hasDraft: Boolean(draft), senderName: payload.afzenderContext?.naam })
-      : buildMailboxDraftRewriteSystemPrompt({ senderName: accountSenderName });
-    const baseUrl = normalizeString(openAiApiBaseUrl) || 'https://api.openai.com/v1';
-    const { response, data } = await fetchJsonWithTimeout(
-      `${baseUrl}/chat/completions`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-          ...buildOpenAiContextHeaders({ env, openAiApiBaseUrl: baseUrl }),
-        },
-        body: JSON.stringify({
-          model,
-          temperature: hasReplyContext ? 0.15 : 0.25,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: JSON.stringify(payload) },
-          ],
-        }),
-      },
-      65000
-    );
-
-    if (!response.ok) {
-      const error = new Error(`OpenAI mailtekst verbeteren mislukt (${response.status})`);
-      error.status = response.status;
-      error.data = data;
-      throw error;
-    }
-
-    const content = data?.choices?.[0]?.message?.content;
-    const generatedText = truncateText(normalizeString(extractOpenAiTextContent(content)), 8000);
-    const text = hasReplyContext
-      ? truncateText(enforceMailboxReplyProfile(generatedText, {
-          firstName: payload.antwoordContext?.aanhefNaam,
-          inboundText: [
-            payload.ontvangenMail?.body || payload.ontvangenMail?.preview,
-          ].filter(Boolean).join('\n'),
-          conversation: payload.gespreksverloop, accountEmail: resolvedAccountEmail, conceptText: draft, senderName: payload.afzenderContext?.naam, originalSentMail: payload.oorspronkelijkeVerzondenMail,
-        }), 8000)
-      : generatedText;
-    if (!text) {
-      const error = new Error('OpenAI gaf geen verbeterde tekst terug.');
-      error.status = 502;
-      throw error;
-    }
-
-    return {
-      text,
-      model: normalizeString(data?.model || model) || model,
-      usage: data?.usage || null,
-      provider: 'openai',
-    };
-  }
+  const { rewriteDraft } = createMailboxReplyRewrite({
+    env, getOpenAiApiKey, openAiApiBaseUrl, openAiModel, fetchJsonWithTimeout, extractOpenAiTextContent, resolveRewriteIdentity,
+    replyExamples: deps.mailboxReplyExamples || createMailboxReplyExamples({ isSupabaseConfigured, getSupabaseClient, logger }),
+    cleanPromptText, normalizeEmail, normalizeString, truncateText,
+  });
 
   async function accountsResponse(_req, res) {
     return res.status(200).json({
@@ -2289,6 +2200,7 @@ function createMailboxService(deps = {}) {
         body: body.body || body.text || '',
         senderProfile: body.senderProfile,
         context: body.context,
+        previousSuggestion: body.previousSuggestion,
       });
       return res.status(200).json({ ok: true, text: result.text, result });
     } catch (error) {

@@ -6374,6 +6374,67 @@ test('voorgestelde Instantly-reactie gebruikt providerprovenance zonder een send
   assert.equal(fields.get('c-body').value, 'Veilige voorgestelde reactie.');
 });
 
+test('voorgestelde reactie blijft beschikbaar als "Opnieuw voorstellen" en vraagt dan een andere variant', async () => {
+  const fields = new Map();
+  ['c-to', 'c-subject', 'c-body', 'compose-overlay'].forEach((id) => {
+    fields.set(id, {
+      value: '', textContent: '', disabled: false,
+      classList: { add() {}, remove() {} },
+      setAttribute() {}, removeAttribute() {}, addEventListener() {},
+    });
+  });
+  const rewriteButton = { textContent: 'Voorgestelde reactie', disabled: false, hidden: false };
+  const requests = [];
+  const answers = ['Eerste voorstel.', 'Tweede voorstel.', 'Verbeterd eigen concept.'];
+  let completed = 0;
+  const mail = {
+    id: 'serve@softora.nl|inbox:1', accountEmail: 'serve@softora.nl', email: 'paul@example.nl',
+    from: 'Paul', subject: 'Re: Kleine vraag over jullie website', body: 'Geen interesse.', folder: 'inbox',
+  };
+  const controller = composeControllerModule.create({
+    document: {
+      getElementById: (id) => fields.get(id) || null,
+      querySelector: (selector) => selector === '[data-mailbox-action="rewrite-compose"]' ? rewriteButton : null,
+    },
+    fetch: async (url, options) => {
+      requests.push(JSON.parse(options.body));
+      return { ok: true, json: async () => ({ ok: true, text: answers[requests.length - 1] }) };
+    },
+    loadSenderProfile: async () => ({ name: 'Servé Creusen' }),
+    compose: {
+      buildReplyContext: composeModule.buildReplyContext,
+      resetOptionalFields() {}, reset() {}, getAttachments: () => [], isUsed: () => false,
+      complete() { completed += 1; },
+      finish(button, label) { button.textContent = label; },
+    },
+    campaignInbox: campaignInboxModule,
+    display: { getReplyToAddress: () => mail.email, formatDetailSubject: (value) => value },
+    getActiveFolder: () => 'inbox',
+    getAccount: () => 'serve@softora.nl',
+    getOwner: () => 'serve',
+    findMail: () => mail,
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    composeWindow: { reset() {} },
+    toast() {},
+  });
+
+  controller.reply(mail);
+  await controller.rewrite();
+  assert.equal(fields.get('c-body').value, 'Eerste voorstel.');
+  assert.equal(rewriteButton.textContent, 'Opnieuw voorstellen');
+  assert.equal(completed, 0);
+
+  await controller.rewrite();
+  assert.equal(requests[1].body, '');
+  assert.equal(requests[1].previousSuggestion, 'Eerste voorstel.');
+  assert.equal(fields.get('c-body').value, 'Tweede voorstel.');
+
+  fields.get('c-body').value = 'Mijn eigen aanpassing.';
+  await controller.rewrite();
+  assert.equal(requests[2].body, 'Mijn eigen aanpassing.');
+  assert.equal(requests[2].previousSuggestion, undefined);
+});
+
 test('mislukte reply voegt geen roze bericht toe en herstelt de composer exact', async () => {
   const fields = new Map();
   ['c-to', 'c-subject', 'c-body', 'c-cc', 'c-bcc', 'compose-overlay'].forEach((id) => {
