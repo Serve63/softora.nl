@@ -54,8 +54,8 @@ test('prefetch warms the next conversations in order and never touches the open 
   await prefetch.warmNow();
   assert.deepEqual(calls, [
     ['bodies', ['a', 'b']],
-    ['timeline', 'a'], ['thread', 'a', true],
-    ['timeline', 'b'],
+    ['timeline', 'a'], ['timeline', 'b'],
+    ['thread', 'a', true],
     ['images', ['a', 'b']],
   ], 'the open conversation is left to the detail load; a body-less one gets no thread fetch');
   assert.equal(mails[1].threadMessages[0].bodyLoadError, '', 'a failed warm-up leaves no error that blocks the retry on click');
@@ -146,8 +146,8 @@ test('the contact timeline is prefetched without touching the open conversation'
 
 test('the Mailbox wires the prefetch after its detail controller and warms after each complete render', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
-  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260924c');
-  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260924g'));
+  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260927a');
+  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260927a'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /afterCommit: \(mail, \{ changed \}\) => \{ mailboxPrefetch\?\.schedule\?\.\(\);/);
   // The outreach list holds grouped copies; the detail opens the stored message, so that one is warmed.
@@ -185,4 +185,88 @@ test('a dossier that a list refresh marked stale is warmed again, at most once a
 test('a click shows a complete but stale dossier at once and refreshes it in the background', () => {
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /const stale = mail\.contactTimelineLoaded === true && mail\.contactTimelineNeedsRefresh === true && Number\(mail\.contactTimelineTotal\) > 0; const load = \(\) => mailboxDiscoveryController\?\.loadContactTimeline\?\.\(mail, \{ deferRender: !stale, signal \}\); if \(stale\) \{ void load\(\); return true; \}/);
+});
+
+test('preparation drains past the first six conversations with at most three concurrent timelines', async () => {
+  const mails = Array.from({ length: 22 }, (_, index) => ({ id: String(index), bodyLoaded: true }));
+  const calls = [], batches = [];
+  let inFlight = 0, peak = 0;
+  const prefetch = create({
+    getMails: () => mails, getActiveMail: () => '0',
+    index: { async prefetchRootBodies({ mails: targets }) { batches.push(targets.map((mail) => mail.id)); } },
+    discovery: { async prefetchContactTimeline(mail) {
+      inFlight++; peak = Math.max(peak, inFlight); calls.push(mail.id);
+      await tick(); inFlight--;
+    } },
+  });
+  await prefetch.warmNow();
+  assert.equal(calls.length, 21);
+  assert.equal(new Set(calls).size, 21, 'each non-active conversation is attempted once');
+  assert.equal(peak, 3);
+  assert.deepEqual(batches.map((batch) => batch.length), [6, 6, 6, 3]);
+  await prefetch.warmNow();
+  assert.equal(calls.length, 21, 'completed preparation does not keep making requests');
+});
+
+test('scroll and pointer intent reprioritize the remaining queue before the next batch', async () => {
+  const mails = Array.from({ length: 14 }, (_, index) => ({ id: String(index) }));
+  const listeners = {}, batches = [], releases = [];
+  let visible = '10';
+  const list = {
+    addEventListener(name, fn) { listeners[name] = fn; },
+    getBoundingClientRect: () => ({ top: 0, bottom: 400, height: 400 }),
+    querySelectorAll: () => [{ getBoundingClientRect: () => ({ top: 10, bottom: 60 }), getAttribute: () => visible }],
+  };
+  const prefetch = create({
+    max: 2, getMails: () => mails, getActiveMail: () => '0', getListElement: () => list,
+    index: { async prefetchRootBodies({ mails: targets }) { batches.push(targets.map((mail) => mail.id)); } },
+    discovery: { prefetchContactTimeline: () => new Promise((resolve) => releases.push(resolve)) },
+  });
+  const pending = prefetch.warmNow();
+  await tick();
+  assert.deepEqual(batches[0], ['10', '1']);
+  visible = '11';
+  listeners.scroll();
+  listeners.pointerover({ target: { closest: () => ({ getAttribute: () => '13' }) } });
+  releases.splice(0).forEach((resolve) => resolve());
+  await tick();
+  assert.deepEqual(batches[1], ['13', '11']);
+  while (releases.length) { releases.splice(0).forEach((resolve) => resolve()); await tick(); }
+  await pending;
+});
+
+test('stopping a scope cancels the batch and never starts the remaining old conversations', async () => {
+  const mails = Array.from({ length: 10 }, (_, index) => ({ id: String(index) }));
+  const calls = [], releases = [];
+  let requestSignal;
+  const prefetch = create({
+    getMails: () => mails, getActiveMail: () => '0',
+    index: { async prefetchRootBodies({ signal }) { requestSignal = signal; } },
+    discovery: { prefetchContactTimeline(mail) { calls.push(mail.id); return new Promise((resolve) => releases.push(resolve)); } },
+  });
+  const pending = prefetch.warmNow();
+  await tick();
+  prefetch.stop();
+  assert.equal(requestSignal.aborted, true);
+  releases.forEach((resolve) => resolve());
+  await pending;
+  assert.deepEqual(calls, ['1', '2', '3']);
+});
+
+test('preparation waits for account scope and failures do not block the rest of the list', async () => {
+  let ready;
+  const accounts = new Promise((resolve) => { ready = resolve; });
+  const calls = [];
+  const mails = Array.from({ length: 9 }, (_, index) => ({ id: String(index) }));
+  const prefetch = create({
+    getMails: () => mails, getActiveMail: () => '0', whenReady: () => accounts,
+    discovery: { async prefetchContactTimeline(mail) { calls.push(mail.id); throw new Error('temporary read failure'); } },
+  });
+  const pending = prefetch.warmNow();
+  await tick();
+  assert.deepEqual(calls, []);
+  ready(); await pending;
+  assert.equal(calls.length, 8);
+  await prefetch.warmNow();
+  assert.equal(calls.length, 8, 'failed reads cannot cause an unbounded retry loop');
 });
