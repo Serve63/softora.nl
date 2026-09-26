@@ -171,6 +171,7 @@ function createMailboxReplyRewrite(deps = {}) {
     const enforceOptions = {
       firstName: payload.antwoordContext?.aanhefNaam,
       inboundText: payload.ontvangenMail?.body || payload.ontvangenMail?.preview || '',
+      senderEmail: payload.ontvangenMail?.email,
       conversation: payload.gespreksverloop,
       accountEmail: resolvedAccountEmail,
       conceptText: draft,
