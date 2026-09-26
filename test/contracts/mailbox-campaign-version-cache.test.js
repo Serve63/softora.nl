@@ -142,3 +142,100 @@ test('campagne-endpoint gebruikt de versiecache maar voegt Instantly en zichtbaa
   await list({ owner: 'martijn', hydrateBodies: false });
   assert.equal(indexBuilds, 3);
 });
+
+const {
+  createMailboxCampaignSharedCache,
+  isMailboxCampaignSharedCacheEnabled,
+} = require('../../server/services/mailbox-campaign-shared-cache');
+
+function createMemorySharedStore({ failRead = false, failWrite = false } = {}) {
+  const rows = new Map();
+  const writes = [];
+  return {
+    rows, writes,
+    async read(key) {
+      if (failRead) throw new Error('read down');
+      return rows.has(key) ? structuredClone(rows.get(key)) : null;
+    },
+    async write(key, entry) {
+      if (failWrite) throw new Error('write down');
+      writes.push(key);
+      rows.set(key, structuredClone(entry));
+    },
+  };
+}
+
+test('een andere serverkopie gebruikt de gedeelde lijst bij dezelfde databaseversie', async () => {
+  const shared = createMemorySharedStore();
+  let builds = 0;
+  const build = async () => { builds += 1; return { replies: [{ id: `r${builds}` }] }; };
+  const first = createMailboxCampaignVersionCache({ readContentVersion: async () => 40, sharedStore: shared, logger: { warn() {} } });
+  const second = createMailboxCampaignVersionCache({ readContentVersion: async () => 40, sharedStore: shared, logger: { warn() {} } });
+  assert.equal((await first('serve', build)).cache, 'miss');
+  assert.deepEqual(await second('serve', build), { value: { replies: [{ id: 'r1' }] }, cache: 'shared-hit' });
+  assert.equal((await second('serve', build)).cache, 'hit');
+  assert.equal(builds, 1);
+  assert.deepEqual(shared.writes, ['serve']);
+});
+
+test('gedeelde lijst met andere versie of te oud wordt nooit gebruikt', async () => {
+  let now = 10_000;
+  const shared = createMemorySharedStore();
+  shared.rows.set('serve', { version: 39, builtAt: now, value: { stale: 'version' } });
+  shared.rows.set('martijn', { version: 40, builtAt: now - MAILBOX_CAMPAIGN_VERSION_CACHE_MAX_AGE_MS, value: { stale: 'age' } });
+  shared.rows.set('future', { version: 40, builtAt: now + 60_000, value: { stale: 'future' } });
+  const cache = createMailboxCampaignVersionCache({ readContentVersion: async () => 40, sharedStore: shared, now: () => now, logger: { warn() {} } });
+  for (const key of ['serve', 'martijn', 'future']) {
+    assert.deepEqual(await cache(key, async () => ({ fresh: key })), { value: { fresh: key }, cache: 'miss' });
+  }
+  assert.equal(shared.rows.get('serve').version, 40);
+});
+
+test('storing in de gedeelde opslag valt terug op volledige opbouw zonder fout', async () => {
+  for (const options of [{ failRead: true }, { failWrite: true }]) {
+    let builds = 0;
+    const cache = createMailboxCampaignVersionCache({
+      readContentVersion: async () => 41, sharedStore: createMemorySharedStore(options), logger: { warn() {} },
+    });
+    assert.deepEqual(await cache('serve', async () => { builds += 1; return { n: builds }; }), { value: { n: 1 }, cache: 'miss' });
+    assert.equal((await cache('serve', async () => assert.fail('geheugen moet raken'))).cache, 'hit');
+  }
+});
+
+test('zonder leesbare versie wordt ook een gedeelde lijst genegeerd', async () => {
+  const shared = createMemorySharedStore();
+  shared.rows.set('serve', { version: 5, builtAt: Date.now(), value: { shared: true } });
+  const cache = createMailboxCampaignVersionCache({ readContentVersion: async () => null, sharedStore: shared, logger: { warn() {} } });
+  assert.deepEqual(await cache('serve', async () => ({ built: true })), { value: { built: true }, cache: 'bypass' });
+});
+
+test('gedeelde campagnecache comprimeert, leest exact terug en is uit te schakelen', async () => {
+  const table = new Map();
+  const client = {
+    from(name) {
+      assert.equal(name, 'softora_mailbox_campaign_list_cache');
+      const query = { key: null };
+      return {
+        select() { return this; },
+        eq(_column, value) { query.key = value; return this; },
+        maybeSingle: async () => ({ data: table.get(query.key) || null, error: null }),
+        upsert: async (row, options) => {
+          assert.deepEqual(options, { onConflict: 'cache_key' });
+          table.set(row.cache_key, row);
+          return { error: null };
+        },
+      };
+    },
+  };
+  const store = createMailboxCampaignSharedCache({ getSupabaseClient: () => client });
+  const value = { replies: [{ id: 'a', subject: 'Kleine vraag over jullie website', threadMessages: [{ id: 'b' }] }] };
+  assert.equal(await store.write('["serve",200,false,false]', { version: 77, builtAt: Date.parse('2026-09-26T22:00:00Z'), value }), true);
+  const row = table.get('["serve",200,false,false]');
+  assert.equal(row.content_version, 77);
+  assert.ok(row.payload.length < JSON.stringify(value).length * 2);
+  assert.deepEqual(await store.read('["serve",200,false,false]'), { version: 77, builtAt: Date.parse('2026-09-26T22:00:00Z'), value });
+  assert.equal(await store.read('onbekend'), null);
+  assert.equal(await createMailboxCampaignSharedCache({ getSupabaseClient: () => null }).read('x'), null);
+  assert.equal(isMailboxCampaignSharedCacheEnabled({}), true);
+  for (const off of ['0', 'false', 'OFF', ' no ']) assert.equal(isMailboxCampaignSharedCacheEnabled({ MAILBOX_CAMPAIGN_SHARED_CACHE: off }), false);
+});
