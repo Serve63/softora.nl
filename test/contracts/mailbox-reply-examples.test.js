@@ -12,6 +12,7 @@ const {
   buildMailboxReplyPromptPayload,
   buildMailboxReplySystemPrompt,
   enforceMailboxReplyProfile,
+  inferMailboxReplyFirstName,
 } = require('../../server/services/mailbox-reply-prompt');
 const { createMailboxService } = require('../../server/services/mailbox');
 
@@ -248,4 +249,14 @@ test('eerste antwoord bedankt altijd voor de moeite en zegt nooit "helemaal begr
   assert.equal((kept.match(/moeite/g) || []).length, 1);
   const followUp = enforceMailboxReplyProfile(reply('Helemaal duidelijk.'), { inboundText, originalSentMail, conversation: [{ folder: 'inbox', body: 'Eerdere reactie' }] });
   assert.doesNotMatch(followUp, /moeite/);
+});
+
+test('bedrijfsnaam als ondertekening (Yoga Moergestel) wordt nooit de aanhefnaam', () => {
+  const originalSentMail = { body: 'Goedendag,\n\nAfgelopen week kwam ik jullie website yogamoergestel⁠.⁠com tegen.' };
+  const body = 'Ik ga me hier niet in verdiepen.\nVeel succes met hetgeen je leuk vindt.\n\nVriendelijke groeten,\n\nYoga Moergestel';
+  assert.equal(inferMailboxReplyFirstName({ from: 'Yoga Moergestel', email: 'yogamoergestel@gmail.com', body }, { originalSentMail }), '');
+  assert.equal(inferMailboxReplyFirstName({ from: 'Arne', email: 'yogamoergestel@gmail.com', body }, { originalSentMail }), 'Arne');
+  assert.equal(inferMailboxReplyFirstName({ from: 'Anneke Jansen', email: 'annekejansen@gmail.com', body: 'Bedankt.' }, {}), 'Anneke');
+  const reply = JSON.stringify({ intent: 'rejection', ctaAllowed: false, aanhefNaam: 'Yoga', paragraphs: [{ text: 'Veel succes verder!', evidence: ['received.body'] }] });
+  assert.match(enforceMailboxReplyProfile(reply, { inboundText: body, senderEmail: 'yogamoergestel@gmail.com', originalSentMail }), /^Goedendag,\n/);
 });

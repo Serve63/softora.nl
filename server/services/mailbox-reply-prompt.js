@@ -33,8 +33,8 @@ const UNSAFE_FIRST_NAMES = new Set([
   'verstuurd',
   'verzonden',
 ]);
-const BUSINESS_NAME_PATTERN = /\b(?:administratie|atelier|b\.?v\.?|bedrijf|camping|contact|groep|groothandel|kapsalon|makelaardij|minicamping|notaris|praktijk|restaurant|salon|service|shop|studio|support|team|textiles|schoolfoto|fotografie|photography|v\.?o\.?f\.?|winkel)\b/i;
-const BUSINESS_IDENTITY_TOKEN_PATTERN = /(?:administratie|atelier|bedrijf|camping|contact|groep|groothandel|kapsalon|makelaardij|minicamping|notaris|praktijk|restaurant|salon|service|shop|studio|support|team|textiles|schoolfoto|fotografie|photography|winkel)/i;
+const BUSINESS_NAME_PATTERN = /\b(?:yoga|pilates|administratie|atelier|b\.?v\.?|bedrijf|camping|contact|groep|groothandel|kapsalon|makelaardij|minicamping|notaris|praktijk|restaurant|salon|service|shop|studio|support|team|textiles|schoolfoto|fotografie|photography|v\.?o\.?f\.?|winkel)\b/i;
+const BUSINESS_IDENTITY_TOKEN_PATTERN = /(?:administratie|atelier|bedrijf|camping|contact|groep|groothandel|kapsalon|makelaardij|minicamping|notaris|praktijk|restaurant|salon|service|shop|studio|support|team|textiles|schoolfoto|fotografie|photography|winkel|yoga|pilates|fysio|pedicure|massage|kapper|bakkerij|tandarts|beauty|coaching)/i;
 const MAILBOX_REPLY_SENDERS = Object.freeze({
   serve: Object.freeze({
     key: 'serve',
@@ -128,14 +128,45 @@ function getNewestReplyLines(body) {
   return (quoteIndex >= 0 ? lines.slice(0, quoteIndex) : lines).map(cleanLine);
 }
 
-function inferMailboxReplyFirstName(context) {
+const PERSONAL_EMAIL_DOMAINS = new Set('gmail.com,googlemail.com,hotmail.com,hotmail.nl,icloud.com,live.com,live.nl,outlook.com,outlook.nl,yahoo.com,yahoo.nl,ziggo.nl,kpnmail.nl,planet.nl,home.nl'.split(','));
+
+function compactIdentity(value) {
+  return String(value || '').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '');
+}
+
+// Company names that match the website or business mail domain, like
+// "Yoga Moergestel" for yogamoergestel.com, are no first name.
+function businessIdentityKeys({ email, originalSentMail } = {}) {
+  const keys = new Set();
+  const addDomain = (domain) => {
+    const clean = String(domain || '').toLowerCase().replace(/^www\./, '');
+    if (!clean || PERSONAL_EMAIL_DOMAINS.has(clean)) return;
+    const label = compactIdentity(clean.split('.')[0]);
+    if (label.length >= 4) keys.add(label);
+  };
+  const emailMatch = String(email || '').match(/@([^\s>]+)/);
+  if (emailMatch) addDomain(emailMatch[1]);
+  const sentText = String(originalSentMail?.body || originalSentMail?.preview || '').replace(/[\u200b-\u200d\u2060\ufeff]/g, '');
+  for (const match of sentText.matchAll(/\b(?:https?:\/\/)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,})\b/gi)) {
+    if (!/softora\.nl$/i.test(match[1])) addDomain(match[1]);
+  }
+  return [...keys];
+}
+
+function isBusinessIdentity(identity, keys) {
+  const compact = compactIdentity(identity);
+  return compact.length >= 4 && (keys || []).some((key) => key.includes(compact) || compact.includes(key));
+}
+
+function inferMailboxReplyFirstName(context, options = {}) {
   const raw = context && typeof context === 'object' ? context : {};
+  const businessKeys = businessIdentityKeys({ email: raw.email, originalSentMail: options.originalSentMail });
   const lines = getNewestReplyLines(raw.body || raw.preview || '');
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     const inlineSignoff = lines[index].match(INLINE_REPLY_SIGNOFF_PATTERN);
     if (!inlineSignoff) continue;
     const signatureIdentity = cleanLine(inlineSignoff[1]);
-    if (!signatureIdentity || BUSINESS_NAME_PATTERN.test(signatureIdentity) || BUSINESS_IDENTITY_TOKEN_PATTERN.test(signatureIdentity)) {
+    if (!signatureIdentity || BUSINESS_NAME_PATTERN.test(signatureIdentity) || BUSINESS_IDENTITY_TOKEN_PATTERN.test(signatureIdentity) || isBusinessIdentity(signatureIdentity, businessKeys)) {
       continue;
     }
     const name = normalizeFirstName(signatureIdentity);
@@ -144,7 +175,7 @@ function inferMailboxReplyFirstName(context) {
   for (let index = lines.length - 2; index >= 0; index -= 1) {
     if (!REPLY_SIGNOFF_PATTERN.test(lines[index])) continue;
     const signatureIdentity = cleanLine(lines.slice(index + 1).find(Boolean));
-    if (!signatureIdentity || BUSINESS_NAME_PATTERN.test(signatureIdentity) || BUSINESS_IDENTITY_TOKEN_PATTERN.test(signatureIdentity)) {
+    if (!signatureIdentity || BUSINESS_NAME_PATTERN.test(signatureIdentity) || BUSINESS_IDENTITY_TOKEN_PATTERN.test(signatureIdentity) || isBusinessIdentity(signatureIdentity, businessKeys)) {
       continue;
     }
     const name = normalizeFirstName(signatureIdentity);
@@ -152,7 +183,7 @@ function inferMailboxReplyFirstName(context) {
   }
 
   const from = cleanLine(raw.from).replace(/\s*<[^>]+>\s*$/, '').replace(/^"|"$/g, '');
-  if (BUSINESS_NAME_PATTERN.test(from) || BUSINESS_IDENTITY_TOKEN_PATTERN.test(from)) return '';
+  if (BUSINESS_NAME_PATTERN.test(from) || BUSINESS_IDENTITY_TOKEN_PATTERN.test(from) || isBusinessIdentity(from, businessKeys)) return '';
   if (/^[\p{L}'’-]+(?:\s+[\p{L}'’-]+)+$/u.test(from)) {
     return normalizeFirstName(from);
   }
@@ -267,7 +298,7 @@ function buildMailboxReplyPromptPayload(options = {}) {
       senderName,
       originalSentMail: sentSource,
     });
-    payload.antwoordContext = { aanhefNaam: inferMailboxReplyFirstName(received) };
+    payload.antwoordContext = { aanhefNaam: inferMailboxReplyFirstName(received, { originalSentMail: sentSource }) };
     const answerPolicy = analyzeMailboxReplyContext([
       received?.body || received?.preview,
     ].filter(Boolean).join('\n'), {
@@ -335,7 +366,10 @@ function groundedModelFirstName(value, options) {
   const signatureLine = new RegExp(`^${escaped}(?=$|[^\\p{L}])`, 'u');
   const afterSignoff = new RegExp(`\\b(?:groet(?:en|jes)?|gr(?:t|oet)?\\.?)[,.]?\\s+${escaped}(?=$|[^\\p{L}])`, 'iu');
   const deviceFooter = /\b(?:sent|from|verzonden|verstuurd|vanaf|iphone|ipad|android|outlook|samsung)\b/i;
-  const lines = getNewestReplyLines(options.inboundText).filter((line) => line && !deviceFooter.test(line));
+  const businessKeys = businessIdentityKeys({ email: options.senderEmail, originalSentMail: options.originalSentMail });
+  if (isBusinessIdentity(name, businessKeys) || BUSINESS_IDENTITY_TOKEN_PATTERN.test(name)) return '';
+  const lines = getNewestReplyLines(options.inboundText).filter((line) => line && !deviceFooter.test(line)
+    && !isBusinessIdentity(line.replace(/^.*\b(?:groet(?:en|jes)?|gr(?:t|oet)?\.?)[,.]?\s+/iu, ''), businessKeys));
   return lines.some((line) => (signatureLine.test(line) && line.split(/\s+/).length <= 4) || afterSignoff.test(line)) ? name : '';
 }
 
