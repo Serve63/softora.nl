@@ -1,4 +1,4 @@
-const { singleWebsitePreviewRequest, mergeWebsitePreviewLibrary, reconcileWebsitePreviewCards, createWebsitePreviewNavigation } = window.SoftoraWebsitePreviewUiState;
+const { buildWebsitePreviewDownloadName, singleWebsitePreviewRequest, mergeWebsitePreviewLibrary, reconcileWebsitePreviewCards, createWebsitePreviewNavigation } = window.SoftoraWebsitePreviewUiState;
 let websitePreviewLibraryRemoteEntries = null;
 let websitePreviewLibraryLoadError = false;
 let websitePreviewLibraryUseRemote = false;
@@ -525,7 +525,7 @@ function wirePreviewBlock(blockId, previewDataUrl, url, hostname, fileName) {
   const img = root.querySelector('img');
   if (img) img.src = previewDataUrl;
   window.__pvDownloads = window.__pvDownloads || {};
-  const fn = String(fileName || `${hostname}-preview.png`).trim();
+  const fn = buildWebsitePreviewDownloadName(url, hostname, fileName);
   window.__pvDownloads[blockId] = { dataUrl: previewDataUrl, fileName: fn };
   window._lastPreviewImageDataUrl = previewDataUrl;
   window._lastPreviewImageFileName = fn;
@@ -556,7 +556,7 @@ function downloadPreviewBlock(blockId) {
   if (!p || !p.dataUrl) return;
   const a = document.createElement('a');
   a.href = p.dataUrl;
-  a.download = p.fileName || 'website-preview.png';
+  a.download = p.fileName || 'Webdesign voor jouw website.png';
   a.click();
   showToast('Preview gedownload');
 }
@@ -1164,7 +1164,7 @@ function downloadPreview() {
   if (!window._lastPreviewImageDataUrl) return;
   const a = document.createElement('a');
   a.href = window._lastPreviewImageDataUrl;
-  a.download = window._lastPreviewImageFileName || 'website-preview.png';
+  a.download = window._lastPreviewImageFileName || 'Webdesign voor jouw website.png';
   a.click();
   showToast('Preview gedownload');
 }
