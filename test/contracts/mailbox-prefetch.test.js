@@ -146,8 +146,8 @@ test('the contact timeline is prefetched without touching the open conversation'
 
 test('the Mailbox wires the prefetch after its detail controller and warms after each complete render', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
-  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260927a');
-  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260927a'));
+  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260927b');
+  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260927b'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /afterCommit: \(mail, \{ changed \}\) => \{ mailboxPrefetch\?\.schedule\?\.\(\);/);
   // The outreach list holds grouped copies; the detail opens the stored message, so that one is warmed.
@@ -269,4 +269,18 @@ test('preparation waits for account scope and failures do not block the rest of 
   assert.equal(calls.length, 8);
   await prefetch.warmNow();
   assert.equal(calls.length, 8, 'failed reads cannot cause an unbounded retry loop');
+});
+
+test('opening an existing row updates only selection without rebuilding hydrated list contents', () => {
+  const { selectItem } = require('../../assets/premium-mailbox-list');
+  const selected = new Map([['a', true], ['b', false]]);
+  const rows = [...selected.keys()].map((id) => ({
+    getAttribute: () => id,
+    closest: () => ({ classList: { toggle: (name, value) => { assert.equal(name, 'active'); selected.set(id, value); } } }),
+  }));
+  const documentRef = { getElementById: () => ({ querySelectorAll: () => rows }) };
+  assert.equal(selectItem(documentRef, 'b'), true);
+  assert.deepEqual([...selected], [['a', false], ['b', true]]);
+  assert.equal(selectItem(documentRef, 'missing'), false);
+  assert.equal(selected.get('b'), true, 'unknown rows leave selection intact for the full render fallback');
 });

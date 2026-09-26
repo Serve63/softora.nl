@@ -87,7 +87,10 @@
             }
           } catch (_) { /* Best effort: the detail load remains the source of truth. */ }
           // Attempted once per loaded message object; a failure is left to the click.
-          if (current() && !isActive(mail)) warmed.add(mail);
+          if (current() && !isActive(mail)) {
+            warmed.add(mail);
+            try { options.onPrepared?.(mail); } catch (_) { /* Display caching cannot stop preparation. */ }
+          }
         }
       }
       await Promise.all(Array.from({ length: Math.min(concurrency, mails.length) }, worker));
