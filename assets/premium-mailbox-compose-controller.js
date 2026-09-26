@@ -418,6 +418,15 @@
       open({ keepContext: true });
     }
 
+    // Centered spinner over the message field while a suggestion is loading.
+    function setBodyLoading(active, label) {
+      const overlay = documentRef?.getElementById('c-body-loading');
+      if (!overlay) return;
+      const labelNode = documentRef.getElementById('c-body-loading-label');
+      if (labelNode && label) labelNode.textContent = label;
+      overlay.hidden = !active;
+    }
+
     async function rewrite() {
       if (options.compose.isUsed() || spellingRequest || rewriteRequestActive) return;
       const bodyField = documentRef?.getElementById('c-body');
@@ -440,6 +449,7 @@
         rewriteBtn.disabled = true;
         rewriteBtn.textContent = 'Bezig...';
       }
+      setBodyLoading(true, isSuggestedReply ? 'Reactie voorstellen…' : 'Tekst verbeteren…');
       if (sendBtn) sendBtn.disabled = true;
       try {
         const replyAccount = options.normalizeEmail(replyContext && replyContext.accountEmail) || options.getAccount();
@@ -482,6 +492,7 @@
         ) || (isSuggestedReply ? 'Reactie voorstellen mislukt' : 'Mailtekst verbeteren mislukt'));
       } finally {
         rewriteRequestActive = false;
+        setBodyLoading(false);
         options.compose.finish(
           rewriteBtn,
           suggested ? 'Opnieuw voorstellen' : (originalLabel || (isSuggestedReply ? 'Voorgestelde reactie' : 'Verwoord dit beter'))
