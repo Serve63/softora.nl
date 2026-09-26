@@ -127,7 +127,7 @@ function createLibraryCardElement(entry) {
   const when = entry.createdAt
     ? new Date(entry.createdAt).toLocaleString('nl-NL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '';
-  const host = String(entry.hostname || '—');
+  const host = String(entry.hostname || '—').replace(/^www\./i, '');
 
   const card = document.createElement('div');
   card.className = 'library-card';
