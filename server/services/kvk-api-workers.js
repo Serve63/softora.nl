@@ -1,5 +1,5 @@
 const crypto = require('node:crypto');
-const { searcherInput, parseAnswer, consultedUrls, toolUsage } = require('./kvk-luna-searcher-prompt');
+const { SEARCHER_INSTRUCTIONS, searcherInput, parseAnswer, consultedUrls, toolUsage } = require('./kvk-luna-searcher-prompt');
 
 const TABLE = 'softora_kvk_api_budget';
 const MODEL = 'gpt-6-luna';
@@ -14,6 +14,8 @@ const STALE_MS = 120000;
 const PRICE_REVIEW_DEADLINE = Date.parse('2026-10-23T00:00:00Z');
 const PAID_ROLES = new Set(['searcher', 'controller']);
 const ROLES = new Set([...PAID_ROLES, 'robot']);
+// Codex Searchers run on the local subscription: no API key, budget or reservation.
+const SEARCHER_ENGINES = new Set(['api', 'codex']);
 
 function createKvkApiWorkersService(deps = {}) {
   const getSupabaseClient = deps.getSupabaseClient || (() => null);
@@ -51,6 +53,14 @@ function createKvkApiWorkersService(deps = {}) {
       && now().getTime() - heartbeat <= STALE_MS;
   }
 
+  function engineOf(row) {
+    return row.searcher_engine === 'codex' ? 'codex' : 'api';
+  }
+
+  function paidStart(row, role) {
+    return PAID_ROLES.has(role) && !(role === 'searcher' && engineOf(row) === 'codex');
+  }
+
   function publicState(row) {
     const spent = Number(row.spent_eur_cents || 0);
     const reserved = Number(row.reserved_eur_cents || 0);
@@ -70,6 +80,7 @@ function createKvkApiWorkersService(deps = {}) {
         heartbeatAt: row[`${role}_heartbeat_at`] || null,
         message: String(row[`${role}_message`] || '').slice(0, 180),
         currentBatch: String(row[`${role}_batch`] || '').slice(0, 100),
+        ...(role === 'searcher' ? { engine: engineOf(row) } : {}),
       }])),
     };
   }
@@ -95,10 +106,13 @@ function createKvkApiWorkersService(deps = {}) {
         if (body.count !== undefined && (!Number.isInteger(body.count) || body.count < 1 || body.count > 10)) {
           return res.status(400).json({ ok: false, error: 'Kies een aantal van 1 tot en met 10.' });
         }
-        if (body.enabled === undefined && body.count === undefined) {
+        if (body.engine !== undefined && (body.role !== 'searcher' || !SEARCHER_ENGINES.has(body.engine))) {
+          return res.status(400).json({ ok: false, error: 'Kies API of Codex voor de searchers.' });
+        }
+        if (body.enabled === undefined && body.count === undefined && body.engine === undefined) {
           return res.status(400).json({ ok: false, error: 'Kies een aantal of zet de werkers aan/uit.' });
         }
-        requested[body.role] = { enabled: body.enabled, count: body.count };
+        requested[body.role] = { enabled: body.enabled, count: body.count, engine: body.engine };
       } else if (typeof body.searcherEnabled === 'boolean' && typeof body.controllerEnabled === 'boolean') {
         // Compatibility for an already open dashboard from before the count selector.
         requested.searcher = { enabled: body.searcherEnabled };
@@ -107,7 +121,12 @@ function createKvkApiWorkersService(deps = {}) {
         return res.status(400).json({ ok: false, error: 'Ongeldige werkrol of instelling.' });
       }
       const row = await readRow();
-      const wantsStart = Object.entries(requested).some(([role, value]) => PAID_ROLES.has(role) && value.enabled === true && !row[`${role}_enabled`]);
+      const engine = requested.searcher?.engine;
+      if (engine !== undefined && engine !== engineOf(row) && row.searcher_enabled) {
+        return res.status(409).json({ ok: false, error: 'Zet de searchers eerst uit om tussen API en Codex te wisselen.' });
+      }
+      const next = engine === undefined ? row : { ...row, searcher_engine: engine };
+      const wantsStart = Object.entries(requested).some(([role, value]) => paidStart(next, role) && value.enabled === true && !row[`${role}_enabled`]);
       if (wantsStart && !env.OPENAI_API_KEY) {
         return res.status(503).json({ ok: false, error: 'Bestaande OpenAI API-sleutel ontbreekt op de server.' });
       }
@@ -120,6 +139,7 @@ function createKvkApiWorkersService(deps = {}) {
       const changes = {};
       for (const [role, value] of Object.entries(requested)) {
         if (value.count !== undefined) changes[`${role}_count`] = value.count;
+        if (value.engine !== undefined) changes.searcher_engine = value.engine;
         if (value.enabled !== undefined) {
           changes[`${role}_enabled`] = value.enabled;
           changes[`${role}_requested_at`] = value.enabled && !row[`${role}_enabled`] ? now().toISOString() : row[`${role}_requested_at`];
@@ -135,7 +155,9 @@ function createKvkApiWorkersService(deps = {}) {
   async function poll(req, res) {
     if (!tokenAllowed(req)) return res.status(401).json({ ok: false, error: 'Ongeldig worker-token.' });
     if (req.body?.diagnose === true) return diagnose(res);
-    return getStatus(req, res);
+    // The local Codex Searcher runs exactly the same instructions as the API Searcher.
+    return handle(res, async () => res.json({ ok: true, state: publicState(await readRow()),
+      searcherInstructions: SEARCHER_INSTRUCTIONS }));
   }
 
   function safeProviderMessage(value) {

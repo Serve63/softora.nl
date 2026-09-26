@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -30,6 +31,11 @@ PENDING = ROOT / "data" / "kvk_api_pending"
 COMPLETED = ROOT / "data" / "kvk_api_completed"
 LOCK = ROOT / "data" / "kvk_api_workers.lock"
 MODEL_LABEL = "Luna 6 Max"
+CODEX_LABEL = "Codex"
+# Codex Searchers use the ChatGPT subscription: same instructions, same model, no API budget.
+CODEX_BIN = "/Applications/ChatGPT.app/Contents/Resources/codex"
+CODEX_MODEL = "gpt-6-luna"
+CODEX_TIMEOUT_SECONDS = 900
 MAX_REPAIR_ATTEMPTS = 3
 
 
@@ -145,15 +151,15 @@ def apply_result(path: Path, flags: list[str], apply_lock: threading.Lock, role:
 
 
 class Heartbeat:
-    def __init__(self, role: str, kvk: str):
-        self.role, self.kvk = role, kvk
+    def __init__(self, role: str, kvk: str, label: str = MODEL_LABEL):
+        self.role, self.kvk, self.label = role, kvk, label
         self.stop = threading.Event()
         self.thread = threading.Thread(target=self.run, daemon=True)
 
     def run(self) -> None:
         while not self.stop.wait(30):
             try:
-                report(self.role, f"{MODEL_LABEL} onderzoekt {self.kvk}", self.kvk)
+                report(self.role, f"{self.label} onderzoekt {self.kvk}", self.kvk)
             except Exception:
                 pass  # Server budget gate independently rejects stale heartbeats.
 
@@ -207,8 +213,60 @@ def validate_saved_result(path, result, flags):
         raise ValidationFailure(failure)
 
 
-def luna_search_one(company: dict, flags: list[str], validate: bool = True) -> bool:
-    """Exactly one paid Luna request per company; later steps only reuse the saved answer."""
+def parse_answer(text: str) -> dict:
+    try:
+        return json.loads(text)
+    except ValueError:
+        start, end = text.find("{"), text.rfind("}")
+        if start < 0 or end <= start:
+            raise RuntimeError("Codex gaf geen JSON-antwoord terug.") from None
+        return json.loads(text[start:end + 1])
+
+
+def codex_consulted_urls(events: str) -> list[str]:
+    """Every page Codex searched or opened, so cited URLs can be checked like API answers."""
+    urls = []
+    for line in events.splitlines():
+        try:
+            item = json.loads(line).get("item") or {}
+        except (ValueError, AttributeError):
+            continue
+        if item.get("type") != "web_search":
+            continue
+        action = item.get("action") or {}
+        candidates = [item.get("query"), action.get("url"), *[source.get("url") for source in action.get("sources") or []
+                                                              if isinstance(source, dict)]]
+        urls += [url for url in candidates if isinstance(url, str) and url.startswith(("http://", "https://"))]
+    return list(dict.fromkeys(urls))[:200]
+
+
+def codex_research(company: dict, instructions: str) -> tuple[dict, list[str]]:
+    if not instructions:
+        raise RuntimeError("Searcher-instructies ontbreken; Codex niet gestart.")
+    target = {key: str(company.get(key) or "") for key in ("kvk_nummer", "bedrijfsnaam", "adres", "plaats")}
+    prompt = f"{instructions}\n\nBedrijf:\n{json.dumps(target, ensure_ascii=False)}"
+    child_env = os.environ.copy()
+    child_env.pop("CODEX_THREAD_ID", None)
+    child_env.pop("CODEX_SESSION_ID", None)
+    with tempfile.TemporaryDirectory(prefix="softora-codex-searcher-") as workdir:
+        last = Path(workdir) / "answer.txt"
+        # No user config: personal instructions or a local model router must not change the answer.
+        process = subprocess.run(
+            [CODEX_BIN, "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check",
+             "-s", "read-only", "-C", workdir, "-m", CODEX_MODEL, "-c", "model_reasoning_effort=max",
+             "-c", "web_search=live", "--json", "-o", str(last), "-"],
+            input=prompt, cwd=workdir, env=child_env, text=True, capture_output=True,
+            timeout=CODEX_TIMEOUT_SECONDS, check=False,
+        )
+        if process.returncode or not last.exists():
+            details = (process.stderr + "\n" + process.stdout).strip()[-300:]
+            raise RuntimeError(f"Codex stopte met code {process.returncode}: {details}")
+        return parse_answer(last.read_text()), codex_consulted_urls(process.stdout)
+
+
+def luna_search_one(company: dict, flags: list[str], validate: bool = True,
+                    engine: str = "api", instructions: str = "") -> bool:
+    """Exactly one Luna request per company (API or Codex); later steps only reuse the saved answer."""
     from kvk_luna_searcher import to_canonical
     kvk = str(company["kvk_nummer"])
     path = pending_path("searcher", kvk, flags)
@@ -219,17 +277,24 @@ def luna_search_one(company: dict, flags: list[str], validate: bool = True) -> b
             os.replace(path, path.with_suffix(f".retired-{int(time.time())}.json"))
         if not is_enabled("searcher"):
             return False
-        try:
-            response = call("/research", {"role": "searcher", "company": company, "brief": {}}, timeout=720)
-        except HTTPError as error:
-            if error.code == 409:
-                return False
-            raise
-        answer = response.get("result")
-        if not response.get("ok") or not isinstance(answer, dict) or str(answer.get("kvk_nummer")) != kvk:
-            raise RuntimeError("Luna gaf geen geldig antwoord voor de juiste onderneming terug.")
-        save_result(answer_path, {"answer": answer, "consulted_urls": response.get("consultedUrls") or [],
-                                  "cost_eur_cents": response.get("costEurCents"), "usage": response.get("usage")})
+        if engine == "codex":
+            answer, consulted = codex_research(company, instructions)
+            if not isinstance(answer, dict) or str(answer.get("kvk_nummer")) != kvk:
+                raise RuntimeError("Codex gaf geen geldig antwoord voor de juiste onderneming terug.")
+            save_result(answer_path, {"answer": answer, "consulted_urls": consulted, "engine": "codex"})
+        else:
+            try:
+                response = call("/research", {"role": "searcher", "company": company, "brief": {}}, timeout=720)
+            except HTTPError as error:
+                if error.code == 409:
+                    return False
+                raise
+            answer = response.get("result")
+            if not response.get("ok") or not isinstance(answer, dict) or str(answer.get("kvk_nummer")) != kvk:
+                raise RuntimeError("Luna gaf geen geldig antwoord voor de juiste onderneming terug.")
+            save_result(answer_path, {"answer": answer, "consulted_urls": response.get("consultedUrls") or [],
+                                      "cost_eur_cents": response.get("costEurCents"), "usage": response.get("usage"),
+                                      "engine": "api"})
     if not path.exists():
         # The apply step only picks up a queue head whose mapped result exists.
         saved = json.loads(answer_path.read_text())
@@ -397,14 +462,19 @@ def run_searcher_pipeline(apply_lock: threading.Lock) -> None:
     window: list[dict] = []
     flags: list[str] = []
     count, refreshed = 1, 0.0
-    with Heartbeat("searcher", "doorlopend"):
+    engine, instructions = "api", ""
+    with Heartbeat("searcher", "doorlopend") as heartbeat:
         try:
             while True:
                 if len(window) <= count or time.monotonic() - refreshed > SEARCHER_REFRESH_SECONDS:
-                    worker = ((call("/poll", {}).get("state") or {}).get("workers") or {}).get("searcher") or {}
+                    polled = call("/poll", {})
+                    worker = ((polled.get("state") or {}).get("workers") or {}).get("searcher") or {}
                     if not worker.get("enabled"):
                         return
                     count = max(1, min(10, int(worker.get("count") or 1)))
+                    engine = "codex" if worker.get("engine") == "codex" else "api"
+                    instructions = str(polled.get("searcherInstructions") or "")
+                    heartbeat.label = CODEX_LABEL if engine == "codex" else MODEL_LABEL
                     packet_result = next_packet("searcher", count * SEARCHER_LOOKAHEAD)
                     refreshed = time.monotonic()
                     window, flags = (list(packet_result[0]["bedrijven"]), packet_result[1]) if packet_result else ([], [])
@@ -429,7 +499,7 @@ def run_searcher_pipeline(apply_lock: threading.Lock) -> None:
                         path = pending_path("searcher", kvk, flags)
                         if kvk in in_flight or path.exists():
                             continue
-                        in_flight[kvk] = pool.submit(luna_search_one, company, flags, False)
+                        in_flight[kvk] = pool.submit(luna_search_one, company, flags, False, engine, instructions)
                 if apply_searcher_head({"bedrijven": window}, flags, apply_lock):
                     window.pop(0)
                     continue
