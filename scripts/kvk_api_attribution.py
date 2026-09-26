@@ -1,7 +1,20 @@
 """Producer attribution for API results and honest dashboard role labels."""
 import hashlib
+import json
 from pathlib import Path
 from kvk_api_validation import PROFILE
+
+
+def engine_for(path):
+    """The sidecar next to a result records whether the API or Codex produced it."""
+    for suffix in ('.luna.json', '.engine.json'):
+        try:
+            engine = json.loads(Path(path).with_suffix(suffix).read_text()).get('engine')
+        except (OSError, ValueError, AttributeError):
+            continue
+        if engine:
+            return engine
+    return 'api'
 
 
 def execution_for(results, path, is_review=False):
@@ -11,6 +24,13 @@ def execution_for(results, path, is_review=False):
     if not all(profiles):
         raise ValueError('Meng geen API- en native-resultaten in dezelfde batch')
     role = 'controller' if is_review else 'searcher'
+    if engine_for(path) == 'codex':
+        return {
+            'producer_thread_id': 'codex:' + role,
+            'model': 'gpt-6-luna', 'reasoning_effort': 'max',
+            'display_label': 'Codex Luna 6 Max', 'model_role': role + '_codex_luna_max',
+            'input_sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+        }
     return {
         'producer_thread_id': 'api:' + role,
         'model': 'gpt-6-luna', 'reasoning_effort': 'max',
