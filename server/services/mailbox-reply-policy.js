@@ -336,7 +336,7 @@ function enforceGroundedMailboxReply(generatedValue, options = {}) {
       structured.paragraphs.length > 0 && structured.paragraphs.every((item) =>
         item && typeof item.text === 'string' && !hasUnsafeOrIrrelevantText(item.text, policy)));
     if (options.allowFallback !== false && safeToReplace && !policy.conceptText && policy.rejection && !policy.questions.length && !policy.substantiveFeedback) {
-      return { policy, paragraphs: ['Dankjewel voor je reactie, helemaal duidelijk. Veel succes verder!'], short: false };
+      return { policy, paragraphs: ['Bedankt dat je de moeite hebt genomen om te reageren, helemaal duidelijk. Veel succes verder!'], short: false };
     }
     const error = new Error('Deze voorgestelde reactie is onvoldoende onderbouwd of beantwoordt niet alle vragen. Je concept is behouden; probeer opnieuw of vul de ontbrekende informatie aan.');
     error.status = 422;

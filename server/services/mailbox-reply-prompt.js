@@ -1,5 +1,6 @@
 const { MAILBOX_REPLY_STYLE, MAILBOX_REPLY_STYLE_EXAMPLES } = require('./mailbox-reply-style');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
+const { polishMailboxReplyParagraphs } = require('./mailbox-reply-polish');
 const {
   REPLY_POLICY_VERSION,
   analyzeMailboxReplyContext,
@@ -23,11 +24,14 @@ const UNSAFE_FIRST_NAMES = new Set([
   'receptie',
   'sales',
   'salon',
+  'sent',
   'service',
   'studio',
   'support',
   'team',
   'van',
+  'verstuurd',
+  'verzonden',
 ]);
 const BUSINESS_NAME_PATTERN = /\b(?:administratie|atelier|b\.?v\.?|bedrijf|camping|contact|groep|groothandel|kapsalon|makelaardij|minicamping|notaris|praktijk|restaurant|salon|service|shop|studio|support|team|textiles|schoolfoto|fotografie|photography|v\.?o\.?f\.?|winkel)\b/i;
 const BUSINESS_IDENTITY_TOKEN_PATTERN = /(?:administratie|atelier|bedrijf|camping|contact|groep|groothandel|kapsalon|makelaardij|minicamping|notaris|praktijk|restaurant|salon|service|shop|studio|support|team|textiles|schoolfoto|fotografie|photography|winkel)/i;
@@ -179,7 +183,7 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '', hasE
     'De Softora-ontwerpen worden op maat met code gebouwd. De bestaande website van de klant kan een ander platform gebruiken. Erken die investering; beweer nooit daarom dat wij Webflow gebruiken. Beloftes over beheer, migratie en integraties vragen bewijs voor deze klant.',
     'Verzin geen feiten, bedragen, beschikbaarheid, namen, afspraken, URLs, voorwaarden of beloftes. Een oude afspraak is geen nieuwe beschikbaarheid. Zeg niet dat iets is aangepast, verzonden of afgemeld zonder bevestiging in het medewerkersconcept. Gebruik geen placeholders zoals [dag] of [link].',
     'Controleer vóór je antwoord: kloppen persoon en perspectief; zijn alle vragen werkelijk behandeld; zijn details, prijzen en planning gegrond; klinkt het warm en natuurlijk; is elke zin nuttig; kloppen spelling en interpunctie? Verbeter het antwoord binnen deze ene aanvraag.',
-    'Zet in aanhefNaam de voornaam waarmee de klant zelf ondertekende, of leeg als die niet in ontvangenMail staat. Noem die naam dan niet nog eens in de eerste zin.',
+    'Zet in aanhefNaam alleen de voornaam waarmee de klant zelf ondertekende en alleen als je het zeker weet; bij twijfel leeg. Tekst als "Sent from my iPhone" of een bedrijfsnaam is geen naam. Noem die naam niet nog eens in de eerste zin.',
     'Geef uitsluitend geldige JSON terug: {"intent":"<antwoordBeleid.intent>","ctaAllowed":<antwoordBeleid.ctaAllowed>,"replyForm":"standard|short","aanhefNaam":"<voornaam of leeg>","paragraphs":[{"text":"<alinea>","evidence":["<bewijslabels>"],"answers":["<beantwoorde q-ids, anders leeg>"]}]}.',
     'Geen markdown, aanhef, ondertekening, onderwerpregel of uitleg buiten deze JSON. Maximaal acht alinea’s van elk 1200 tekens; de inhoud bepaalt de passende lengte.',
   ].filter(Boolean).join('\n');
@@ -325,8 +329,14 @@ function groundedModelFirstName(value, options) {
   const structured = parseStructuredDraft(value);
   const name = normalizeFirstName(structured && structured.aanhefNaam);
   if (!name || resolveReplySenderCandidate(name) || /^(?:serv[eé]|martijn)$/i.test(name)) return '';
+  // Only a real signature counts: a short line that starts with the name, or
+  // the name right after a sign-off. "Sent from my iPhone" is no signature.
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(^|[^\\p{L}])${escaped}(?=$|[^\\p{L}])`, 'iu').test(getNewestReplyLines(options.inboundText).join('\n')) ? name : '';
+  const signatureLine = new RegExp(`^${escaped}(?=$|[^\\p{L}])`, 'u');
+  const afterSignoff = new RegExp(`\\b(?:groet(?:en|jes)?|gr(?:t|oet)?\\.?)[,.]?\\s+${escaped}(?=$|[^\\p{L}])`, 'iu');
+  const deviceFooter = /\b(?:sent|from|verzonden|verstuurd|vanaf|iphone|ipad|android|outlook|samsung)\b/i;
+  const lines = getNewestReplyLines(options.inboundText).filter((line) => line && !deviceFooter.test(line));
+  return lines.some((line) => (signatureLine.test(line) && line.split(/\s+/).length <= 4) || afterSignoff.test(line)) ? name : '';
 }
 
 function enforceMailboxReplyProfile(value, options = {}) {
@@ -347,7 +357,11 @@ function enforceMailboxReplyProfile(value, options = {}) {
     originalSentMail: options.originalSentMail,
   });
   const enforced = enforceGroundedMailboxReply(value, options);
-  const body = enforced.paragraphs.join('\n\n');
+  const body = polishMailboxReplyParagraphs(enforced.paragraphs, {
+    short: enforced.short,
+    conversation: options.conversation,
+    policy: enforced.policy,
+  }).join('\n\n');
   if (enforced.short) return body;
   return `${greeting}\n\n${body}\n\n${sender.signature}`;
 }

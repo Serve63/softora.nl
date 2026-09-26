@@ -3501,7 +3501,7 @@ test('mailbox service rewrites compose draft through OpenAI with reply context',
     },
   });
 
-  assert.equal(result.text, 'Beste,\n\nWat wil je precies voor vrijdag klaar hebben?\n\nMet vriendelijke groet,\nServé Creusen');
+  assert.equal(result.text, 'Beste,\n\nBedankt dat je de moeite hebt genomen om te reageren! Wat wil je precies voor vrijdag klaar hebben?\n\nMet vriendelijke groet,\nServé Creusen');
   assert.equal(result.model, 'gpt-test');
   assert.equal(calls[0].url, 'https://api.openai.test/v1/chat/completions');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer openai-key');
@@ -3606,7 +3606,7 @@ test('mailbox service laat replycontext Martijn bepalen en voegt uitsluitend de 
   assert.match(calls[0].messages[0].content, /Schrijf altijd namens Martijn van de Ven/);
   assert.match(calls[0].messages[1].content, /"accountEmail":"martijn@softora.nl"/);
   assert.match(calls[0].messages[1].content, /"naam":"Martijn van de Ven"/);
-  assert.equal(result.text, 'Beste,\n\nDankjewel voor je reactie 😁\n\nMet vriendelijke groet,\nMartijn van de Ven');
+  assert.equal(result.text, 'Beste,\n\nBedankt dat je de moeite hebt genomen om te reageren 😁\n\nMet vriendelijke groet,\nMartijn van de Ven');
 });
 
 test('mailbox service geeft Salon TOF zowel inbound als oorspronkelijke coldmail en behoudt een gegrond technisch antwoord', async () => {
@@ -5201,7 +5201,7 @@ test('eenvoudige afwijzing van Bert krijgt zonder betaalde modelaanvraag een vei
   });
   assert.equal(result.provider, 'local');
   assert.match(result.text, /^Goedendag Bert,/);
-  assert.match(result.text, /Dankjewel voor je reactie/);
+  assert.match(result.text, /Bedankt dat je de moeite hebt genomen om te reageren/);
   assert.doesNotMatch(result.text, /preview|afspraak/i);
 });
 
