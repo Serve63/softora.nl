@@ -6,11 +6,15 @@ from kvk_api_validation import PROFILE
 
 
 def engine_for(path):
-    """The saved raw answer next to a result records whether the API or Codex produced it."""
-    try:
-        return json.loads(Path(path).with_suffix('.luna.json').read_text()).get('engine') or 'api'
-    except (OSError, ValueError, AttributeError):
-        return 'api'
+    """The sidecar next to a result records whether the API or Codex produced it."""
+    for suffix in ('.luna.json', '.engine.json'):
+        try:
+            engine = json.loads(Path(path).with_suffix(suffix).read_text()).get('engine')
+        except (OSError, ValueError, AttributeError):
+            continue
+        if engine:
+            return engine
+    return 'api'
 
 
 def execution_for(results, path, is_review=False):
@@ -20,11 +24,11 @@ def execution_for(results, path, is_review=False):
     if not all(profiles):
         raise ValueError('Meng geen API- en native-resultaten in dezelfde batch')
     role = 'controller' if is_review else 'searcher'
-    if not is_review and engine_for(path) == 'codex':
+    if engine_for(path) == 'codex':
         return {
-            'producer_thread_id': 'codex:searcher',
+            'producer_thread_id': 'codex:' + role,
             'model': 'gpt-6-luna', 'reasoning_effort': 'max',
-            'display_label': 'Codex Luna 6 Max', 'model_role': 'searcher_codex_luna_max',
+            'display_label': 'Codex Luna 6 Max', 'model_role': role + '_codex_luna_max',
             'input_sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest(),
         }
     return {
