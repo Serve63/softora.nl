@@ -1,5 +1,6 @@
 """Offline runner checks. Never calls OpenAI or touches the company database."""
 import importlib.util
+import os
 import sys
 import tempfile
 import threading
@@ -39,7 +40,9 @@ class WorkerTests(unittest.TestCase):
         self.codex = [patch.object(runner, 'codex_run', side_effect=AssertionError('echte Codex-run in een test')),
                       patch.object(runner, 'codex_research', side_effect=fake_research),
                       patch.object(runner, 'codex_control', side_effect=fake_control),
-                      patch.object(runner, 'instructions_for', return_value='INSTRUCTIES')]
+                      patch.object(runner, 'instructions_for', return_value='INSTRUCTIES'),
+                      patch.object(runner, 'already_researched', return_value=False),
+                      patch.object(runner, 'ROBOT_QUEUE', Path(self.directory.name) / 'geen-robot')]
         for patcher in self.codex:
             patcher.start()
         self.packet = {'bedrijven': [{'kvk_nummer': f'{i:08}'} for i in range(1, 4)]}
@@ -197,6 +200,46 @@ class WorkerTests(unittest.TestCase):
         control.assert_called_once_with(company, {'contract': 'x'}, 'INSTRUCTIES')
         path = runner.pending_path('controller', company['kvk_nummer'], [])
         self.assertEqual(runner.json.loads(path.with_suffix('.engine.json').read_text()), {'engine': 'codex'})
+
+    def test_a_searcher_answer_for_a_company_the_robot_already_found_is_set_aside_without_stopping(self):
+        company = self.packet['bedrijven'][0]
+        path = runner.pending_path('searcher', company['kvk_nummer'], [])
+        runner.save_result(path.with_suffix('.luna.json'), {'answer': company, 'consulted_urls': []})
+        runner.save_result(path, company)
+        completed = Path(self.directory.name) / 'completed'
+        with patch.object(runner, 'COMPLETED', completed), patch.object(runner, 'already_researched', return_value=True), \
+                patch.object(runner, 'apply_result') as apply, patch.object(runner, 'report'):
+            self.assertTrue(runner.apply_searcher_head(self.packet, [], threading.Lock()))
+            apply.assert_not_called()
+        self.assertFalse(path.exists())
+        self.assertEqual(len(list(completed.glob('*.superseded-*'))), 2)
+
+    def test_the_searcher_marks_a_company_busy_while_codex_researches_it(self):
+        company = self.packet['bedrijven'][0]
+        busy = runner.pending_path('searcher', company['kvk_nummer'], []).with_suffix('.busy')
+        seen = []
+        def research(company, _instructions, feedback=''):
+            seen.append(busy.exists())
+            return company, []
+        with patch.object(runner, 'codex_research', side_effect=research), \
+                patch.object(kvk_luna_searcher, 'to_canonical', side_effect=lambda company, *_: company):
+            self.assertTrue(runner.luna_search_one(company, [], False))
+        self.assertEqual(seen, [True])
+        self.assertFalse(busy.exists())
+
+    def test_a_searcher_waits_while_the_robot_is_researching_the_same_company(self):
+        queue = Path(self.directory.name) / 'robot'
+        with patch.object(runner, 'ROBOT_QUEUE', queue):
+            self.assertFalse(runner.robot_busy('00000001'))
+            (queue / '00000001').mkdir(parents=True)
+            (queue / '00000001' / 'runner.log').write_text('bezig')
+            self.assertTrue(runner.robot_busy('00000001'))
+            (queue / '00000001' / 'completed.json').write_text('{}')
+            self.assertFalse(runner.robot_busy('00000001'))
+            (queue / '00000002').mkdir()
+            old = time.time() - runner.ROBOT_BUSY_SECONDS - 5
+            os.utime(queue / '00000002', (old, old))
+            self.assertFalse(runner.robot_busy('00000002'))
 
     def test_refused_searcher_answer_is_researched_again_with_the_reason(self):
         company = self.packet['bedrijven'][0]

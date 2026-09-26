@@ -11,12 +11,13 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import re
 import signal
 import sqlite3
 import subprocess
 import time
 from pathlib import Path
-from kvk_api_workers import ROOT, call, report, run_cli, save_result
+from kvk_api_workers import PENDING, ROOT, call, report, run_cli, save_result
 from kvk_robot_import import import_find, publish_live, robot_find
 
 QUEUE = ROOT / 'data' / 'shadow' / 'robot-v5-dashboard'
@@ -31,12 +32,23 @@ def enabled():
     return bool(state.get('workers', {}).get('robot', {}).get('enabled'))
 
 
+SEARCHER_WORK = re.compile(r'^contact_agent_results_api_searcher_initial_(\d{8})\.(?:busy|luna\.json|json|recovery\.json)$')
+
+
+def searcher_claims():
+    """Companies a Searcher is researching or has an answer waiting for; the Robot leaves those alone."""
+    if not PENDING.is_dir():
+        return set()
+    return {match.group(1) for match in (SEARCHER_WORK.match(path.name) for path in PENDING.iterdir()) if match}
+
+
 def next_identity():
     # Read current planning afresh; never resume an obsolete location or fixed list.
     completed = {p.parent.name for p in QUEUE.glob('*/completed.json')}
+    skip = completed | searcher_claims()
     packet = json.loads(run_cli('contact_research.py', 'planning-next', '--fast-head',
-                               '--limit', str(len(completed) + 1), '--json'))
-    company = next((c for c in packet.get('bedrijven', []) if str(c['kvk_nummer']) not in completed), None)
+                               '--limit', str(len(skip) + 1), '--json'))
+    company = next((c for c in packet.get('bedrijven', []) if str(c['kvk_nummer']) not in skip), None)
     if not company:
         return None
     with sqlite3.connect(f'file:{ROOT / "data/nederland_bedrijven.sqlite"}?mode=ro', uri=True) as db:
