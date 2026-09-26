@@ -193,20 +193,32 @@ textarea.inp { min-height: 88px; resize: vertical; line-height: 1.45; max-height
   gap: 14px;
 }
 .library-card {
+  position: relative;
   background: var(--tag);
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+.library-card-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--text-dark);
+  box-shadow: 0 2px 8px rgba(0,0,0,.18);
+  font: 24px/1 sans-serif;
   cursor: pointer;
-  transition: border-color .15s, box-shadow .15s, transform .15s;
 }
-.library-card:hover {
-  border-color: rgba(155,35,85,.28);
-  box-shadow: 0 10px 24px rgba(26,26,46,.08);
-  transform: translateY(-1px);
-}
+.library-card-remove:hover { background: var(--tag); color: var(--crimson); }
+.library-card-remove:focus-visible { outline: 2px solid var(--crimson); outline-offset: 2px; }
 .library-thumb-wrap {
   aspect-ratio: 2 / 3;
   background: #0f1830;

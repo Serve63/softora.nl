@@ -101,7 +101,12 @@ test('premium websitegenerator removes the legacy openen button but keeps downlo
   assert.doesNotMatch(source, />Openen</);
   assert.match(source, /Download PNG/);
   assert.match(source, /function createLibraryCardElement\(entry\) \{/);
-  assert.match(source, /card\.addEventListener\('click', \(\) => openLibraryEntry\(id\)\);/);
+  assert.doesNotMatch(source, /card\.addEventListener\('(click|keydown)'/);
+  assert.doesNotMatch(source, /card\.setAttribute\('(role|tabindex)'/);
+  assert.match(source, /removeBtn\.className = 'library-card-remove'/);
+  assert.match(source, /removeBtn\.textContent = '×'/);
+  assert.match(source, /link\.download = buildWebsitePreviewDownloadName\(full.url, full.hostname, full.fileName\)/);
+  assert.match(source, /if \(!isSafeLibraryDataUrl\(full\?\.dataUrl\)\) full = await fetchLibraryEntryById\(id\)/);
   assert.match(source, /removeBtn\.addEventListener\('click', \(event\) => \{[\s\S]*void removeLibraryEntry\(id, event\);/);
   assert.match(source, /reconcileWebsitePreviewCards\(grid, items, createLibraryCardElement\)/);
   assert.doesNotMatch(source, /onclick="openLibraryEntry\(/);
