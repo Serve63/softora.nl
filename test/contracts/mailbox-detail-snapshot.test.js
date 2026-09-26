@@ -124,15 +124,15 @@ test('reopening the visible conversation never downgrades it to a version withou
   assert.equal(v.detail.innerHTML, 'Body|Sent');
 });
 
-test('the Mailbox wires the detail snapshot before its page script and only captures the newest conversation', () => {
+test('the Mailbox wires the detail snapshot before its page script and captures every complete conversation', () => {
   const repoRoot = path.join(__dirname, '../..');
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
-  const adapter = page.indexOf('assets/premium-mailbox-detail-snapshot.js?v=20260924a');
+  const adapter = page.indexOf('assets/premium-mailbox-detail-snapshot.js?v=20260927b');
   assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < adapter);
   assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924b') < adapter);
-  assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20260927a'));
+  assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20260927b'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
-  assert.match(source, /snapshot: window\.SoftoraMailboxDetailSnapshot, shouldCaptureSnapshot: \(mail\) => String\(getMailsForFolder\(activeFolder\)\[0\]\?\.id \?\? ''\) === String\(mail\.id\)/);
+  assert.match(source, /snapshot: window\.SoftoraMailboxDetailSnapshot, shouldCaptureSnapshot: \(\) => true/);
   const snapshotAdapter = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-detail-snapshot.js'), 'utf8');
   assert.match(snapshotAdapter, /inertIds: \['mail-detail'\]/);
   assert.match(snapshotAdapter, /maxChars: MAX_CHARS/);
@@ -214,4 +214,85 @@ test('switching conversations keeps the complete previous content without a load
   await opened;
   assert.equal(v.detail.innerHTML, 'Next complete conversation|');
   assert.equal(v.classes.has('is-detail-pending'), false);
+});
+
+test('a prepared conversation replaces the previous view immediately but stays inert until verified', async () => {
+  const timeline = deferred();
+  let active = '';
+  const classes = new Set(), attributes = new Set();
+  const detail = { innerHTML: '', dataset: {},
+    classList: { add: (key) => classes.add(key), remove: (key) => classes.delete(key), contains: (key) => classes.has(key) },
+    setAttribute: (key) => attributes.add(key), removeAttribute: (key) => attributes.delete(key),
+  };
+  const first = { id: 'first', bodyLoaded: true }, next = { id: 'next', bodyLoaded: true };
+  const snapshot = fakeSnapshot('outreach|serve||next', detail);
+  // The production snapshot sets the inert fence when applying stored HTML.
+  const restore = snapshot.restore;
+  snapshot.restore = (view) => { const found = restore(view); if (found) attributes.add('inert'); return found; };
+  const controller = createController({
+    getMail: (id) => id === 'first' ? first : next, getScope: () => ({ folder: 'outreach', owner: 'serve' }),
+    ensureToken: () => ({}), isTokenCurrent: () => true,
+    getActiveMail: () => active, setActiveMail: (id) => { active = id; }, getDetailElement: () => detail,
+    renderHtml: (mail) => mail.id, snapshot,
+    hydrateTimeline: ({ mail }) => mail === next ? timeline.promise : null,
+  });
+  await controller.open('first');
+  const opened = controller.open('next');
+  assert.equal(detail.innerHTML, 'SNAPSHOT', 'the requested conversation is visible synchronously');
+  assert.equal(classes.has('is-detail-pending'), false);
+  assert.equal(attributes.has('inert'), true);
+  timeline.resolve(); await opened;
+  assert.equal(detail.innerHTML, 'next');
+  assert.equal(attributes.has('inert'), false);
+});
+
+function preparedHarness() {
+  const { createPreparedViews } = require('../../assets/premium-mailbox-detail-snapshot');
+  const records = new Map(), attributes = new Set();
+  const detail = { innerHTML: '', dataset: {}, setAttribute: (key) => attributes.add(key), removeAttribute: (key) => attributes.delete(key) };
+  let identity = 'serve', clock = 1000;
+  const options = {
+    store: {
+      async read(key, owner) { const entry = records.get(key); return entry?.owner === owner ? structuredClone(entry.value) : null; },
+      async write(key, owner, value) { records.set(key, { owner, value: structuredClone(value) }); return true; },
+    },
+    document: { getElementById: () => detail }, getIdentity: () => identity, now: () => clock,
+  };
+  return { create: () => createPreparedViews(options), detail, attributes, records,
+    identity: (value) => { identity = value; }, advance: (ms) => { clock += ms; } };
+}
+
+test('complete prepared views survive reload with exact user and mailbox scope and disabled actions', async () => {
+  const h = preparedHarness(), first = h.create();
+  await first.ready;
+  const view = 'outreach|serve||account|inbox:1';
+  assert.equal(first.remember(view, '<article>Complete conversation</article>'), true);
+  await first.flush();
+  const reloaded = h.create(); await reloaded.ready;
+  assert.equal(reloaded.restore('outreach|martijn||account|inbox:1'), false);
+  assert.equal(reloaded.restore(view), true);
+  assert.equal(h.detail.innerHTML, '<article>Complete conversation</article>');
+  assert.equal(h.attributes.has('inert'), true);
+  assert.equal(h.detail.dataset.mailboxDomDirty, 'true');
+  reloaded.release();
+  assert.equal(h.attributes.has('inert'), false);
+  h.identity('martijn');
+  assert.equal(reloaded.restore(view), false, 'even a loaded in-memory view is refused after user switch');
+  const other = h.create(); await other.ready;
+  assert.equal(other.restore(view), false);
+});
+
+test('prepared views reject partial/error screens, expire, and evict to a fixed memory budget', async () => {
+  const h = preparedHarness(), cache = h.create(); await cache.ready;
+  assert.equal(cache.remember('loading', '<div class="detail-mail-loading">Laden</div>'), false);
+  assert.equal(cache.remember('error', '<div class="detail-mail-load-error">Error</div>'), false);
+  assert.equal(cache.remember('oversize', 'x'.repeat(400001)), false);
+  for (let i = 0; i < 12; i++) { cache.remember(`view${i}`, `${i}`.padEnd(300000, 'x')); h.advance(1); }
+  await cache.flush();
+  assert.equal(cache.restore('view0'), false, 'oldest screens are evicted');
+  assert.equal(cache.restore('view11'), true); cache.release();
+  const saved = [...h.records.values()][0].value.entries;
+  assert.ok(saved.reduce((sum, [, entry]) => sum + entry.html.length, 0) <= 3000000);
+  h.advance(24 * 60 * 60 * 1000);
+  assert.equal(cache.restore('view11'), false);
 });

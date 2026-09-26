@@ -57,7 +57,17 @@
     </div>`;
   }
 
-  const mailboxListApi = { renderItem };
+  // Opening an existing row only changes selection. Rebuilding every hydrated
+  // conversation here turns a cache hit into hundreds of milliseconds of work.
+  function selectItem(documentRef, id) {
+    const rows = Array.from(documentRef?.getElementById?.('mail-items')?.querySelectorAll?.('[data-mailbox-action="open-mail"]') || []);
+    const key = String(id || '');
+    if (!rows.some((row) => row.getAttribute('data-mailbox-id') === key)) return false;
+    rows.forEach((row) => row.closest('.mail-item')?.classList.toggle('active', row.getAttribute('data-mailbox-id') === key));
+    return true;
+  }
+
+  const mailboxListApi = { renderItem, selectItem };
   global.SoftoraMailboxList = mailboxListApi;
   if (typeof module !== 'undefined' && module.exports) module.exports = mailboxListApi;
 })(typeof window !== 'undefined' ? window : globalThis);

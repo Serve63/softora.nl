@@ -319,7 +319,7 @@
       const view = snapshotViewOf(mail, scope);
       let showsSnapshot = Boolean(snapshot?.isShowing?.() && snapshotView === view);
       if (!showsSnapshot) releaseSnapshot();
-      if (!showsSnapshot && !committedId && snapshot?.restore?.(view)) {
+      if (!showsSnapshot && !preserveVisibleDetail && committedId !== String(mail.id) && snapshot?.restore?.(view)) {
         snapshotView = view;
         showsSnapshot = true;
       }

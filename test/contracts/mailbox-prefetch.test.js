@@ -146,12 +146,12 @@ test('the contact timeline is prefetched without touching the open conversation'
 
 test('the Mailbox wires the prefetch after its detail controller and warms after each complete render', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
-  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260927a');
-  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260927a'));
+  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260927b');
+  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20260927b'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /afterCommit: \(mail, \{ changed \}\) => \{ mailboxPrefetch\?\.schedule\?\.\(\);/);
   // The outreach list holds grouped copies; the detail opens the stored message, so that one is warmed.
-  assert.match(source, /^mailboxPrefetch = window\.SoftoraMailboxPrefetch\?\.create\(\{ getMails: \(\) => getMailsForFolder\(activeFolder\)\.map\(\(item\) => findMailById\(item\.id\)\)\.filter\(Boolean\), getActiveMail: \(\) => activeMail,/m);
+  assert.ok(source.includes(`getMails: () => Array.from(document.querySelectorAll('#mail-items [data-mailbox-action="open-mail"]')).map((row) => findMailById(row.getAttribute('data-mailbox-id'))).filter(Boolean)`));
 });
 
 test('a dossier that a list refresh marked stale is warmed again, at most once a minute', async () => {
@@ -269,4 +269,18 @@ test('preparation waits for account scope and failures do not block the rest of 
   assert.equal(calls.length, 8);
   await prefetch.warmNow();
   assert.equal(calls.length, 8, 'failed reads cannot cause an unbounded retry loop');
+});
+
+test('opening an existing row updates only selection without rebuilding hydrated list contents', () => {
+  const { selectItem } = require('../../assets/premium-mailbox-list');
+  const selected = new Map([['a', true], ['b', false]]);
+  const rows = [...selected.keys()].map((id) => ({
+    getAttribute: () => id,
+    closest: () => ({ classList: { toggle: (name, value) => { assert.equal(name, 'active'); selected.set(id, value); } } }),
+  }));
+  const documentRef = { getElementById: () => ({ querySelectorAll: () => rows }) };
+  assert.equal(selectItem(documentRef, 'b'), true);
+  assert.deepEqual([...selected], [['a', false], ['b', true]]);
+  assert.equal(selectItem(documentRef, 'missing'), false);
+  assert.equal(selected.get('b'), true, 'unknown rows leave selection intact for the full render fallback');
 });
