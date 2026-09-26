@@ -151,7 +151,7 @@ test('the Mailbox wires the prefetch after its detail controller and warms after
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /afterCommit: \(mail, \{ changed \}\) => \{ mailboxPrefetch\?\.schedule\?\.\(\);/);
   // The outreach list holds grouped copies; the detail opens the stored message, so that one is warmed.
-  assert.match(source, /^mailboxPrefetch = window\.SoftoraMailboxPrefetch\?\.create\(\{ getMails: \(\) => getMailsForFolder\(activeFolder\)\.map\(\(item\) => findMailById\(item\.id\)\)\.filter\(Boolean\), getActiveMail: \(\) => activeMail,/m);
+  assert.ok(source.includes(`getMails: () => Array.from(document.querySelectorAll('#mail-items [data-mailbox-action="open-mail"]')).map((row) => findMailById(row.getAttribute('data-mailbox-id'))).filter(Boolean)`));
 });
 
 test('a dossier that a list refresh marked stale is warmed again, at most once a minute', async () => {
