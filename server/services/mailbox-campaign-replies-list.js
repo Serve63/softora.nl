@@ -9,6 +9,10 @@ const {
   serializeMailboxCampaignSnapshot,
 } = require('./mailbox-campaign-snapshot');
 const { createMailboxCampaignSnapshotRead } = require('./mailbox-campaign-snapshot-read');
+const {
+  createMailboxCampaignContentVersionReader,
+  createMailboxCampaignVersionCache,
+} = require('./mailbox-campaign-version-cache');
 
 function createMailboxCampaignRepliesList({
   mailboxCampaignRepliesService,
@@ -17,7 +21,12 @@ function createMailboxCampaignRepliesList({
   setUiStateValues,
   getUiStateValues,
   mailboxIndexStore,
+  getSupabaseClient,
   logger,
+  campaignVersionCache = createMailboxCampaignVersionCache({
+    readContentVersion: createMailboxCampaignContentVersionReader({ getSupabaseClient }),
+    logger,
+  }),
   normalizeString,
   truncateText,
 }) {
@@ -38,7 +47,10 @@ function createMailboxCampaignRepliesList({
         return snapshot;
       }
     }
-    const { replies, snapshotBaseReplies } = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies, includeSnapshotMessages });
+    const { value: { replies, snapshotBaseReplies }, cache } = await campaignVersionCache(
+      JSON.stringify([owner, limit, hydrateBodies, includeSnapshotMessages]),
+      () => listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies, includeSnapshotMessages })
+    );
     const indexedAt = Date.now();
     const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText, includeSnapshotMessages });
     const mergedAt = Date.now();
@@ -68,7 +80,7 @@ function createMailboxCampaignRepliesList({
         logger.warn('[Mailbox][CampaignSnapshot]', error?.message || error);
       }
     }
-    logger.info?.('[Mailbox][CampaignListTiming]', { indexMs: indexedAt - startedAt, providerMs: mergedAt - indexedAt, snapshotMs: Date.now() - mergedAt, totalMs: Date.now() - startedAt, messages: messages.length, hydrateBodies });
+    logger.info?.('[Mailbox][CampaignListTiming]', { indexMs: indexedAt - startedAt, providerMs: mergedAt - indexedAt, snapshotMs: Date.now() - mergedAt, totalMs: Date.now() - startedAt, messages: messages.length, hydrateBodies, cache });
     return includeSnapshotMessages ? { ...result, snapshotMessages } : result;
   };
 }

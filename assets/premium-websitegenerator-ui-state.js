@@ -1,4 +1,21 @@
 (function () {
+function buildWebsitePreviewDownloadName(url, hostname, originalFileName) {
+  let domain = '';
+  for (const candidate of [url, hostname]) {
+    try {
+      const value = String(candidate || '').trim();
+      if (!value) continue;
+      const parsed = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+      if (!['https:', 'http:'].includes(parsed.protocol)) continue;
+      domain = parsed.hostname.replace(/^www\./i, '').replace(/[^a-z0-9.-]/gi, '');
+      if (domain) break;
+    } catch (_) {}
+  }
+  const concept = String(originalFileName || '').match(/-design-(editorial|minimal|expressive)\.png$/i)?.[1]?.toLowerCase();
+  const number = { editorial: 1, minimal: 2, expressive: 3 }[concept];
+  return `Webdesign voor ${domain || 'jouw website'}${number ? ` - ontwerp ${number}` : ''}.png`;
+}
+
 function singleWebsitePreviewRequest(run, keyFor = () => '') {
   const pending = new Map();
   return (...args) => {
@@ -60,7 +77,7 @@ function createWebsitePreviewNavigation({ window, document, loadLibrary, renderL
   return { switchTab, init, beginOpen };
 }
 
-const websitePreviewUiState = { singleWebsitePreviewRequest, mergeWebsitePreviewLibrary, reconcileWebsitePreviewCards, createWebsitePreviewNavigation };
+const websitePreviewUiState = { buildWebsitePreviewDownloadName, singleWebsitePreviewRequest, mergeWebsitePreviewLibrary, reconcileWebsitePreviewCards, createWebsitePreviewNavigation };
 if (typeof module === 'object' && module.exports) module.exports = websitePreviewUiState;
 if (typeof window !== 'undefined') window.SoftoraWebsitePreviewUiState = websitePreviewUiState;
 })();
