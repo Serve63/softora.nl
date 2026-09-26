@@ -171,6 +171,43 @@ test('snelle refresh claimt maximaal één lease naast twee actieve cronleases',
   assert.equal(peak, 1);
 });
 
+test('snelle refresh gebruikt alleen vrije globale leases en valt zonder telling terug op één', async () => {
+  for (const [activeLeases, expectedPeak] of [[0, 3], [1, 2], [2, 1], [3, 1], [null, 1], ['error', 1]]) {
+    let activeReads = 0;
+    let peak = 0;
+    const selectedAccounts = SERVE_ACCOUNTS.map(account);
+    const service = createMailboxSyncService({
+      mailboxIndexStore: {
+        acquireSyncLock: async () => ({ ok: true, lockToken: 'fixture-lock' }),
+        finishSync: async () => ({ ok: true }),
+        upsertMessages: async () => ({ ok: true, upserted: 0 }),
+        countActiveSyncLeases: async () => {
+          if (activeLeases === 'error') throw new Error('supabase down');
+          return activeLeases;
+        },
+      },
+      assertReadableAccount: (email) => selectedAccounts.find((candidate) => candidate.email === email),
+      canUseMailboxIndex: () => true,
+      fetchMessagesFromImap: async () => {
+        activeReads += 1; peak = Math.max(peak, activeReads);
+        await new Promise((resolve) => setImmediate(resolve));
+        activeReads -= 1;
+        return [];
+      },
+      getSafeLimit: Number,
+      getAccounts: () => selectedAccounts,
+      normalizeEmail: String, normalizeFolder: String, logger: { error() {} },
+    });
+    const result = await service.syncMailbox({
+      owner: 'serve', folders: ['inbox'], campaignOnly: true, incrementalOnly: true,
+      fastRefresh: true, limit: 4,
+    });
+    assert.equal(result.ok, true, `leases=${activeLeases}`);
+    assert.ok(result.results.length >= selectedAccounts.length);
+    assert.equal(peak, expectedPeak, `leases=${activeLeases}`);
+  }
+});
+
 test('mailbox cron houdt normale sync binnen runtime en voegt campaign-inboxrecovery toe', async () => {
   const calls = [];
   const result = await syncMailboxRequest({
