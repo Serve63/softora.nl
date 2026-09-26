@@ -8,6 +8,8 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   const scriptPath = path.join(__dirname, '../../assets/premium-word.js');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+  const toolsSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-word-tools.js'), 'utf8');
+  const styleSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-word.css'), 'utf8');
 
   assert.match(pageSource, /data-sidebar-shell="canonical"/);
   assert.match(pageSource, /data-sidebar-key="word"/);
@@ -18,7 +20,13 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.match(pageSource, /id="wordRestoreBackup"/);
   assert.match(pageSource, /id="wordStatus"/);
   assert.match(pageSource, /assets\/premium-ui-state-client\.js\?v=20260924a/);
-  assert.match(pageSource, /assets\/premium-word\.js\?v=20260616a/);
+  assert.match(pageSource, /assets\/premium-word\.css\?v=20260926a/);
+  assert.match(pageSource, /assets\/premium-word-tools\.js\?v=20260926a/);
+  assert.match(pageSource, /assets\/premium-word\.js\?v=20260926a/);
+  for (const id of ['wordTitle', 'wordSaveState', 'wordBlockStyle', 'wordFontFamily', 'wordFontSize', 'wordLineHeight',
+    'wordTableBar', 'wordFindBar', 'wordOutline', 'wordExportMenu', 'wordImportFile', 'wordLinkDialog', 'wordBackupDialog', 'wordZoom']) {
+    assert.match(pageSource, new RegExp(`id="${id}"`), id);
+  }
   assert.doesNotMatch(pageSource, /REMOTE_SCOPE|softora_premium_word_html_v1|fetchUiStateGet|editor\.innerHTML/);
   assert.match(scriptSource, /REMOTE_SCOPE = "premium_word"/);
   assert.match(scriptSource, /BACKUP_KEY = "softora_premium_word_html_backups_v1"/);
@@ -29,7 +37,14 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.doesNotMatch(scriptSource, /function fetchUiStateGet|function fetchUiStateSet/);
   assert.match(scriptSource, /function sanitizeWordHtml\(html\)/);
   assert.match(scriptSource, /function parseWordBackups\(value\)/);
-  assert.match(scriptSource, /function restoreLatestBackup\(\)/);
+  assert.match(scriptSource, /function restoreBackup\(index\)/);
+  assert.match(scriptSource, /Deze versie terugzetten\? Je huidige tekst wordt eerst zelf als versie bewaard\./);
+  assert.match(scriptSource, /TITLE_KEY = "softora_premium_word_title_v1"/);
+  assert.match(scriptSource, /patch\[TITLE_KEY\] = getDocTitle\(\)/);
+  assert.match(scriptSource, /runCommand\("insertHTML", sanitizeWordHtml\(html\), false\)/);
+  assert.doesNotMatch(toolsSource, /localStorage|innerHTML\s*=/);
+  assert.match(toolsSource, /window\.SoftoraWordTools = \{ create: create \}/);
+  assert.match(toolsSource, /isSafeHref\(url\)/);
   assert.match(scriptSource, /refreshBackupsFromState\(state\)/);
   assert.match(scriptSource, /function enableLocalFallback\(error\)/);
   assert.match(scriptSource, /function scheduleReconnect\(\)/);
@@ -37,7 +52,7 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.match(scriptSource, /function persistLocalDraft\(\)/);
   assert.match(scriptSource, /function setWordStatus\(message, type\)/);
   assert.match(scriptSource, /function closestElement\(target, selector\)/);
-  assert.match(scriptSource, /blockedTags = \{ IFRAME: true, LINK: true, META: true, OBJECT: true, SCRIPT: true, STYLE: true \}/);
+  assert.match(scriptSource, /blockedTags = \{ IFRAME: true, LINK: true, META: true, NOSCRIPT: true, OBJECT: true, SCRIPT: true, STYLE: true, TEMPLATE: true, TITLE: true \}/);
   assert.match(scriptSource, /name\.indexOf\("on"\) === 0/);
   assert.match(scriptSource, /patch\[REMOTE_KEY\] = sanitizeWordHtml\(editor\.innerHTML\)/);
   assert.match(scriptSource, /var html = sanitizeWordHtml\(String\(state && state\.values && state\.values\[REMOTE_KEY\] \|\| ""\)\)/);
@@ -56,7 +71,8 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.match(scriptSource, /scheduleReconnect\(\);[\s\S]*Word-document opslaan mislukt/);
   assert.match(scriptSource, /Online opslag hersteld\. Je tekst wordt nu opgeslagen\./);
   assert.match(scriptSource, /if \(isDirty\) void save\(\);/);
-  assert.match(pageSource, /\.word-page\s*\{/);
-  assert.match(pageSource, /\.word-ribbon\s*\{/);
-  assert.match(pageSource, /\.word-status\s*\{/);
+  assert.match(styleSource, /\.word-page\s*\{/);
+  assert.match(styleSource, /\.word-ribbon\s*\{/);
+  assert.match(styleSource, /\.word-status\s*\{/);
+  assert.match(styleSource, /@media print/);
 });
