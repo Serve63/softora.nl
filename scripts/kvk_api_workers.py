@@ -120,7 +120,9 @@ def run_cli(script: str, *args: str, timeout: int = 900) -> str:
 
 
 def next_packet(role: str, count: int = 1) -> tuple[dict, list[str]] | None:
-    variants = ["searcher"] if role == "searcher" else ["controller-approved", "controller-unusable"]
+    # Controllers only re-research rejected companies to find what the Searcher missed;
+    # approved companies are not reviewed again.
+    variants = ["searcher"] if role == "searcher" else ["controller-unusable"]
     for variant in variants:
         flags = ROLE_FLAGS[variant]
         raw = run_cli("contact_research.py", "agent-prompts", "--limit", str(count), "--compact", "--no-scout-hints", *flags)
