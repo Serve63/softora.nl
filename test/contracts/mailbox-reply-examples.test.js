@@ -153,11 +153,11 @@ test('voorbeelden met inloggegevens gaan nooit mee en contactgegevens worden afg
   assert.match(migration, /like '%kleine vraag over jullie website%'/);
 });
 
-test('voorgestelde reactie gebruikt GPT-6 Sol op max-denkstand zonder temperature', async () => {
+test('voorgestelde reactie gebruikt GPT-6 Luna op max-denkstand zonder temperature', async () => {
   const calls = [];
   const service = createMailboxService({
     getOpenAiApiKey: () => 'openai-key',
-    openAiModel: 'gpt-6-sol',
+    openAiModel: 'gpt-6-luna',
     openAiReasoningEffort: 'max',
     mailboxReplyExamples: { findReplyExamples: async () => [] },
     fetchJsonWithTimeout: async (_url, options, timeout) => {
@@ -170,11 +170,11 @@ test('voorgestelde reactie gebruikt GPT-6 Sol op max-denkstand zonder temperatur
     accountEmail: 'serve@softora.nl', to: 'klant@example.test', subject: 'Re: Kleine vraag over jullie website', body: '',
     context: { from: 'Klant', email: 'klant@example.test', body: 'We hebben geen interesse.' },
   });
-  assert.equal(calls[0].payload.model, 'gpt-6-sol');
+  assert.equal(calls[0].payload.model, 'gpt-6-luna');
   assert.equal(calls[0].payload.reasoning_effort, 'max');
   assert.equal('temperature' in calls[0].payload, false);
   assert.equal(calls[0].timeout, 300000);
   const composition = fs.readFileSync(path.join(__dirname, '../../server/services/server-app-runtime-feature-composition-builders.js'), 'utf8');
-  assert.match(composition, /MAILBOX_REWRITE_OPENAI_MODEL \|\| 'gpt-6-sol'/);
+  assert.match(composition, /MAILBOX_REWRITE_OPENAI_MODEL \|\| 'gpt-6-luna'/);
   assert.match(composition, /MAILBOX_REWRITE_REASONING_EFFORT \|\| 'max'/);
 });

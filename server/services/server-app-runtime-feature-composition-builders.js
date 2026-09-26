@@ -505,7 +505,7 @@ function buildServerAppFeatureWiringRuntimeContext({
         getUiStateValues: dataOpsAwareUiStateGetter,
         setUiStateValues: dataOpsAwareUiStateSetter,
         openAiApiBaseUrl: envConfig.OPENAI_API_BASE_URL,
-        openAiModel: shared.normalizeString(env.MAILBOX_REWRITE_OPENAI_MODEL || 'gpt-6-sol'),
+        openAiModel: shared.normalizeString(env.MAILBOX_REWRITE_OPENAI_MODEL || 'gpt-6-luna'),
         openAiReasoningEffort: shared.normalizeString(env.MAILBOX_REWRITE_REASONING_EFFORT || 'max'),
         fetchJsonWithTimeout: shared.fetchJsonWithTimeout,
         extractOpenAiTextContent: aiHelpers.extractOpenAiTextContent,

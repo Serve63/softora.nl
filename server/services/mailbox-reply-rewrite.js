@@ -81,7 +81,7 @@ function createMailboxReplyRewrite(deps = {}) {
       error.status = 400;
       throw error;
     }
-    const model = normalizeString(openAiModel) || 'gpt-6-sol';
+    const model = normalizeString(openAiModel) || 'gpt-6-luna';
     const { resolvedAccountEmail, accountSenderName } = await resolveRewriteIdentity({ context, accountEmail, recipientEmail: to, isReply: hasReplyContext });
     const payloadOptions = {
       accountEmail: resolvedAccountEmail,
