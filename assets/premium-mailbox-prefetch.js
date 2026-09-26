@@ -1,5 +1,5 @@
-// Mailbox prefetch: once the open conversation is on screen, the next few
-// conversations in the list are prepared in the background (body with AI
+// Mailbox prefetch: prepare the entire list in bounded background batches,
+// prioritizing visible and pointed-at conversations (body with AI
 // presentation, contact timeline, earlier messages, images), so a click can
 // render the complete conversation at once instead of "E-mail laden...".
 // Nothing here renders, selects or marks as read; an open conversation is
@@ -8,7 +8,7 @@
   'use strict';
 
   const DEFAULT_MAX = 6;
-  const DEFAULT_DELAY_MS = 1200;
+  const DEFAULT_DELAY_MS = 0;
   const STALE_RETRY_MS = 60000;
 
   function create(options = {}) {
@@ -24,15 +24,27 @@
     const warmed = new WeakSet();
     const staleAttempts = new WeakMap();
     const now = options.now || (() => Date.now());
+    const concurrency = Math.max(1, Math.min(3, Number(options.concurrency) || 3));
+    let priorityId = '';
+    const listElement = options.getListElement?.();
+
+    function visibleIds() {
+      const bounds = listElement?.getBoundingClientRect?.();
+      if (!bounds) return [];
+      return Array.from(listElement.querySelectorAll('[data-mailbox-action="open-mail"]'))
+        .filter((row) => { const rect = row.getBoundingClientRect(); return rect.bottom >= bounds.top && rect.top <= bounds.bottom + bounds.height; })
+        .map((row) => row.getAttribute('data-mailbox-id'));
+    }
 
     const isActive = (mail) => String(options.getActiveMail?.() || '') === String(mail?.id || '');
 
-    // The conversations right below the open one first (the likely next
-    // click), then the top of the list.
+    // Visible and intended conversations first, then neighbours and the rest.
     function pickMails() {
       const list = (options.getMails?.() || []).filter(Boolean);
       const activeIndex = list.findIndex(isActive);
-      const ordered = [...(activeIndex >= 0 ? list.slice(activeIndex + 1, activeIndex + 1 + max) : []), ...list.slice(0, max)];
+      const byId = new Map(list.map((mail) => [String(mail.id), mail]));
+      const priority = [priorityId, ...visibleIds()].map((id) => byId.get(String(id))).filter(Boolean);
+      const ordered = [...priority, ...(activeIndex >= 0 ? list.slice(activeIndex + 1, activeIndex + 1 + max) : []), ...list];
       // A dossier that a list refresh marked stale is warmed again (at most
       // once a minute, so a dossier that cannot refresh is not retried per render).
       const staleDue = (mail) => mail.contactTimelineNeedsRefresh === true &&
@@ -42,8 +54,10 @@
     }
 
     async function warm(run) {
-      const current = () => run === generation;
+      const current = () => run === generation && !signal?.aborted;
       const signal = controller?.signal;
+      await options.whenReady?.();
+      if (!current()) return;
       const mails = pickMails();
       if (!mails.length) return;
       try {
@@ -51,28 +65,32 @@
           mails, getRequest: options.getRequest, getActiveMail: options.getActiveMail, fetchImpl: options.fetch, signal,
         });
       } catch (_) { /* The detail load fetches it on click. */ }
-      for (const mail of mails) {
-        if (!current()) return;
-        if (isActive(mail)) continue;
-        try {
-          if (mail.contactTimelineNeedsRefresh === true) staleAttempts.set(mail, now());
-          await options.discovery?.prefetchContactTimeline?.(mail, { signal });
-          if (!current() || isActive(mail)) continue;
-          if (mail.bodyLoaded && options.shouldHydrateThread?.(mail)) {
-            // A failed warm-up must never leave an error that stops the
-            // detail load from trying again on click.
-            const priorErrors = new Map((mail.threadMessages || []).map((message) => [message, message?.bodyLoadError || '']));
-            await options.index?.loadThreadBodies?.({
-              mail, normalizeBodyImages: options.normalizeBodyImages, normalizeOptOutUrl: options.normalizeOptOutUrl,
-              getActiveMail: options.getActiveMail, openMail: options.openMail, fetchImpl: options.fetch, signal,
-              isCurrent: () => current() && !isActive(mail),
-            });
-            priorErrors.forEach((prior, message) => { if (!prior && message?.bodyLoadError) message.bodyLoadError = ''; });
-          }
-        } catch (_) { /* Best effort: the detail load remains the source of truth. */ }
-        // Attempted once per loaded message object; a failure is left to the click.
-        if (current()) warmed.add(mail);
+      let cursor = 0;
+      async function worker() {
+        while (cursor < mails.length && current()) {
+          const mail = mails[cursor++];
+          if (isActive(mail)) continue;
+          try {
+            if (mail.contactTimelineNeedsRefresh === true) staleAttempts.set(mail, now());
+            await options.discovery?.prefetchContactTimeline?.(mail, { signal });
+            if (!current() || isActive(mail)) continue;
+            if (mail.bodyLoaded && options.shouldHydrateThread?.(mail)) {
+              // A failed warm-up must never leave an error that stops the
+              // detail load from trying again on click.
+              const priorErrors = new Map((mail.threadMessages || []).map((message) => [message, message?.bodyLoadError || '']));
+              await options.index?.loadThreadBodies?.({
+                mail, normalizeBodyImages: options.normalizeBodyImages, normalizeOptOutUrl: options.normalizeOptOutUrl,
+                getActiveMail: options.getActiveMail, openMail: options.openMail, fetchImpl: options.fetch, signal,
+                isCurrent: () => current() && !isActive(mail),
+              });
+              priorErrors.forEach((prior, message) => { if (!prior && message?.bodyLoadError) message.bodyLoadError = ''; });
+            }
+          } catch (_) { /* Best effort: the detail load remains the source of truth. */ }
+          // Attempted once per loaded message object; a failure is left to the click.
+          if (current() && !isActive(mail)) warmed.add(mail);
+        }
       }
+      await Promise.all(Array.from({ length: Math.min(concurrency, mails.length) }, worker));
       if (current()) options.images?.prewarm?.(mails, max);
     }
 
@@ -81,8 +99,12 @@
       try {
         do {
           rerun = false;
-          await warm(generation);
-        } while (rerun);
+          const run = generation;
+          await warm(run);
+          // Drain the entire list in bounded batches, re-reading viewport
+          // priority between batches. Stop does not restart the old scope.
+          if (run === generation && pickMails().length) rerun = true;
+        } while (rerun && !controller?.signal.aborted);
       } finally {
         running = false;
       }
@@ -91,9 +113,9 @@
     // Renders of the open conversation (refreshes, images, AI) happen often;
     // they must not restart or abort a warm-up that is making progress.
     function scheduleWarm() {
+      if (!controller) controller = typeof AbortController === 'function' ? new AbortController() : null;
       if (running) { rerun = true; return; }
       if (timer) return;
-      if (!controller) controller = typeof AbortController === 'function' ? new AbortController() : null;
       timer = schedule(() => {
         timer = null;
         void runWarm();
@@ -102,12 +124,22 @@
 
     function stop() {
       generation += 1;
+      rerun = false;
+      priorityId = '';
       if (timer) cancel(timer);
       timer = null;
       controller?.abort?.();
       controller = null;
     }
 
+    function prioritize(event) {
+      const row = event.target?.closest?.('[data-mailbox-action="open-mail"]');
+      if (row) priorityId = row.getAttribute('data-mailbox-id') || '';
+      scheduleWarm();
+    }
+    listElement?.addEventListener?.('pointerover', prioritize, { passive: true });
+    listElement?.addEventListener?.('focusin', prioritize);
+    listElement?.addEventListener?.('scroll', scheduleWarm, { passive: true });
     return { schedule: scheduleWarm, stop, warmNow: () => { stop(); controller = typeof AbortController === 'function' ? new AbortController() : null; return runWarm(); } };
   }
 
