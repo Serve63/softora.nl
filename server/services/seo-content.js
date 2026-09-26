@@ -5,6 +5,7 @@ const { WEBSITE_PROPOSAL_CONTENT_ITEM } = require('./seo-content-website-proposa
 const { SOFTWARE_PROPOSAL_CONTENT_ITEM } = require('./seo-content-software-proposal');
 const { CRM_COST_CONTENT_ITEM } = require('./seo-content-crm-kosten');
 const { BUSINESS_SOFTWARE_EXPLAINER } = require('./seo-content-business-software-explainer');
+const { LEAD_SCORING_CONTENT_ITEM } = require('./seo-content-lead-scoring');
 const { buildSeoImageObject, buildSeoImagePreviewMeta, getSeoImageSitemapEntries } = require('./seo-content-image-search');
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
@@ -1754,6 +1755,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
         heading: 'Begin met drie duidelijke taakmomenten',
         paragraphs: Object.freeze([
           'Een sterke eerste versie hoeft niet groot te zijn. Kies bijvoorbeeld taken na een nieuwe aanvraag, reminders na een verstuurde offerte en een signaal wanneer een klant al te lang geen update heeft gehad.',
+          Object.freeze({ text: 'Gebruik lead scoring om de volgorde van opvolging uit te leggen, niet om ontbrekende informatie als afwijzing te behandelen. Bewaar naast de prioriteit altijd een eigenaar en een concrete volgende actie.', links: Object.freeze([Object.freeze({ anchor: 'lead scoring', href: '/kennisbank/wat-is-lead-scoring', availableFrom: '2026-07-01' })]) }),
           Object.freeze({
             text: 'Vanuit die basis kan Softora CRM, website, mailbox en eventueel AI automatisering koppelen. Voor advieswerk helpt een projectstart en overdracht voor adviesbureaus om een taak pas te sluiten wanneer vraag, scope, voorstel, capaciteit en dossier aantoonbaar op elkaar aansluiten. Zo wordt opvolging consistenter zonder dat automatisering het inhoudelijke besluit overneemt.',
             links: Object.freeze([
@@ -1779,55 +1781,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
     ]),
   }),
-  Object.freeze({
-    collection: 'kennisbank',
-    slug: 'wat-is-lead-scoring',
-    title: 'Wat is lead scoring?',
-    description:
-      'Een heldere uitleg van lead scoring: hoe je leads beoordeelt op fit, timing en intentie zonder blind op automatische scores te varen.',
-    category: 'CRM',
-    intent: 'Uitleg',
-    publishedAt: '2026-07-01',
-    updatedAt: '2026-07-01',
-    image: Object.freeze({
-      src: '/assets/seo-content/crm-software-dashboard-softora.jpg',
-      alt: 'CRM-dashboard met lead scoring, prioriteit en opvolgstatussen voor betere commerciële keuzes.',
-      width: 1600,
-      height: 1000,
-    }),
-    summary:
-      'Lead scoring helpt teams bepalen welke aanvragen eerst aandacht verdienen, zolang de score uitlegbaar blijft en niet de enige beslisser wordt.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'De simpele betekenis',
-        paragraphs: Object.freeze([
-          'Lead scoring is het geven van een prioriteit aan leads op basis van signalen. Denk aan dienstinteresse, budgetindicatie, timing, bedrijfsprofiel, bronpagina, ingevulde gegevens en eerdere contactmomenten.',
-          'Het doel is niet om mensen als nummers te behandelen. Het doel is om sneller te zien welke aanvraag waarschijnlijk meer context, snelheid of persoonlijke aandacht nodig heeft.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Welke signalen vaak meetellen',
-        paragraphs: Object.freeze([
-          'Een praktische score kijkt naar fit en intentie. Fit gaat over de vraag of de klant past bij je dienstverlening. Intentie gaat over gedrag: welke pagina is bezocht, welke vraag is gesteld en hoe concreet is de behoefte?',
-          'AI kan helpen om tekst uit formulieren, chatgesprekken of belnotities samen te vatten. De score moet daarna altijd uitlegbaar blijven, zodat een medewerker kan zien waarom een lead hoger of lager staat.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Wanneer lead scoring zinvol wordt',
-        paragraphs: Object.freeze([
-          'Lead scoring wordt vooral nuttig wanneer er genoeg aanvragen zijn om prioriteit te moeten kiezen. Bij weinig volume is een duidelijke pipeline vaak belangrijker dan een uitgebreide score.',
-          'Voor Softora-projecten is de beste start meestal compact: score op dienst, urgentie, volledigheid en opvolgstatus. Daarna kun je koppelen met CRM-taken, reminders en dashboards.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'Wat is leadkwalificatie?', href: '/kennisbank/wat-is-leadkwalificatie' }),
-      Object.freeze({ label: 'CRM taken automatiseren', href: '/blog/crm-taken-reminders-automatiseren-mkb' }),
-      Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
-      Object.freeze({ label: 'Wat is een sales pipeline?', href: '/kennisbank/wat-is-een-sales-pipeline-crm' }),
-    ]),
-  }),
+  LEAD_SCORING_CONTENT_ITEM,
   Object.freeze({
     collection: 'blog',
     slug: 'ai-telefonie-menselijke-overdracht',
