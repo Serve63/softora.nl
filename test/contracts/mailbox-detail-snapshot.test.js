@@ -285,7 +285,7 @@ test('complete prepared views survive reload with exact user and mailbox scope a
 test('prepared views reject partial/error screens, expire, and evict to a fixed memory budget', async () => {
   const h = preparedHarness(), cache = h.create(); await cache.ready;
   assert.equal(cache.remember('loading', '<div class="detail-mail-loading">Laden</div>'), false);
-  assert.equal(cache.remember('error', '<div class="detail-mail-error">Error</div>'), false);
+  assert.equal(cache.remember('error', '<div class="detail-mail-load-error">Error</div>'), false);
   assert.equal(cache.remember('oversize', 'x'.repeat(400001)), false);
   for (let i = 0; i < 12; i++) { cache.remember(`view${i}`, `${i}`.padEnd(300000, 'x')); h.advance(1); }
   await cache.flush();

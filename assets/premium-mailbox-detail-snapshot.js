@@ -44,7 +44,7 @@
 
     function remember(view, html) {
       if (!current() || !view || typeof html !== 'string' || !html || html.length > MAX_CHARS ||
-          /detail-mail-loading|detail-mail-error/.test(html)) return false;
+          /detail-mail-loading|detail-mail-(?:load-)?error/.test(html)) return false;
       views.delete(view);
       views.set(view, { html, at: now() });
       trim(); revision++;
