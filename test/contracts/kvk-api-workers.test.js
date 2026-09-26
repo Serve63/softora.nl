@@ -223,6 +223,12 @@ test('the local Codex workers receive searcher and controller instructions from 
   assert.match(CONTROLLER_INSTRUCTIONS, /Controleer precies dit eerder onderzochte KVK-bedrijf/);
   assert.match(CONTROLLER_INSTRUCTIONS, /previous_result/);
   assert.match(CONTROLLER_INSTRUCTIONS, /result_schema/);
+  // The controller builds on the Searcher: open its cited pages first, search only for gaps.
+  assert.match(CONTROLLER_INSTRUCTIONS, /luna_claim/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /Doe dan geen zoekacties/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /routes die de Searcher niet gebruikte/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /hoogstens 2 zoekacties/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /alleen concreet tegenbewijs mag het weghalen/);
   const { row } = settingsFixture();
   const polled = response();
   await createKvkApiWorkersService({ kvkDatabaseSyncToken: 'token', getSupabaseClient: () => ({ from() { return {
