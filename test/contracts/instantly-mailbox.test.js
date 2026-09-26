@@ -1763,6 +1763,42 @@ test('reply uses the exact stored account/thread and rejects cross-owner, recipi
   assert.equal(store.rows.some((message) => message.providerMessageId === 'sent-reply-1'), true);
 });
 
+test('reply preserves paragraphs in delivered HTML and provider sync without interpreting user markup', async () => {
+  const text = 'Hallo Bart,\n\nDank voor je reactie & je tijd.\nBekijk https://example.org/?a=1&b=2\n\nLetterlijk <script>alert("x")</script>.\n\nMet vriendelijke groet,\nMartijn';
+  const { service, store, requests } = buildService({
+    fetchJsonWithTimeout: async (_url, options) => ({
+      response: { ok: true, status: 200 },
+      data: {
+        id: 'sent-paragraphs',
+        body: JSON.parse(options.body).body,
+        timestamp_created: '2026-07-25T12:00:00.000Z',
+      },
+    }),
+  });
+  store.rows.push(service.normalizeInstantlyMessage(incoming()));
+  const result = await service.reply({
+    owner: 'serve', accountEmail: 'serve-sender@example.com',
+    providerMessageId: 'incoming-serve-1', providerThreadId: 'thread-serve',
+    to: 'prospect@example.org', subject: 'Re: Kleine vraag', text,
+  });
+  const payload = JSON.parse(requests.find((request) => request.url.endsWith('/emails/reply')).options.body);
+  assert.equal(payload.body.text, text);
+  assert.match(payload.body.html, /Hallo Bart,<br\/><br\/>Dank/);
+  assert.match(payload.body.html, /&lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt;/);
+  assert.equal(payload.body.html.includes('<script>'), false);
+  assert.equal(result.sentMessage.body, text);
+  assert.equal(store.rows.find((row) => row.providerMessageId === 'sent-paragraphs').body, text);
+});
+
+test('Instantly reply HTML preserves Windows and legacy line endings and literal entities', () => {
+  const { buildInstantlyReplyBody } = require('../../server/services/instantly-reply-body');
+  const text = "Hoi,\r\n\r\nA & B < C > D 'quote' &lt;\rGroet";
+  assert.deepEqual(buildInstantlyReplyBody(text), {
+    text,
+    html: 'Hoi,<br/><br/>A &amp; B &lt; C &gt; D &#39;quote&#39; &amp;lt;<br/>Groet',
+  });
+});
+
 test('reply roept providerstartcallback na validatie en direct vóór de Instantly POST aan', async () => {
   const events = [];
   let callbackEvent = null;
