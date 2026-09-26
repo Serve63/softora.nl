@@ -1088,11 +1088,15 @@ function createMailboxSyncService({
     );
     const campaignSeedCache = new Map();
     const refreshDeadlineAtMs = fastRefresh ? Date.now() + FAST_REFRESH_BUDGET_MS : 0;
+    // At most three mailbox syncs run at once (softora_claim_mailbox_sync_lock)
+    // and cron can hold two. A foreground refresh uses only the free slots.
+    const activeLeases = fastRefresh && typeof mailboxIndexStore?.countActiveSyncLeases === 'function'
+      ? await mailboxIndexStore.countActiveSyncLeases().catch(() => null) : null;
     const accountResults = await mapWithConcurrency(
       accounts,
-      // Cron can hold two of the three global leases. Keep the remaining
-      // foreground slot sequential instead of contending with ourselves.
-      fastRefresh ? 1 : Math.max(1, Math.min(3, Number(maxConcurrentAccounts) || 1)),
+      fastRefresh
+        ? (Number.isInteger(activeLeases) ? Math.max(1, 3 - activeLeases) : 1)
+        : Math.max(1, Math.min(3, Number(maxConcurrentAccounts) || 1)),
       async (account) => {
         const results = [];
         const imapSession = fastRefresh ? createMailboxImapSession() : null;
