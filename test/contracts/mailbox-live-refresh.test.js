@@ -828,7 +828,7 @@ test('latere geslaagde outreach-lijstrefresh herstelt een eerdere tijdelijke cac
 
   assert.equal(await controller.refresh(), true);
   assert.equal(loadCalls, 2);
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist');
   assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'ok' });
   controller.destroy();
 });
@@ -979,7 +979,7 @@ test('foreground refresh status is exclusive while active, successful, partial a
   assert.equal(button.attributes['aria-label'], 'Mailbox nu controleren voor serve');
   assert.equal(button.attributes.title, 'Mailbox nu controleren voor serve');
   assert.equal(await controller.refresh(), true);
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist');
   assert.match(ageLabel.attributes.title, /^Laatste volledige providercontrole voor serve:/);
   assert.match(button.attributes['aria-label'], /^Mailbox opnieuw controleren voor serve; laatste volledige controle om /);
 
@@ -1063,7 +1063,7 @@ test('automatische initial background poll toont checking en een handmatige over
 
   release(successfulResponse());
   assert.equal(await foreground, true);
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist');
   assert.equal(button.disabled, false);
   assert.equal(button.attributes['aria-busy'], 'false');
   assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'ok' });
@@ -1211,7 +1211,7 @@ test('uitgestelde mailboxboot toont direct controleren en houdt automatisch hers
   await new Promise((resolve) => setImmediate(resolve));
   releases[1](successfulResponse());
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist');
   assert.equal(button.disabled, false);
   controller.destroy();
 });
@@ -1299,7 +1299,7 @@ test('eerste provider-timeout kan bij de tweede poging volledig herstellen', asy
   timeoutHandlers[0]();
   assert.equal(await pending, true);
   assert.equal(attempts, 2);
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist');
   assert.deepEqual(controller.snapshot(), { foregroundInFlight: 0, inFlight: 0, status: 'ok' });
   controller.destroy();
 });
@@ -1527,7 +1527,7 @@ test('met een bekende laatste controle opent de mailbox zonder "Controleren…" 
     clearTimeout() {}, setInterval: () => 1, clearInterval() {},
   });
 
-  assert.equal(ageLabel.textContent, '5 min geleden gecontroleerd');
+  assert.equal(ageLabel.textContent, '5 min geleden');
   assert.equal(button.disabled, false);
   assert.equal(button.classList.values.has('is-refreshing'), false);
   assert.equal(button.attributes['aria-busy'], 'true', 'assistive tech still hears that a check is running');
@@ -1535,7 +1535,7 @@ test('met een bekende laatste controle opent de mailbox zonder "Controleren…" 
   controller.start();
   timers[0].handler();
   await Promise.resolve();
-  assert.equal(ageLabel.textContent, '5 min geleden gecontroleerd', 'the automatic check stays silent');
+  assert.equal(ageLabel.textContent, '5 min geleden', 'the automatic check stays silent');
   assert.equal(button.classList.values.has('is-refreshing'), false);
 
   button.listeners.click();
@@ -1547,6 +1547,6 @@ test('met een bekende laatste controle opent de mailbox zonder "Controleren…" 
     await new Promise((resolve) => setImmediate(resolve));
   }
   assert.deepEqual(remembered.at(-1), ['outreach|serve|', now]);
-  assert.equal(ageLabel.textContent, 'Zojuist gecontroleerd');
+  assert.equal(ageLabel.textContent, 'Zojuist');
   controller.destroy();
 });

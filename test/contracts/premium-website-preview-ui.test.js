@@ -158,7 +158,7 @@ test('premium websitegenerator toont compacte previews en behoudt de volledige a
   assert.match(source, /img\.id = 'preview-image';/);
   assert.match(source, /img\.className = 'preview-image-pixel';/);
   assert.match(source, /downloadBtn\.addEventListener\('click', \(\) => downloadPreviewBlock\(blockId\)\);/);
-  assert.match(source, /stack\.appendChild\(createPreviewZoneElement\(blockId, entry\.hostname \|\| host, w, false, Number\(entry.height\) \|\| WEBSITE_PREVIEW_IMAGE_HEIGHT\)\);/);
+  assert.match(source, /stack\.appendChild\(createPreviewZoneElement\(blockId, designLabel, w, false, Number\(entry.height\) \|\| WEBSITE_PREVIEW_IMAGE_HEIGHT\)\);/);
   assert.match(source, /mountScanBatchShell\(out, 'Preview hervatten…'\);/);
   assert.doesNotMatch(source, /previewZoneHtml/);
   assert.doesNotMatch(source, /insertAdjacentHTML/);
