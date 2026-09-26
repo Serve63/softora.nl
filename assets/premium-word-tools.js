@@ -503,8 +503,8 @@
                 return String(result && result.value || "");
             }
             if (/\.html?$/.test(name)) {
-                var parsed = new DOMParser().parseFromString(await file.text(), "text/html");
-                return parsed.body ? parsed.body.innerHTML : "";
+                // Ruwe HTML; premium-word.js haalt alles door sanitizeWordHtml voordat het in de editor komt.
+                return await file.text();
             }
             if (/\.(txt|md|markdown)$/.test(name) || /^text\/plain/.test(file.type)) {
                 return textToHtml(await file.text());

@@ -77,7 +77,7 @@
         U: true,
         UL: true
     };
-    var blockedTags = { IFRAME: true, LINK: true, META: true, OBJECT: true, SCRIPT: true, STYLE: true };
+    var blockedTags = { IFRAME: true, LINK: true, META: true, NOSCRIPT: true, OBJECT: true, SCRIPT: true, STYLE: true, TEMPLATE: true, TITLE: true };
     var safeStyleProperties = {
         "background-color": true,
         color: true,
@@ -144,15 +144,16 @@
     }
 
     function sanitizeWordHtml(html) {
-        var template = document.createElement("template");
-        template.innerHTML = String(html || "");
-        var commentWalker = document.createTreeWalker(template.content, NodeFilter.SHOW_COMMENT);
+        // Inert document: scripts draaien niet en externe bronnen laden niet tijdens het opschonen.
+        var parsed = new DOMParser().parseFromString("<!DOCTYPE html><body>" + String(html || ""), "text/html");
+        var root = parsed.body;
+        var commentWalker = parsed.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
         var comments = [];
         while (commentWalker.nextNode()) comments.push(commentWalker.currentNode);
         comments.forEach(function (comment) {
             comment.remove();
         });
-        Array.prototype.slice.call(template.content.querySelectorAll("*")).forEach(function (element) {
+        Array.prototype.slice.call(root.querySelectorAll("*")).forEach(function (element) {
             if (!element.parentNode) return;
             var tag = element.tagName;
             if (blockedTags[tag]) {
@@ -188,7 +189,7 @@
                 }
             });
         });
-        return template.innerHTML;
+        return root.innerHTML;
     }
 
     /* ---------- Selectie en opdrachten ---------- */
@@ -484,9 +485,8 @@
     }
 
     function textFromHtml(html) {
-        var template = document.createElement("template");
-        template.innerHTML = sanitizeWordHtml(html);
-        return String(template.content.textContent || "").replace(/\s+/g, " ").trim();
+        var parsed = new DOMParser().parseFromString(sanitizeWordHtml(html), "text/html");
+        return String(parsed.body.textContent || "").replace(/\s+/g, " ").trim();
     }
 
     function formatBackupDate(value) {

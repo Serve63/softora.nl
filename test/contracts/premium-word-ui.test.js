@@ -52,7 +52,7 @@ test('premium word: rich editor, eigen ui-state scope, canonical shell', () => {
   assert.match(scriptSource, /function persistLocalDraft\(\)/);
   assert.match(scriptSource, /function setWordStatus\(message, type\)/);
   assert.match(scriptSource, /function closestElement\(target, selector\)/);
-  assert.match(scriptSource, /blockedTags = \{ IFRAME: true, LINK: true, META: true, OBJECT: true, SCRIPT: true, STYLE: true \}/);
+  assert.match(scriptSource, /blockedTags = \{ IFRAME: true, LINK: true, META: true, NOSCRIPT: true, OBJECT: true, SCRIPT: true, STYLE: true, TEMPLATE: true, TITLE: true \}/);
   assert.match(scriptSource, /name\.indexOf\("on"\) === 0/);
   assert.match(scriptSource, /patch\[REMOTE_KEY\] = sanitizeWordHtml\(editor\.innerHTML\)/);
   assert.match(scriptSource, /var html = sanitizeWordHtml\(String\(state && state\.values && state\.values\[REMOTE_KEY\] \|\| ""\)\)/);
