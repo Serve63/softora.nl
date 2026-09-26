@@ -84,7 +84,7 @@ test('premium personeel pagina’s met boot-shell delen personnel-theme loader e
         const notepadSource = fs.readFileSync(notepadPath, 'utf8');
         assert.match(notepadSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
       } else if (file === 'premium-word.html') {
-        assert.match(source, /<script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script>\s*<script src="assets\/premium-word\.js\?v=20260616a"><\/script>/, file);
+        assert.match(source, /<script src="assets\/premium-word-tools\.js\?v=20260926a"><\/script>\s*<script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script>\s*<script src="assets\/premium-word\.js\?v=20260926a"><\/script>/, file);
         const wordPath = path.join(__dirname, '../../assets/premium-word.js');
         const wordSource = fs.readFileSync(wordPath, 'utf8');
         assert.match(wordSource, /SoftoraPremiumBoot\.setShellBooting\(false\)/, file);
