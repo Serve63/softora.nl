@@ -1364,6 +1364,9 @@ test('SEO uses the shared black heading and outer frame without changing the sid
 test('database loading repair keeps its premium shell and serves matching design eligibility assets', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
   assert.ok(extractSidebarLinkTargets(source).database);
+  assert.match(source, /premium-database-screen-snapshot\.js\?v=20260927a/);
+  assert.match(source, /<button id="instantlyQueueImportButton" type="button" class="sf-btn">Uploaden<\/button><input id="instantlyQueueImportFile"/);
+  assert.ok(source.indexOf('id="instantlyQueueImportButton"') < source.indexOf('<table id="databaseTable">'), 'the upload control reserves its final space before scripts run');
   assert.match(source, /premium-database-boot\.js\?v=20260923-provider-readmodel/);
   assert.match(source, /premium-database-readiness\.js\?v=20260923-provider-readmodel/);
   assert.match(source, /premium-database-system-mail-count\.js\?v=20260924-stable-metrics/);

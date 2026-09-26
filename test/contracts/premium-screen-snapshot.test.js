@@ -113,14 +113,97 @@ test('logout wipes screen snapshots together with the other read models', async 
   assert.equal(first.storage.map.size, 0);
 });
 
+test('database retains each standard view through tab changes, search, expanded rows and immediate navigation', () => {
+  const fixture = setup();
+  // No idle callback ever runs: navigating immediately must still retain the table.
+  globalThis.requestIdleCallback = () => {};
+  const { createAdapter } = require('../../assets/premium-database-screen-snapshot');
+  const elements = {};
+  const factory = (config) => {
+    config.elements.forEach(({ id }) => { elements[id] ||= createElement(); });
+    return create({ ...config, document: createDocument(elements), store: fixture.store });
+  };
+  const adapter = createAdapter({ create: factory, sentReady: () => true });
+  const state = { activeStatus: 'beschikbaar', query: '', sortKey: 'distance', sortAsc: true,
+    visibleLimit: 25, canonicalInventoryReady: true, remoteCustomersLoaded: true };
+  // Initialize the DOM fixtures; missing copies must not show anything.
+  assert.equal(adapter.restore(state), false);
+  elements.tbody.innerHTML = '<tr><td>Beschikbaar bedrijf</td></tr>';
+  adapter.capture(state);
+  state.activeStatus = 'instantly';
+  elements.tbody.innerHTML = '<tr><td>Verstuurd bedrijf</td></tr>';
+  adapter.capture(state);
+  state.activeStatus = 'beschikbaar';
+  state.query = 'zoekterm';
+  elements.tbody.innerHTML = '<tr><td>Zoekresultaat</td></tr>';
+  adapter.capture(state);
+  state.query = ''; state.visibleLimit = 50;
+  elements.tbody.innerHTML = '<tr><td>Meer rijen</td></tr>';
+  adapter.capture(state);
+  state.visibleLimit = 25; state.photoRestorePending = true;
+  assert.equal(adapter.hold(state), true);
+  assert.match(elements.tbody.innerHTML, /Beschikbaar bedrijf/);
+  assert.equal(elements.tbody.inert, true);
+  adapter.capture(state); // A restored/unfinished table must never become verified data.
+  state.activeStatus = 'instantly';
+  assert.equal(adapter.hold(state), true);
+  assert.match(elements.tbody.innerHTML, /Verstuurd bedrijf/);
+  state.activeStatus = 'beschikbaar';
+  assert.equal(adapter.hold(state), true);
+  assert.match(elements.tbody.innerHTML, /Beschikbaar bedrijf/);
+  state.photoRestorePending = false;
+  assert.equal(adapter.hold(state), false);
+  adapter.release();
+  assert.equal(elements.tbody.inert, false);
+  state.dataUnavailable = true;
+  assert.equal(adapter.hold(state), false, 'a failed verification must surface its error');
+});
+
+test('partial inventory and photo preparation cannot publish intermediate rows or count them as complete', () => {
+  const { isPreparing } = require('../../assets/premium-database-screen-snapshot');
+  assert.equal(isPreparing({ canonicalInventoryReady: true, remoteCustomersLoaded: false }), true);
+  assert.equal(isPreparing({ remoteCustomersLoaded: true, photoRestorePending: true }), true);
+  assert.equal(isPreparing({ remoteCustomersLoaded: true, photoRestorePending: false, dataLoading: false }), false);
+  assert.equal(isPreparing({ remoteCustomersLoaded: false, dataUnavailable: true }), false, 'errors remain visible');
+  const page = fs.readFileSync(path.join(repoRoot, 'premium-database.html'), 'utf8');
+  assert.match(page, /dataLoading: preparing \|\| state\.photoRestoreFailed, normalizeString, isColdmailTestCompany, outreachController, databaseContactStatus/);
+  assert.match(page, /if \(!preparing\) publishMailReadyCounts\(\); if \(!preparing && window\.SoftoraDatabaseSentRegister\.render/);
+});
+
+test('static upload controls bind without insertion or sending any request', () => {
+  const listeners = {};
+  const elements = Object.fromEntries(['instantlyQueueImportButton', 'instantlyQueueImportFile', 'instantlyQueueImportStatus']
+    .map((id) => [id, { addEventListener(type, listener) { listeners[id + ':' + type] = listener; } }]));
+  let filePickerOpened = false;
+  elements.instantlyQueueImportFile.click = () => { filePickerOpened = true; };
+  const document = { readyState: 'complete', querySelector: () => ({}), getElementById: (id) => elements[id],
+    createElement() { throw new Error('static controls must not be replaced'); } };
+  const { bind } = require('../../assets/premium-database-instantly-queue-import');
+  const previousDocument = globalThis.document;
+  const previousLocation = globalThis.location;
+  try {
+    globalThis.document = document;
+    globalThis.location = { href: 'https://www.softora.nl/premium-database' };
+    bind();
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+    if (previousLocation === undefined) delete globalThis.location;
+    else globalThis.location = previousLocation;
+  }
+  assert.equal(typeof listeners['instantlyQueueImportFile:change'], 'function');
+  listeners['instantlyQueueImportButton:click']();
+  assert.equal(filePickerOpened, true);
+});
+
 test('Mailsysteem shows its snapshot instead of the loading row and replaces it on the first real render', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-database.html'), 'utf8');
   assert.match(page, /applyDatabaseUrlIntent\(\); window\.SoftoraDatabaseScreenSnapshot\?\.restore\(state\);\n\s+renderPage\(\);/);
   assert.match(page, /if \(canonicalInventoryStatus !== "ready"\) \{ if \(canonicalInventoryStatus !== "unavailable" && window\.SoftoraDatabaseScreenSnapshot\?\.isShowing\(\)\) return;/);
   assert.match(page, /function setDatabaseTableBodyHtml\(html\) \{ window\.SoftoraDatabaseScreenSnapshot\?\.release\(\);/);
-  assert.match(page, /setDatabaseTableBodyHtml\(tableBodyHtml\); if \(state\.remoteCustomersLoaded && !state\.dataLoading && !state\.photoRestorePending && !state\.photoRestoreFailed\) window\.SoftoraDatabaseScreenSnapshot\?\.capture\(state\);/);
-  const snapshotScript = page.indexOf('assets/premium-database-screen-snapshot.js?v=20260924a');
-  assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924b') < snapshotScript);
+  assert.match(page, /function renderPage\(\) \{ renderTable\(\); window\.SoftoraDatabaseScreenSnapshot\?\.capture\(state\);/);
+  const snapshotScript = page.indexOf('assets/premium-database-screen-snapshot.js?v=20260927a');
+  assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260927a') < snapshotScript);
   assert.ok(snapshotScript < page.indexOf('const state = {'), 'the snapshot is available before the first render');
 
   const adapter = require('../../assets/premium-database-screen-snapshot');
