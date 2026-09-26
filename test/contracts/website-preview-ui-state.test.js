@@ -119,3 +119,14 @@ test('a slow image open cannot override a newer image selection or tab click', a
   await f.nav.switchTab('scan');
   assert.equal(latest(), false);
 });
+
+
+test('download names use the website and design number instead of provider filenames', () => {
+  const { buildWebsitePreviewDownloadName: name } = require('../../assets/premium-websitegenerator-ui-state');
+  assert.equal(name('https://www.alleskidzkinderopvang.nl/', '', 'ChatGPT Image.png'), 'Webdesign voor alleskidzkinderopvang.nl.png');
+  for (const [index, concept] of ['editorial', 'minimal', 'expressive'].entries()) {
+    assert.equal(name('https://www.example.com/path?token=private', '', `example.com-design-${concept}.png`), `Webdesign voor example.com - ontwerp ${index + 1}.png`);
+  }
+  assert.equal(name('', 'www.example.nl', 'chatgpt.png'), 'Webdesign voor example.nl.png');
+  assert.equal(name('', '', 'ChatGPT Image.png'), 'Webdesign voor jouw website.png');
+});
