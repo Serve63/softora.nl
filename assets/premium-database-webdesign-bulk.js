@@ -137,7 +137,7 @@
             const status = fallbackNormalize(batch && batch.status).toLowerCase();
             return {
                 num: formatNumber(made) + " / " + formatNumber(total),
-                rest: status === "cancelled" ? formatNumber(cancelled || Math.max(0, total - made - failed)) + " geannuleerd" : formatNumber(remaining) + " resterend"
+                rest: status === "cancelled" ? formatNumber(cancelled || Math.max(0, total - made - failed)) + " geannuleerd" : formatNumber(remaining) + " resterend" + (failed ? " · " + formatNumber(failed) + " mislukt" : "") + (cancelled ? " · " + formatNumber(cancelled) + " geannuleerd" : "")
             };
         }
 
