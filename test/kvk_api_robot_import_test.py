@@ -73,5 +73,20 @@ class RobotImportTests(unittest.TestCase):
         self.assertFalse(robot_import.import_find(self.db, find))
 
 
+class RobotLeavesSearcherWorkAloneTests(unittest.TestCase):
+    def test_robot_skips_companies_a_searcher_is_busy_with_or_has_an_answer_for(self):
+        import kvk_robot_v5 as robot
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            pending = Path(directory)
+            for name in ('contact_agent_results_api_searcher_initial_00000001.busy',
+                         'contact_agent_results_api_searcher_initial_00000002.luna.json',
+                         'contact_agent_results_api_searcher_initial_00000003.rejected-1.json',
+                         'contact_agent_results_api_controller_unusable_00000004.json'):
+                (pending / name).write_text('{}')
+            with patch.object(robot, 'PENDING', pending):
+                self.assertEqual(robot.searcher_claims(), {'00000001', '00000002'})
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -30,6 +30,9 @@ API_URL = os.environ.get("SOFTORA_KVK_API_WORKERS_URL", "https://www.softora.nl/
 PENDING = ROOT / "data" / "kvk_api_pending"
 COMPLETED = ROOT / "data" / "kvk_api_completed"
 LOCK = ROOT / "data" / "kvk_api_workers.lock"
+DATABASE = ROOT / "data" / "nederland_bedrijven.sqlite"
+ROBOT_QUEUE = ROOT / "data" / "shadow" / "robot-v5-dashboard"
+ROBOT_BUSY_SECONDS = 600  # a Robot folder without progress this long no longer holds its company
 # Searchers and Controllers both run through Codex on the ChatGPT subscription; the paid API is not used.
 CODEX_LABEL = "Codex"
 CODEX_BIN = "/Applications/ChatGPT.app/Contents/Resources/codex"
@@ -309,6 +312,37 @@ def mark_codex(path: Path) -> None:
     save_result(path.with_suffix(".engine.json"), {"engine": "codex"})
 
 
+def robot_busy(kvk: str) -> bool:
+    """The Robot is researching this company right now; a Searcher waits instead of doubling the work."""
+    folder = ROBOT_QUEUE / kvk
+    if not folder.is_dir() or (folder / "completed.json").exists():
+        return False
+    newest = max((item.stat().st_mtime for item in folder.iterdir()), default=folder.stat().st_mtime)
+    return time.time() - newest < ROBOT_BUSY_SECONDS
+
+
+def already_researched(kvk: str) -> bool:
+    """Another worker (the Robot) already put this company in the database."""
+    import sqlite3
+    try:
+        with sqlite3.connect(f"file:{DATABASE}?mode=ro", uri=True, timeout=30) as db:
+            row = db.execute("SELECT lead_status FROM companies WHERE kvk_nummer=?", (kvk,)).fetchone()
+    except sqlite3.Error:
+        return False
+    return bool(row) and row[0] != "unresearched"
+
+
+def discard_superseded(path: Path, kvk: str) -> None:
+    """Keep a Searcher answer for a company the Robot already finished as evidence, without applying it."""
+    COMPLETED.mkdir(parents=True, exist_ok=True)
+    stamp = int(time.time())
+    for source in PENDING.glob(f"{path.stem}.*"):
+        os.replace(source, COMPLETED / f"{source.name}.superseded-{stamp}")
+    if path.exists():
+        os.replace(path, COMPLETED / f"{path.name}.superseded-{stamp}")
+    report("searcher", f"{kvk}: al door de Robot gevonden; Searcher-antwoord bewaard, niet dubbel toegepast.")
+
+
 def luna_search_one(company: dict, flags: list[str], validate: bool = True) -> bool:
     """Exactly one Codex run per company; later steps only reuse the saved answer."""
     from kvk_luna_searcher import to_canonical
@@ -323,7 +357,13 @@ def luna_search_one(company: dict, flags: list[str], validate: bool = True) -> b
             return False
         recovery_path = path.with_suffix(".recovery.json")
         feedback = json.loads(recovery_path.read_text()).get("last_error", "") if recovery_path.exists() else ""
-        answer, consulted = codex_research(company, instructions_for("searcher"), feedback)
+        # The Robot skips a company while this marker exists.
+        busy = path.with_suffix(".busy")
+        busy.touch()
+        try:
+            answer, consulted = codex_research(company, instructions_for("searcher"), feedback)
+        finally:
+            busy.unlink(missing_ok=True)
         if not isinstance(answer, dict) or str(answer.get("kvk_nummer")) != kvk:
             raise RuntimeError("Codex gaf geen geldig antwoord voor de juiste onderneming terug.")
         save_result(answer_path, {"answer": answer, "consulted_urls": consulted, "engine": "codex"})
@@ -463,6 +503,10 @@ def apply_searcher_head(packet: dict, flags: list[str], apply_lock: threading.Lo
     path = pending_path("searcher", kvk, flags)
     if not path.exists():
         return False
+    if already_researched(kvk):
+        # The Robot found this company while the Searcher was still busy: move on, don't stop.
+        discard_superseded(path, kvk)
+        return True
     try:
         # apply_result runs the precheck that creates the hash-bound draft; no second precheck.
         # The precheck writes nothing, so only the write step checks the dashboard switch.
@@ -536,7 +580,7 @@ def run_searcher_pipeline(apply_lock: threading.Lock) -> None:
                             break
                         kvk = str(company["kvk_nummer"])
                         path = pending_path("searcher", kvk, flags)
-                        if kvk in in_flight or path.exists():
+                        if kvk in in_flight or path.exists() or robot_busy(kvk):
                             continue
                         in_flight[kvk] = pool.submit(luna_search_one, company, flags, False)
                 if apply_searcher_head({"bedrijven": window}, flags, apply_lock):
