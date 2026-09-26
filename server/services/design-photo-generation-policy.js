@@ -8,8 +8,9 @@ function normalizeWebdesignVariant() {
   return WEBDESIGN_VARIANT_V2;
 }
 
-function buildWebdesignPipelineOptions({ source, company = '', domain = '' }) {
+function buildWebdesignPipelineOptions({ source, company = '', domain = '', designConcept = '' }) {
   return {
+    designConcept,
     allowScanFallback: true,
     imageSize: '1024x1536',
     disableReferenceImages: false,

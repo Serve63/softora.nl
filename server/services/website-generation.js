@@ -204,6 +204,11 @@ function createWebsiteGenerationHelpers(deps = {}) {
         ? `Er zijn ${referenceImageCount} referentiebeeld(en) meegegeven; gebruik die als verplichte referentie voor de bestaande merkkleuren en als inspiratie voor sfeer en doelgroep.`
         : '',
       formatWebsitePreviewCustomerIdentityLock(),
+      ({
+        editorial: 'ONTWERPRICHTING EDITORIAL: gebruik een asymmetrische split-hero, grote redactionele koppen en afwisselende beeld-tekstsecties.',
+        minimal: 'ONTWERPRICHTING MINIMAL: gebruik een gecentreerde typografische hero, royale witruimte, fijne lijnen en rustige verticaal opgebouwde secties.',
+        expressive: 'ONTWERPRICHTING EXPRESSIEF: gebruik een beeldgedreven hero met overlappende typografie, speelse geometrische vormen en verspringende contentvlakken in de bestaande merkkleuren.',
+      })[scan.designConcept] || '',
       formatWebsitePreviewBrandColorLock(scan),
       'Genereer een volledig nieuw ultra-premium full-page desktop homepage-concept waarbij de aangeleverde screenshot de bestaande merkkleuren vastlegt en context geeft voor branche, contentbasis, sfeer en doelgroep; ontwerp vanaf nul een radicaal andere Awwwards-level website met een totaal nieuwe informatiearchitectuur, geen herkenbare kopie van layout, hero, sectievolgorde, grids, kaartenrijen, iconenblokken, USP-blokken of footerstructuur, en creëer in plaats daarvan een rustige, ruimtelijke, branche-passende editorial compositie met veel negative space, sterke visual hierarchy, hoogwaardige beeldregie, asymmetrische layout, subtiele diepte, verfijnde CTA’s, premium typografie en maximaal 5 grote ademende contentmomenten.',
       'NIEUW-DESIGN REGEL: maak nooit een letterlijke screenshot, crop, browserweergave of bijna-kopie van de huidige website. De output moet zichtbaar een nieuw ontworpen homepage zijn met eigen compositie, nieuwe sectie-opbouw, vernieuwde visuele hiërarchie en herkenbare merkstijl met dezelfde kleurfamilies. Creatieve vrijheid geldt voor de vormgeving; behoud de bestaande kleuridentiteit.',
