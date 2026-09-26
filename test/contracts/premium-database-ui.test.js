@@ -7059,7 +7059,7 @@ test('informational database banners stay hidden while actionable errors remain 
   const source = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
   const body = source.match(/function setStatusMessage\(message, tone, autoClear\) \{([\s\S]*?)\n        \}/)[1];
   const banner = { textContent: '', dataset: {}, classList: { remove() { this.visible = false; }, add() { this.visible = true; } } };
-  const show = new Function('state', 'nodes', 'message', 'tone', 'autoClear', body);
+  const show = vm.runInNewContext('(function (state, nodes, message, tone, autoClear) {' + body + '})', {});
   show({}, { statusBanner: banner }, 'FrosIT · €0,04', 'info', false);
   assert.equal(banner.textContent, '');
   assert.equal(banner.classList.visible, false);
