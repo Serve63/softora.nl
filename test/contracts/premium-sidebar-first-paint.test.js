@@ -41,7 +41,7 @@ for (const fileName of modulePages) {
     assert.match(res.body, /scrollbar-gutter:auto !important/);
     assert.match(res.body, /premium-sidebar-mobile\.css\?v=/);
     assert.doesNotMatch(res.body, /premium-sidebar-links\.js\?v=20260818a/);
-    assert.match(res.body, /premium-sidebar-links\.js\?v=20260922-design" defer blocking="render"/);
+    assert.match(res.body, /premium-sidebar-links\.js\?v=20260927-locked" defer blocking="render"/);
     assert.match(res.body, /function prefillPremiumSidebarActiveState/);
   });
 }
@@ -151,7 +151,7 @@ test('empty module hosts receive their correct active item from the server', () 
   const session = { authenticated: true, role: 'admin' };
   for (const [file, key] of [['premium-samenvatten.html', 'summarize'], ['premium-world-watcher.html', 'settings'], ['premium-lead-radar-shell.html', 'lead_radar']]) {
     const output = render('<aside class="sidebar"></aside>', session, file);
-    const active = output.match(/<a\b[^>]*class="sidebar-link magnetic active"[^>]*data-sidebar-key="([^"]+)"/);
+    const active = output.match(/<a\b[^>]*class="sidebar-link magnetic active(?: sidebar-link--coming-soon)?"[^>]*data-sidebar-key="([^"]+)"/);
     assert.equal(active?.[1], key);
   }
 });

@@ -457,7 +457,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.ok(comingSoonSetMatch, 'coming soon set hoort expliciet te blijven bestaan');
   assert.doesNotMatch(comingSoonSetMatch[1], /"seo"/);
   assert.match(comingSoonSetMatch[1], /"qr_code"/);
-  assert.doesNotMatch(comingSoonSetMatch[1], /"ads_facebook"/);
+  assert.match(comingSoonSetMatch[1], /"ads_facebook"/);
   assert.match(themeJsSource, /function activateFacebookAdsSidebarLink\(sidebar\)/);
   assert.match(themeJsSource, /activateFacebookAdsSidebarLink\(sidebar\)/);
   assert.match(themeJsSource, /filterPremiumSidebarLinksForSession\(/);
@@ -524,8 +524,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260922-design'/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260922-design'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260927-locked'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260927-locked'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909b'/);
@@ -1448,4 +1448,20 @@ test('dashboard owns refresh lifetime while preserving the existing sidebar shel
   assert.match(refreshSource, /root\.removeEventListener\('focus', refreshWhenVisible\)/);
   assert.match(refreshSource, /root\.document\.removeEventListener\('visibilitychange', refreshWhenVisible\)/);
   assert.match(pageSource, /if \(!isCurrent\(\)\) return false;/);
+});
+
+
+test('Lead Radar, Facebook ads and Google ads use the shared disabled sidebar state', () => {
+  const links = require('../../assets/premium-sidebar-links');
+  const sections = links.getPremiumSidebarSections({ authenticated: true, role: 'admin' });
+  for (const key of ['lead_radar', 'ads_facebook', 'ads_google']) {
+    const link = sections.flatMap(section => section.links).find(link => link.key === key);
+    assert.ok(link);
+    const rendered = links.renderSidebarLink(link, 'dashboard');
+    assert.match(rendered, /sidebar-link--coming-soon/);
+    assert.match(rendered, /aria-disabled="true" tabindex="-1"/);
+    assert.match(rendered, /sidebar-link-lock/);
+  }
+  assert.match(readRepoFile('assets/personnel-theme.js'), /function activateFacebookAdsSidebarLink\(sidebar\) \{ if \(PREMIUM_SIDEBAR_COMING_SOON_KEYS.has\("ads_facebook"\)\) return;/);
+  assert.match(readRepoFile('assets/premium-sidebar-profile-prefill.js'), /sharedLinks.COMING_SOON_KEYS.indexOf\(link.key\)/);
 });
