@@ -281,5 +281,10 @@ test('preview title stays on one line beside the download button', () => {
 
 test('library actions and download-name scripts invalidate cached browser versions together', () => {
   assert.match(websiteGeneratorHtmlSource, /premium-websitegenerator-ui-state\.js\?v=20260926-download-names/);
-  assert.match(websiteGeneratorHtmlSource, /premium-websitegenerator\.js\?v=20260926-library-actions/);
+  assert.match(websiteGeneratorHtmlSource, /premium-websitegenerator\.js\?v=20260926-library-domain/);
+});
+
+
+test('library displays the site name without the www prefix', () => {
+  assert.ok(websiteGeneratorScriptSource.includes("const host = String(entry.hostname || '—').replace(/^www\\./i, '');"));
 });
