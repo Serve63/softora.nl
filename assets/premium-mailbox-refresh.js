@@ -141,7 +141,7 @@
         } else if (state.status === 'recovering') {
           ageLabel.textContent = 'Verbindingsfout · opnieuw proberen';
         } else {
-          ageLabel.textContent = age ? `${age} gecontroleerd` : 'Nog niet gecontroleerd';
+          ageLabel.textContent = age || 'Nog niet gecontroleerd';
         }
         ageLabel.setAttribute('title', statusText);
         ageLabel.setAttribute('aria-label', statusText);
