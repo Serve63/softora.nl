@@ -111,6 +111,17 @@ async function savePreviewToLibrary({ dataUrl, url, hostname, fileName, width, h
   showToast('Log eerst in om previews centraal op te slaan.');
 }
 
+function createLibraryThumbImage(src) {
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = '';
+  img.loading = 'lazy';
+  img.decoding = 'async';
+  img.width = 200;
+  img.height = 300;
+  return img;
+}
+
 function createLibraryCardElement(entry) {
   const id = String(entry?.id || '').trim();
   const when = entry.createdAt
@@ -132,31 +143,21 @@ function createLibraryCardElement(entry) {
 
   const thumbWrap = document.createElement('div');
   thumbWrap.className = 'library-thumb-wrap';
-  const thumbSrc = isSafeLibraryDataUrl(entry.dataUrl) ? entry.dataUrl : '';
+  const thumbSrc = [entry.thumbDataUrl, entry.dataUrl].find(isSafeLibraryDataUrl) || '';
   if (thumbSrc) {
-    const img = document.createElement('img');
-    img.src = thumbSrc;
-    img.alt = '';
-    img.loading = 'lazy';
-    img.width = 200;
-    img.height = 300;
-    thumbWrap.appendChild(img);
+    thumbWrap.appendChild(createLibraryThumbImage(thumbSrc));
   } else if (entry.imageDeferred) {
     appendWebsiteGeneratorTextElement(thumbWrap, 'span', '', 'Afbeelding laden…');
     const observer = new IntersectionObserver((records) => {
       if (!records.some((record) => record.isIntersecting)) return;
       observer.disconnect();
       void fetchLibraryEntryById(id).then((full) => {
-        if (!isSafeLibraryDataUrl(full?.dataUrl)) {
+        const src = [full?.thumbDataUrl, full?.dataUrl].find(isSafeLibraryDataUrl);
+        if (!src) {
           thumbWrap.textContent = 'Klik om de afbeelding te openen';
           return;
         }
-        const img = document.createElement('img');
-        img.src = full.dataUrl;
-        img.alt = '';
-        img.width = 200;
-        img.height = 300;
-        thumbWrap.replaceChildren(img);
+        thumbWrap.replaceChildren(createLibraryThumbImage(src));
       });
     });
     observer.observe(thumbWrap);
