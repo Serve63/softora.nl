@@ -95,7 +95,7 @@ test('Robot v5 can be enabled without an API key or paid budget reservation', as
   assert.equal(res.body.state.workers.robot.enabled, true);
 });
 
-test('robot control keeps evidence review separate from approved inventory', () => {
+test('robot writes only its own usable finds, via the guarded import, never via a paid route', () => {
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
   const runner = fs.readFileSync(path.join(root, 'scripts/kvk_robot_v5.py'), 'utf8');
   assert.match(page, /id="kvk-api-robot-toggle"/);
@@ -107,6 +107,11 @@ test('robot control keeps evidence review separate from approved inventory', () 
   assert.match(runner, /mode=ro/);
   assert.match(runner, /os\.killpg/);
   assert.doesNotMatch(runner, /contact_validate_apply|\/research|api\.openai/);
+  assert.match(runner, /import_find\(DB, find\)/);
+  const importer = fs.readFileSync(path.join(root, 'scripts/kvk_robot_import.py'), 'utf8');
+  assert.match(importer, /WHERE kvk_nummer=\? AND lead_status='unresearched'/);
+  const workers = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
+  assert.match(workers, /variants = \["searcher"\] if role == "searcher" else \["controller-unusable"\]/);
 });
 
 test('worker dialog shows real spend and only Aan or Uit for worker status', () => {

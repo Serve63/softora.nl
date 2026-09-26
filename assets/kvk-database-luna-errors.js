@@ -120,16 +120,22 @@
     const head = documentRef.getElementById('latest-luna-errors-table-head');
     const body = documentRef.getElementById('latest-luna-errors-table-body');
 
+    let renderedHead = null;
+    let renderedBody = null;
+
     function render() {
       if (!head || !body) return;
-      head.innerHTML = tableHeaderHtml();
       const snapshot = getSnapshot();
       const activities = Array.isArray(snapshot?.latestTreated)
         ? snapshot.latestTreated.slice(0, 10)
         : [];
-      body.innerHTML = activities.length
+      const headHtml = tableHeaderHtml();
+      const bodyHtml = activities.length
         ? activities.map(activityRowHtml).join('')
         : '<tr class="empty-row"><td colspan="8">Nog geen nieuwe onderzoeksresultaten of Controleur-correcties.</td></tr>';
+      // Rewriting unchanged rows every second would clear any text the user is selecting.
+      if (headHtml !== renderedHead) head.innerHTML = renderedHead = headHtml;
+      if (bodyHtml !== renderedBody) body.innerHTML = renderedBody = bodyHtml;
     }
 
     return { render };
@@ -138,7 +144,7 @@
   function start(deps = {}) {
     const controller = createController(deps);
     controller.render();
-    deps.window.setInterval(controller.render, 1000);
+    deps.window.setInterval(() => { if (!deps.window.SoftoraKvkSelectionPause?.isSelecting()) controller.render(); }, 1000);
     deps.window.addEventListener('focus', controller.render);
     deps.document.addEventListener('visibilitychange', () => {
       if (!deps.document.hidden) controller.render();

@@ -213,8 +213,8 @@ test('a truly empty canonical planning stays empty rather than retaining fabrica
 
 test('both changed browser assets have fresh cache keys and preserve script ordering', () => {
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
-  const coreUrl = '/assets/kvk-database.js?v=20260924-review-status';
-  const fastUrl = '/assets/kvk-database-fast-progress.js?v=20260915b-planning-sync';
+  const coreUrl = '/assets/kvk-database.js?v=20260927-copyable';
+  const fastUrl = '/assets/kvk-database-fast-progress.js?v=20260927-copyable';
   assert.ok(page.includes(coreUrl));
   assert.ok(page.includes(fastUrl));
   assert.ok(page.indexOf(coreUrl) < page.indexOf(fastUrl));
