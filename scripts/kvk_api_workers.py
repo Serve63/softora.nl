@@ -33,7 +33,7 @@ LOCK = ROOT / "data" / "kvk_api_workers.lock"
 MODEL_LABEL = "Luna 6 Max"
 CODEX_LABEL = "Codex"
 # Codex Searchers use the ChatGPT subscription: same instructions, same model, no API budget.
-CODEX_BIN = os.environ.get("SOFTORA_CODEX_BIN") or shutil.which("codex") or "/Applications/ChatGPT.app/Contents/Resources/codex"
+CODEX_BIN = "/Applications/ChatGPT.app/Contents/Resources/codex"
 CODEX_MODEL = "gpt-6-luna"
 CODEX_TIMEOUT_SECONDS = 900
 MAX_REPAIR_ATTEMPTS = 3
