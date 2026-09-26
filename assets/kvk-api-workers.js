@@ -9,10 +9,15 @@
     searcher: { count: document.getElementById('kvk-api-searcher-count'), button: document.getElementById('kvk-api-searcher-toggle'), status: document.getElementById('kvk-api-searcher-status') },
     controller: { count: document.getElementById('kvk-api-controller-count'), button: document.getElementById('kvk-api-controller-toggle'), status: document.getElementById('kvk-api-controller-status') },
   };
+  const engine = document.getElementById('kvk-api-searcher-engine');
   controls.robot = { button: document.getElementById('kvk-api-robot-toggle'), status: document.getElementById('kvk-api-robot-status') };
   let state = null;
   let busy = false;
   let revision = 0;
+
+  function usesApi(role) {
+    return role === 'controller' || (role === 'searcher' && state.workers.searcher.engine !== 'codex');
+  }
 
   function render() {
     if (!state) return;
@@ -25,8 +30,13 @@
       }
       control.button.setAttribute('aria-pressed', String(worker.enabled));
       control.button.textContent = worker.enabled ? 'Uitzetten' : 'Aanzetten';
-      control.button.disabled = busy || (role !== 'robot' && !worker.enabled && (!state.apiKeyConfigured || state.budget.availableEur < (state.budget.reservationEur || 12)));
+      control.button.disabled = busy || (usesApi(role) && !worker.enabled && (!state.apiKeyConfigured || state.budget.availableEur < (state.budget.reservationEur || 12)));
       control.status.textContent = worker.enabled ? 'Aan' : 'Uit';
+    }
+    if (engine) {
+      engine.value = state.workers.searcher.engine === 'codex' ? 'codex' : 'api';
+      // Switching is only possible while the searchers are off.
+      engine.disabled = busy || state.workers.searcher.enabled;
     }
     if (!state.apiKeyConfigured) message.textContent = 'De bestaande API-sleutel is niet beschikbaar op de server.';
     else if (state.budget.availableEur < (state.budget.reservationEur || 12)) message.textContent = 'Budgetruimte is tijdelijk gereserveerd of onvoldoende voor een nieuwe aanvraag.';
@@ -82,5 +92,8 @@
       if (event.key === 'Enter') { event.preventDefault(); control.count.blur(); }
     });
   }
+  engine?.addEventListener('change', () => {
+    if (state && engine.value !== state.workers.searcher.engine) void update('searcher', { engine: engine.value });
+  });
   setInterval(() => { if (dialog.open && !busy) void load(); }, 5000);
 })();

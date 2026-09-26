@@ -98,6 +98,19 @@ class ApiValidationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 execution_for([{}, {'validation_profile': 'api-basic-v1'}], path)
 
+    def test_codex_searcher_results_are_labelled_as_codex(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'result.json'
+            path.write_text('{}')
+            path.with_suffix('.luna.json').write_text('{"engine": "codex"}')
+            result = execution_for([{'validation_profile': 'api-basic-v1'}], path, False)
+            self.assertEqual(result['producer_thread_id'], 'codex:searcher')
+            self.assertEqual(result['display_label'], 'Codex Luna 6 Max')
+            self.assertEqual(activity_labels(False, result['model_role'], result['display_label']),
+                             ('Searcher', 'Codex Luna 6 Max'))
+            # A controller review is always the paid API worker.
+            self.assertEqual(execution_for([{'validation_profile': 'api-basic-v1'}], path, True)['display_label'], 'Luna 6 Max')
+
 
 if __name__ == '__main__':
     unittest.main()

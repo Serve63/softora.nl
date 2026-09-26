@@ -376,3 +376,54 @@ test('Luna Searcher fills a missing contact only from this company\'s own struct
   assert.match(mapper, /own = kvk in identifiers if identifiers else/);
   assert.match(mapper, /if len\(matches\) != 1:/);
 });
+
+test('dashboard lets the searchers run via the API or via Codex', () => {
+  const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
+  assert.match(page, /<select id="kvk-api-searcher-engine"[^>]*>\s*<option value="api">API<\/option>\s*<option value="codex">Codex<\/option>/);
+  const script = fs.readFileSync(path.join(root, 'assets/kvk-api-workers.js'), 'utf8');
+  assert.match(script, /update\('searcher', \{ engine: engine\.value \}\)/);
+});
+
+test('Codex searchers start without an API key or budget and receive the same instructions', async () => {
+  const { SEARCHER_INSTRUCTIONS } = require('../../server/services/kvk-luna-searcher-prompt');
+  const { service, row, writes } = settingsFixture({ spent_eur_cents: 10000 });
+  const res = response();
+  await service.setEnabled({ body: { role: 'searcher', engine: 'codex' } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(writes, [{ searcher_engine: 'codex' }]);
+  assert.equal(res.body.state.workers.searcher.engine, 'codex');
+  const start = response();
+  await service.setEnabled({ body: { role: 'searcher', enabled: true } }, start);
+  assert.equal(start.statusCode, 200);
+  assert.equal(row.searcher_enabled, true);
+  // The controller still uses the paid API and stays blocked without a key.
+  const controller = response();
+  await service.setEnabled({ body: { role: 'controller', enabled: true } }, controller);
+  assert.equal(controller.statusCode, 503);
+  const polled = response();
+  await createKvkApiWorkersService({ getSupabaseClient: () => ({ from() { return {
+    select() { return { eq() { return { single: async () => ({ data: { ...row } }) }; } }; },
+  }; } }), env: {}, kvkDatabaseSyncToken: 'token' }).poll({ headers: { authorization: 'Bearer token' }, body: {} }, polled);
+  assert.equal(polled.body.searcherInstructions, SEARCHER_INSTRUCTIONS);
+  assert.equal(polled.body.state.workers.searcher.engine, 'codex');
+});
+
+test('searcher engine only switches while off and only to API or Codex', async () => {
+  const running = settingsFixture({ searcher_enabled: true });
+  const res = response();
+  await running.service.setEnabled({ body: { role: 'searcher', engine: 'codex' } }, res);
+  assert.equal(res.statusCode, 409);
+  assert.deepEqual(running.writes, []);
+  for (const body of [{ role: 'searcher', engine: 'gemini' }, { role: 'controller', engine: 'codex' }]) {
+    const invalid = settingsFixture();
+    const rejected = response();
+    await invalid.service.setEnabled({ body }, rejected);
+    assert.equal(rejected.statusCode, 400);
+    assert.deepEqual(invalid.writes, []);
+  }
+  const { service } = settingsFixture();
+  const state = response();
+  await service.getStatus({}, state);
+  assert.equal(state.body.state.workers.searcher.engine, 'api');
+  assert.equal(state.body.state.workers.controller.engine, undefined);
+});

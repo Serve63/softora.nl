@@ -121,6 +121,59 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(applied, [company['kvk_nummer'] for company in companies])
         self.assertLessEqual(self.queue_reads, 7)  # 12 companies in windows of 6, not 12+ reads
 
+    def test_codex_searcher_uses_the_same_instructions_and_never_calls_the_paid_api(self):
+        company = {'kvk_nummer': '00000001', 'bedrijfsnaam': 'Voorbeeld B.V.', 'plaats': 'Tilburg'}
+        answer = {'kvk_nummer': '00000001', 'telefoonnummer': ''}
+        with patch.object(runner, 'codex_research', return_value=(answer, ['https://voorbeeld.nl/'])) as codex, \
+                patch.object(runner, 'call') as call, \
+                patch.object(kvk_luna_searcher, 'to_canonical', side_effect=lambda company, *_: company):
+            self.assertTrue(runner.luna_search_one(company, [], False, 'codex', 'INSTRUCTIES'))
+            call.assert_not_called()
+        codex.assert_called_once_with(company, 'INSTRUCTIES')
+        saved = runner.json.loads(runner.pending_path('searcher', '00000001', []).with_suffix('.luna.json').read_text())
+        self.assertEqual((saved['engine'], saved['consulted_urls']), ('codex', ['https://voorbeeld.nl/']))
+
+    def test_codex_answer_for_another_company_is_refused(self):
+        with patch.object(runner, 'codex_research', return_value=({'kvk_nummer': '99999999'}, [])):
+            with self.assertRaisesRegex(RuntimeError, 'juiste onderneming'):
+                runner.luna_search_one({'kvk_nummer': '00000001'}, [], False, 'codex', 'INSTRUCTIES')
+
+    def test_codex_run_passes_the_prompt_and_reads_opened_pages(self):
+        events = '\n'.join([
+            '{"type":"item.completed","item":{"type":"web_search","query":"naam plaats","action":{"type":"search"}}}',
+            '{"type":"item.completed","item":{"type":"web_search","query":"https://voorbeeld.nl/contact","action":{"type":"other"}}}',
+            'geen json',
+        ])
+        def run(command, **kwargs):
+            self.assertIn('--ignore-user-config', command)
+            self.assertIn('web_search=live', command)
+            self.assertIn('gpt-6-luna', command)
+            self.assertTrue(kwargs['input'].startswith('INSTRUCTIES'))
+            self.assertIn('"kvk_nummer": "00000001"', kwargs['input'])
+            Path(command[command.index('-o') + 1]).write_text('Antwoord: {"kvk_nummer":"00000001"}')
+            return types.SimpleNamespace(returncode=0, stdout=events, stderr='')
+        with patch.object(runner.subprocess, 'run', side_effect=run):
+            answer, urls = runner.codex_research({'kvk_nummer': '00000001'}, 'INSTRUCTIES')
+        self.assertEqual((answer, urls), ({'kvk_nummer': '00000001'}, ['https://voorbeeld.nl/contact']))
+
+    def test_codex_pipeline_takes_engine_and_instructions_from_the_dashboard(self):
+        seen = []
+        def call(path, payload, **kwargs):
+            if path == '/poll':
+                return {'state': {'workers': {'searcher': {'enabled': not seen, 'count': 1, 'engine': 'codex'}}},
+                        'searcherInstructions': 'INSTRUCTIES'}
+            return {'ok': True}
+        def search(company, flags, validate, engine, instructions):
+            seen.append((engine, instructions))
+            return True
+        with patch.object(runner, 'call', side_effect=call), patch.object(runner, 'report'), \
+                patch.object(runner, 'next_packet', return_value=({'bedrijven': [{'kvk_nummer': '00000001'}]}, [])), \
+                patch.object(runner, 'luna_search_one', side_effect=search), \
+                patch.object(runner, 'SEARCHER_REFRESH_SECONDS', 0), \
+                patch.object(runner.time, 'sleep'):
+            runner.run_searcher_pipeline(threading.Lock())
+        self.assertEqual(seen, [('codex', 'INSTRUCTIES')])
+
     def test_pipeline_never_exceeds_one_request_with_count_one(self):
         companies = [{'kvk_nummer': f'{i:08}'} for i in range(1, 4)]
         researched, applied, peak = self.run_pipeline(companies, 1, lambda kvk: 0.01)
