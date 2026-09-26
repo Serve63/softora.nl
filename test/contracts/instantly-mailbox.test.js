@@ -983,7 +983,7 @@ test('an old reply restores proven emoji when its HTML omits the complete text q
   await service.syncOwner('martijn');
   const restored = store.rows.find((message) => message.providerMessageId === 'old-emoji-sent');
   assert.equal(restored.providerOriginalBodyAvailable, true);
-  assert.equal(restored.providerQuotedBodyAuditReplyId, 'v1:old-emoji-reply');
+  assert.equal(restored.providerQuotedBodyAuditReplyId, 'v2:old-emoji-reply');
   assert.match(restored.body, /eerlijke mening 😁/u);
   assert.match(restored.body, /📍 Alphen/u);
   assert.equal(requests.some((request) => new URL(request.url).searchParams.get('search') ===
@@ -992,7 +992,7 @@ test('an old reply restores proven emoji when its HTML omits the complete text q
 
 test('a checked unmatched quote waits for a new reply before another audit', () => {
   const sent = { folder: 'sent', originalCampaignOutbound: true,
-    providerOriginalBodyAvailable: false, providerQuotedBodyAuditReplyId: 'v1:first-reply',
+    providerOriginalBodyAvailable: false, providerQuotedBodyAuditReplyId: 'v2:first-reply',
     date: '2026-07-03T05:00:00.000Z' };
   const firstReply = { folder: 'inbox', providerMessageId: 'first-reply',
     date: '2026-07-03T06:00:00.000Z' };
@@ -1311,7 +1311,7 @@ test('active Instantly replies outside the newest 2000-message window are still 
   const audited = store.rows.find((message) => message.providerMessageId === 'outside-window-sent');
   assert.equal(audited.providerOriginalBodyEvidenceKnown, true);
   assert.equal(audited.providerOriginalBodyAvailable, false);
-  assert.equal(audited.providerQuotedBodyAuditReplyId, 'v1:outside-window-received');
+  assert.equal(audited.providerQuotedBodyAuditReplyId, 'v2:outside-window-received');
   assert.equal(
     requests.some((request) => request.url.endsWith('/emails/outside-window-sent')),
     true
@@ -2556,4 +2556,33 @@ test('exact lead source accepts another Instantly account of the same sender pro
     accountEmail: 'martijnven@websoftora.com', recipientEmail: 'prospect@example.org',
   });
   assert.deepEqual(otherProfile, { evidenceKnown: true, available: false, reason: 'identity-mismatch' });
+});
+
+
+test('nested forwarded original preserves delivered emoji with exact sender and body evidence', () => {
+  const providerBody = 'Goedendag,\n\nIk maakte een ontwerp voor jullie website en hoor graag je eerlijke mening. Bekijk het ontwerp via de link.\n\nMet vriendelijke groet,\nServé\nOirschot';
+  const deliveredBody = providerBody.replace('mening.', 'mening. 😁')
+    .replace('link.', 'link. 🎨').replace('\nOirschot', '\n📍 Oirschot');
+  const sent = incoming({ id: 'nested-sent', thread_id: 'nested-thread', campaign_id: 'campaign',
+    eaccount: 'sender@example.com', from_address_email: 'sender@example.com',
+    to_address_email_list: ['recipient@example.org'], body: { text: providerBody },
+    timestamp_email: '2026-09-24T12:33:00Z' });
+  const envelope = '---------- Forwarded message ---------\nVan: Servé <sender@example.com>\nDate: do 24 sep 2026 om 14:33\nSubject: Kleine vraag\nTo: <recipient@example.org>\n\n';
+  const reply = incoming({ id: 'nested-reply', thread_id: 'nested-thread',
+    eaccount: 'sender@example.com', from_address_email: 'alias@example.org',
+    to_address_email_list: ['recipient@example.org', 'sender@example.com'],
+    timestamp_email: '2026-09-25T12:33:00Z',
+    body: { text: 'Bedankt.\n\nOn Thu, 24 Sept 2026 at 17:18, Team <recipient@example.org> wrote:\n\nIntern antwoord.\n\n' + envelope + deliveredBody } });
+  const options = { accountEmail: 'sender@example.com', recipientEmail: 'recipient@example.org' };
+  const result = buildStrictThreadQuotedMessageSource(sent, [reply], options);
+  assert.equal(result.available, true);
+  assert.equal(result.body, deliveredBody);
+  assert.equal(result.auditedReplyId, 'v2:nested-reply');
+  for (const changed of [reply.body.text.replace('Van: Servé <sender@example.com>', 'Van: Ander <other@example.com>'),
+    reply.body.text.replace('eerlijke mening', 'andere mening')]) {
+    assert.equal(buildStrictThreadQuotedMessageSource(sent, [{ ...reply, body: { text: changed } }], options).available, false);
+  }
+  assert.equal(needsQuotedBodyAudit([{ folder: 'sent', originalCampaignOutbound: true,
+    providerOriginalBodyAvailable: false, providerQuotedBodyAuditReplyId: 'v1:nested-reply',
+    date: sent.timestamp_email }, { folder: 'inbox', providerMessageId: 'nested-reply', date: reply.timestamp_email }]), true);
 });
