@@ -107,3 +107,28 @@ test('premium session watchdog limits proactive session polling', () => {
 
   assert.deepEqual(windowRef.__intervals, [300000]);
 });
+
+for (const payload of [null, {}, { ok: false }, { ok: true, configured: false, authenticated: false },
+  { ok: true, authenticated: false, hydrationUnavailable: true }]) {
+  test('session watchdog preserves the page for inconclusive session response ' + JSON.stringify(payload), async () => {
+    const windowRef = loadWatchdogSandbox(async (url) => url === '/api/auth/session'
+      ? { ok: true, status: 200, json: async () => payload }
+      : { ok: false, status: 401 });
+    await windowRef.fetch('/api/ui-state-get?scope=premium_customers_database');
+    assert.equal(windowRef.location.replacedWith, undefined);
+  });
+}
+test('session watchdog preserves the page during a database outage and a malformed response', async () => {
+  for (const response of [{ ok: false, status: 503 },
+    { ok: true, status: 200, json: async () => { throw new SyntaxError('invalid JSON'); } }]) {
+    const windowRef = loadWatchdogSandbox(async (url) => url === '/api/auth/session'
+      ? response : { ok: false, status: 401 });
+    await windowRef.fetch('/api/premium-database/customers');
+    assert.equal(windowRef.location.replacedWith, undefined);
+  }
+});
+
+test('HTML responses load the outage-safe session watchdog with a fresh asset version', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../../server/services/html-pages.js'), 'utf8');
+  assert.match(source, /premium-session-watchdog\.js\?v=20260927a/);
+});
