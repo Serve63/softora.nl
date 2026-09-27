@@ -159,6 +159,10 @@ test('Luna Searcher records mentioned but unkept contacts as rejected for the ca
   assert.match(mapper, /def withhold_unaccepted_contacts/);
   assert.match(mapper, /"reason_code": "unverified_candidate"/);
   assert.match(mapper, /withhold_unaccepted_contacts\(result, reference/);
+  // The same rule for the Controller, and register pages for an empty contact set, keep workers from stalling.
+  const workers = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
+  assert.match(workers, /record_mentioned_contacts\(result, company\)\n\s+save_result\(path, result\)/);
+  assert.match(mapper, /sources \+= registry_sources\(company, sources, open_page\)/);
 });
 
 test('Searcher refills a finished worker at once instead of waiting for the slowest of a batch', () => {

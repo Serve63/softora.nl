@@ -10,6 +10,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from difflib import SequenceMatcher
 from urllib.parse import urlsplit
@@ -251,10 +252,47 @@ def withhold_unaccepted_contacts(result: dict, reference_url: str, identifiers: 
     }
 
 
+def register_slug(value: str) -> str:
+    text = unicodedata.normalize("NFKD", clean(value)).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "-", text.replace(".", "")).strip("-")
+
+
+def registry_urls(company: dict) -> list[str]:
+    kvk = str(company["kvk_nummer"])
+    place = clean(company.get("plaats")) or clean(company.get("adres")).rpartition(",")[2]
+    urls = [f"https://www.liza.nl/nl/{kvk}"]
+    if register_slug(place) and register_slug(company.get("bedrijfsnaam", "")):
+        urls.append(f"https://www.bedrijvenregister.nl/{register_slug(place)}/{register_slug(company['bedrijfsnaam'])}")
+    return urls
+
+
+def registry_sources(company: dict, sources: list[dict], fetch) -> list[dict]:
+    """An empty contact set needs two opened company pages and three recorded checks: open this KVK's
+    public register pages until both hold.
+
+    A register page only counts when it is actually opened and shows this exact KVK number.
+    """
+    kvk = str(company["kvk_nummer"])
+    concrete = [source for source in sources if not SEARCH_URL.search(source["url"])]
+    added = []
+    for url in registry_urls(company):
+        if len(concrete) + len(added) >= 2 and len(sources) + len(added) >= 3:
+            break
+        if any(url_key(url) == url_key(source["url"]) for source in sources):
+            continue
+        page = fetch(url) or ""
+        if kvk in re.sub(r"\D", " ", page).split():
+            added.append({"url": url, "label": "Registerpagina",
+                          "note": f"Registerpagina met KVK {kvk} door de lokale controle geopend; "
+                                  "hiervan is geen contact als bedrijfscontact overgenomen."})
+    return added
+
+
 def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=fetch_page) -> dict:
     kvk = str(company["kvk_nummer"])
     if clean(answer.get("kvk_nummer")) != kvk:
         raise ValueError(f"Luna-antwoord hoort niet bij KVK {kvk}.")
+    open_page = fetch  # `fetch` is narrowed to the pages fetched below
     consulted = {url_key(url) for url in consulted_urls}
     # Fetch every page to verify at once, each only once (phone and e-mail often share one).
     website_url = clean(answer.get("website"))
@@ -311,6 +349,8 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
 
     field_urls = [identity_url, phone_url, email_url, website]
     sources = lead_sources(answer, consulted_urls, [url for url in field_urls if url])
+    if not phone and not email:
+        sources += registry_sources(company, sources, open_page)
     queries = [clean(query) for query in answer.get("zoekopdrachten") or [] if clean(query)]
     dropped = [note for value, note in ((phone, phone_note), (email, email_note)) if not value and note]
     source_urls = [source["url"] for source in sources]

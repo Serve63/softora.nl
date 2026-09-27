@@ -241,6 +241,35 @@ class WorkerTests(unittest.TestCase):
             os.utime(queue / '00000002', (old, old))
             self.assertFalse(runner.robot_busy('00000002'))
 
+    def test_a_contact_the_controller_only_mentions_is_recorded_as_rejected_next_to_its_own(self):
+        result = {'kvk_nummer': '84043784', 'telefoonnummer': '', 'email': '',
+                  'conclusion_note': 'Het eerder genoemde telefoonnummer 06-57201895 hoort bij een andere vestiging.',
+                  'field_evidence': {'telefoonnummer': ''}, 'route_notes': {'identity': {'status': 'checked', 'notes': 'KVK 84043784'}},
+                  'sources': [{'url': 'https://companyinfo.nl/kapsalon', 'note': 'KVK 84043784'}],
+                  'contact_rejections': {'email': [{'value': 'mail@rokven.io', 'reason_code': 'technical_contact'}]}}
+        runner.record_mentioned_contacts(result, {'kvk_nummer': '84043784', 'vestigingsnummer': '000050183036'})
+        self.assertNotIn('06-57201895', result['conclusion_note'])
+        self.assertEqual([item['value'] for item in result['contact_rejections']['telefoonnummer']], ['06-57201895'])
+        self.assertEqual(result['contact_rejections']['email'][0]['reason_code'], 'technical_contact')
+        self.assertIn('KVK 84043784', result['route_notes']['identity']['notes'])  # identifiers are not scrubbed
+
+    def test_an_empty_contact_set_gets_opened_register_pages_that_show_this_kvk(self):
+        company = {'kvk_nummer': '68961375', 'bedrijfsnaam': 'R. Kuijpers Beheer B.V.', 'adres': 'Kerkstraat 1, Berkel-Enschot'}
+        opened = []
+        def fetch(url):
+            opened.append(url)
+            return '<p>KVK 68961375</p>' if 'liza' in url or 'bedrijvenregister' in url else None
+        sources = kvk_luna_searcher.registry_sources(company, [{'url': 'https://www.kvk.nl/bestellen/#/bedrijf/68961375/'}], fetch)
+        self.assertEqual([source['url'] for source in sources], [
+            'https://www.liza.nl/nl/68961375', 'https://www.bedrijvenregister.nl/berkel-enschot/r-kuijpers-beheer-bv'])
+        # A page that does not show this exact KVK number is never added.
+        self.assertEqual(kvk_luna_searcher.registry_sources(company, [], lambda url: 'KVK 12345678'), [])
+        # Enough opened pages already: nothing extra is fetched.
+        opened.clear()
+        enough = [{'url': f'https://bron{i}.nl/bedrijf'} for i in range(3)]
+        self.assertEqual(kvk_luna_searcher.registry_sources(company, enough, fetch), [])
+        self.assertEqual(opened, [])
+
     def test_refused_searcher_answer_is_researched_again_with_the_reason(self):
         company = self.packet['bedrijven'][0]
         path = runner.pending_path('searcher', company['kvk_nummer'], [])
