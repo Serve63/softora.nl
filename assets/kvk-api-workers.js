@@ -23,7 +23,9 @@
       control.button.setAttribute('aria-pressed', String(worker.enabled));
       control.button.textContent = worker.enabled ? 'Uitzetten' : 'Aanzetten';
       control.button.disabled = busy;
-      control.status.textContent = worker.enabled ? 'Aan' : 'Uit';
+      const stateLabel = worker.blocked ? 'Herstel nodig' : worker.enabled ? 'Aan' : 'Uit';
+      const detail = String(worker.message || '').trim();
+      control.status.textContent = detail ? `${stateLabel} · ${detail}` : stateLabel;
     }
   }
 

@@ -8,6 +8,11 @@ const MODEL_LABEL = 'Codex Luna 6 Max';
 const STALE_MS = 120000;
 const ROLES = new Set(['searcher', 'controller', 'robot']);
 
+function validationBlocked(message) {
+  return /^Herstel nodig:/.test(message)
+    || (/^Gestopt:/.test(message) && /na \d+ (?:nieuwe Codex-pogingen|herstelpogingen)/.test(message));
+}
+
 function createKvkApiWorkersService(deps = {}) {
   const getSupabaseClient = deps.getSupabaseClient || (() => null);
   const now = deps.now || (() => new Date());
@@ -51,7 +56,8 @@ function createKvkApiWorkersService(deps = {}) {
       workers: Object.fromEntries([...ROLES].map((role) => [role, {
         enabled: row[`${role}_enabled`] === true,
         count: Number(row[`${role}_count`] || 1),
-        active: isLive(row, role),
+        active: isLive(row, role) && !validationBlocked(String(row[`${role}_message`] || '')),
+        blocked: validationBlocked(String(row[`${role}_message`] || '')),
         heartbeatAt: row[`${role}_heartbeat_at`] || null,
         message: String(row[`${role}_message`] || '').slice(0, 180),
         currentBatch: String(row[`${role}_batch`] || '').slice(0, 100),
@@ -110,8 +116,16 @@ function createKvkApiWorkersService(deps = {}) {
   async function poll(req, res) {
     if (!tokenAllowed(req)) return res.status(401).json({ ok: false, error: 'Ongeldig worker-token.' });
     // The local Codex workers always run the instructions that ship with this server.
-    return handle(res, async () => res.json({ ok: true, state: publicState(await readRow()),
-      searcherInstructions: SEARCHER_INSTRUCTIONS, controllerInstructions: CONTROLLER_INSTRUCTIONS }));
+    return handle(res, async () => {
+      const state = publicState(await readRow());
+      // Keep the user's switch separate from permission to run more model work.
+      // Existing workers already wait when enabled=false in their polling view.
+      for (const worker of Object.values(state.workers)) {
+        if (worker.blocked) worker.enabled = false;
+      }
+      return res.json({ ok: true, state,
+        searcherInstructions: SEARCHER_INSTRUCTIONS, controllerInstructions: CONTROLLER_INSTRUCTIONS });
+    });
   }
 
   async function report(req, res) {
@@ -119,12 +133,14 @@ function createKvkApiWorkersService(deps = {}) {
     return handle(res, async () => {
       const role = String(req.body?.role || '');
       if (!ROLES.has(role)) return res.status(400).json({ ok: false, error: 'Ongeldige werkrol.' });
+      const message = String(req.body?.message || '').slice(0, 180);
+      const blocked = req.body?.halt === true && validationBlocked(message);
       const update = {
         [`${role}_heartbeat_at`]: now().toISOString(),
-        [`${role}_message`]: String(req.body?.message || '').slice(0, 180),
+        [`${role}_message`]: blocked ? message.replace(/^Gestopt:/, 'Herstel nodig:').slice(0, 180) : message,
         [`${role}_batch`]: String(req.body?.currentBatch || '').slice(0, 100),
       };
-      if (req.body?.halt === true) update[`${role}_enabled`] = false;
+      if (req.body?.halt === true && !blocked) update[`${role}_enabled`] = false;
       const { error } = await client().from(TABLE).update(update).eq('id', true);
       if (error) throw error;
       return res.json({ ok: true });

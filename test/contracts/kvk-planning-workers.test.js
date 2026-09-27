@@ -17,10 +17,16 @@ test('marks each role at its planning location, including shared locations', () 
 test('explicit control route overrides the next unfinished stage', () => {
   const state = { ...scraper, contact_parallel_routes: [{ queue_kind: 'global_review', active_location_code: 'c' }] };
   assert.deepEqual(rolesFor(locations[1], locations, state, workers), []);
-  assert.deepEqual(rolesFor(locations[2], locations, state, workers), ['searcher', 'controller']);
+  assert.deepEqual(rolesFor(locations[2], locations, state, workers), ['searcher', 'controller', 'robot']);
 });
-test('unknown and inactive robot locations are never guessed', () => {
-  assert.deepEqual(rolesFor(locations[2], locations, scraper, {}), []);
+test('roles stay visible when workers are off; robot uses its known location or the research head', () => {
+  assert.deepEqual(rolesFor(locations[2], locations, scraper, {}), ['searcher', 'robot']);
   assert.deepEqual(rolesFor(locations[2], locations, scraper, workers, { plaats: 'Plaats', provincie: 'Anders' }), ['searcher']);
   assert.deepEqual(rolesFor(locations[2], locations, scraper, workers, { plaats: 'Plaats', provincie: 'Brabant' }), ['searcher', 'robot']);
+});
+
+test('stopping all three workers keeps all planning markers', () => {
+  const stopped = { searcher: { enabled: false }, controller: { enabled: false }, robot: { active: false } };
+  assert.deepEqual(rolesFor(locations[1], locations, scraper, stopped), ['controller']);
+  assert.deepEqual(rolesFor(locations[2], locations, scraper, stopped, { woonplaatscode: 'c' }), ['searcher', 'robot']);
 });
