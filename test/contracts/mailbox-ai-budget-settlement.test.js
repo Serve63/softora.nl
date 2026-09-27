@@ -483,3 +483,50 @@ test('stale claims outside campaign scope close without refunding uncertain rese
     assert.equal(Number((await db.query('select reserved_micro_usd from softora_mailbox_ai_budget')).rows[0].reserved_micro_usd),600000);
   } finally { await db.close(); }
 });
+
+test('bounded discovery advances through history in 200-row rounds while new replies retain priority', async () => {
+  const db = await database();
+  try {
+    await db.exec(migration);
+    await db.exec(`alter table public.softora_mailbox_messages add column in_reply_to text;
+      alter table public.softora_mailbox_messages add column references_text text;
+      alter table public.softora_mailbox_messages add column recipients_text text;
+      alter table public.softora_mailbox_messages add column subject text;
+      create table public.softora_mailbox_campaign_lineage_members(message_key text,account_email text);
+      create table public.softora_mailbox_campaign_lineage_roots(message_key text,account_email text);
+      create function public.softora_mailbox_message_has_campaign_proof(text,text,text,text,text,text,text,text,text,text,jsonb,text,text default null)
+        returns boolean language sql immutable as $$select $1 like 'campaign-%'$$;
+      update public.softora_mailbox_ai_budget set approved_micro_usd=18000000,include_history=true;
+      insert into public.softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,
+        body_text,has_body,body_truncated,payload)
+        select 'private-'||i,'owner',now()-interval '1 day',now()-interval '1 day'+i*interval '1 second',
+          'inbox','personal@example.nl','Personal',true,false,'{}' from generate_series(1,400) i;
+      insert into public.softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,
+        body_text,has_body,body_truncated,payload,in_reply_to)
+        values ('campaign-old','owner',now()-interval '2 days',now()-interval '2 days',
+          'inbox','reply@example.nl','Old reply',true,false,'{}','<sent@example.nl>');`);
+    for (const file of ['20260923122053_mailbox_ai_campaign_only.sql',
+      '20260923122633_mailbox_ai_campaign_hint.sql',
+      '20260923133902_mailbox_ai_paged_candidates.sql',
+      '20260927000452_bound_mailbox_background_reads.sql'])
+      await db.exec(fs.readFileSync(require.resolve('../../supabase/migrations/'+file),'utf8'));
+    assert.deepEqual((await db.query('select message_key from softora_mailbox_ai_candidates(20)')).rows, []);
+    let cursor = (await db.query('select after_message_key from softora_mailbox_ai_candidate_cursor')).rows[0];
+    assert.equal(cursor.after_message_key, 'private-201');
+    assert.deepEqual((await db.query('select message_key from softora_mailbox_ai_candidates(20)')).rows, []);
+    cursor = (await db.query('select after_message_key from softora_mailbox_ai_candidate_cursor')).rows[0];
+    assert.equal(cursor.after_message_key, 'private-1');
+    assert.deepEqual((await db.query('select message_key from softora_mailbox_ai_candidates(20)')).rows,
+      [{ message_key: 'campaign-old' }]);
+    await db.exec(`insert into public.softora_mailbox_messages(message_key,account_email,created_at,date,folder,sender_email,
+      body_text,has_body,body_truncated,payload,in_reply_to)
+      values ('campaign-new','owner',now(),now(),'inbox','reply@example.nl','New reply',true,false,'{}','<sent@example.nl>');`);
+    assert.ok((await db.query('select message_key from softora_mailbox_ai_candidates(20)')).rows
+      .some(row => row.message_key === 'campaign-new'));
+    await db.exec('update public.softora_mailbox_ai_budget set approved_micro_usd=reserved_micro_usd+299999');
+    assert.deepEqual((await db.query('select message_key from softora_mailbox_ai_candidates(20)')).rows, []);
+    await db.exec('set role anon');
+    await assert.rejects(db.query('select * from public.softora_mailbox_ai_candidate_cursor'), /permission denied/);
+    await assert.rejects(db.query('select * from public.softora_mailbox_ai_candidates(20)'), /permission denied/);
+  } finally { await db.close(); }
+});
