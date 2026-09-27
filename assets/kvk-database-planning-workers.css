@@ -1,0 +1,18 @@
+.planning-panel .location-button.is-worker-active {
+  background: #faf3f7;
+  box-shadow: inset 4px 0 #8e2f5f;
+}
+.planning-worker-label {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #f0dfe9;
+  color: #7b2852;
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.planning-worker-label.is-controller { background: #fff0db; color: #975b19; }
+.planning-worker-label.is-robot { background: #e0edef; color: #326872; }
