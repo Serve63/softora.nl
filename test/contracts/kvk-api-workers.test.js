@@ -49,7 +49,7 @@ function settingsFixture(overrides = {}) {
     select() { return { eq() { return { single: async () => ({ data: { ...row } }) }; } }; },
     update(changes) { return { async eq() { writes.push(changes); Object.assign(row, changes); return { error: null }; } }; },
   }; } };
-  return { row, writes, service: createKvkApiWorkersService({ getSupabaseClient: () => client, env: {} }) };
+  return { row, writes, service: createKvkApiWorkersService({ getSupabaseClient: () => client, kvkDatabaseSyncToken: 'test-worker-token', env: {} }) };
 }
 
 test('count changes persist independently without enabling either role or requiring an API key', async () => {
@@ -124,13 +124,14 @@ test('robot and searchers never research the same company twice', () => {
   assert.match(workers, /if already_researched\(kvk\):\n\s+# The Robot found this company[^\n]*\n\s+discard_superseded\(path, kvk\)\n\s+return True/);
 });
 
-test('worker dialog shows real spend and only Aan or Uit for worker status', () => {
+test('worker dialog shows worker errors instead of hiding the reason behind Aan or Uit', () => {
   const js = fs.readFileSync(path.join(root, 'assets/kvk-api-workers.js'), 'utf8');
   const css = fs.readFileSync(path.join(root, 'assets/kvk-database-redesign.css'), 'utf8');
   assert.doesNotMatch(js, /spentEur \+ state\.budget\.reservedEur/);
   assert.doesNotMatch(js, /reservationLabel|gereserveerd`/);
-  assert.match(js, /control\.status\.textContent = worker\.enabled \? 'Aan' : 'Uit'/);
-  assert.doesNotMatch(js, /worker\.message/);
+  assert.match(js, /worker\.blocked \? 'Herstel nodig'/);
+  assert.match(js, /control\.status\.textContent = detail/);
+  assert.match(js, /worker\.message/);
   const html = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
   assert.doesNotMatch(html, /kvk-api-workers-reserved/);
   assert.doesNotMatch(js, /'aangezet' : 'uitgezet'/);
@@ -254,4 +255,40 @@ test('the local Codex workers receive searcher and controller instructions from 
   const runner = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
   assert.doesNotMatch(runner, /call\("\/research"/);
   assert.match(runner, /"--ignore-user-config", "--ephemeral"/);
+});
+
+for (const [role, failure] of [
+  ['searcher', 'Gestopt: 12345678: na 2 nieuwe Codex-pogingen weigert de database het antwoord nog'],
+  ['controller', 'Gestopt: 87654321: na 3 herstelpogingen nog onvolledig; bewijs bewaard.'],
+]) {
+  test(`${role} validation exhaustion preserves the switch but blocks further worker requests`, async () => {
+    const { service, row } = settingsFixture({ [`${role}_enabled`]: true });
+    const headers = { authorization: 'Bearer test-worker-token' };
+    await service.report({ headers, body: { role, message: failure, halt: true } }, response());
+    assert.equal(row[`${role}_enabled`], true);
+    const status = response();
+    await service.getStatus({}, status);
+    assert.equal(status.body.state.workers[role].enabled, true);
+    assert.equal(status.body.state.workers[role].blocked, true);
+    assert.equal(status.body.state.workers[role].active, false);
+    assert.match(status.body.state.workers[role].message, /^Herstel nodig:/);
+    const poll = response();
+    await service.poll({ headers }, poll);
+    assert.equal(poll.body.state.workers[role].enabled, false);
+    assert.equal(row[`${role}_enabled`], true);
+    await service.setEnabled({ body: { role, enabled: false } }, response());
+    assert.equal(row[`${role}_enabled`], false);
+    await service.setEnabled({ body: { role, enabled: true } }, response());
+    const restarted = response();
+    await service.poll({ headers }, restarted);
+    assert.equal(restarted.body.state.workers[role].enabled, true);
+    assert.equal(restarted.body.state.workers[role].blocked, false);
+  });
+}
+
+test('ordinary worker halts and manual stops still turn the switch off', async () => {
+  const { service, row } = settingsFixture({ searcher_enabled: true });
+  await service.report({ headers: { authorization: 'Bearer test-worker-token' },
+    body: { role: 'searcher', halt: true, message: 'Lokale werker gereed; wacht op handmatige start.' } }, response());
+  assert.equal(row.searcher_enabled, false);
 });

@@ -27,9 +27,9 @@
       : normalized(robot.woonplaats || robot.plaats) === normalized(location.woonplaats)
         && normalized(robot.provincie) === normalized(location.provincie));
     return [
-      status.searcher?.enabled && code === searchCode ? 'searcher' : '',
-      status.controller?.enabled && code === reviewHead ? 'controller' : '',
-      status.robot?.active && robotMatches ? 'robot' : '',
+      code === searchCode ? 'searcher' : '',
+      code === reviewHead ? 'controller' : '',
+      (robotMatches || (!robot && code === searchCode)) ? 'robot' : '',
     ].filter(Boolean);
   }
 
@@ -47,10 +47,12 @@
       if (!payload.ok || !payload.state?.workers) return;
       workers = payload.state.workers;
       const kvk = workers.robot?.currentBatch;
-      robotLocation = null;
-      if (workers.robot?.active && /^\d{8}$/.test(kvk || '')) {
+      if (/^\d{8}$/.test(kvk || '')) {
         const directory = await fetch(`/api/kvk-database/company-directory?q=${encodeURIComponent(kvk)}&limit=10&categorie=all`, { cache: 'no-store', credentials: 'same-origin' });
-        if (directory.ok) robotLocation = (await directory.json()).rows?.find(row => String(row.kvk_nummer) === kvk) || null;
+        if (directory.ok) {
+          const location = (await directory.json()).rows?.find(row => String(row.kvk_nummer) === kvk);
+          if (location) robotLocation = location;
+        }
       }
       if (!window.SoftoraKvkSelectionPause?.isSelecting()) renderLocationList();
     } catch {
