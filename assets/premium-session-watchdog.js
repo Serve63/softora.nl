@@ -67,7 +67,9 @@
         });
         if (!response.ok) return false;
         var payload = await response.json().catch(function () { return null; });
-        if (!payload || payload.authenticated !== true) {
+        // An unreadable or unavailable session response is not proof of logout.
+        if (!payload || payload.ok !== true || payload.configured === false || payload.hydrationUnavailable) return false;
+        if (payload.authenticated === false) {
           redirectToLogin();
           return false;
         }
