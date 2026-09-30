@@ -377,3 +377,9 @@ test('both worker roles use per-result streaming with guarded completion order',
   assert.doesNotMatch(work, /research_batch/);
   assert.match(runner, /child_env\["SOFTORA_KVK_COMPLETION_ORDER"\] = "1"/);
 });
+
+test('validated drafts carry producer metadata before canonical apply', () => {
+  const source = fs.readFileSync(path.join(root, 'scripts/contact_validate_apply.py'), 'utf8');
+  assert.ok(source.indexOf('copy_execution_metadata(args.source, draft)') < source.indexOf('research.command_apply(apply_args)'));
+  assert.match(source, /precheck\.validated_draft_path\(args\.source\)/);
+});
