@@ -315,8 +315,7 @@ test('report persists a complete validation failure and poll keeps the worker pa
   assert.equal(res.body.state.workers.controller.blocked, true);
 });
 
-test('dialog renders a single error prefix and distinguishes stale workers from running workers', async () => {
-  const vm = require('node:vm');
+test('dialog renders a single error prefix and distinguishes stale workers from running workers', async (t) => {
   const elements = new Map();
   const element = (id) => {
     if (!elements.has(id)) elements.set(id, { textContent: '', value: '', events: {},
@@ -329,10 +328,16 @@ test('dialog renders a single error prefix and distinguishes stale workers from 
     controller: { enabled: true, active: false, message: '' },
     robot: { enabled: true, active: true, message: 'Onderzoekt bedrijf' },
   };
-  vm.runInNewContext(fs.readFileSync(path.join(root, 'assets/kvk-api-workers.js'), 'utf8'), {
-    document: { getElementById: element }, setInterval() {},
-    fetch: async () => ({ ok: true, json: async () => ({ ok: true, state: { workers } }) }),
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { getElementById: element } });
+  t.after(() => {
+    if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument);
+    else delete globalThis.document;
+    delete require.cache[require.resolve('../../assets/kvk-api-workers.js')];
   });
+  t.mock.method(globalThis, 'setInterval', () => {});
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ ok: true, state: { workers } }) }));
+  require('../../assets/kvk-api-workers.js');
   element('kvk-api-workers-open').events.click();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(element('kvk-api-searcher-status').textContent, 'Herstel nodig · Bewijs ontbreekt');
