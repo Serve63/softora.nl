@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { directoryDossier } = require('./kvk-directory-candidates');
 
 const DIRECTORY_TABLE = 'softora_kvk_company_directory';
 const UNUSED_DIRECTORY_VIEW = 'softora_kvk_unused_company_directory';
@@ -239,6 +240,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
       sync_generation: generation,
       source_updated_at: normalizeTimestamp(row?.source_updated_at || row?.updated_at),
       synced_at: now().toISOString(),
+      research_dossier: directoryDossier(row),
     };
     normalized.search_text = normalizedSearchValue(
       [
@@ -265,7 +267,9 @@ function createKvkCompanyDirectoryService(deps = {}) {
     if (!client) return { ok: false, error: 'Supabase is niet geconfigureerd.' };
     let request = client
       .from(directoryReadRelation(category))
-      .select(DIRECTORY_SELECT_COLUMNS)
+      // Usable inventory uses the existing view and cannot contain uncertain matches.
+      .select(UNUSED_CATEGORIES.has(normalizeCategory(category))
+        ? DIRECTORY_SELECT_COLUMNS : `${DIRECTORY_SELECT_COLUMNS},research_dossier`)
       .order('source_company_id', { ascending: true })
       .limit(limit + 1);
     request = applyDirectoryCategoryFilter(request, normalizeCategory(category));

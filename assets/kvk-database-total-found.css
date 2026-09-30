@@ -256,6 +256,42 @@
 
 .company-directory .company-status.is-pending {
   min-width: 96px;
+  max-width: 100%;
+  height: auto;
+  min-height: 20px;
+  padding: 4px 8px;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.company-directory .candidate-contact,
+.company-directory .candidate-details-row td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-transform: none;
+  line-height: 1.5;
+}
+
+.company-directory .candidate-contact + .candidate-contact,
+.company-directory .candidate-explanation {
+  margin-top: 10px;
+}
+
+.company-directory .candidate-contact a,
+.company-directory .candidate-explanation a {
+  color: var(--accent-dark);
+}
+
+.company-directory .candidate-contact small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 600;
+}
+
+.company-directory .candidate-details-row summary {
+  cursor: pointer;
+  color: var(--muted);
 }
 
 .company-directory .company-status.is-usable {

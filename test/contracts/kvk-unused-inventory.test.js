@@ -43,6 +43,7 @@ test('only the three unused categories read the destination-filtered view, for b
       ? UNUSED_DIRECTORY_VIEW : DIRECTORY_TABLE;
     assert.equal(calls.length, 2);
     assert.deepEqual(calls.map(call => call.table), [expected, expected]);
+    assert.equal(calls[0].columns.includes('research_dossier'), expected === DIRECTORY_TABLE);
     assert.deepEqual(calls[1].options, { count: 'exact', head: true });
     assert.deepEqual(calls[0].filters.filter(f => f[0] !== 'gt'), calls[1].filters);
     assert.deepEqual(calls[0].order, ['source_company_id', { ascending: true }]);
