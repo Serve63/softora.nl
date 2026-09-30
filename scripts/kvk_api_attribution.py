@@ -1,8 +1,19 @@
 """Producer attribution for API results and honest dashboard role labels."""
 import hashlib
 import json
+import shutil
 from pathlib import Path
 from kvk_api_validation import PROFILE
+
+
+def copy_execution_metadata(source, draft):
+    """Carry producer metadata to the hash-validated draft without changing its bytes."""
+    for suffix in ('.luna.json', '.engine.json'):
+        origin, target = Path(source).with_suffix(suffix), Path(draft).with_suffix(suffix)
+        if origin.exists():
+            shutil.copyfile(origin, target)
+        else:
+            target.unlink(missing_ok=True)
 
 
 def engine_for(path):
@@ -59,3 +70,20 @@ def activity_labels(is_controller, model_role, researcher):
     if role.startswith('searcher_'):
         return 'Searcher', model
     return 'Onbekend', model
+
+
+def patched_dashboard_source(source):
+    """Include actual Codex producer roles in the existing recent-activity query."""
+    start = source.index('def latest_treated_query(')
+    end = source.index('\ndef ', start + 4)
+    query = source[start:end]
+    for role in ('searcher', 'controller'):
+        old = "'" + role + "_luna_max'"
+        new = old + ", '" + role + "_codex_luna_max', '" + role + "_codex_luna_xhigh'"
+        if new not in query:
+            if old not in query:
+                raise ValueError('Recent-activity query changed; inspect before installing')
+            query = query.replace(old, new)
+    result = source[:start] + query + source[end:]
+    compile(result, 'serve_dashboard.py', 'exec')
+    return result
