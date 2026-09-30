@@ -25,10 +25,18 @@ def execution_for(results, path, is_review=False):
         raise ValueError('Meng geen API- en native-resultaten in dezelfde batch')
     role = 'controller' if is_review else 'searcher'
     if engine_for(path) == 'codex':
+        effort = 'max'  # Older saved results retain their original model label.
+        try:
+            saved = json.loads(Path(path).with_suffix('.luna.json').read_text())
+            if saved.get('model') == 'gpt-6-luna' and saved.get('reasoning_effort') in ('max', 'xhigh'):
+                effort = saved['reasoning_effort']
+        except (OSError, ValueError, AttributeError):
+            pass
+        label = 'Codex Luna 6 ' + ('Max' if effort == 'max' else effort)
         return {
             'producer_thread_id': 'codex:' + role,
-            'model': 'gpt-6-luna', 'reasoning_effort': 'max',
-            'display_label': 'Codex Luna 6 Max', 'model_role': role + '_codex_luna_max',
+            'model': 'gpt-6-luna', 'reasoning_effort': effort,
+            'display_label': label, 'model_role': role + '_codex_luna_' + effort,
             'input_sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest(),
         }
     return {

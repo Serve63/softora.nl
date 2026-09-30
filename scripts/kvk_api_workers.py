@@ -395,7 +395,9 @@ def luna_search_one(company: dict, flags: list[str], validate: bool = True) -> b
             busy.unlink(missing_ok=True)
         if not isinstance(answer, dict) or str(answer.get("kvk_nummer")) != kvk:
             raise RuntimeError("Codex gaf geen geldig antwoord voor de juiste onderneming terug.")
-        save_result(answer_path, {"answer": answer, "consulted_urls": consulted, "engine": "codex"})
+        save_result(answer_path, {"answer": answer, "consulted_urls": consulted, "engine": "codex",
+                                  "model": CODEX_MODELS["searcher"][0],
+                                  "reasoning_effort": CODEX_MODELS["searcher"][1]})
     if not path.exists():
         # The apply step only picks up a queue head whose mapped result exists.
         saved = json.loads(answer_path.read_text())
