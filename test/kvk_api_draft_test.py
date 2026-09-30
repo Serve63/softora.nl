@@ -19,7 +19,8 @@ class DraftAttributionTest(unittest.TestCase):
             with self.subTest(review=review), tempfile.TemporaryDirectory() as folder:
                 source, draft = Path(folder)/'source.json', Path(folder)/'draft.json'
                 source.write_text('{}'); draft.write_text('[{"validation_profile":"api-basic-v1"}]')
-                source.with_suffix(suffix).write_text(json.dumps(dict(engine='codex', model='gpt-6-luna', reasoning_effort='xhigh')))
+                family = 'luna' if review else 'sol'
+                source.with_suffix(suffix).write_text(json.dumps(dict(engine='codex', model='gpt-6-' + family, reasoning_effort='xhigh')))
                 digest = hashlib.sha256(draft.read_bytes()).hexdigest()
                 precheck = types.ModuleType('contact_agent_precheck')
                 precheck.validated_draft_path = lambda path: draft
@@ -30,8 +31,8 @@ class DraftAttributionTest(unittest.TestCase):
                 def apply(args):
                     self.assertEqual(calls, ['validate'])
                     execution = execution_for(json.loads(draft.read_text()), Path(args[1]), review)
-                    self.assertEqual(execution['display_label'], 'Codex Luna 6 xhigh')
-                    self.assertEqual(execution['model_role'], ('controller' if review else 'searcher')+'_codex_luna_xhigh')
+                    self.assertEqual(execution['display_label'], 'Codex ' + family.title() + ' 6 xhigh')
+                    self.assertEqual(execution['model_role'], ('controller' if review else 'searcher')+'_codex_' + family + '_xhigh')
                     self.assertEqual(execution['input_sha256'], digest)
                     return 0
                 research.command_apply = apply
@@ -76,6 +77,12 @@ class DraftAttributionTest(unittest.TestCase):
         patched = patched_dashboard_source(source)
         self.assertIn('searcher_codex_luna_xhigh', patched)
         self.assertIn('controller_codex_luna_xhigh', patched)
+        self.assertIn('searcher_codex_sol_xhigh', patched)
+        previous = source.replace("'searcher_luna_max'", "'searcher_luna_max', 'searcher_codex_luna_max', 'searcher_codex_luna_xhigh'", 1)
+        upgraded = patched_dashboard_source(previous)
+        self.assertEqual(upgraded.count("'searcher_codex_luna_xhigh'"), 1)
+        self.assertIn('searcher_codex_sol_xhigh', upgraded)
+        self.assertEqual(patched_dashboard_source(upgraded), upgraded)
         self.assertEqual(patched_dashboard_source(patched), patched)
         self.assertTrue(patched.endswith("return 'searcher_luna_max'\n"))
 

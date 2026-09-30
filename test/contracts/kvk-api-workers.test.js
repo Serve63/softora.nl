@@ -212,7 +212,7 @@ test('searchers and controllers start without an API key, even with the old budg
   }
   const state = response();
   await service.getStatus({}, state);
-  assert.equal(state.body.state.workers.searcher.model, 'gpt-6-luna');
+  assert.equal(state.body.state.workers.searcher.model, 'gpt-6-sol');
   assert.equal(state.body.state.workers.searcher.reasoningEffort, 'xhigh');
   assert.equal(state.body.state.workers.controller.model, 'gpt-6-luna');
   assert.equal(state.body.state.workers.controller.reasoningEffort, 'xhigh');

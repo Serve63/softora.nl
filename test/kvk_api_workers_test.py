@@ -277,7 +277,7 @@ class WorkerTests(unittest.TestCase):
             self.assertNotIn('CODEX_APP_TOOLS_PIPE_PATH', kwargs['env'])
             self.assertNotIn('CODEX_INTERNAL_ORIGINATOR_OVERRIDE', kwargs['env'])
             self.assertNotIn('CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY', kwargs['env'])
-            self.assertIn('gpt-6-luna', command)
+            self.assertIn('gpt-6-sol', command)
             self.assertIn('model_reasoning_effort=xhigh', command)
             self.assertTrue(kwargs['input'].startswith('INSTRUCTIES'))
             self.assertIn('"kvk_nummer": "00000001"', kwargs['input'])

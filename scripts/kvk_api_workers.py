@@ -50,7 +50,7 @@ def codex_binary() -> str:
             return candidate
     raise RuntimeError("Codex CLI niet gevonden; werk de Codex-app bij. Geen onderzoek gestart.")
 
-CODEX_MODELS = {"searcher": ("gpt-6-luna", "xhigh"), "controller": ("gpt-6-luna", "xhigh")}
+CODEX_MODELS = {"searcher": ("gpt-6-sol", "xhigh"), "controller": ("gpt-6-luna", "xhigh")}
 CODEX_TIMEOUT_SECONDS = 900
 MAX_REPAIR_ATTEMPTS = 3
 SEARCHER_RETRIES = 2  # a refused Searcher answer gets this many new Codex runs before the worker stops
@@ -687,9 +687,12 @@ def main() -> int:
     from kvk_completion_order import patched_source as completion_source
     if completion_source(canonical) != canonical:
         raise RuntimeError("Installeer eerst de voltooiingsvolgorde; geen werker gestart.")
-    from install_kvk_candidates import patch, RESEARCH_EDITS
+    from install_kvk_candidates import patch, RESEARCH_EDITS, HANDOFF_EDITS
     if patch(canonical, RESEARCH_EDITS) != canonical:
         raise RuntimeError("Installeer eerst het kandidaatbewijs; geen werker gestart.")
+    handoff = (ROOT / "scripts/contact_dossier_handoff.py").read_text()
+    if patch(handoff, HANDOFF_EDITS) != handoff:
+        raise RuntimeError("Installeer eerst de kandidaatoverdracht; geen werker gestart.")
     PENDING.mkdir(parents=True, exist_ok=True)
     LOCK.touch(exist_ok=True)
     with LOCK.open("r+") as lock:
