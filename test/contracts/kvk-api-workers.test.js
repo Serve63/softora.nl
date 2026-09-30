@@ -212,7 +212,10 @@ test('searchers and controllers start without an API key, even with the old budg
   }
   const state = response();
   await service.getStatus({}, state);
-  assert.equal(state.body.state.modelLabel, 'Codex Luna 6 Max');
+  assert.equal(state.body.state.workers.searcher.model, 'gpt-6-luna');
+  assert.equal(state.body.state.workers.searcher.reasoningEffort, 'xhigh');
+  assert.equal(state.body.state.workers.controller.model, 'gpt-6-luna');
+  assert.equal(state.body.state.workers.controller.reasoningEffort, 'max');
   assert.equal(state.body.state.budget, undefined);
   assert.equal(state.body.state.apiKeyConfigured, undefined);
 });
@@ -343,4 +346,14 @@ test('dialog renders a single error prefix and distinguishes stale workers from 
   assert.equal(element('kvk-api-searcher-status').textContent, 'Herstel nodig · Bewijs ontbreekt');
   assert.equal(element('kvk-api-controller-status').textContent, 'Wacht op lokale werker');
   assert.equal(element('kvk-api-robot-status').textContent, 'Aan · Onderzoekt bedrijf');
+});
+
+test('Searcher uses the agreed goal without a prescribed search route', () => {
+  const { SEARCHER_INSTRUCTIONS } = require('../../server/services/kvk-luna-searcher-prompt');
+  assert.match(SEARCHER_INSTRUCTIONS, /Bepaal zelf je zoekaanpak/);
+  assert.match(SEARCHER_INSTRUCTIONS, /ketenfilialen\/formules/);
+  assert.match(SEARCHER_INSTRUCTIONS, /Naam of kapotte website alleen is geen afwijsreden/);
+  assert.match(SEARCHER_INSTRUCTIONS, /telefoon én e-mail; website is optioneel/);
+  assert.doesNotMatch(SEARCHER_INSTRUCTIONS, /hoogstens|Werkwijze|site:|zoekacties/);
+  assert.ok(SEARCHER_INSTRUCTIONS.length < 1600);
 });

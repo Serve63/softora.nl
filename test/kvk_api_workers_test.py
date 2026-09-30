@@ -36,6 +36,7 @@ class WorkerTests(unittest.TestCase):
         def fake_control(company, brief, _instructions):
             return runner.call('/research', {'role': 'controller', 'company': company, 'brief': brief})['result']
         self.real_codex_run, self.real_codex_research = runner.codex_run, runner.codex_research
+        self.real_codex_control = runner.codex_control
         self.real_instructions_for = runner.instructions_for
         self.codex = [patch.object(evidence, 'repair_page_evidence', return_value=[]),
                       patch.object(runner, 'codex_run', side_effect=AssertionError('echte Codex-run in een test')),
@@ -169,6 +170,7 @@ class WorkerTests(unittest.TestCase):
             self.assertIn('--ignore-user-config', command)
             self.assertIn('web_search=live', command)
             self.assertIn('gpt-6-luna', command)
+            self.assertIn('model_reasoning_effort=xhigh', command)
             self.assertTrue(kwargs['input'].startswith('INSTRUCTIES'))
             self.assertIn('"kvk_nummer": "00000001"', kwargs['input'])
             Path(command[command.index('-o') + 1]).write_text('Antwoord: {"kvk_nummer":"00000001"}')
@@ -177,6 +179,15 @@ class WorkerTests(unittest.TestCase):
                 patch.object(runner, 'codex_research', self.real_codex_research), patch.object(runner, 'codex_binary', return_value='/test/codex'):
             answer, urls = runner.codex_research({'kvk_nummer': '00000001'}, 'INSTRUCTIES')
         self.assertEqual((answer, urls), ({'kvk_nummer': '00000001'}, ['https://voorbeeld.nl/contact']))
+
+    def test_controller_retains_luna_max(self):
+        def run(command, **kwargs):
+            self.assertIn('gpt-6-luna', command)
+            self.assertIn('model_reasoning_effort=max', command)
+            Path(command[command.index('-o') + 1]).write_text('{}')
+            return types.SimpleNamespace(returncode=0, stdout='', stderr='')
+        with patch.object(runner.subprocess, 'run', side_effect=run), patch.object(runner, 'codex_run', self.real_codex_run), patch.object(runner, 'codex_binary', return_value='/test/codex'):
+            self.assertEqual(self.real_codex_control({}, {}, 'CONTROLE'), {})
 
     def test_codex_binary_survives_app_layout_change(self):
         with tempfile.TemporaryDirectory() as folder:

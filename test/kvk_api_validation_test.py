@@ -1,5 +1,6 @@
 """Offline regression coverage for basic evidence and the runtime migration."""
 import copy
+import json
 import sys
 import unittest
 import tempfile
@@ -82,6 +83,18 @@ class ApiValidationTests(unittest.TestCase):
         self.assertEqual(activity_labels(False, 'searcher_robot', 'Sol 5.6 Xhigh'), ('Robot', ''))
         self.assertEqual(activity_labels(True, 'controller_api_sol_max', 'Sol 6 Max'), ('Controleur', 'Sol 6 Max'))
         self.assertEqual(activity_labels(False, None, None), ('Onbekend', ''))
+
+    def test_new_searcher_records_xhigh_without_relabelling_old_results(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'result.json'
+            path.write_text('[]')
+            marker = path.with_suffix('.luna.json')
+            marker.write_text(json.dumps({'engine': 'codex', 'model': 'gpt-6-luna', 'reasoning_effort': 'xhigh'}))
+            result = execution_for([{'validation_profile': 'api-basic-v1'}], path)
+            self.assertEqual(result['display_label'], 'Codex Luna 6 xhigh')
+            self.assertEqual(result['reasoning_effort'], 'xhigh')
+            marker.write_text(json.dumps({'engine': 'codex'}))
+            self.assertEqual(execution_for([{'validation_profile': 'api-basic-v1'}], path)['reasoning_effort'], 'max')
 
     def test_api_attribution_is_durable_and_separate_from_native_workers(self):
         with tempfile.TemporaryDirectory() as directory:
