@@ -48,7 +48,7 @@ def codex_binary() -> str:
             return candidate
     raise RuntimeError("Codex CLI niet gevonden; werk de Codex-app bij. Geen onderzoek gestart.")
 
-CODEX_MODELS = {"searcher": ("gpt-6-sol", "xhigh"), "controller": ("gpt-6-luna", "max")}
+CODEX_MODELS = {"searcher": ("gpt-6-luna", "xhigh"), "controller": ("gpt-6-luna", "max")}
 CODEX_TIMEOUT_SECONDS = 900
 MAX_REPAIR_ATTEMPTS = 3
 SEARCHER_RETRIES = 2  # a refused Searcher answer gets this many new Codex runs before the worker stops

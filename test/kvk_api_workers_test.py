@@ -169,7 +169,7 @@ class WorkerTests(unittest.TestCase):
         def run(command, **kwargs):
             self.assertIn('--ignore-user-config', command)
             self.assertIn('web_search=live', command)
-            self.assertIn('gpt-6-sol', command)
+            self.assertIn('gpt-6-luna', command)
             self.assertIn('model_reasoning_effort=xhigh', command)
             self.assertTrue(kwargs['input'].startswith('INSTRUCTIES'))
             self.assertIn('"kvk_nummer": "00000001"', kwargs['input'])
