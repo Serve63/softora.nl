@@ -322,6 +322,36 @@ def codex_control(company: dict, brief: dict, instructions: str) -> dict:
     return parse_answer(text)
 
 
+def record_mentioned_contacts(result: dict, company: dict) -> None:
+    """A phone number or e-mail the Controller only mentions is recorded as rejected, as for the Searcher.
+
+    The database refuses a result whose notes name a contact that is neither kept nor
+    rejected; the Controller's own rejections are kept.
+    """
+    from kvk_luna_searcher import withhold_unaccepted_contacts
+    earlier = result.get("contact_rejections") if isinstance(result.get("contact_rejections"), dict) else {}
+    for key, empty in (("telefoonnummer", ""), ("email", ""), ("conclusion_note", ""),
+                       ("field_evidence", {}), ("sources", []), ("route_notes", {})):
+        if not isinstance(result.get(key), type(empty)):
+            result[key] = empty
+    result["sources"] = [source for source in result["sources"] if isinstance(source, dict)]
+    for source in result["sources"]:
+        source["note"], source["label"] = str(source.get("note") or ""), str(source.get("label") or "Bron")
+    result["route_notes"] = {key: stage for key, stage in result["route_notes"].items() if isinstance(stage, dict)}
+    for stage in result["route_notes"].values():
+        stage["notes"] = str(stage.get("notes") or "")
+    result["field_evidence"] = {key: str(value or "") for key, value in result["field_evidence"].items()}
+    reference = next((source.get("url") for source in result["sources"] if source.get("url")), "")
+    withhold_unaccepted_contacts(result, reference, [str(company.get("kvk_nummer") or ""),
+                                                     str(company.get("vestigingsnummer") or "")])
+    for field in ("telefoonnummer", "email"):
+        kept = [item for item in earlier.get(field) or [] if isinstance(item, dict)]
+        values = {str(item.get("value") or "").casefold() for item in kept}
+        result["contact_rejections"][field] = kept + [
+            item for item in result["contact_rejections"].get(field, [])
+            if str(item.get("value") or "").casefold() not in values]
+
+
 def mark_codex(path: Path) -> None:
     # Attribution reads this marker so the research history names the worker honestly.
     save_result(path.with_suffix(".engine.json"), {"engine": "codex"})
@@ -442,6 +472,7 @@ def research_one(role: str, company: dict, brief: dict, flags: list[str], valida
         result = codex_control(company, repair_brief, instructions_for(role))
         if not isinstance(result, dict) or str(result.get("kvk_nummer")) != kvk:
             raise RuntimeError("Codex gaf geen geldig resultaat voor de juiste onderneming terug.")
+        record_mentioned_contacts(result, company)
         save_result(path, result)
         mark_codex(path)
         previous = result
