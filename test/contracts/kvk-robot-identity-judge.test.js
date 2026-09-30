@@ -123,3 +123,12 @@ test('the runtime wires the judge with the existing server OpenAI key, outside t
   assert.match(routes, /'\/api\/kvk-database\/api-workers\/identity-judge'/);
 });
 
+test('the local Robot can reach the judge like poll and report: token-checked, exempt from same-origin', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const auth = fs.readFileSync(path.join(__dirname, '../../server/security/premium-auth.js'), 'utf8');
+  const context = fs.readFileSync(path.join(__dirname, '../../server/security/request-context.js'), 'utf8');
+  assert.match(auth, /requestPath === '\/api\/kvk-database\/api-workers\/identity-judge'\) &&\s*method === 'POST'/);
+  assert.match(context, /'\/api\/kvk-database\/api-workers\/identity-judge',/);
+});
+

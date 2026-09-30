@@ -411,7 +411,8 @@ function createPremiumAuthStateManager(options = {}) {
       if (
         (requestPath === '/api/kvk-database/api-workers/poll' ||
           requestPath === '/api/kvk-database/api-workers/report' ||
-          requestPath === '/api/kvk-database/api-workers/research') &&
+          requestPath === '/api/kvk-database/api-workers/research' ||
+          requestPath === '/api/kvk-database/api-workers/identity-judge') &&
         method === 'POST'
       ) {
         return true;
