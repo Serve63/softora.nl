@@ -25,6 +25,15 @@ DASHBOARD_EDITS = (
      '    return latest\n\n\nLUNA_ERROR_FIELD_LABELS'),
 )
 
+DIRECTORY_EDITS = (
+    ('import review_classification\n',
+     'import review_classification\nfrom kvk_directory_candidates import enrich_directory_rows\n'),
+    ('        payload = [row_payload(row) for row in rows]\n        yield payload\n        cursor =',
+     '        payload = enrich_directory_rows(connection, [row_payload(row) for row in rows])\n        yield payload\n        cursor ='),
+    ('        payload = [row_payload(row) for row in rows]\n        yield payload\n        timestamp =',
+     '        payload = enrich_directory_rows(connection, [row_payload(row) for row in rows])\n        yield payload\n        timestamp ='),
+)
+
 
 def patch(source, edits):
     installed = [new in source for old, new in edits]
@@ -44,11 +53,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('root', type=Path)
     args = parser.parse_args()
-    for name in ('kvk_candidate_identity.py', 'kvk_api_validation.py'):
+    for name in ('kvk_candidate_identity.py', 'kvk_api_validation.py', 'kvk_directory_candidates.py'):
         if (args.root / 'scripts' / name).read_bytes() != Path(__file__).with_name(name).read_bytes():
             raise ValueError('Installeer eerst de kandidaatmodules')
     plans = []
-    for name, edits in (('contact_research.py', RESEARCH_EDITS), ('serve_dashboard.py', DASHBOARD_EDITS)):
+    for name, edits in (('contact_research.py', RESEARCH_EDITS), ('serve_dashboard.py', DASHBOARD_EDITS),
+                        ('sync_company_directory_online.py', DIRECTORY_EDITS)):
         target = args.root / 'scripts' / name
         before = target.read_text()
         plans.append((target, before, patch(before, edits)))

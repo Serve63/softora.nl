@@ -70,8 +70,8 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
   assert.doesNotMatch(shellSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidates/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260930-candidate-contacts/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidate-contacts/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -82,8 +82,8 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
   assert.doesNotMatch(pageSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidates/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260930-candidate-contacts/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidate-contacts/);
 });
 
 test('directory links keep their target but display only the site name and a real review status', () => {
@@ -172,10 +172,10 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(fastProgressSource, /\/api\/kvk-database\/snapshot\/progress/);
   assert.match(fastProgressSource, /const REFRESH_MS = 1000/);
   assert.match(fastProgressSource, /renderLatestTreatedRows\(\)/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidates/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidate-contacts/);
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260930-candidate-contacts/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260930-candidates/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);

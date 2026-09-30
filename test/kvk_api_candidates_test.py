@@ -12,7 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
 from kvk_candidate_identity import from_answer, validate_review
 from kvk_api_validation import validate_api_evidence
-from install_kvk_candidates import patch, RESEARCH_EDITS
+from install_kvk_candidates import patch, RESEARCH_EDITS, DIRECTORY_EDITS
+from kvk_directory_candidates import enrich_directory_rows
 from kvk_candidate_repair import repair
 from kvk_luna_searcher_test import COMPANY, answer, canonical
 
@@ -32,6 +33,39 @@ def ambiguous():
 
 
 class CandidateTests(unittest.TestCase):
+    def test_directory_mirrors_latest_evidence_without_filling_confirmed_contacts(self):
+        connection = sqlite3.connect(':memory:')
+        connection.execute('CREATE TABLE contact_research_audits (id INTEGER, kvk_nummer TEXT, route_json TEXT)')
+        dossier = {'identity_status': 'unconfirmed', 'possible_matches': [candidate()]}
+        connection.execute('INSERT INTO contact_research_audits VALUES (1, ?, ?)',
+                           ('12345678', json.dumps({'research_dossier': dossier})))
+        row = dict(kvk_nummer='12345678', unusable_reason='identity_unconfirmed',
+                   lead_status='unusable', telefoonnummer='', email='', website='')
+        module = types.SimpleNamespace(decode_audit_json=lambda value: value)
+        with mock_patch.dict(sys.modules, {'contact_research': module}):
+            result = enrich_directory_rows(connection, [row])[0]
+            self.assertEqual(result['research_dossier'], dossier)
+            self.assertEqual(result['telefoonnummer'], '')
+            self.assertEqual(result['lead_status'], 'unusable')
+            connection.execute('INSERT INTO contact_research_audits VALUES (2, ?, ?)', ('12345678', '{}'))
+            self.assertEqual(enrich_directory_rows(connection, [row])[0]['research_dossier'], {})
+        connection.close()
+
+    def test_directory_does_not_resurrect_stale_candidates_after_review(self):
+        row = dict(kvk_nummer='12345678', unusable_reason='', lead_status='usable',
+                   telefoonnummer='0101234567', research_dossier={'stale': True})
+        self.assertEqual(enrich_directory_rows(None, [row])[0]['research_dossier'], {})
+        self.assertEqual(row['telefoonnummer'], '0101234567')
+
+    def test_directory_installer_covers_full_and_incremental_and_refuses_drift(self):
+        source = 'import review_classification\n\ndef full():\n    for rows in []:\n' + DIRECTORY_EDITS[1][0] + ' 0\n'
+        source += '\ndef incremental():\n    for rows in []:\n' + DIRECTORY_EDITS[2][0] + " ''\n"
+        updated = patch(source, DIRECTORY_EDITS)
+        self.assertEqual(updated.count('payload = enrich_directory_rows('), 2)
+        self.assertEqual(patch(updated, DIRECTORY_EDITS), updated)
+        with self.assertRaises(ValueError):
+            patch(source.replace('yield payload', 'yield []'), DIRECTORY_EDITS)
+
     def test_candidate_survives_without_becoming_a_confirmed_contact(self):
         result = canonical(ambiguous())
         self.assertTrue(validate_review(result))
