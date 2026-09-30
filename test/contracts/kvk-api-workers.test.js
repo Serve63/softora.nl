@@ -359,3 +359,12 @@ test('Searcher uses the agreed goal without a prescribed search route', () => {
   assert.doesNotMatch(SEARCHER_INSTRUCTIONS, /hoogstens|Werkwijze|site:|zoekacties/);
   assert.ok(SEARCHER_INSTRUCTIONS.length < 1600);
 });
+
+
+test('startup isolates results from other prompts before launching any worker', () => {
+  const runner = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
+  const startup = runner.slice(runner.indexOf('def main()'));
+  assert.ok(startup.indexOf('quarantine_stale(') < startup.indexOf('threading.Thread('));
+  assert.match(runner, /stamp\(path, contract\(\*CODEX_MODELS/);
+  assert.match(runner, /"\.recovery\.json", "\.contract\.json"/);
+});

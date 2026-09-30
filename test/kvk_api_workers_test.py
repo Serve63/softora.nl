@@ -58,6 +58,37 @@ class WorkerTests(unittest.TestCase):
         self.pending.stop()
         self.directory.cleanup()
 
+    def test_restart_quarantines_old_answers_and_exhausted_repairs(self):
+        from kvk_worker_cache import contract, stamp, quarantine_stale
+        root = Path(self.directory.name)
+        expected = {role: contract('gpt-6-luna', 'xhigh', 'NEW') for role in ('searcher', 'controller')}
+        old = root / 'contact_agent_results_api_controller_unusable_12345678.json'
+        old.write_text('{"checks_completed":false}')
+        recovery = old.with_suffix('.recovery.json')
+        recovery.write_text('{"attempts":3}')
+        stamp(old, contract('gpt-6-luna', 'max', 'OLD'))
+        current = root / 'contact_agent_results_api_searcher_initial_23456789.json'
+        current.write_text('{}')
+        stamp(current, expected['searcher'])
+        moved = quarantine_stale(root, root / 'archive', expected)
+        self.assertEqual(moved, [old.stem])
+        self.assertFalse(old.exists())
+        self.assertFalse(recovery.exists())
+        self.assertTrue(current.exists())
+        saved = list((root / 'archive').glob('*/' + recovery.name))
+        self.assertEqual(json.loads(saved[0].read_text()), {'attempts': 3})
+
+    def test_prompt_change_and_missing_marker_both_invalidate_cache(self):
+        from kvk_worker_cache import contract, stamp, quarantine_stale
+        root = Path(self.directory.name)
+        for i in (1, 2):
+            path = root / f'contact_agent_results_api_searcher_initial_{i:08}.json'
+            path.write_text('{}')
+            if i == 1:
+                stamp(path, contract('gpt-6-luna', 'xhigh', 'OLD PROMPT'))
+        expected = {role: contract('gpt-6-luna', 'xhigh', 'NEW PROMPT') for role in ('searcher', 'controller')}
+        self.assertEqual(len(quarantine_stale(root, root / 'archive', expected)), 2)
+
     def test_selected_count_runs_concurrently_and_saves_every_result(self):
         barrier = threading.Barrier(3)
         def call(path, payload, **kwargs):
