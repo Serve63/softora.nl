@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
 import unittest
 from unittest.mock import patch
-from kvk_completion_order import completion_scope, patched_source, ANCHOR
+from kvk_completion_order import completion_scope, patched_source, ANCHOR, DRAFT_ANCHOR, completion_draft_rows
 from kvk_api_validation import PROFILE
 
 
@@ -14,6 +14,7 @@ class CompletionTests(unittest.TestCase):
                 'uses_approved_review': lambda a: False, 'uses_unusable_review': lambda a: review,
                 'assert_results_match_active_location': lambda c, r: {'id': 1},
                 'active_location_filters': lambda l: ('filter', []),
+                'planning_scope_from_args': lambda a: ({'id': 1}, '', 'filter', []),
                 'review_scope_from_args': lambda a: ({'id': 2}, '', 'filter', []),
                 'fetch_next': lambda *a, **kw: [{'kvk_nummer': '1'}, {'kvk_nummer': '2'}],
                 'fetch_unusable_review': lambda *a: [{'kvk_nummer': '1'}, {'kvk_nummer': '2'}]}
@@ -35,8 +36,22 @@ class CompletionTests(unittest.TestCase):
             self.assertIsNone(completion_scope(None, [{'kvk_nummer': '2'}], None, {}))
 
     def test_install_is_idempotent_and_rejects_drift(self):
-        source = 'def gate():\n' + ANCHOR + '        pass\n'
+        source = 'def gate():\n' + ANCHOR + '        pass\n' + 'def command_draft_batch():\n    with connect() as connection:\n' + DRAFT_ANCHOR + '            pass\n'
         installed = patched_source(source)
         self.assertEqual(patched_source(installed), installed)
         with self.assertRaises(ValueError):
             patched_source('changed')
+
+
+    def test_draft_selects_matching_peer_before_expansion_for_both_roles(self):
+        with patch.dict(os.environ, {'SOFTORA_KVK_COMPLETION_ORDER': '1'}):
+            for review in (False, True):
+                item = {'kvk_nummer': '2', 'validation_profile': PROFILE}
+                location, rows = completion_draft_rows(None, [item], None, self.api(review))
+                self.assertEqual(rows[0]['kvk_nummer'], '2')
+                self.assertIsNotNone(completion_scope(None, [item], None, self.api(review)))
+                with self.assertRaises(ValueError):
+                    completion_draft_rows(None, [dict(item, kvk_nummer='3')], None, self.api(review))
+                with self.assertRaises(ValueError):
+                    completion_draft_rows(None, [item, item], None, self.api(review))
+                self.assertIsNone(completion_draft_rows(None, [{'kvk_nummer':'2'}], None, self.api(review)))
