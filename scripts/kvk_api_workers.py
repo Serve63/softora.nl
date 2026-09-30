@@ -48,7 +48,7 @@ def codex_binary() -> str:
             return candidate
     raise RuntimeError("Codex CLI niet gevonden; werk de Codex-app bij. Geen onderzoek gestart.")
 
-CODEX_MODELS = {"searcher": ("gpt-6-luna", "xhigh"), "controller": ("gpt-6-luna", "max")}
+CODEX_MODELS = {"searcher": ("gpt-6-luna", "xhigh"), "controller": ("gpt-6-luna", "xhigh")}
 CODEX_TIMEOUT_SECONDS = 900
 MAX_REPAIR_ATTEMPTS = 3
 SEARCHER_RETRIES = 2  # a refused Searcher answer gets this many new Codex runs before the worker stops
@@ -325,7 +325,8 @@ def codex_control(company: dict, brief: dict, instructions: str) -> dict:
 
 def mark_codex(path: Path) -> None:
     # Attribution reads this marker so the research history names the worker honestly.
-    save_result(path.with_suffix(".engine.json"), {"engine": "codex"})
+    model, effort = CODEX_MODELS["controller"]
+    save_result(path.with_suffix(".engine.json"), {"engine": "codex", "model": model, "reasoning_effort": effort})
 
 
 def robot_busy(kvk: str) -> bool:
