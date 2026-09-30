@@ -1,5 +1,6 @@
 """Offline runner checks. Never calls OpenAI or touches the company database."""
 import importlib.util
+import json
 import os
 import sys
 import tempfile
@@ -188,6 +189,21 @@ class WorkerTests(unittest.TestCase):
             return types.SimpleNamespace(returncode=0, stdout='', stderr='')
         with patch.object(runner.subprocess, 'run', side_effect=run), patch.object(runner, 'codex_run', self.real_codex_run), patch.object(runner, 'codex_binary', return_value='/test/codex'):
             self.assertEqual(self.real_codex_control({}, {}, 'CONTROLE'), {})
+
+    def test_controller_receives_company_searcher_result_and_evidence(self):
+        company = {'kvk_nummer': '00000001', 'bedrijfsnaam': 'Voorbeeld',
+                   'negative_claim': {'email': 'info@example.nl', 'unusable_reason': 'phone_missing'},
+                   'prior_evidence': [{'url': 'https://example.nl/contact'}]}
+        brief = runner.api_brief({})
+        with patch.object(runner, 'codex_run', return_value=('{}', '')) as run:
+            self.real_codex_control(company, brief, 'KORTE CONTROLEPROMPT')
+        prompt = run.call_args.args[0]
+        self.assertTrue(prompt.startswith('KORTE CONTROLEPROMPT\n\nOpdracht:\n'))
+        self.assertEqual(json.loads(prompt.split('Opdracht:\n', 1)[1]),
+                         {'company': company, 'research_contract': brief})
+        self.assertEqual(run.call_args.kwargs, {'role': 'controller'})
+        for old_instruction in ('Begin met', 'Open een gevonden', 'heropen eerst', 'hoogstens'):
+            self.assertNotIn(old_instruction, prompt)
 
     def test_codex_binary_survives_app_layout_change(self):
         with tempfile.TemporaryDirectory() as folder:

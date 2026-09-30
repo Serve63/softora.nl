@@ -239,15 +239,17 @@ test('the paid research endpoint never calls OpenAI anymore', async () => {
 
 test('the local Codex workers receive searcher and controller instructions from the server', async () => {
   const { SEARCHER_INSTRUCTIONS, CONTROLLER_INSTRUCTIONS } = require('../../server/services/kvk-luna-searcher-prompt');
-  assert.match(CONTROLLER_INSTRUCTIONS, /Controleer precies dit eerder onderzochte KVK-bedrijf/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /Controleer via gratis openbare bronnen/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /Bepaal zelf je controleaanpak/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /bevestigde telefoon én e-mail; website is optioneel/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /Naam of kapotte website alleen is geen afwijsreden/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /ketenfilialen.*holdings/);
   assert.match(CONTROLLER_INSTRUCTIONS, /previous_result/);
   assert.match(CONTROLLER_INSTRUCTIONS, /result_schema/);
-  // The controller builds on the Searcher: open its cited pages first, search only for gaps.
   assert.match(CONTROLLER_INSTRUCTIONS, /luna_claim/);
-  assert.match(CONTROLLER_INSTRUCTIONS, /Doe dan geen zoekacties/);
-  assert.match(CONTROLLER_INSTRUCTIONS, /routes die de Searcher niet gebruikte/);
-  assert.match(CONTROLLER_INSTRUCTIONS, /hoogstens 2 zoekacties/);
-  assert.match(CONTROLLER_INSTRUCTIONS, /alleen concreet tegenbewijs mag het weghalen/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /prior_evidence/);
+  assert.match(CONTROLLER_INSTRUCTIONS, /negative_claim/);
+  assert.doesNotMatch(CONTROLLER_INSTRUCTIONS, /hoogstens|Werkwijze|Doe dan geen zoekacties|Open eerst/);
   const { row } = settingsFixture();
   const polled = response();
   await createKvkApiWorkersService({ kvkDatabaseSyncToken: 'token', getSupabaseClient: () => ({ from() { return {
