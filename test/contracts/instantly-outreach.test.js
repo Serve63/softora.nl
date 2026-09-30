@@ -2956,6 +2956,39 @@ test('automatic upload does not reactivate a completed campaign that still conta
   assert.equal(harness.outboundGuardCalls.length, 0);
 });
 
+test('automatic upload resumes a completed campaign once every existing lead finished its sequence', async () => {
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
+  const createHarness = (remoteInstantlyLeads) => createService({
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    rows: [{ id: 'fresh-design', bedrijf: 'Vers ontwerp', email: 'fresh@instantly-fresh.test', website: 'https://instantly-fresh.test', mail: true, verantwoordelijk: 'Serve' }],
+    photoMap: { 'fresh-design': { id: 'fresh-design', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
+    remoteInstantlyLeads,
+    fetchJsonWithTimeout: async (url) => url.includes('/campaigns/') && !url.includes('/activate')
+      ? { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 3 } }
+      : url.includes('/activate')
+        ? { response: { ok: true, status: 200 }, data: { status: 1 } }
+        : { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'fresh-lead', email: 'fresh@instantly-fresh.test', index: 0 }] } },
+  });
+
+  const finished = createHarness([
+    { id: 'done-1', email: 'done-1@old.test', status: 3 },
+    { id: 'bounced', email: 'bounced@old.test', status: -1 },
+    { id: 'unsubscribed', email: 'unsubscribed@old.test', status: '-2' },
+  ]);
+  assert.equal((await finished.service.autoUploadMailReady()).uploaded, 1);
+  const activateIndex = finished.fetchCalls.findIndex((call) => call.url.includes('/activate'));
+  const addIndex = finished.fetchCalls.findIndex((call) => call.url.endsWith('/leads/add'));
+  assert.ok(activateIndex >= 0 && addIndex > activateIndex);
+
+  for (const blockingLead of [{ status: 1 }, { status: 2 }, { status: '' }, {}]) {
+    const blocked = createHarness([{ id: 'done', email: 'done@old.test', status: 3 }, { id: 'open', email: 'open@old.test', ...blockingLead }]);
+    await assert.rejects(() => blocked.service.autoUploadMailReady(), { code: 'INSTANTLY_AUTO_COMPLETED_CAMPAIGN_HAS_LEADS' });
+    assert.equal(blocked.fetchCalls.filter((call) => call.url.includes('/activate') || call.url.endsWith('/leads/add')).length, 0);
+    assert.equal(blocked.outboundGuardCalls.length, 0);
+  }
+});
+
 test('automatic Instantly upload appends without truncating an already large legacy guard', async () => {
   const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const originalEntries = Array.from({ length: 1001 }, (_, index) => ({ recipientEmail: `entry${index}@old.test`, recipientId: `old-entry-${index}` }));

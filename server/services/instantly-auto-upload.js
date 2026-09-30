@@ -16,8 +16,19 @@ const LEGACY_CAMPAIGNS = Object.freeze({
   martijn: '79b1f8c0-35de-4687-95ea-8384c4c491bd',
 });
 
+// A full page means the campaign could hold more leads than were checked.
+const COMPLETED_CAMPAIGN_LEAD_CHECK_LIMIT = 10000;
+// Instantly lead statuses for a finished sequence: Completed, Bounced,
+// Unsubscribed and Skipped. Active (1), Paused (2) or unknown still block.
+const FINISHED_REMOTE_LEAD_STATUSES = new Set([3, -1, -2, -3]);
+
 function text(value) {
   return String(value || '').trim();
+}
+
+function isFinishedRemoteLead(lead) {
+  const status = text(lead && lead.status);
+  return /^-?\d+$/.test(status) && FINISHED_REMOTE_LEAD_STATUSES.has(Number(status));
 }
 
 function isDesignedInstantlyRow(row, assets, normalizeString = text) {
@@ -409,14 +420,16 @@ function createInstantlyAutoUpload(deps = {}) {
     let activated = status === 1;
     if (!activated && status === 3) {
       // Instantly rejects new leads for a Completed campaign. Resume only an
-      // exact approved campaign with no current leads, before creating any new
-      // outbound reservation; existing leads must never be sent again.
+      // exact approved campaign whose existing leads have all finished their
+      // sequence, before creating any new outbound reservation; Instantly
+      // never restarts finished leads, so existing leads are not sent again.
       if (typeof listCampaignLeads !== 'function') {
         throw createError('Instantly-campagne kan niet veilig op bestaande leads worden gecontroleerd.',
           'INSTANTLY_AUTO_CAMPAIGN_LEADS_CHECK_UNAVAILABLE', 503);
       }
-      const existingLeads = await listCampaignLeads(approved.id, 1);
-      if (!Array.isArray(existingLeads) || existingLeads.length) {
+      const existingLeads = await listCampaignLeads(approved.id, COMPLETED_CAMPAIGN_LEAD_CHECK_LIMIT);
+      if (!Array.isArray(existingLeads) || existingLeads.length >= COMPLETED_CAMPAIGN_LEAD_CHECK_LIMIT ||
+        !existingLeads.every(isFinishedRemoteLead)) {
         throw createError('Afgeronde Instantly-campagne bevat nog leads; niet opnieuw geactiveerd.',
           'INSTANTLY_AUTO_COMPLETED_CAMPAIGN_HAS_LEADS', 503);
       }
