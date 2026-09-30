@@ -123,6 +123,7 @@ def run_cli(script: str, *args: str, timeout: int = 900) -> str:
     child_env = os.environ.copy()
     child_env.pop("CODEX_THREAD_ID", None)
     child_env.pop("CODEX_SESSION_ID", None)
+    child_env["SOFTORA_KVK_COMPLETION_ORDER"] = "1"
     process = subprocess.run(
         [sys.executable, str(ROOT / "scripts" / script), *args],
         cwd=ROOT, env=child_env, text=True, capture_output=True, timeout=timeout,
@@ -645,25 +646,8 @@ def work(role: str, apply_lock: threading.Lock) -> None:
             if not worker.get("enabled"):
                 time.sleep(10)
                 continue
-            if role == "searcher":
-                run_searcher_pipeline(apply_lock)
-                continue
-            count = max(1, min(10, int(worker.get("count") or 1)))
-            report(role, f"{count} ingesteld; wachtrij lezen.")
-            packet_result = next_packet(role, count)
-            if packet_result is None:
-                report(role, "Wachtrij leeg; wacht op nieuw werk.")
-                time.sleep(30)
-                continue
-            packet, flags = packet_result
-            batch_label = f"{len(packet['bedrijven'])} bedrijven"
-            report(role, f"{count} ingesteld; {batch_label} onderzoeken.", batch_label)
-            with Heartbeat(role, batch_label):
-                research_batch(role, packet, flags, count)
-                applied = apply_ready_prefix(role, packet, flags, apply_lock)
-            if not applied:
-                report(role, "Wacht op budgetruimte of handmatige start; resultaten bewaard.")
-                time.sleep(10)
+            from kvk_worker_stream import run
+            run(role, sys.modules[__name__], apply_lock)
         except Exception as error:
             if transient_control_failure(error):
                 print(f"KVK API {role}: tijdelijke verbindingstoring; opnieuw proberen.", flush=True)
@@ -682,6 +666,9 @@ def main() -> int:
     canonical = (ROOT / "scripts/contact_research.py").read_text()
     if patched_source(canonical) != canonical:
         raise RuntimeError("Installeer eerst het API-basiscontract; geen werker gestart.")
+    from kvk_completion_order import patched_source as completion_source
+    if completion_source(canonical) != canonical:
+        raise RuntimeError("Installeer eerst de voltooiingsvolgorde; geen werker gestart.")
     PENDING.mkdir(parents=True, exist_ok=True)
     LOCK.touch(exist_ok=True)
     with LOCK.open("r+") as lock:

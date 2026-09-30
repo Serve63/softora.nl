@@ -167,7 +167,7 @@ test('Searcher refills a finished worker at once instead of waiting for the slow
   assert.match(pipeline, /return_when=FIRST_COMPLETED/);
   assert.match(pipeline, /apply_searcher_head\(\{"bedrijven": window\}, flags, apply_lock\)/);
   assert.match(pipeline, /pool\.shutdown\(wait=True\)/);
-  assert.match(runner, /if role == "searcher":\n\s+run_searcher_pipeline\(apply_lock\)/);
+  assert.match(runner, /run\(role, sys.modules\[__name__\], apply_lock\)/);
 });
 
 test('Luna Searcher keeps opened search pages and exact field URLs as recorded sources', () => {
@@ -367,4 +367,13 @@ test('startup isolates results from other prompts before launching any worker', 
   assert.ok(startup.indexOf('quarantine_stale(') < startup.indexOf('threading.Thread('));
   assert.match(runner, /stamp\(path, contract\(\*CODEX_MODELS/);
   assert.match(runner, /"\.recovery\.json", "\.contract\.json"/);
+});
+
+
+test('both worker roles use per-result streaming with guarded completion order', () => {
+  const runner = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
+  const work = runner.slice(runner.indexOf('def work('), runner.indexOf('def main('));
+  assert.match(work, /from kvk_worker_stream import run/);
+  assert.doesNotMatch(work, /research_batch/);
+  assert.match(runner, /child_env\["SOFTORA_KVK_COMPLETION_ORDER"\] = "1"/);
 });
