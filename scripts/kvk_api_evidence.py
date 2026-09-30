@@ -2,6 +2,7 @@
 import hashlib
 import ipaddress
 import json
+import re
 import socket
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, unquote, urljoin, urlsplit
@@ -109,3 +110,13 @@ def unreviewed_contacts(result, pages):
             if not result.get(field) and not reviewed:
                 pending.append(item)
     return pending
+
+
+def repair_page_evidence(feedback):
+    """Reopen at most four concrete recovery URLs through the public-only fetcher.
+
+    This is evidence for the model, never an automatic contact or classification.
+    Local HTTP reads can succeed when the model web tool cannot open a source.
+    """
+    urls = list(dict.fromkeys(url.rstrip('.,;:)') for url in re.findall(r'https?://[^\s<>"\\]+', feedback)))
+    return [fetch_page(url) for url in urls[:4]]

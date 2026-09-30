@@ -37,7 +37,8 @@ class WorkerTests(unittest.TestCase):
             return runner.call('/research', {'role': 'controller', 'company': company, 'brief': brief})['result']
         self.real_codex_run, self.real_codex_research = runner.codex_run, runner.codex_research
         self.real_instructions_for = runner.instructions_for
-        self.codex = [patch.object(runner, 'codex_run', side_effect=AssertionError('echte Codex-run in een test')),
+        self.codex = [patch.object(evidence, 'repair_page_evidence', return_value=[]),
+                      patch.object(runner, 'codex_run', side_effect=AssertionError('echte Codex-run in een test')),
                       patch.object(runner, 'codex_research', side_effect=fake_research),
                       patch.object(runner, 'codex_control', side_effect=fake_control),
                       patch.object(runner, 'instructions_for', return_value='INSTRUCTIES'),
@@ -437,6 +438,21 @@ class WorkerTests(unittest.TestCase):
                     self.cli.start()
         self.assertIn('first missing route', str(caught.exception))
         self.assertIn('last missing route', str(caught.exception))
+
+
+class RecoveryEvidenceTests(unittest.TestCase):
+    def test_recovery_reopens_only_bounded_deduplicated_urls(self):
+        urls = [f'https://example.org/company/{i}' for i in range(6)]
+        with patch.object(evidence, 'fetch_page', side_effect=lambda url: {'url': url, 'text': 'proof'}) as fetch:
+            pages = evidence.repair_page_evidence(' '.join([urls[0] + '.', *urls]))
+        self.assertEqual([p['url'] for p in pages], urls[:4])
+        self.assertEqual(fetch.call_count, 4)
+
+    def test_blocked_recovery_source_is_preserved_as_blocked_not_as_proof(self):
+        with patch.object(evidence, 'require_public_url', side_effect=ValueError('Non-public address rejected')):
+            pages = evidence.repair_page_evidence('http://127.0.0.1/internal')
+        self.assertIn('blocked', pages[0])
+        self.assertNotIn('text', pages[0])
 
 
 if __name__ == '__main__':
