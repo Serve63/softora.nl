@@ -25,6 +25,14 @@ DASHBOARD_EDITS = (
      '    return latest\n\n\nLUNA_ERROR_FIELD_LABELS'),
 )
 
+HANDOFF_EDITS = (
+    ("    receipt = row.get('research_dossier')\n",
+     "    from kvk_candidate_identity import verify_api_dossier\n"
+     "    if verify_api_dossier(row, required):\n"
+     "        return\n"
+     "    receipt = row.get('research_dossier')\n"),
+)
+
 DIRECTORY_EDITS = (
     ('import review_classification\n',
      'import review_classification\nfrom kvk_directory_candidates import enrich_directory_rows\n'),
@@ -58,7 +66,8 @@ def main():
             raise ValueError('Installeer eerst de kandidaatmodules')
     plans = []
     for name, edits in (('contact_research.py', RESEARCH_EDITS), ('serve_dashboard.py', DASHBOARD_EDITS),
-                        ('sync_company_directory_online.py', DIRECTORY_EDITS)):
+                        ('sync_company_directory_online.py', DIRECTORY_EDITS),
+                        ('contact_dossier_handoff.py', HANDOFF_EDITS)):
         target = args.root / 'scripts' / name
         before = target.read_text()
         plans.append((target, before, patch(before, edits)))

@@ -49,19 +49,22 @@ def execution_for(results, path, is_review=False):
     role = 'controller' if is_review else 'searcher'
     if engine_for(path) == 'codex':
         effort = 'max'  # Older saved results retain their original model label.
+        model = 'gpt-6-luna'
         for suffix in ('.luna.json', '.engine.json'):
             try:
                 saved = json.loads(Path(path).with_suffix(suffix).read_text())
-                if saved.get('model') == 'gpt-6-luna' and saved.get('reasoning_effort') in ('max', 'xhigh'):
+                if saved.get('model') in ('gpt-6-luna', 'gpt-6-sol') and saved.get('reasoning_effort') in ('max', 'xhigh'):
+                    model = saved['model']
                     effort = saved['reasoning_effort']
                     break
             except (OSError, ValueError, AttributeError):
                 continue
-        label = 'Codex Luna 6 ' + ('Max' if effort == 'max' else effort)
+        family = model.removeprefix('gpt-6-')
+        label = 'Codex ' + family.title() + ' 6 ' + ('Max' if effort == 'max' else effort)
         return {
             'producer_thread_id': 'codex:' + role,
-            'model': 'gpt-6-luna', 'reasoning_effort': effort,
-            'display_label': label, 'model_role': role + '_codex_luna_' + effort,
+            'model': model, 'reasoning_effort': effort,
+            'display_label': label, 'model_role': role + '_codex_' + family + '_' + effort,
             'input_sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest(),
         }
     return {
@@ -91,11 +94,13 @@ def patched_dashboard_source(source):
     query = source[start:end]
     for role in ('searcher', 'controller'):
         old = "'" + role + "_luna_max'"
-        new = old + ", '" + role + "_codex_luna_max', '" + role + "_codex_luna_xhigh'"
-        if new not in query:
-            if old not in query:
-                raise ValueError('Recent-activity query changed; inspect before installing')
-            query = query.replace(old, new)
+        if old not in query:
+            raise ValueError('Recent-activity query changed; inspect before installing')
+        missing = ["'" + role + '_codex_' + family + '_' + effort + "'"
+                   for family in ('luna', 'sol') for effort in ('max', 'xhigh')
+                   if "'" + role + '_codex_' + family + '_' + effort + "'" not in query]
+        if missing:
+            query = query.replace(old, old + ', ' + ', '.join(missing))
     result = source[:start] + query + source[end:]
     compile(result, 'serve_dashboard.py', 'exec')
     return result

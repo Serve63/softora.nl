@@ -6,13 +6,13 @@ import sqlite3
 import tempfile
 import types
 import unittest
-from unittest.mock import patch as mock_patch
+from unittest.mock import Mock, patch as mock_patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
-from kvk_candidate_identity import from_answer, validate_review
+from kvk_candidate_identity import from_answer, validate_review, verify_api_dossier
 from kvk_api_validation import validate_api_evidence
-from install_kvk_candidates import patch, RESEARCH_EDITS, DIRECTORY_EDITS
+from install_kvk_candidates import patch, RESEARCH_EDITS, DIRECTORY_EDITS, HANDOFF_EDITS
 from kvk_directory_candidates import enrich_directory_rows
 from kvk_candidate_repair import repair
 from kvk_luna_searcher_test import COMPANY, answer, canonical
@@ -33,6 +33,60 @@ def ambiguous():
 
 
 class CandidateTests(unittest.TestCase):
+    def test_api_dossier_handoff_accepts_only_valid_candidates_or_empty_placeholder(self):
+        rows = [canonical(ambiguous())] + [dict(canonical(answer()), research_dossier=dossier)
+                for dossier in ({}, {'possible_matches': []}, {'identity_status': '', 'possible_matches': []},
+                                {'identity_status': 'confirmed', 'possible_matches': []})]
+        for row in rows:
+            self.assertTrue(verify_api_dossier(row))
+            self.assertFalse(verify_api_dossier(row, required=True))
+            self.assertFalse(verify_api_dossier(dict(row, validation_profile='native')))
+            with self.assertRaises(ValueError):
+                verify_api_dossier(dict(row, sources=[]))
+        for dossier in ({'version': 1}, {'unknown': True}, [], None):
+            self.assertFalse(verify_api_dossier(dict(canonical(answer()), research_dossier=dossier)))
+        for dossier in ({'identity_status': 'unconfirmed', 'possible_matches': []},
+                        {'identity_status': 'confirmed', 'possible_matches': [candidate()]},
+                        {'possible_matches': None}, {'identity_status': 'unknown'}):
+            with self.assertRaises(ValueError):
+                verify_api_dossier(dict(canonical(answer()), research_dossier=dossier))
+        row = canonical(ambiguous())
+        with self.assertRaises(ValueError):
+            verify_api_dossier(dict(row, lead_status='usable'))
+        row['research_dossier']['possible_matches'][0]['telefoon_bron_url'] = ''
+        with self.assertRaises(ValueError):
+            verify_api_dossier(row)
+
+    def test_handoff_installer_preserves_native_and_required_hash_validation(self):
+        source = '''def verify_row(row, required=False):
+    receipt = row.get('research_dossier')
+    if receipt is None and not required:
+        return
+    if not isinstance(receipt, dict) or receipt.get('version') != 1:
+        raise ValueError('hash-gekoppeld onderzoeksdossier')
+    return verify_hashes(receipt)
+'''
+        patched = patch(source, HANDOFF_EDITS)
+        self.assertEqual(patch(patched, HANDOFF_EDITS), patched)
+        hashes = Mock(side_effect=ValueError('Dossier gewijzigd'))
+        namespace = {'verify_hashes': hashes}
+        exec(patched, namespace)
+        verify = namespace['verify_row']
+        verify(canonical(ambiguous()))
+        verify(dict(canonical(answer()), research_dossier={}))
+        hashes.assert_not_called()
+        with self.assertRaisesRegex(ValueError, 'hash-gekoppeld'):
+            verify(canonical(ambiguous()), required=True)
+        with self.assertRaisesRegex(ValueError, 'hash-gekoppeld'):
+            verify({'research_dossier': {}})
+        native = dict(canonical(answer()), research_dossier={'version': 1})
+        for required in (False, True):
+            with self.assertRaisesRegex(ValueError, 'Dossier gewijzigd'):
+                verify(native, required=required)
+        self.assertEqual(hashes.call_count, 2)
+        with self.assertRaises(ValueError):
+            patch(source.replace("receipt = row.get('research_dossier')", 'receipt = None'), HANDOFF_EDITS)
+
     def test_directory_mirrors_latest_evidence_without_filling_confirmed_contacts(self):
         connection = sqlite3.connect(':memory:')
         connection.execute('CREATE TABLE contact_research_audits (id INTEGER, kvk_nummer TEXT, route_json TEXT)')

@@ -75,6 +75,26 @@ def validate_review(result):
     return True
 
 
+def verify_api_dossier(row, required=False):
+    """Distinguish API candidate evidence from a native sealed dossier receipt."""
+    from kvk_api_validation import PROFILE, validate_api_evidence
+    if required or row.get('validation_profile') != PROFILE:
+        return False
+    dossier = row.get('research_dossier')
+    if not isinstance(dossier, dict):
+        return False
+    if dossier:
+        if not set(dossier) <= {'identity_status', 'possible_matches'}:
+            return False  # Native versioned receipts still go through hash verification.
+        if dossier.get('identity_status') == 'unconfirmed':
+            if not validate_review(row):
+                raise ValueError('Ongeldig kandidaatdossier')
+        elif dossier.get('identity_status') not in (None, '', 'confirmed') or dossier.get('possible_matches', []) != []:
+            raise ValueError('Ongeldig kandidaatdossier')
+    validate_api_evidence(row)
+    return True
+
+
 def preserve_candidates(result, company, answer):
     matches = from_answer(company, answer)
     if not matches or answer.get('uitsluiting'):
