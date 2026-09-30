@@ -120,7 +120,8 @@ class CandidateTests(unittest.TestCase):
                 INSERT INTO contact_research_audits VALUES(1,'12345678','{}','Adresverschil','initial-time');
                 INSERT INTO research_execution_attributions VALUES('12345678','initial','initial-time','draft-hash');
             ''')
-            codec = types.SimpleNamespace(decode_audit_json=lambda s: s, encode_audit_json=json.dumps)
+            codec = types.SimpleNamespace(decode_audit_json=lambda s: s, encode_audit_json=json.dumps,
+                                          now=lambda: '2026-09-30T22:00:00+0200')
             with mock_patch.dict(sys.modules, {'contact_research': codec}):
                 c.execute("UPDATE research_execution_attributions SET input_sha256='newer'")
                 with self.assertRaisesRegex(ValueError, 'Laatste audit'):
@@ -133,6 +134,7 @@ class CandidateTests(unittest.TestCase):
             self.assertEqual((row['lead_status'], row['unusable_review_grade']), ('unusable', 1))
             self.assertEqual((row['telefoonnummer'], row['email'], row['website']), ('', '', ''))
             self.assertEqual((row['unusable_reason'], row['website_status']), ('identity_unconfirmed', 'unknown'))
+            self.assertEqual(row['updated_at'], '2026-09-30T22:00:00+0200')
             audit = json.loads(c.execute('SELECT route_json FROM contact_research_audits').fetchone()[0])
             self.assertEqual(audit['research_dossier']['possible_matches'], [candidate()])
             self.assertEqual(json.loads((Path(folder) / 'backup.json').read_text())['company']['website_status'], 'no_website')

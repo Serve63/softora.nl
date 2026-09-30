@@ -7,7 +7,7 @@ from kvk_candidate_identity import from_answer, normalize_matches
 
 def repair(connection, source, backup_path, supplemental_matches=None):
     """Caller owns canonical apply lock + transaction; later research is never overwritten."""
-    from contact_research import decode_audit_json, encode_audit_json
+    from contact_research import decode_audit_json, encode_audit_json, now
     source = Path(source)
     marker = json.loads(source.with_name(source.name + '.precheck-ok.json').read_text())
     if marker.get('status') != 'PRECHECK_OK' or marker.get('sha256') != hashlib.sha256(source.read_bytes()).hexdigest():
@@ -43,5 +43,5 @@ def repair(connection, source, backup_path, supplemental_matches=None):
     with Path(backup_path).open('x') as backup:
         json.dump({'company': dict(row), 'audit': dict(audit), 'source': str(source)}, backup, ensure_ascii=False)
     connection.execute('UPDATE contact_research_audits SET route_json=? WHERE id=?', (encode_audit_json(payload), audit['id']))
-    connection.execute("UPDATE companies SET unusable_reason='identity_unconfirmed', website_status='unknown', updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id=?", (row['id'],))
+    connection.execute("UPDATE companies SET unusable_reason='identity_unconfirmed', website_status='unknown', updated_at=? WHERE id=?", (now(), row['id']))
     return True
