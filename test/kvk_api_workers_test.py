@@ -274,13 +274,16 @@ class WorkerTests(unittest.TestCase):
         def run(command, **kwargs):
             self.assertIn('--ignore-user-config', command)
             self.assertIn('web_search=live', command)
+            self.assertNotIn('CODEX_APP_TOOLS_PIPE_PATH', kwargs['env'])
+            self.assertNotIn('CODEX_INTERNAL_ORIGINATOR_OVERRIDE', kwargs['env'])
+            self.assertNotIn('CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY', kwargs['env'])
             self.assertIn('gpt-6-luna', command)
             self.assertIn('model_reasoning_effort=xhigh', command)
             self.assertTrue(kwargs['input'].startswith('INSTRUCTIES'))
             self.assertIn('"kvk_nummer": "00000001"', kwargs['input'])
             Path(command[command.index('-o') + 1]).write_text('Antwoord: {"kvk_nummer":"00000001"}')
             return types.SimpleNamespace(returncode=0, stdout=events, stderr='')
-        with patch.object(runner.subprocess, 'run', side_effect=run), patch.object(runner, 'codex_run', self.real_codex_run), \
+        with patch.dict(os.environ, {'CODEX_APP_TOOLS_PIPE_PATH':'parent-pipe', 'CODEX_INTERNAL_ORIGINATOR_OVERRIDE':'parent-origin', 'CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY':'parent-task'}), patch.object(runner.subprocess, 'run', side_effect=run), patch.object(runner, 'codex_run', self.real_codex_run), \
                 patch.object(runner, 'codex_research', self.real_codex_research), patch.object(runner, 'codex_binary', return_value='/test/codex'):
             answer, urls = runner.codex_research({'kvk_nummer': '00000001'}, 'INSTRUCTIES')
         self.assertEqual((answer, urls), ({'kvk_nummer': '00000001'}, ['https://voorbeeld.nl/contact']))

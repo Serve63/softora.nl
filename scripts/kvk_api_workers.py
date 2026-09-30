@@ -292,8 +292,10 @@ def codex_run(prompt: str, role: str = "searcher") -> tuple[str, str]:
     """One short-lived Codex run: no chat history, nothing saved, gone when the company is done."""
     model, effort = CODEX_MODELS[role]
     child_env = os.environ.copy()
-    child_env.pop("CODEX_THREAD_ID", None)
-    child_env.pop("CODEX_SESSION_ID", None)
+    # Standalone research must not inherit the parent app task or IPC routing.
+    for key in list(child_env):
+        if key.startswith("CODEX_") and key != "CODEX_HOME":
+            child_env.pop(key)
     # Subscription-only: never inherit a key or an alternate API endpoint.
     for key in ("OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL"):
         child_env.pop(key, None)
