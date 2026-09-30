@@ -21,6 +21,7 @@ function createKvkApiWorkersService(deps = {}) {
   const getSupabaseClient = deps.getSupabaseClient || (() => null);
   const now = deps.now || (() => new Date());
   const validTokens = [deps.kvkDatabaseSyncToken, deps.fallbackSyncToken].filter(Boolean);
+  const identityJudge = deps.identityJudge || null;
 
   function tokenAllowed(req) {
     const submitted = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
@@ -152,13 +153,25 @@ function createKvkApiWorkersService(deps = {}) {
     });
   }
 
+  // The Robot's only model route: one fixed-answer identity question per undecided company.
+  async function judgeIdentity(req, res) {
+    if (!tokenAllowed(req)) return res.status(401).json({ ok: false, error: 'Ongeldig worker-token.' });
+    if (!identityJudge) return res.status(503).json({ ok: false, error: 'Beoordelingsmodel niet geconfigureerd.' });
+    try {
+      const result = await identityJudge.judge(req.body);
+      return res.status(result.status).json(result.body);
+    } catch (_error) {
+      return res.status(502).json({ ok: false, error: 'Beoordelingsmodel niet bereikbaar.' });
+    }
+  }
+
   // Kept so an old local worker gets a clear answer instead of a paid request.
   async function research(req, res) {
     if (!tokenAllowed(req)) return res.status(401).json({ ok: false, error: 'Ongeldig worker-token.' });
     return res.status(410).json({ ok: false, error: 'De betaalde API is uitgeschakeld; werk de lokale werker bij naar Codex.' });
   }
 
-  return { getStatus, setEnabled, poll, report, research };
+  return { getStatus, setEnabled, poll, report, research, judgeIdentity };
 }
 
 module.exports = { createKvkApiWorkersService };
