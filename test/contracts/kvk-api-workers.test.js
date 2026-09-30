@@ -292,3 +292,55 @@ test('ordinary worker halts and manual stops still turn the switch off', async (
     body: { role: 'searcher', halt: true, message: 'Lokale werker gereed; wacht op handmatige start.' } }, response());
   assert.equal(row.searcher_enabled, false);
 });
+
+
+test('worker status retains the validation cause beyond the old 180 character cutoff', async () => {
+  const detail = 'Herstel nodig: ' + 'context '.repeat(30) + 'telefoonveld leeg';
+  const { service } = settingsFixture({ controller_message: detail });
+  const res = response();
+  await service.getStatus({}, res);
+  assert.equal(res.body.state.workers.controller.message, detail);
+  assert.equal(res.body.state.workers.controller.blocked, true);
+});
+
+test('report persists a complete validation failure and poll keeps the worker paused', async () => {
+  const { service, row } = settingsFixture({ controller_enabled: true });
+  const message = 'Herstel nodig: ' + 'context '.repeat(30) + 'telefoonveld leeg';
+  await service.report({ headers: { authorization: 'Bearer test-worker-token' },
+    body: { role: 'controller', message, halt: true } }, response());
+  assert.equal(row.controller_message, message);
+  const res = response();
+  await service.poll({ headers: { authorization: 'Bearer test-worker-token' } }, res);
+  assert.equal(res.body.state.workers.controller.enabled, false);
+  assert.equal(res.body.state.workers.controller.blocked, true);
+});
+
+test('dialog renders a single error prefix and distinguishes stale workers from running workers', async (t) => {
+  const elements = new Map();
+  const element = (id) => {
+    if (!elements.has(id)) elements.set(id, { textContent: '', value: '', events: {},
+      addEventListener(name, action) { this.events[name] = action; },
+      setAttribute() {}, showModal() { this.open = true; } });
+    return elements.get(id);
+  };
+  const workers = {
+    searcher: { enabled: true, blocked: true, message: 'Herstel nodig: Bewijs ontbreekt' },
+    controller: { enabled: true, active: false, message: '' },
+    robot: { enabled: true, active: true, message: 'Onderzoekt bedrijf' },
+  };
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { getElementById: element } });
+  t.after(() => {
+    if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument);
+    else delete globalThis.document;
+    delete require.cache[require.resolve('../../assets/kvk-api-workers.js')];
+  });
+  t.mock.method(globalThis, 'setInterval', () => {});
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ ok: true, state: { workers } }) }));
+  require('../../assets/kvk-api-workers.js');
+  element('kvk-api-workers-open').events.click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(element('kvk-api-searcher-status').textContent, 'Herstel nodig · Bewijs ontbreekt');
+  assert.equal(element('kvk-api-controller-status').textContent, 'Wacht op lokale werker');
+  assert.equal(element('kvk-api-robot-status').textContent, 'Aan · Onderzoekt bedrijf');
+});

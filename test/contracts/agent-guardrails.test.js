@@ -696,8 +696,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.scripts['clean:local'], 'bash scripts/clean-local-artifacts.sh');
   assert.equal(packageJson.engines.node, '22.x');
   assert.equal(nvmrcSource.trim(), '22');
-  assert.equal(packageJson.dependencies.nodemailer, '^9.1.1');
-  assert.equal(packageJson.dependencies.mailparser, '^3.9.14');
+  assert.equal(packageJson.dependencies.nodemailer, '^10.0.13');
+  assert.equal(packageJson.dependencies.mailparser, '^3.9.32');
   assert.equal(packageJson.overrides['deepmerge-ts'], '8.0.1');
   assert.equal(packageJson.overrides.qs, '6.16.0');
   assert.equal(packageJson.dependencies.htmlparser2, '^10.1.0');
@@ -968,4 +968,16 @@ test('agent rules keep the instant-screen standard for personnel pages', () => {
   assert.match(platform, /## Direct zichtbare schermen \(geïmplementeerd, verplicht voor nieuwe functies\)/);
   assert.match(platform, /Teruggezette of onthouden inhoud is alleen-lezen/);
   assert.match(platform, /Checklist voor een nieuwe of gewijzigde personeelsfunctie/);
+});
+
+
+test('production mail dependencies retain the September 2026 security fixes', () => {
+  const pkg = require('../../package.json');
+  const lock = require('../../package-lock.json');
+  for (const [name, minimum] of [['nodemailer', [10, 0, 13]], ['mailparser', [3, 9, 32]], ['ip-address', [10, 7, 2]]]) {
+    const version = lock.packages['node_modules/' + name].version.split('.').map(Number);
+    const comparison = version.reduce((value, part, index) => value || Math.sign(part - minimum[index]), 0);
+    assert.ok(comparison >= 0, name + ' must include the audited security fixes');
+  }
+  assert.equal(pkg.scripts['check:deps'], 'npm audit --omit=dev');
 });

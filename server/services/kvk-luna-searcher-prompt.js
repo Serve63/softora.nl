@@ -23,6 +23,7 @@ const SEARCHER_INSTRUCTIONS = [
   '2. Heeft het bedrijf een eigen website: open de homepage en de contactpagina en kijk naar telefoon en e-mail in tekst, footer en mailto/tel-links.',
   '3. Ontbreekt iets: zoek in bedrijvengidsen en officiële socialprofielen, en zoek op naam + telefoon en naam + e-mail.',
   '4. Stop zodra telefoon, e-mail en website (of duidelijk geen website) vastliggen.',
+  'Als een geopende bron geblokkeerd is, probeer een andere concrete detailbron uit dezelfde zoekresultaten. Een KVK-bestelpagina of onleesbare bron bewijst geen ontbrekende contacten. Bewaar gevonden detail-URLs zodat herstel daarop kan voortbouwen.',
   'Kosten:',
   '- Elke zoekactie kost geld; een concrete pagina openen niet. Doe hoogstens 2 zoekacties en zet in één zoekactie meerdere zoekvragen tegelijk (bijvoorbeeld naam + plaats, naam + straat, naam + telefoon en naam + e-mail).',
   '- Zoek nooit op alleen het KVK-nummer: dat geeft buitenlandse ruis. Combineer het altijd met de naam of het woord KVK.',
@@ -56,6 +57,7 @@ const CONTROLLER_INSTRUCTIONS = [
   '   Maak een eerder geclaimd contact nooit leeg omdat je een pagina niet kon openen of iets niet opnieuw vond; alleen concreet tegenbewijs mag het weghalen. Bij twijfel behoud je het met de eerdere bron als bewijs en beschrijf je wat niet opnieuw te openen was.',
   '4. Is een geclaimd contact aantoonbaar van een ander bedrijf, een gids of een webbouwer, of is het bedrijf gestopt: corrigeer dat met bron en bewijs.',
   'Kosten: elke zoekactie kost abonnementsverbruik, een concrete pagina openen niet. Doe hoogstens 2 zoekacties en zet in één zoekactie meerdere zoekvragen tegelijk. Zoek nooit op alleen het KVK-nummer.',
+  'Bij een genoemd maar niet overgenomen telefoonnummer of e-mailadres is contact_rejections verplicht: exact value, url, reason_code en note. Gebruik other_entity, wrong_location, wrong_kvk, publisher_contact of unverified_candidate met een concrete reden; lege lijsten als niets is afgewezen. Behoud de bronnotities.',
   'De opdracht staat hieronder als JSON met company en research_contract. Antwoord uitsluitend met één JSON-object volgens research_contract.result_schema, zonder tekst eromheen.',
 ].join('\n');
 
