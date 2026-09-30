@@ -110,14 +110,14 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(runner.apply_ready_prefix('searcher', packet, [], threading.Lock()), 1)
             apply.assert_called_once()
 
-    def run_pipeline(self, companies, count, research_delay):
+    def run_pipeline(self, companies, count, research_delay, streaming_role=None):
         queue = [dict(company) for company in companies]
         researched, applied, running, peak = [], [], [0], [0]
         lock = threading.Lock()
 
         def call(path, payload, **kwargs):
             if path == '/poll':
-                return {'state': {'workers': {'searcher': {'enabled': bool(queue), 'count': count}}}}
+                return {'state': {'workers': {streaming_role or 'searcher': {'enabled': bool(queue), 'count': count}}}}
             if path == '/research':
                 with lock:
                     running[0] += 1
@@ -134,9 +134,10 @@ class WorkerTests(unittest.TestCase):
             return ({'bedrijven': queue[:limit]}, []) if queue else None
 
         def apply(path, flags, apply_lock, role, **kwargs):
-            kvk = queue[0]['kvk_nummer']
-            self.assertIn(kvk, path.name)  # only ever the current queue head
-            applied.append(queue.pop(0)['kvk_nummer'])
+            index = next(i for i, c in enumerate(queue) if c['kvk_nummer'] in path.name) if streaming_role else 0
+            kvk = queue[index]['kvk_nummer']
+            self.assertIn(kvk, path.name)
+            applied.append(queue.pop(index)['kvk_nummer'])
             path.unlink()
             return True
 
@@ -145,8 +146,24 @@ class WorkerTests(unittest.TestCase):
                 patch.object(runner, 'apply_result', side_effect=apply), patch.object(runner, 'report'), \
                 patch.object(kvk_luna_searcher, 'to_canonical', side_effect=lambda company, *_: company), \
                 patch.object(runner, 'wait', side_effect=lambda futures, **kw: original_wait(futures, timeout=0.05, return_when=runner.FIRST_COMPLETED)):
-            runner.run_searcher_pipeline(threading.Lock())
+            if streaming_role:
+                import kvk_worker_stream
+                with patch.object(runner, 'validate_saved_result'):
+                    kvk_worker_stream.run(streaming_role, runner, threading.Lock())
+            else:
+                runner.run_searcher_pipeline(threading.Lock())
         return researched, applied, peak[0]
+
+    def test_stream_applies_fast_results_before_slow_peer_for_both_roles(self):
+        for role in ('searcher', 'controller'):
+            with self.subTest(role=role):
+                companies = [{'kvk_nummer': f'{i:08}'} for i in range(11, 15)]
+                researched, applied, peak = self.run_pipeline(companies, 3,
+                    lambda kvk: 0.4 if kvk == '00000011' else 0.02, role)
+                self.assertNotEqual(applied[0], '00000011')
+                self.assertEqual(sorted(applied), [c['kvk_nummer'] for c in companies])
+                self.assertEqual(sorted(researched), sorted(applied))
+                self.assertLessEqual(peak, 3)
 
     def test_pipeline_applies_in_queue_order_while_slow_requests_keep_running(self):
         companies = [{'kvk_nummer': f'{i:08}'} for i in range(1, 9)]
