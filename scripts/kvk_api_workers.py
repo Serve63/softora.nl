@@ -23,6 +23,7 @@ from pathlib import Path
 
 from start_database_fill_control import post_json, resolve_token
 from kvk_api_validation import PROFILE
+from kvk_worker_cache import contract, stamp, quarantine_stale
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -180,7 +181,7 @@ def apply_result(path: Path, flags: list[str], apply_lock: threading.Lock, role:
             raise
     os.replace(archive_temp, destination)
     path.unlink(missing_ok=True)
-    for suffix in (".luna.json", ".engine.json", ".recovery.json"):
+    for suffix in (".luna.json", ".engine.json", ".recovery.json", ".contract.json"):
         sidecar = path.with_suffix(suffix)
         if sidecar.exists():
             os.replace(sidecar, destination.with_suffix(suffix))
@@ -391,7 +392,9 @@ def luna_search_one(company: dict, flags: list[str], validate: bool = True) -> b
                              "Je mag deze leesbare inhoud als geopende bron beoordelen en citeren. "
                              "Controleer de exacte entiteit; een blocked-resultaat is geen bewijs. "
                              "Gebruik geen gidscontact als bedrijfscontact:\n" + json.dumps(pages, ensure_ascii=False))
-            answer, consulted = codex_research(company, instructions_for("searcher"), feedback)
+            instructions = instructions_for("searcher")
+            stamp(path, contract(*CODEX_MODELS["searcher"], instructions))
+            answer, consulted = codex_research(company, instructions, feedback)
         finally:
             busy.unlink(missing_ok=True)
         if not isinstance(answer, dict) or str(answer.get("kvk_nummer")) != kvk:
@@ -443,7 +446,9 @@ def research_one(role: str, company: dict, brief: dict, flags: list[str], valida
         recovery["attempts"] += 1
         recovery["last_error"] = failure
         save_result(recovery_path, recovery)
-        result = codex_control(company, repair_brief, instructions_for(role))
+        instructions = instructions_for(role)
+        stamp(path, contract(*CODEX_MODELS[role], instructions))
+        result = codex_control(company, repair_brief, instructions)
         if not isinstance(result, dict) or str(result.get("kvk_nummer")) != kvk:
             raise RuntimeError("Codex gaf geen geldig resultaat voor de juiste onderneming terug.")
         save_result(path, result)
@@ -695,6 +700,11 @@ def main() -> int:
                     if not transient_control_failure(error):
                         raise
                     time.sleep(15)
+        poll_state()
+        expected = {role: contract(*CODEX_MODELS[role], instructions_for(role))
+                    for role in ("searcher", "controller")}
+        moved = quarantine_stale(PENDING, ROOT / "data/kvk_stale_results", expected)
+        print(f"Oude resultaatgroepen veilig apart gezet: {len(moved)}", flush=True)
         apply_lock = threading.Lock()
         threads = [threading.Thread(target=work, args=(role, apply_lock), daemon=True)
                    for role in ("searcher", "controller")]
