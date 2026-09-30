@@ -24,7 +24,12 @@ from kvk_robot_import import import_find, publish_live, robot_find
 
 QUEUE = ROOT / 'data' / 'shadow' / 'robot-v5-dashboard'
 DB = ROOT / 'data' / 'nederland_bedrijven.sqlite'
-ENGINE = Path(os.environ.get('SOFTORA_ROBOT_ENGINE') or ROOT / 'experiments' / 'robot-v5-deterministic-20260919' / 'run_shadow.py')
+# Robot v7 engine: the v5 evidence gate plus measured recall fixes (search
+# retries, reordered-name and free-mail own-site bridges, http sites, stricter
+# umbrella/portal/cessation checks). The v5 engine stays available for rollback.
+ENGINE_V5 = ROOT / 'experiments' / 'robot-v5-deterministic-20260919' / 'run_shadow.py'
+ENGINE_V7 = ROOT / 'experiments' / 'robot-v7-limit-20260930' / 'run_shadow.py'
+ENGINE = Path(os.environ.get('SOFTORA_ROBOT_ENGINE') or (ENGINE_V7 if ENGINE_V7.exists() else ENGINE_V5))
 PYTHON = ROOT / '.venv-robot-zero' / 'bin' / 'python'
 FIELDS = ('id', 'kvk_nummer', 'bedrijfsnaam', 'plaats', 'straatnaam', 'huisnummer', 'postcode', 'vestigingsnummer')
 # Each company is its own engine process; a handful run side by side.
