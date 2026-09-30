@@ -416,7 +416,10 @@ def luna_search_one(company: dict, flags: list[str], validate: bool = True) -> b
     if not path.exists():
         # The apply step only picks up a queue head whose mapped result exists.
         saved = json.loads(answer_path.read_text())
-        save_result(path, to_canonical(company, saved["answer"], saved.get("consulted_urls") or []))
+        try:
+            save_result(path, to_canonical(company, saved["answer"], saved.get("consulted_urls") or []))
+        except ValueError as error:
+            raise CompanyValidationFailure(f"{kvk}: onvolledig antwoordbewijs: {error}") from error
     if not validate:
         return True
     try:
@@ -487,6 +490,8 @@ def api_brief(packet: dict) -> dict:
         "telefoonnummer": [{"value": "", "url": "", "reason_code": "unverified_candidate", "note": ""}],
         "email": [{"value": "", "url": "", "reason_code": "other_entity", "note": ""}],
     }
+    schema["research_dossier"] = {"identity_status": "unconfirmed (alleen bij onopgeloste identiteit)", "possible_matches": [
+        {key: "" for key in ("bedrijfsnaam", "adres", "telefoonnummer", "telefoon_bron_url", "email", "email_bron_url", "website", "bron_url", "onzekerheid")}]}
     schema["route_notes"] = {
         key: {"status": "checked | not_found | blocked | not_applicable", "notes": "concrete bevinding", "urls": []}
         for key in (schema.get("route_notes") or {})
@@ -495,6 +500,7 @@ def api_brief(packet: dict) -> dict:
         "contract": PROFILE,
         "planning_scope": packet.get("planning_scope"),
         "bindend": [
+            "Bij een mogelijke match met onopgeloste identiteit: bewaar kandidaten met concrete bronnen en onzekerheid in research_dossier (identity_status=unconfirmed, possible_matches); laat hoofdcontactvelden leeg, lead_status=unusable, unusable_reason=identity_unconfirmed en website_status=unknown. Verwar onbevestigd niet met niet gevonden. Na bewezen bevestiging/afwijzing vervalt identity_status=unconfirmed; onderbouw de beslissing.",
             "Bewijscontract: identity, entity_match en final_crosscheck zijn checked met concrete bevindingen; identity koppelt naam/adres aan doel-KVK via een geopende bron. lead_status=usable vereist telefoonnummer EN email, source_quality official of supported, operational_status operational en entity_role specific; anders unusable met feitelijke reden.",
             "sources bevatten exacte URL en feitelijke note; elk gevuld contactveld heeft field_evidence met exacte bron-URL. Elk leeg veld krijgt een verklaring. contact_rejections vermeldt genoemde maar niet overgenomen contacten met value, url, reason_code (other_entity, wrong_location, wrong_kvk, publisher_contact of unverified_candidate) en note; anders lege lijsten. Verwijder geen bewijs om validatie te passeren.",
             "route_notes bevatten status, notes en urls; status is checked, not_found, blocked of not_applicable met eerlijke reden. checks_completed=true alleen voor werkelijk uitgevoerde controle; toolfouten bewijzen geen afwezigheid.",
@@ -681,6 +687,9 @@ def main() -> int:
     from kvk_completion_order import patched_source as completion_source
     if completion_source(canonical) != canonical:
         raise RuntimeError("Installeer eerst de voltooiingsvolgorde; geen werker gestart.")
+    from install_kvk_candidates import patch, RESEARCH_EDITS
+    if patch(canonical, RESEARCH_EDITS) != canonical:
+        raise RuntimeError("Installeer eerst het kandidaatbewijs; geen werker gestart.")
     PENDING.mkdir(parents=True, exist_ok=True)
     LOCK.touch(exist_ok=True)
     with LOCK.open("r+") as lock:
