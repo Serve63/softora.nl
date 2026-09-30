@@ -306,7 +306,10 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
     quality = clean(answer.get("source_quality")) or "weak"
     if not identity_ok:
         role = "unclear"
-    usable = bool(phone and email) and identity_ok and operational == "operational" \
+    exclusion = clean(answer.get("uitsluiting"))
+    if exclusion not in ("", "chain_branch", "non_specific_entity", "stopped"):
+        raise ValueError("Onbekende uitsluitingsreden")
+    usable = not exclusion and bool(phone and email) and identity_ok and operational == "operational" \
         and role == "specific" and quality in ("official", "supported")
 
     field_urls = [identity_url, phone_url, email_url, website]
@@ -341,8 +344,8 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
         "website": website,
         "website_status": website_status,
         "lead_status": "usable" if usable else "unusable",
-        "unusable_reason": "non_specific_entity" if role in ("parent_or_holding", "asset_or_real_estate")
-        else "stopped" if operational == "stopped" else "",
+        "unusable_reason": exclusion or ("non_specific_entity" if role in ("parent_or_holding", "asset_or_real_estate")
+        else "stopped" if operational == "stopped" else ""),
         "operational_status": operational,
         "source_quality": quality,
         "entity_role": role,

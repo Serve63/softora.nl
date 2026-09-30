@@ -48,7 +48,7 @@ def codex_binary() -> str:
             return candidate
     raise RuntimeError("Codex CLI niet gevonden; werk de Codex-app bij. Geen onderzoek gestart.")
 
-CODEX_MODEL = "gpt-6-luna"
+CODEX_MODELS = {"searcher": ("gpt-6-sol", "xhigh"), "controller": ("gpt-6-luna", "max")}
 CODEX_TIMEOUT_SECONDS = 900
 MAX_REPAIR_ATTEMPTS = 3
 SEARCHER_RETRIES = 2  # a refused Searcher answer gets this many new Codex runs before the worker stops
@@ -280,8 +280,9 @@ def codex_consulted_urls(events: str) -> list[str]:
     return list(dict.fromkeys(urls))[:200]
 
 
-def codex_run(prompt: str) -> tuple[str, str]:
+def codex_run(prompt: str, role: str = "searcher") -> tuple[str, str]:
     """One short-lived Codex run: no chat history, nothing saved, gone when the company is done."""
+    model, effort = CODEX_MODELS[role]
     child_env = os.environ.copy()
     child_env.pop("CODEX_THREAD_ID", None)
     child_env.pop("CODEX_SESSION_ID", None)
@@ -293,7 +294,7 @@ def codex_run(prompt: str) -> tuple[str, str]:
         # No user config: personal instructions or a local model router must not change the answer.
         process = subprocess.run(
             [codex_binary(), "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check",
-             "-s", "read-only", "-C", workdir, "-m", CODEX_MODEL, "-c", "model_reasoning_effort=max",
+             "-s", "read-only", "-C", workdir, "-m", model, "-c", f"model_reasoning_effort={effort}",
              "-c", "web_search=live", "-c", "model_provider=openai", "--json", "-o", str(last), "-"],
             input=prompt, cwd=workdir, env=child_env, text=True, capture_output=True,
             timeout=CODEX_TIMEOUT_SECONDS, check=False,
@@ -318,7 +319,7 @@ def codex_research(company: dict, instructions: str, feedback: str = "") -> tupl
 
 def codex_control(company: dict, brief: dict, instructions: str) -> dict:
     task = json.dumps({"company": company, "research_contract": brief}, ensure_ascii=False)
-    text, _events = codex_run(f"{instructions}\n\nOpdracht:\n{task}")
+    text, _events = codex_run(f"{instructions}\n\nOpdracht:\n{task}", role="controller")
     return parse_answer(text)
 
 

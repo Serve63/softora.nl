@@ -34,6 +34,19 @@ def canonical(value, consulted=()):
 
 
 class LunaSearcherTests(unittest.TestCase):
+    def test_excluded_company_with_full_contacts_is_not_usable(self):
+        for reason in ('chain_branch', 'non_specific_entity', 'stopped'):
+            with self.subTest(reason=reason):
+                result = canonical(answer(uitsluiting=reason))
+                self.assertEqual(result['lead_status'], 'unusable')
+                self.assertEqual(result['unusable_reason'], reason)
+                self.assertTrue(result['telefoonnummer'])
+                self.assertTrue(result['email'])
+
+    def test_unknown_exclusion_is_refused(self):
+        with self.assertRaises(ValueError):
+            canonical(answer(uitsluiting='guess'))
+
     def test_contacts_on_the_cited_page_make_a_usable_lead(self):
         result = canonical(answer())
         self.assertEqual(result['lead_status'], 'usable')

@@ -2,9 +2,13 @@ const crypto = require('node:crypto');
 const { SEARCHER_INSTRUCTIONS, CONTROLLER_INSTRUCTIONS } = require('./kvk-luna-searcher-prompt');
 
 const TABLE = 'softora_kvk_api_budget';
-const MODEL = 'gpt-6-luna';
+const MODEL = 'gpt-6-sol';
 // All workers run through Codex on the local ChatGPT subscription; the paid API is not used.
-const MODEL_LABEL = 'Codex Luna 6 Max';
+const MODEL_LABEL = 'Searcher: Codex Sol 6 xhigh · Controleur: Codex Luna 6 Max';
+const ROLE_MODELS = {
+  searcher: { model: MODEL, modelLabel: 'Codex Sol 6 xhigh', reasoningEffort: 'xhigh' },
+  controller: { model: 'gpt-6-luna', modelLabel: 'Codex Luna 6 Max', reasoningEffort: 'max' },
+};
 const STALE_MS = 120000;
 const ROLES = new Set(['searcher', 'controller', 'robot']);
 
@@ -51,9 +55,10 @@ function createKvkApiWorkersService(deps = {}) {
     return {
       model: MODEL,
       modelLabel: MODEL_LABEL,
-      reasoningEffort: 'max',
+      reasoningEffort: 'xhigh',
       maxWorkersPerRole: 10,
       workers: Object.fromEntries([...ROLES].map((role) => [role, {
+        ...ROLE_MODELS[role],
         enabled: row[`${role}_enabled`] === true,
         count: Number(row[`${role}_count`] || 1),
         active: isLive(row, role) && !validationBlocked(String(row[`${role}_message`] || '')),
