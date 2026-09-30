@@ -104,6 +104,9 @@ function registerKvkDatabaseRoutes(app, deps = {}) {
   app.post('/api/kvk-database/api-workers/research', (req, res) =>
     apiWorkersCoordinator.research(req, res)
   );
+  app.post('/api/kvk-database/api-workers/identity-judge', (req, res) =>
+    apiWorkersCoordinator.judgeIdentity(req, res)
+  );
 }
 
 module.exports = {

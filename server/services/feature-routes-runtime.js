@@ -71,6 +71,7 @@ const { createKvkDatabaseSnapshotService } = require('./kvk-database-snapshot');
 const { createKvkDatabaseControlService } = require('./kvk-database-control');
 const { createKvkDatabaseUploadService } = require('./kvk-database-upload');
 const { createKvkApiWorkersService } = require('./kvk-api-workers');
+const { createKvkRobotIdentityJudge } = require('./kvk-robot-identity-judge');
 const { createKvkCompanyDirectoryService } = require('./kvk-company-directory');
 const {
   createPremiumDatabaseMassResearchCoordinator,
@@ -176,6 +177,7 @@ function registerFeatureRoutes(app, deps = {}) {
     getSupabaseClient: whoopHealth.getSupabaseClient,
     fallbackSyncToken: mailboxCronSecret,
     env: deps.env || process.env,
+    identityJudge: createKvkRobotIdentityJudge({ getApiKey: () => (deps.env || process.env).OPENAI_API_KEY || '' }),
   });
   const kvkCompanyDirectoryCoordinator = createKvkCompanyDirectoryService({
     ...(kvkDatabaseSnapshot || {}),
