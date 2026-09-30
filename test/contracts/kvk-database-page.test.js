@@ -767,7 +767,7 @@ test('activity deltas keep a sign at zero and use the short period label', () =>
 test('unconfirmed candidate contacts remain visible with their uncertainty and safe sources', () => {
   const { activityRowHtml, activityStatus } = require('../../assets/kvk-database-luna-errors');
   const row = { kvk_nummer: '12345678', lead_status: 'unusable', unusable_reason: 'identity_unconfirmed',
-    research_dossier: { identity_status: 'unconfirmed', possible_matches: [{ bedrijfsnaam: '<script>name</script>',
+    research_dossier: { identity_status: 'unconfirmed', possible_matches: [{ bedrijfsnaam: '<SCRIPT>name</SCRIPT>',
       telefoonnummer: '0612345678', email: 'info@example.nl', website: 'https://example.nl',
       bron_url: 'https://example.nl/contact', onzekerheid: 'Adresverschil nog niet verklaard.' }] } };
   const html = activityRowHtml(row);
@@ -776,7 +776,7 @@ test('unconfirmed candidate contacts remain visible with their uncertainty and s
   assert.match(html, /info@example.nl/);
   assert.match(html, /Adresverschil nog niet verklaard/);
   assert.match(html, /Mogelijke match/);
-  assert.doesNotMatch(html, /Niet gevonden|Geen contact|<script>/);
+  assert.doesNotMatch(html, /Niet gevonden|Geen contact|<script>/i);
   row.research_dossier.possible_matches[0].bron_url = 'javascript:alert(1)';
   assert.doesNotMatch(activityRowHtml(row), /href="javascript:/);
   delete row.research_dossier;
