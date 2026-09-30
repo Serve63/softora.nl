@@ -37,7 +37,7 @@ class DraftAttributionTest(unittest.TestCase):
                 research.command_apply = apply
                 spec = importlib.util.spec_from_file_location('draft_entrypoint', Path(__file__).resolve().parents[1]/'scripts/contact_validate_apply.py')
                 module = importlib.util.module_from_spec(spec)
-                with patch.dict(sys.modules, contact_agent_precheck=precheck, contact_research=research), patch.object(sys, 'argv', ['apply', str(source)] + (['--review-unusable'] if review else [])):
+                with patch('kvk_api_attribution.DATA_ROOT', Path(folder)), patch.dict(sys.modules, contact_agent_precheck=precheck, contact_research=research), patch.object(sys, 'argv', ['apply', str(source)] + (['--review-unusable'] if review else [])):
                     spec.loader.exec_module(module)
                     self.assertEqual(module.main(), 0)
 
@@ -46,8 +46,15 @@ class DraftAttributionTest(unittest.TestCase):
             source, draft = Path(folder)/'source.json', Path(folder)/'draft.json'
             source.write_text('{}'); draft.write_text('{}')
             draft.with_suffix('.engine.json').write_text('{"engine":"codex"}')
-            copy_execution_metadata(source, draft)
+            with patch("kvk_api_attribution.DATA_ROOT", Path(folder)):
+                copy_execution_metadata(source, draft)
             self.assertFalse(draft.with_suffix('.engine.json').exists())
+
+    def test_metadata_cannot_write_outside_data_root(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch('kvk_api_attribution.DATA_ROOT', Path(folder)/'data'):
+                with self.assertRaises(ValueError):
+                    copy_execution_metadata(Path(folder)/'source.json', Path(folder)/'outside.json')
 
     def test_repair_requires_hash_bound_explicit_metadata(self):
         from kvk_attribution_repair import proven_execution

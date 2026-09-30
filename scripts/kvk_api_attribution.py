@@ -2,18 +2,30 @@
 import hashlib
 import json
 import shutil
+import os
 from pathlib import Path
 from kvk_api_validation import PROFILE
+
+
+DATA_ROOT = Path(__file__).resolve().parents[1] / "data"
+
+
+def metadata_path(path, suffix):
+    root = os.path.realpath(DATA_ROOT) + os.sep
+    resolved = os.path.realpath(Path(path).with_suffix(suffix))
+    if not resolved.startswith(root):
+        raise ValueError("Producer metadata must remain inside the database data directory")
+    return resolved
 
 
 def copy_execution_metadata(source, draft):
     """Carry producer metadata to the hash-validated draft without changing its bytes."""
     for suffix in ('.luna.json', '.engine.json'):
-        origin, target = Path(source).with_suffix(suffix), Path(draft).with_suffix(suffix)
-        if origin.exists():
+        origin, target = metadata_path(source, suffix), metadata_path(draft, suffix)
+        if os.path.exists(origin):
             shutil.copyfile(origin, target)
-        else:
-            target.unlink(missing_ok=True)
+        elif os.path.exists(target):
+            os.unlink(target)
 
 
 def engine_for(path):
