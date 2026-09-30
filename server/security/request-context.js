@@ -20,6 +20,7 @@ const SAME_ORIGIN_PROTECTION_EXEMPT_PATHS = new Set([
   '/api/kvk-database/api-workers/poll',
   '/api/kvk-database/api-workers/report',
   '/api/kvk-database/api-workers/research',
+  '/api/kvk-database/api-workers/identity-judge',
   '/api/retell/webhook',
   '/api/retell/functions/agenda/availability',
   '/retell/webhook',
