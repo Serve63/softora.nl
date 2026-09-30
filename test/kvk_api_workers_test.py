@@ -173,9 +173,33 @@ class WorkerTests(unittest.TestCase):
             Path(command[command.index('-o') + 1]).write_text('Antwoord: {"kvk_nummer":"00000001"}')
             return types.SimpleNamespace(returncode=0, stdout=events, stderr='')
         with patch.object(runner.subprocess, 'run', side_effect=run), patch.object(runner, 'codex_run', self.real_codex_run), \
-                patch.object(runner, 'codex_research', self.real_codex_research):
+                patch.object(runner, 'codex_research', self.real_codex_research), patch.object(runner, 'codex_binary', return_value='/test/codex'):
             answer, urls = runner.codex_research({'kvk_nummer': '00000001'}, 'INSTRUCTIES')
         self.assertEqual((answer, urls), ({'kvk_nummer': '00000001'}, ['https://voorbeeld.nl/contact']))
+
+    def test_codex_binary_survives_app_layout_change(self):
+        with tempfile.TemporaryDirectory() as folder:
+            binary = Path(folder) / 'codex'
+            binary.write_text('test')
+            binary.chmod(0o700)
+            with patch.object(runner, 'CODEX_CANDIDATES', (folder + '/missing', str(binary))), \
+                    patch.object(runner.shutil, 'which', return_value=None):
+                self.assertEqual(runner.codex_binary(), str(binary))
+            with patch.object(runner, 'CODEX_CANDIDATES', (folder + '/missing',)), \
+                    patch.object(runner.shutil, 'which', return_value=None):
+                with self.assertRaisesRegex(RuntimeError, 'Geen onderzoek gestart'):
+                    runner.codex_binary()
+
+    def test_report_preserves_the_actual_validation_reason(self):
+        reason = 'Herstel nodig: ' + 'x' * 180 + ' telefoonveld leeg'
+        with patch.object(runner, 'call') as call:
+            runner.report('controller', reason, halt=True)
+        self.assertEqual(call.call_args.args[1]['message'], reason)
+
+    def test_controller_contract_requires_structured_contact_rejections(self):
+        brief = runner.api_brief({})
+        self.assertIn('contact_rejections', brief['result_schema'])
+        self.assertTrue(any('Verwijder geen bewijs' in rule for rule in brief['bindend']))
 
     def test_worker_instructions_come_from_the_server_poll(self):
         runner.INSTRUCTIONS.clear()

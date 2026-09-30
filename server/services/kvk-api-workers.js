@@ -59,7 +59,7 @@ function createKvkApiWorkersService(deps = {}) {
         active: isLive(row, role) && !validationBlocked(String(row[`${role}_message`] || '')),
         blocked: validationBlocked(String(row[`${role}_message`] || '')),
         heartbeatAt: row[`${role}_heartbeat_at`] || null,
-        message: String(row[`${role}_message`] || '').slice(0, 180),
+        message: String(row[`${role}_message`] || '').slice(0, 1200),
         currentBatch: String(row[`${role}_batch`] || '').slice(0, 100),
       }])),
     };
@@ -133,11 +133,11 @@ function createKvkApiWorkersService(deps = {}) {
     return handle(res, async () => {
       const role = String(req.body?.role || '');
       if (!ROLES.has(role)) return res.status(400).json({ ok: false, error: 'Ongeldige werkrol.' });
-      const message = String(req.body?.message || '').slice(0, 180);
+      const message = String(req.body?.message || '').slice(0, 1200);
       const blocked = req.body?.halt === true && validationBlocked(message);
       const update = {
         [`${role}_heartbeat_at`]: now().toISOString(),
-        [`${role}_message`]: blocked ? message.replace(/^Gestopt:/, 'Herstel nodig:').slice(0, 180) : message,
+        [`${role}_message`]: blocked ? message.replace(/^Gestopt:/, 'Herstel nodig:').slice(0, 1200) : message,
         [`${role}_batch`]: String(req.body?.currentBatch || '').slice(0, 100),
       };
       if (req.body?.halt === true && !blocked) update[`${role}_enabled`] = false;

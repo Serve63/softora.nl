@@ -61,8 +61,8 @@
     "helmet": "^8.0.0",
     "htmlparser2": "^10.1.0",
     "imapflow": "^1.2.18",
-    "mailparser": "^3.9.14",
-    "nodemailer": "^9.1.1",
+    "mailparser": "^3.9.32",
+    "nodemailer": "^10.0.13",
     "nspell": "^2.1.5",
     "playwright": "^1.61.1",
     "sharp": "^0.35.4"
