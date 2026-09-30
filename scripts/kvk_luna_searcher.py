@@ -360,6 +360,8 @@ def to_canonical(company: dict, answer: dict, consulted_urls: list[str], fetch=f
         "route_notes": route_notes,
         "validation_profile": PROFILE,
     }
+    from kvk_candidate_identity import preserve_candidates
+    preserve_candidates(result, company, answer)
     reference = identity_url or (source_urls[0] if source_urls else "")
     withhold_unaccepted_contacts(result, reference, [kvk, clean(company.get("vestigingsnummer"))])
     return result

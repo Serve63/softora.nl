@@ -131,10 +131,14 @@
   }
 
   function missingLabel(company) {
+    if (company?.unusable_reason === 'identity_unconfirmed') return 'Nog niet bevestigd';
     return isTreated(company) ? 'Niet gevonden' : 'Nog niet behandeld';
   }
 
   function companyStatus(company) {
+    if (company?.unusable_reason === 'identity_unconfirmed') {
+      return { label: 'Mogelijke match · Identiteit controleren', className: 'is-pending' };
+    }
     const leadStatus = String(company?.lead_status || '').trim();
     if (leadStatus === 'usable') {
       return { label: 'Bruikbaar verklaard', className: 'is-usable' };

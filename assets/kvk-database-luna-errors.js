@@ -56,6 +56,7 @@
   }
 
   function activityStatus(activity) {
+    if (activity.unusable_reason === 'identity_unconfirmed') return 'Identiteit controleren';
     const findingLabels = {
       incorrect_approval: 'Onterecht goedgekeurd',
       missed_usable: 'Onterecht afgekeurd',
@@ -92,6 +93,20 @@
   }
 
   function activityRowHtml(activity) {
+    const uncertain = activity.unusable_reason === 'identity_unconfirmed';
+    const matches = uncertain && Array.isArray(activity.research_dossier?.possible_matches)
+      ? activity.research_dossier.possible_matches.slice(0, 5) : [];
+    function candidateField(field) {
+      const values = [...new Set(matches.map((item) => String(item?.[field] || '').trim()).filter(Boolean))];
+      return values.length ? values.map((value) => `<span class="cell-stack"><strong>${escapeHtml(value)}</strong><span>Mogelijke match</span></span>`).join('')
+        : '<span class="pending-value">Nog niet bevestigd</span>';
+    }
+    const explanation = matches.map((item) => {
+      let source = '';
+      try { const url = new URL(item.bron_url); if (['http:', 'https:'].includes(url.protocol)) source = url.href; } catch { /* Invalid sources are not clickable. */ }
+      return `<p>${escapeHtml([item.bedrijfsnaam, item.adres, item.onzekerheid].filter(Boolean).join(' · '))}${source ? ` <a href="${escapeHtml(source)}" target="_blank" rel="noopener noreferrer">Bron</a>` : ''}</p>`;
+    }).join('');
+    const details = uncertain ? `<details><summary>Mogelijke match — identiteit nog niet bevestigd</summary>${explanation || escapeHtml(activity.contact_research_note || 'De Controleur beoordeelt de koppeling met dit bedrijf.')}</details>` : '';
     const isRobot = String(activity.found_by_role_label || '').trim().toLowerCase() === 'robot';
     const modelHtml = isRobot ? '' : `<span>${escapeHtml(activity.found_by_model_label || '-')}</span>`;
     const location = [activity.woonplaats, activity.provincie].filter(Boolean).join(', ');
@@ -105,11 +120,11 @@
       <tr>
         <td>${escapeHtml(relativeTimeLabel(activity.contact_checked_at))}</td>
         <td><span class="cell-stack"><strong>${escapeHtml(activity.bedrijfsnaam)}</strong><span>KVK ${escapeHtml(activity.kvk_nummer || '-')}</span></span></td>
-        <td><span class="company-status${statusClass}"${statusExplanation ? ` title="${escapeHtml(statusExplanation)}"` : ''}>${escapeHtml(activityStatus(activity))}</span></td>
+        <td><span class="company-status${statusClass}"${statusExplanation ? ` title="${escapeHtml(statusExplanation)}"` : ''}>${escapeHtml(activityStatus(activity))}</span>${details}</td>
         <td><span class="cell-stack"><strong>${escapeHtml(activity.found_by_role_label || '-')}</strong>${modelHtml}</span></td>
-        <td>${escapeHtml(fieldValue(activity.telefoonnummer))}</td>
-        <td>${escapeHtml(fieldValue(activity.email))}</td>
-        <td class="link-like">${websiteHtml(activity.website)}</td>
+        <td>${uncertain ? candidateField('telefoonnummer') : escapeHtml(fieldValue(activity.telefoonnummer))}</td>
+        <td>${uncertain ? candidateField('email') : escapeHtml(fieldValue(activity.email))}</td>
+        <td class="link-like">${uncertain ? candidateField('website') : websiteHtml(activity.website)}</td>
         <td><strong>${escapeHtml(location || '-')}</strong></td>
       </tr>`;
   }

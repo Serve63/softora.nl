@@ -12,6 +12,8 @@ PROFILE = 'api-basic-v1'
 
 
 def validate_api_evidence(result):
+    from kvk_candidate_identity import validate_review
+    validate_review(result)
     kvk = str(result.get('kvk_nummer') or '')
     sources = result.get('sources') or []
     evidence = result.get('field_evidence') or {}

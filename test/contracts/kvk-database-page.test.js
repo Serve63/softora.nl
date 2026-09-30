@@ -71,7 +71,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-retry"/);
   assert.doesNotMatch(shellSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260914a/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidates/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
   assert.doesNotMatch(shellSource, /<iframe/);
@@ -83,7 +83,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-total"/);
   assert.doesNotMatch(pageSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260914a/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidates/);
 });
 
 test('directory links keep their target but display only the site name and a real review status', () => {
@@ -172,11 +172,11 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(fastProgressSource, /\/api\/kvk-database\/snapshot\/progress/);
   assert.match(fastProgressSource, /const REFRESH_MS = 1000/);
   assert.match(fastProgressSource, /renderLatestTreatedRows\(\)/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260914a/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidates/);
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260809f/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260927-copyable/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20260930-candidates/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -761,4 +761,31 @@ test('activity deltas keep a sign at zero and use the short period label', () =>
  assert.equal(label.textContent,'60m');
  assert.equal(classes['is-negative'],value<0);
  }
+});
+
+
+test('unconfirmed candidate contacts remain visible with their uncertainty and safe sources', () => {
+  const { activityRowHtml, activityStatus } = require('../../assets/kvk-database-luna-errors');
+  const row = { kvk_nummer: '12345678', lead_status: 'unusable', unusable_reason: 'identity_unconfirmed',
+    research_dossier: { identity_status: 'unconfirmed', possible_matches: [{ bedrijfsnaam: '<SCRIPT>name</SCRIPT>',
+      telefoonnummer: '0612345678', email: 'info@example.nl', website: 'https://example.nl',
+      bron_url: 'https://example.nl/contact', onzekerheid: 'Adresverschil nog niet verklaard.' }] } };
+  const html = activityRowHtml(row);
+  assert.equal(activityStatus(row), 'Identiteit controleren');
+  assert.match(html, /0612345678/);
+  assert.match(html, /info@example.nl/);
+  assert.match(html, /Adresverschil nog niet verklaard/);
+  assert.match(html, /Mogelijke match/);
+  assert.doesNotMatch(html, /Niet gevonden|Geen contact|<script>/i);
+  row.research_dossier.possible_matches[0].bron_url = 'javascript:alert(1)';
+  assert.doesNotMatch(activityRowHtml(row), /href="javascript:/);
+  delete row.research_dossier;
+  assert.match(activityRowHtml(row), /Nog niet bevestigd/);
+});
+
+test('directory keeps possible matches distinct from missing contacts after they leave the latest ten', () => {
+  const directory = require('../../assets/kvk-database-total-found');
+  const row = { lead_status: 'unusable', contact_status: 'unusable', unusable_reason: 'identity_unconfirmed' };
+  assert.equal(directory.companyStatus(row).label, 'Mogelijke match · Identiteit controleren');
+  assert.doesNotMatch(directory.companyRowHtml(row), /Niet gevonden|Geen contact/);
 });
