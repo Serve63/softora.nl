@@ -383,3 +383,11 @@ test('validated drafts carry producer metadata before canonical apply', () => {
   assert.ok(source.indexOf('copy_execution_metadata(args.source, draft)') < source.indexOf('research.command_apply(apply_args)'));
   assert.match(source, /precheck\.validated_draft_path\(args\.source\)/);
 });
+
+
+test('single-company failures do not reach the group halt handler', () => {
+  const stream = fs.readFileSync(path.join(root, 'scripts/kvk_worker_stream.py'), 'utf8');
+  assert.match(stream, /except failures.CompanyFailure as error/);
+  assert.match(stream, /failures.record\(path, error\)/);
+  assert.doesNotMatch(stream, /halt=True/);
+});

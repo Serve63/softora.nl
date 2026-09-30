@@ -110,22 +110,26 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(runner.apply_ready_prefix('searcher', packet, [], threading.Lock()), 1)
             apply.assert_called_once()
 
-    def run_pipeline(self, companies, count, research_delay, streaming_role=None):
+    def run_pipeline(self, companies, count, research_delay, streaming_role=None, stop_when_isolated=False, writer_failure=None):
         queue = [dict(company) for company in companies]
         researched, applied, running, peak = [], [], [0], [0]
         lock = threading.Lock()
 
         def call(path, payload, **kwargs):
             if path == '/poll':
-                return {'state': {'workers': {streaming_role or 'searcher': {'enabled': bool(queue), 'count': count}}}}
+                import kvk_worker_failures as failures
+                enabled = bool(queue) and not (stop_when_isolated and all(failures.read(runner.pending_path(streaming_role, c['kvk_nummer'], [])).get('needs_review') for c in queue))
+                return {'state': {'workers': {streaming_role or 'searcher': {'enabled': enabled, 'count': count}}}}
             if path == '/research':
                 with lock:
                     running[0] += 1
                     peak[0] = max(peak[0], running[0])
                     researched.append(payload['company']['kvk_nummer'])
-                time.sleep(research_delay(payload['company']['kvk_nummer']))
-                with lock:
-                    running[0] -= 1
+                try:
+                    time.sleep(research_delay(payload['company']['kvk_nummer']))
+                finally:
+                    with lock:
+                        running[0] -= 1
                 return {'ok': True, 'result': payload['company']}
             return {'ok': True}
 
@@ -137,6 +141,8 @@ class WorkerTests(unittest.TestCase):
             index = next(i for i, c in enumerate(queue) if c['kvk_nummer'] in path.name) if streaming_role else 0
             kvk = queue[index]['kvk_nummer']
             self.assertIn(kvk, path.name)
+            if writer_failure:
+                writer_failure(kvk)
             applied.append(queue.pop(index)['kvk_nummer'])
             path.unlink()
             return True
@@ -148,7 +154,7 @@ class WorkerTests(unittest.TestCase):
                 patch.object(runner, 'wait', side_effect=lambda futures, **kw: original_wait(futures, timeout=0.05, return_when=runner.FIRST_COMPLETED)):
             if streaming_role:
                 import kvk_worker_stream
-                with patch.object(runner, 'validate_saved_result'):
+                with patch.object(runner, 'validate_saved_result'), patch.object(kvk_worker_stream, 'time', types.SimpleNamespace(monotonic=lambda: time.monotonic()*100, sleep=lambda _: time.sleep(0.01))), patch.object(kvk_worker_stream, 'wait', side_effect=lambda futures, **kw: original_wait(futures, timeout=0.02, return_when=runner.FIRST_COMPLETED)):
                     kvk_worker_stream.run(streaming_role, runner, threading.Lock())
             else:
                 runner.run_searcher_pipeline(threading.Lock())
@@ -164,6 +170,56 @@ class WorkerTests(unittest.TestCase):
                 self.assertEqual(sorted(applied), [c['kvk_nummer'] for c in companies])
                 self.assertEqual(sorted(researched), sorted(applied))
                 self.assertLessEqual(peak, 3)
+
+    def test_invalid_answers_retry_per_company_while_peers_apply(self):
+        from kvk_worker_failures import InvalidModelAnswer
+        import kvk_worker_failures as failures
+        for role in ('searcher', 'controller'):
+            attempts = {}
+            def delay(kvk):
+                attempts[kvk] = attempts.get(kvk, 0) + 1
+                if kvk == '00000081' and attempts[kvk] < 3:
+                    raise InvalidModelAnswer('wrong company', {'kvk_nummer': '99999999'})
+                return 0.1 if kvk == '00000081' else 0.01
+            with self.subTest(role=role), patch.object(failures, 'RETRY_DELAYS', (0, 0)):
+                _, applied, peak = self.run_pipeline([{'kvk_nummer': k} for k in ('00000081','00000082')], 2, delay, role)
+                self.assertEqual(applied, ['00000082','00000081'])
+                self.assertEqual(attempts['00000081'], 3)
+                self.assertLessEqual(peak, 2)
+                self.assertFalse(failures.state_path(runner.pending_path(role,'00000081',[])).exists())
+
+    def test_permanent_bad_answer_is_bounded_persistent_and_never_applied(self):
+        import kvk_worker_failures as failures
+        for role in ('searcher', 'controller'):
+            def delay(kvk):
+                if kvk == '00000091':
+                    runner.parse_answer('not JSON')
+                return 0.01
+            with self.subTest(role=role), patch.object(failures, 'RETRY_DELAYS', (0, 0)):
+                _, applied, _ = self.run_pipeline([{'kvk_nummer': k} for k in ('00000091','00000092')], 2, delay, role, True)
+                self.assertEqual(applied, ['00000092'])
+                path = runner.pending_path(role, '00000091', [])
+                state = failures.read(path)
+                self.assertEqual(state['attempts'], 3)
+                self.assertEqual(state['history'][0]['answer'], 'not JSON')
+                self.assertFalse(failures.ready(path))
+                self.assertFalse(path.exists())
+                # A fresh stream sees the persisted isolation and still processes peers.
+                _, applied, _ = self.run_pipeline([{'kvk_nummer': k} for k in ('00000091','00000093')], 2, delay, role, True)
+                self.assertEqual(applied, ['00000093'])
+                self.assertEqual(failures.read(path)['attempts'], 3)
+
+    def test_exhausted_validation_isolated_but_system_errors_still_propagate(self):
+        for role in ('searcher', 'controller'):
+            def writer(kvk):
+                if kvk == '00000071':
+                    raise runner.CompanyValidationFailure('Evidence rejected after repairs')
+            with self.subTest(role=role):
+                _, applied, _ = self.run_pipeline([{'kvk_nummer': k} for k in ('00000071','00000072')], 2, lambda _: 0.01, role, True, writer)
+                self.assertEqual(applied, ['00000072'])
+                with self.assertRaisesRegex(RuntimeError, 'provider failed'):
+                    self.run_pipeline([{'kvk_nummer':'00000073'}], 1,
+                                      lambda _: (_ for _ in ()).throw(RuntimeError('provider failed')), role)
 
     def test_pipeline_applies_in_queue_order_while_slow_requests_keep_running(self):
         companies = [{'kvk_nummer': f'{i:08}'} for i in range(1, 9)]
