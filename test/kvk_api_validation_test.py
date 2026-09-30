@@ -96,6 +96,18 @@ class ApiValidationTests(unittest.TestCase):
             marker.write_text(json.dumps({'engine': 'codex'}))
             self.assertEqual(execution_for([{'validation_profile': 'api-basic-v1'}], path)['reasoning_effort'], 'max')
 
+    def test_controller_xhigh_marker_preserves_legacy_max_history(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'result.json'
+            path.write_text('[]')
+            marker = path.with_suffix('.engine.json')
+            marker.write_text(json.dumps({'engine': 'codex', 'model': 'gpt-6-luna', 'reasoning_effort': 'xhigh'}))
+            result = execution_for([{'validation_profile': 'api-basic-v1'}], path, True)
+            self.assertEqual(result['model_role'], 'controller_codex_luna_xhigh')
+            self.assertEqual(result['display_label'], 'Codex Luna 6 xhigh')
+            marker.write_text(json.dumps({'engine': 'codex'}))
+            self.assertEqual(execution_for([{'validation_profile': 'api-basic-v1'}], path, True)['reasoning_effort'], 'max')
+
     def test_api_attribution_is_durable_and_separate_from_native_workers(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'result.json'
