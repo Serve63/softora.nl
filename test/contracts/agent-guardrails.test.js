@@ -981,17 +981,3 @@ test('production mail dependencies retain the September 2026 security fixes', ()
   }
   assert.equal(pkg.scripts['check:deps'], 'npm audit --omit=dev');
 });
-
-
-test('mail analytics registration preserves the complete-readiness and protected quality baseline', () => {
-  const fs = require('node:fs'); const path = require('node:path');
-  const root = path.resolve(__dirname, '../..');
-  const registry = JSON.parse(fs.readFileSync(path.join(root, 'server/config/platform-pages.json'), 'utf8'));
-  const page = registry.pages['premium-mail-analytics.html'];
-  assert.equal(page.delivery, 'isolated-document'); assert.equal(page.targetReadyMs, 3000);
-  assert.deepEqual(page.requiredData, ['/api/mailbox/analytics']); assert.deepEqual(page.requiredImages, []);
-  assert.equal(page.readinessContract, 'test/contracts/mail-analytics.test.js'); assert.ok(page.isolationReason);
-  assert.match(page.freshness, /fetchedAt visible/);
-  const critical = fs.readFileSync(path.join(root, 'scripts/verify-critical.js'), 'utf8');
-  for (const gate of ['check:guardrails','check:quality-lock','test:contracts','test:smoke','check:secrets']) assert.ok(critical.includes(gate));
-});

@@ -227,49 +227,7 @@
     function renderPremiumSidebarNavigation(session, activeKey) {
         return getPremiumSidebarSections(session).map(section => '<div class="' + section.className + '"><div class="sidebar-section-label">' + section.label + '</div>' + section.links.map(link => renderSidebarLink(link, activeKey)).join('') + '</div>').join('');
     }
-
-  function mountMailSystemMenu(sidebar, activeKey) {
-    if (!sidebar) return;
-    const database = sidebar.querySelector('[data-sidebar-key="database"]');
-    if (!database) return;
-    let group = sidebar.querySelector('[data-mail-system]');
-    if (!group) {
-      group = document.createElement('div');
-      group.setAttribute('data-mail-system', '');
-      group.className = 'sidebar-mail-system';
-      database.parentNode.insertBefore(group, database);
-      group.innerHTML = '<button type="button" class="sidebar-link sidebar-mail-system-toggle" aria-expanded="false" aria-controls="sidebar-mail-system-children" data-mail-system-toggle>' + getDatabaseSidebarLink().icon + '<span class="sidebar-link-text">Mailsysteem</span><span class="sidebar-mail-system-chevron" aria-hidden="true">⌄</span></button><div id="sidebar-mail-system-children" class="sidebar-mail-system-children" hidden></div>';
-      group.querySelector('button').addEventListener('click', function () {
-        const expanded = this.getAttribute('aria-expanded') !== 'true';
-        this.setAttribute('aria-expanded', String(expanded));
-        group.querySelector('.sidebar-mail-system-children').hidden = !expanded;
-        window.dispatchEvent(new Event('resize'));
-      });
-    }
-    const children = group.querySelector('.sidebar-mail-system-children');
-    children.appendChild(database);
-    const label = database.querySelector('.sidebar-link-text');
-    if (label) label.textContent = 'Verzendingen';
-    let mailbox = sidebar.querySelector('[data-sidebar-key="mailbox"]');
-    if (!mailbox) { children.insertAdjacentHTML('beforeend', renderSidebarLink(getMailboxSidebarLink(), activeKey)); }
-    else if (mailbox.parentNode !== children) children.appendChild(mailbox);
-    if (!children.querySelector('[data-sidebar-key="mail_analytics"]')) {
-      children.insertAdjacentHTML('beforeend', renderSidebarLink({ key: 'mail_analytics', href: '/premium-mail-analytics', label: 'Analytics', icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 20h16M7 16V9m5 7V4m5 12v-5"/></svg>' }, activeKey));
-    }
-    children.querySelectorAll('[data-sidebar-key]').forEach(function (link) {
-      const active = link.dataset.sidebarKey === activeKey;
-      link.classList.toggle('active', active);
-      if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
-    });
-    const active = ['database', 'mailbox', 'mail_analytics'].includes(activeKey);
-    group.querySelector('button').classList.toggle('active', active);
-    if (group.dataset.activeKey !== activeKey && active) {
-      group.querySelector('button').setAttribute('aria-expanded', 'true');
-      children.hidden = false;
-    }
-    group.dataset.activeKey = activeKey;
-  }
-  const api = Object.freeze({ mountMailSystemMenu, getWebdesignSidebarLink, getLeadRadarSidebarLink, getSummarizeSidebarLink, getMailboxSidebarLink,
+  const api = Object.freeze({ getWebdesignSidebarLink, getLeadRadarSidebarLink, getSummarizeSidebarLink, getMailboxSidebarLink,
     getCustomersSidebarLink, getDatabaseSidebarLink, getPremiumSidebarAdminExtraLinks,
     getPremiumSidebarSections, renderSidebarLink, renderPremiumSidebarNavigation,
     COMING_SOON_KEYS: Object.freeze(Array.from(PREMIUM_SIDEBAR_COMING_SOON_KEYS)), COMING_SOON_LOCK_SVG });

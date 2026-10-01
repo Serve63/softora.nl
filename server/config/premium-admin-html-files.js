@@ -5,7 +5,6 @@
  */
 const PREMIUM_ADMIN_ONLY_HTML_FILE_NAMES = Object.freeze([
   'premium-instellingen.html',
-  'premium-mail-analytics.html',
   'premium-gezondheidsdossier.html',
   'premium-wachtwoordenregister.html',
   'premium-flynow.html',
