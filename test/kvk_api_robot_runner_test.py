@@ -146,5 +146,14 @@ class RobotRunnerTests(unittest.TestCase):
         self.assertEqual(len(calls), 2)
 
 
+    def test_the_engine_setting_only_names_an_installed_engine_never_a_path(self):
+        import importlib
+        for value in ('/tmp/evil.py', '../../bin/sh', 'v9'):
+            with patch.dict('os.environ', {'SOFTORA_ROBOT_ENGINE': value}):
+                module = importlib.reload(robot)
+                self.assertIn(module.ENGINE, (module.ENGINE_V5, module.ENGINE_V7))
+        importlib.reload(robot)
+
+
 if __name__ == '__main__':
     unittest.main()

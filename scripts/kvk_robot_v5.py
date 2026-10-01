@@ -29,7 +29,11 @@ DB = ROOT / 'data' / 'nederland_bedrijven.sqlite'
 # umbrella/portal/cessation checks). The v5 engine stays available for rollback.
 ENGINE_V5 = ROOT / 'experiments' / 'robot-v5-deterministic-20260919' / 'run_shadow.py'
 ENGINE_V7 = ROOT / 'experiments' / 'robot-v7-limit-20260930' / 'run_shadow.py'
-ENGINE = Path(os.environ.get('SOFTORA_ROBOT_ENGINE') or (ENGINE_V7 if ENGINE_V7.exists() else ENGINE_V5))
+# SOFTORA_ROBOT_ENGINE only names one of the two installed engines, never a path.
+ENGINES = {'v5': ENGINE_V5, 'v7': ENGINE_V7}
+ENGINE = ENGINES.get(str(os.environ.get('SOFTORA_ROBOT_ENGINE') or 'v7').strip().lower(), ENGINE_V7)
+if not ENGINE.exists():
+    ENGINE = ENGINE_V5
 PYTHON = ROOT / '.venv-robot-zero' / 'bin' / 'python'
 FIELDS = ('id', 'kvk_nummer', 'bedrijfsnaam', 'plaats', 'straatnaam', 'huisnummer', 'postcode', 'vestigingsnummer')
 # Each company is its own engine process; a handful run side by side.
