@@ -131,13 +131,13 @@
   }
 
   function missingLabel(company) {
-    if (company?.unusable_reason === 'identity_unconfirmed') return 'Nog niet bevestigd';
+    if (company?.unusable_reason === 'identity_unconfirmed') return '—';
     return isTreated(company) ? 'Niet gevonden' : 'Nog niet behandeld';
   }
 
   function companyStatus(company) {
     if (company?.unusable_reason === 'identity_unconfirmed') {
-      return { label: 'Mogelijke match · Identiteit controleren', className: 'is-pending' };
+      return { label: Number(company.unusable_review_grade || 0) >= 2 ? 'Afgekeurd' : 'Ter controle', className: 'is-unusable' };
     }
     const leadStatus = String(company?.lead_status || '').trim();
     if (leadStatus === 'usable') {
@@ -161,17 +161,16 @@
   }
 
   function fieldHtml(company, field) {
+    if (company?.unusable_reason === 'identity_unconfirmed') return '<span class="pending-value" aria-label="Niet bevestigd">—</span>';
     const value = String(company?.[field] || '').trim();
     if (value) return escapeHtml(value);
-    const candidate = candidateFieldHtml(company, field);
-    if (candidate) return candidate;
     return `<span class="pending-value">${escapeHtml(missingLabel(company))}</span>`;
   }
 
   function websiteHtml(company) {
+    if (company?.unusable_reason === 'identity_unconfirmed') return '<span class="pending-value" aria-label="Niet bevestigd">—</span>';
     const website = String(company?.website || '').trim();
-    if (!website) return candidateFieldHtml(company, 'website')
-      || `<span class="pending-value">${escapeHtml(missingLabel(company))}</span>`;
+    if (!website) return `<span class="pending-value">${escapeHtml(missingLabel(company))}</span>`;
     const href = /^https?:\/\//i.test(website) ? website : `https://${website}`;
     let label = website.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '');
     try { label = new URL(href).hostname.replace(/^www\./i, ''); } catch { /* Keep a readable legacy value. */ }
@@ -186,46 +185,6 @@
       .join(', ');
   }
 
-  function possibleMatches(company) {
-    const dossier = company?.research_dossier;
-    return company?.unusable_reason === 'identity_unconfirmed'
-      && dossier?.identity_status === 'unconfirmed' && Array.isArray(dossier.possible_matches)
-      ? dossier.possible_matches.slice(0, 5).filter((match) => match && typeof match === 'object') : [];
-  }
-
-  function safeSource(value) {
-    try {
-      const url = new URL(String(value || ''));
-      return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password ? url.href : '';
-    } catch { return ''; }
-  }
-
-  function candidateFieldHtml(company, field) {
-    const matches = possibleMatches(company);
-    if (!matches.some((match) => match[field])) return '';
-    return matches.map((match, index) => {
-      const value = String(match[field] || '').trim();
-      const source = safeSource(field === 'website' ? value
-        : match[field === 'email' ? 'email_bron_url' : 'telefoon_bron_url']);
-      const label = `Mogelijke match${matches.length > 1 ? ` ${index + 1}` : ''}`;
-      const text = field === 'website' && source ? new URL(source).hostname.replace(/^www\./i, '') : value;
-      const content = value && source
-        ? `<a href="${escapeHtml(source)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>` : '—';
-      return `<div class="candidate-contact">${content}<small>${label} · nog te controleren</small></div>`;
-    }).join('');
-  }
-
-  function candidateDetailsHtml(company) {
-    const matches = possibleMatches(company);
-    if (!matches.length) return '';
-    return `<tr class="candidate-details-row"><td colspan="7"><details><summary>Bronnen en toelichting bij de gevonden gegevens</summary>${matches.map((match, index) => {
-      const sources = [...new Set([match.bron_url, match.telefoon_bron_url, match.email_bron_url].map(safeSource).filter(Boolean))];
-      return `<div class="candidate-explanation"><strong>Mogelijke match ${index + 1}: ${escapeHtml(match.bedrijfsnaam || '')}</strong>
-        <div>${escapeHtml(match.adres || '')}</div><div>${escapeHtml(match.onzekerheid || '')}</div>
-        ${sources.map((source, n) => `<a href="${escapeHtml(source)}" target="_blank" rel="noopener noreferrer">Bron ${n + 1}</a>`).join(' · ')}</div>`;
-    }).join('')}</details></td></tr>`;
-  }
-
   function companyRowHtml(company) {
     const status = companyStatus(company);
     return `
@@ -238,7 +197,6 @@
         <td class="link-like">${websiteHtml(company)}</td>
         <td>${escapeHtml(locationLabel(company) || '-')}</td>
       </tr>
-      ${candidateDetailsHtml(company)}
     `;
   }
 
