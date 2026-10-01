@@ -1,5 +1,6 @@
 """Producer attribution for API results and honest dashboard role labels."""
 import hashlib
+import re
 import json
 import shutil
 import os
@@ -40,6 +41,12 @@ def engine_for(path):
     return 'api'
 
 
+# Codex models whose saved label is trusted; the role keeps the model family so
+# counters and filters continue across a version change (Sol 6 -> Sol 6.1).
+CODEX_ATTRIBUTED_MODELS = ('gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol')
+MODEL_PARTS = re.compile(r'gpt-(\d+(?:\.\d+)?)-([a-z]+)')
+
+
 def execution_for(results, path, is_review=False):
     profiles = [row.get('validation_profile') == PROFILE for row in results]
     if not any(profiles):
@@ -53,14 +60,14 @@ def execution_for(results, path, is_review=False):
         for suffix in ('.luna.json', '.engine.json'):
             try:
                 saved = json.loads(Path(path).with_suffix(suffix).read_text())
-                if saved.get('model') in ('gpt-6-luna', 'gpt-6-sol') and saved.get('reasoning_effort') in ('max', 'xhigh'):
+                if saved.get('model') in CODEX_ATTRIBUTED_MODELS and saved.get('reasoning_effort') in ('max', 'xhigh'):
                     model = saved['model']
                     effort = saved['reasoning_effort']
                     break
             except (OSError, ValueError, AttributeError):
                 continue
-        family = model.removeprefix('gpt-6-')
-        label = 'Codex ' + family.title() + ' 6 ' + ('Max' if effort == 'max' else effort)
+        version, family = MODEL_PARTS.fullmatch(model).groups()
+        label = 'Codex ' + family.title() + ' ' + version + ' ' + ('Max' if effort == 'max' else effort)
         return {
             'producer_thread_id': 'codex:' + role,
             'model': model, 'reasoning_effort': effort,

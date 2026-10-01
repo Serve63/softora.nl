@@ -108,6 +108,17 @@ class ApiValidationTests(unittest.TestCase):
             marker.write_text(json.dumps({'engine': 'codex'}))
             self.assertEqual(execution_for([{'validation_profile': 'api-basic-v1'}], path, True)['reasoning_effort'], 'max')
 
+    def test_sol_6_1_is_labelled_by_version_and_keeps_the_sol_role(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'result.json'
+            path.write_text('[]')
+            marker = path.with_suffix('.engine.json')
+            for model, label in (('gpt-6.1-sol', 'Codex Sol 6.1 xhigh'), ('gpt-6-sol', 'Codex Sol 6 xhigh')):
+                marker.write_text(json.dumps({'engine': 'codex', 'model': model, 'reasoning_effort': 'xhigh'}))
+                result = execution_for([{'validation_profile': 'api-basic-v1'}], path, True)
+                self.assertEqual((result['model'], result['display_label']), (model, label))
+                self.assertEqual(result['model_role'], 'controller_codex_sol_xhigh')
+
     def test_api_attribution_is_durable_and_separate_from_native_workers(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'result.json'
