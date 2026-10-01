@@ -110,7 +110,7 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(runner.apply_ready_prefix('searcher', packet, [], threading.Lock()), 1)
             apply.assert_called_once()
 
-    def run_pipeline(self, companies, count, research_delay, streaming_role=None, stop_when_isolated=False, writer_failure=None):
+    def run_pipeline(self, companies, count, research_delay, streaming_role=None, stop_when_isolated=False, writer_failure=None, validate_delay=None):
         queue = [dict(company) for company in companies]
         researched, applied, running, peak = [], [], [0], [0]
         lock = threading.Lock()
@@ -154,7 +154,7 @@ class WorkerTests(unittest.TestCase):
                 patch.object(runner, 'wait', side_effect=lambda futures, **kw: original_wait(futures, timeout=0.05, return_when=runner.FIRST_COMPLETED)):
             if streaming_role:
                 import kvk_worker_stream
-                with patch.object(runner, 'validate_saved_result'), patch.object(kvk_worker_stream, 'time', types.SimpleNamespace(monotonic=lambda: time.monotonic()*100, sleep=lambda _: time.sleep(0.01))), patch.object(kvk_worker_stream, 'wait', side_effect=lambda futures, **kw: original_wait(futures, timeout=0.02, return_when=runner.FIRST_COMPLETED)):
+                with patch.object(runner, 'validate_saved_result', side_effect=validate_delay), patch.object(kvk_worker_stream, 'time', types.SimpleNamespace(monotonic=lambda: time.monotonic()*100, sleep=lambda _: time.sleep(0.01))), patch.object(kvk_worker_stream, 'wait', side_effect=lambda futures, **kw: original_wait(futures, timeout=0.02, return_when=runner.FIRST_COMPLETED)):
                     kvk_worker_stream.run(streaming_role, runner, threading.Lock())
             else:
                 runner.run_searcher_pipeline(threading.Lock())
@@ -170,6 +170,55 @@ class WorkerTests(unittest.TestCase):
                 self.assertEqual(sorted(applied), [c['kvk_nummer'] for c in companies])
                 self.assertEqual(sorted(researched), sorted(applied))
                 self.assertLessEqual(peak, 3)
+
+    def test_capacity_failure_keeps_peers_writing_and_retries_without_rejecting_company(self):
+        for role in ('searcher', 'controller'):
+            attempts = {}
+            def delay(kvk):
+                attempts[kvk] = attempts.get(kvk, 0) + 1
+                if kvk == '00000041' and attempts[kvk] == 1:
+                    raise runner.TemporaryResearchFailure('Codex-model tijdelijk bezet')
+                return 0.01
+            companies = [{'kvk_nummer': f'{i:08}'} for i in range(41, 44)]
+            researched, applied, peak = self.run_pipeline(companies, 3, delay, role)
+            self.assertNotEqual(applied[0], '00000041')
+            self.assertEqual(sorted(applied), [c['kvk_nummer'] for c in companies])
+            self.assertEqual(researched.count('00000041'), 2)
+            self.assertLessEqual(peak, 3)
+            self.assertFalse(list(runner.PENDING.glob('*.failure.json')))
+
+    def test_slow_controller_repair_does_not_hold_the_database_writer(self):
+        calls = {}
+        def validate(path, result, flags):
+            kvk = result['kvk_nummer']
+            calls[kvk] = calls.get(kvk, 0) + 1
+            if kvk == '00000051' and calls[kvk] == 1:
+                time.sleep(0.4)
+                raise runner.ValidationFailure('bron ontbreekt')
+        companies = [{'kvk_nummer': f'{i:08}'} for i in range(51, 54)]
+        researched, applied, peak = self.run_pipeline(companies, 3, lambda kvk: 0.01,
+            'controller', validate_delay=validate)
+        self.assertNotEqual(applied[0], '00000051')
+        self.assertEqual(sorted(applied), [c['kvk_nummer'] for c in companies])
+        self.assertEqual(researched.count('00000051'), 2)
+        self.assertLessEqual(peak, 3)
+
+    def test_controller_capacity_does_not_consume_evidence_repair_attempts(self):
+        company = self.packet['bedrijven'][0]
+        path = runner.pending_path('controller', company['kvk_nummer'], [])
+        with patch.object(runner, 'call', side_effect=runner.TemporaryResearchFailure('tijdelijk bezet')):
+            for _ in range(4):
+                with self.assertRaises(runner.TemporaryResearchFailure):
+                    runner.research_one('controller', company, {}, [])
+                self.assertEqual(json.loads(path.with_suffix('.recovery.json').read_text())['attempts'], 0)
+        self.assertFalse(path.exists())
+
+    def test_codex_timeout_is_retryable_and_never_uses_a_fallback(self):
+        with patch.object(runner.subprocess, 'run', side_effect=runner.subprocess.TimeoutExpired('codex', 900)) as run, \
+                patch.object(runner, 'codex_run', self.real_codex_run), patch.object(runner, 'codex_binary', return_value='/test/codex'):
+            with self.assertRaises(runner.TemporaryResearchFailure):
+                runner.codex_run('test')
+            self.assertEqual(run.call_count, 1)
 
     def test_invalid_answers_retry_per_company_while_peers_apply(self):
         from kvk_worker_failures import InvalidModelAnswer

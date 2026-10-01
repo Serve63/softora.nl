@@ -25,6 +25,7 @@ from start_database_fill_control import post_json, resolve_token
 from kvk_api_validation import PROFILE
 from kvk_worker_cache import contract, stamp, quarantine_stale
 from kvk_worker_failures import CompanyFailure, InvalidModelAnswer, read as failure_state
+from kvk_codex_recovery import TemporaryResearchFailure, process_failure
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -303,16 +304,18 @@ def codex_run(prompt: str, role: str = "searcher") -> tuple[str, str]:
     with tempfile.TemporaryDirectory(prefix="softora-codex-searcher-") as workdir:
         last = Path(workdir) / "answer.txt"
         # No user config: personal instructions or a local model router must not change the answer.
-        process = subprocess.run(
-            [codex_binary(), "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check",
-             "-s", "read-only", "-C", workdir, "-m", model, "-c", f"model_reasoning_effort={effort}",
-             "-c", "web_search=live", "-c", "model_provider=openai", "--json", "-o", str(last), "-"],
-            input=prompt, cwd=workdir, env=child_env, text=True, capture_output=True,
-            timeout=CODEX_TIMEOUT_SECONDS, check=False,
-        )
+        try:
+            process = subprocess.run(
+                [codex_binary(), "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check",
+                 "-s", "read-only", "-C", workdir, "-m", model, "-c", f"model_reasoning_effort={effort}",
+                 "-c", "web_search=live", "-c", "model_provider=openai", "--json", "-o", str(last), "-"],
+                input=prompt, cwd=workdir, env=child_env, text=True, capture_output=True,
+                timeout=CODEX_TIMEOUT_SECONDS, check=False,
+            )
+        except subprocess.TimeoutExpired:
+            raise TemporaryResearchFailure('Codex-onderzoek duurde te lang; opnieuw proberen') from None
         if process.returncode or not last.exists():
-            details = (process.stderr + "\n" + process.stdout).strip()[-300:]
-            raise RuntimeError(f"Codex stopte met code {process.returncode}: {details}")
+            raise process_failure(process)
         return last.read_text(), process.stdout
 
 
@@ -465,7 +468,13 @@ def research_one(role: str, company: dict, brief: dict, flags: list[str], valida
         save_result(recovery_path, recovery)
         instructions = instructions_for(role)
         stamp(path, contract(*CODEX_MODELS[role], instructions))
-        result = codex_control(company, repair_brief, instructions)
+        try:
+            result = codex_control(company, repair_brief, instructions)
+        except TemporaryResearchFailure:
+            # An unavailable provider did not produce a rejected company answer.
+            recovery["attempts"] -= 1
+            save_result(recovery_path, recovery)
+            raise
         if not isinstance(result, dict) or str(result.get("kvk_nummer")) != kvk:
             raise InvalidModelAnswer("Codex gaf geen geldig resultaat voor de juiste onderneming terug.", result)
         save_result(path, result)
