@@ -53,7 +53,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-icon-catalog\.js\?v=20260811a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-goal-actions\.js\?v=20260716a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-endgame-interactions\.js\?v=20260911a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20260911c" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-endgame-cards\.js\?v=20261001a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-video\.js\?v=20260904c" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-calendar\.js\?v=20260717a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
@@ -530,6 +530,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(endGameCardsJs, /\{ id: 'loondienst', title: 'Loondienst', imageId: 'bestaanszekerheid-bedrijf' \}/);
   assert.match(endGameCardsJs, /\{ id: 'de-driehoek-aanspreken', title: 'De Driehoek aanspreken' \}/);
   assert.match(endGameCardsJs, /\{ id: 'droomfysiek-2028', title: 'Droomfysiek', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
+  assert.match(endGameCardsJs, /\{ id: 'droomdroog-2028', title: 'Droomdroog', timeframe: 2028, imageId: 'bodyfat-onder-13' \}/);
   assert.match(endGameCardsJs, /\{ id: 'tweede-haartransplantatie-2028', title: '2e haartransplantatie', timeframe: 2028, imageId: 'haartransplantatie' \}/);
   assert.match(endGameCardsJs, /\{ id: 'instagram-post-2028', title: 'Jaarlijkse Instagram-post 2028', timeframe: 2028, imageId: 'jaarlijkse-instagram-post' \}/);
   assert.match(endGameCardsJs, /if \(card\.missionText\) artwork\.append\(missionCopy\)/);
@@ -560,7 +561,7 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
     'Nieuwe Whoop', 'Nieuwe fiets', '30 dagen streak', 'Gezondheidscenter',
     "Servé's gezondheidsdossier", 'ai zet toto', 'Kantoor A af', 'Kantoor B af', "Ruben's World Watcher", "Ruben's vakantieradar", 'Transferoverzicht',
     'Ruben’s Company', 'Ruben’s Trading System', 'Jurisalem af', 'Gewenst lang kapsel', 'Gewenste kledingkast',
-    'Droomfysiek', '2e haartransplantatie', 'Droomkapsel', 'Eigen parfum', 'Kledingstijl upgraden', 'Inloopkast',
+    'Droomfysiek', 'Droomdroog', '2e haartransplantatie', 'Droomkapsel', 'Eigen parfum', 'Kledingstijl upgraden', 'Inloopkast',
     'Eigen automaat', 'Starterswoning kopen', 'Maatpak', 'Fotomuur', 'Israël bezoeken',
     'Wereldkaart', 'Professionele fotoshoot', 'Persoonlijke handtekening',
     'Sponsorbord bij Nemelaer', 'VIP-box Willem II', 'Jaarlijkse Instagram-post 2027', 'Jaarlijkse Instagram-post 2028',
@@ -882,7 +883,28 @@ test('de nieuwe medicatie- en opleidingstegels migreren zonder bestaande voortga
   });
 });
 
-test('Silence controle is een unieke missie 67 met geïsoleerde duurzame state', () => {
+test('Droomdroog wordt als aparte 2028-missie ingevoegd zonder Droomfysiek-voortgang te wijzigen', () => {
+  const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
+  const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
+  const droomfysiekIndex = catalog.findIndex((card) => card.id === 'droomfysiek-2028');
+  const droomdroogIndex = catalog.findIndex((card) => card.id === 'droomdroog-2028');
+  const oldPersistedOrder = catalog.filter((card) => card.id !== 'droomdroog-2028').map((card) => card.id);
+  const migrated = JSON.parse(JSON.stringify(api.normalizeState({
+    __order: oldPersistedOrder,
+    'droomfysiek-2028': { completed: true, deleted: false }
+  })));
+
+  assert.equal(droomdroogIndex, droomfysiekIndex + 1);
+  assert.deepEqual(catalog[droomdroogIndex], {
+    id: 'droomdroog-2028', title: 'Droomdroog', timeframe: 2028, imageId: 'bodyfat-onder-13'
+  });
+  assert.deepEqual(migrated['droomfysiek-2028'], { completed: true, deleted: false });
+  assert.deepEqual(migrated['droomdroog-2028'], { completed: false, deleted: false });
+  assert.equal(migrated.__order.indexOf('droomdroog-2028'), migrated.__order.indexOf('droomfysiek-2028') + 1);
+  assert.equal(migrated.__order.filter((id) => id === 'droomdroog-2028').length, 1);
+});
+
+test('Silence controle is een unieke missie 68 met geïsoleerde duurzame state', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const cardMatches = catalog.filter((card) => card.id === 'silence-controle');
@@ -898,7 +920,7 @@ test('Silence controle is een unieke missie 67 met geïsoleerde duurzame state',
     title: 'Silence controle',
     imageId: 'silence-controle'
   }]);
-  assert.equal(missionNumber, 67);
+  assert.equal(missionNumber, 68);
   assert.equal(cardIndex, funnelSitesIndex - 1);
 
   const oldPersistedOrder = catalog
@@ -928,7 +950,7 @@ test('Silence controle is een unieke missie 67 met geïsoleerde duurzame state',
   assert.deepEqual(resetReload['softora-gpt-af'], completedReload['softora-gpt-af']);
 });
 
-test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voortgang te wijzigen', () => {
+test('Funnel Sites Live is een unieke missie 69 en migreert zonder bestaande voortgang te wijzigen', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const cardMatches = catalog.filter((card) => card.id === 'funnel-sites-live');
@@ -945,7 +967,7 @@ test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voo
     title: 'Funnel Sites Live',
     imageId: 'softora-apple-kwaliteit-software'
   }]);
-  assert.equal(missionNumber, 68);
+  assert.equal(missionNumber, 69);
   assert.equal(cardIndex, firstStreakIndex - 1);
   assert.equal(firstStreakIndex, checkpointIndex - 15);
 
@@ -970,7 +992,7 @@ test('Funnel Sites Live is een unieke missie 68 en migreert zonder bestaande voo
   assert.deepEqual(completedReload['silence-controle'], initial['silence-controle']);
 });
 
-test('de zes streakmijlpalen zijn unieke missies 69 tot en met 74 met duurzame state', () => {
+test('de zes streakmijlpalen zijn unieke missies 70 tot en met 75 met duurzame state', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const expected = [
@@ -990,7 +1012,7 @@ test('de zes streakmijlpalen zijn unieke missies 69 tot en met 74 met duurzame s
     catalog.slice(0, catalog.findIndex((item) => item.id === card.id) + 1)
       .filter((item) => !['origin', 'checkpoint', 'destination'].includes(item.type))
       .length
-  )), [69, 70, 71, 72, 73, 74]);
+  )), [70, 71, 72, 73, 74, 75]);
 
   const oldPersistedOrder = catalog
     .filter((card) => !ids.includes(card.id))
@@ -1015,7 +1037,7 @@ test('de zes streakmijlpalen zijn unieke missies 69 tot en met 74 met duurzame s
   assert.deepEqual(completedReload['funnel-sites-live'], migrated['funnel-sites-live']);
 });
 
-test('Loondienst is een unieke missie 75 en migreert met geisoleerde duurzame state', () => {
+test('Loondienst is een unieke missie 76 en migreert met geisoleerde duurzame state', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const cardMatches = catalog.filter((card) => card.id === 'loondienst');
@@ -1031,7 +1053,7 @@ test('Loondienst is een unieke missie 75 en migreert met geisoleerde duurzame st
     title: 'Loondienst',
     imageId: 'bestaanszekerheid-bedrijf'
   }]);
-  assert.equal(missionNumber, 75);
+  assert.equal(missionNumber, 76);
   assert.equal(cardIndex, driehoekIndex - 1);
 
   const oldPersistedOrder = catalog
@@ -1062,7 +1084,7 @@ test('Loondienst is een unieke missie 75 en migreert met geisoleerde duurzame st
   assert.equal(deletedReload.__order.filter((id) => id === 'loondienst').length, 1);
 });
 
-test('De Driehoek aanspreken is een unieke missie 76 met eigen artwork en duurzame state', () => {
+test('De Driehoek aanspreken is een unieke missie 77 met eigen artwork en duurzame state', () => {
   const api = require(path.join(repoRoot, 'assets/live-momentum-endgame-cards.js'));
   const catalog = JSON.parse(JSON.stringify(api.CARD_CATALOG));
   const cardMatches = catalog.filter((card) => card.id === 'de-driehoek-aanspreken');
@@ -1077,7 +1099,7 @@ test('De Driehoek aanspreken is een unieke missie 76 met eigen artwork en duurza
     id: 'de-driehoek-aanspreken',
     title: 'De Driehoek aanspreken'
   }]);
-  assert.equal(missionNumber, 76);
+  assert.equal(missionNumber, 77);
   assert.equal(cardIndex, sponsorIndex - 1);
   assert.equal(
     fs.existsSync(path.join(repoRoot, 'assets/live-momentum-endgame-cards/de-driehoek-aanspreken.png')),
