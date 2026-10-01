@@ -11,6 +11,17 @@ import re
 PROFILE = 'api-basic-v1'
 
 
+def phone_identity(value):
+    """Compare complete Dutch numbers across 0, +31 and 0031 notation."""
+    digits = re.sub(r'\D', '', str(value or ''))
+    national = digits[4:] if digits.startswith('0031') else digits[2:] if digits.startswith('31') else ''
+    if national.startswith('0') and len(national) == 10:
+        national = national[1:]
+    if len(national) == 9 and national[0] != '0':
+        return '0' + national
+    return digits  # Never equate a suffix, short number or another country.
+
+
 def validate_api_evidence(result):
     from kvk_candidate_identity import validate_review
     validate_review(result)

@@ -51,6 +51,19 @@ def run(role, runner, apply_lock):
             action = "apart gezet voor herstel" if state["needs_review"] else "wordt automatisch opnieuw geprobeerd"
             print(f"KVK {role} {path.stem}: {error}; {action}.", flush=True)
             return False
+
+    def finish_write():
+        nonlocal writing, saved, window, refreshed
+        kvk, future, path = writing
+        writing = None
+        if completed(future, path):
+            saved += 1
+            failures.clear(path)
+            prepared.discard(kvk)
+            finished.add(kvk)
+            window = [c for c in window if str(c['kvk_nummer']) != kvk]
+            if len(window) <= count:
+                refreshed = 0.0
     try:
         with runner.Heartbeat(role, 'doorlopend', message=message):
             while True:
@@ -73,16 +86,7 @@ def run(role, runner, apply_lock):
                         if completed(future, paths.pop(kvk), researched=True):
                             prepared.add(kvk)
                 if writing and writing[1].done():
-                    kvk, future, path = writing
-                    writing = None
-                    if completed(future, path):
-                        saved += 1
-                        failures.clear(path)
-                        prepared.discard(kvk)
-                        finished.add(kvk)
-                        window = [c for c in window if str(c['kvk_nummer']) != kvk]
-                        if len(window) <= count:
-                            refreshed = 0.0
+                    finish_write()
                 for company in window:
                     kvk = str(company['kvk_nummer'])
                     if kvk in finished or kvk in active or (writing and writing[0] == kvk):
@@ -127,3 +131,7 @@ def run(role, runner, apply_lock):
     finally:
         research.shutdown(wait=True)
         writer.shutdown(wait=True)
+        # A stop can arrive while an already-dispatched write finishes. Consume
+        # its outcome after draining; never submit another write during shutdown.
+        if writing:
+            finish_write()

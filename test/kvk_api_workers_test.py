@@ -237,6 +237,34 @@ class WorkerTests(unittest.TestCase):
                 self.assertLessEqual(peak, 2)
                 self.assertFalse(failures.state_path(runner.pending_path(role,'00000081',[])).exists())
 
+    def test_stop_during_inflight_write_clears_only_successful_recovery(self):
+        import kvk_worker_stream as stream
+        import kvk_worker_failures as failures
+        for succeeded in (True, False):
+            path = runner.pending_path('controller', '00000084', [])
+            path.write_text('{}')
+            failures.state_path(path).write_text('{"attempts":1}')
+            started, stopped = threading.Event(), threading.Event()
+            def poll():
+                enabled = not started.is_set()
+                if not enabled:
+                    stopped.set()
+                return {'state': {'workers': {'controller': {'enabled': enabled, 'count': 1}}}}
+            def apply(*_args):
+                started.set()
+                self.assertTrue(stopped.wait(timeout=3))
+                return succeeded
+            with self.subTest(succeeded=succeeded), \
+                    patch.object(runner, 'poll_state', side_effect=poll), \
+                    patch.object(runner, 'next_packet', return_value=({'bedrijven':[{'kvk_nummer':'00000084'}]}, [])), \
+                    patch.object(runner, 'research_one', return_value=True), \
+                    patch.object(runner, 'apply_result', side_effect=apply) as writer, \
+                    patch.object(runner, 'report'), \
+                    patch.object(stream, 'time', types.SimpleNamespace(monotonic=lambda: time.monotonic()*1000, sleep=lambda _: time.sleep(0.01))):
+                stream.run('controller', runner, threading.Lock())
+                writer.assert_called_once()
+                self.assertEqual(failures.state_path(path).exists(), not succeeded)
+
     def test_permanent_bad_answer_is_bounded_persistent_and_never_applied(self):
         import kvk_worker_failures as failures
         for role in ('searcher', 'controller'):
@@ -624,6 +652,75 @@ class WorkerTests(unittest.TestCase):
 
 
 class RecoveryEvidenceTests(unittest.TestCase):
+    def test_worker_refuses_start_until_phone_contract_is_installed(self):
+        from install_kvk_contact_identity import EDITS
+        import install_kvk_api_validation
+        source = ('def rejected(rejections, field):\n    if field == "telefoonnummer":\n' + EDITS[0][0]
+                  + 'def gate(rejected_phones):\n    for hit in []:\n        if True:\n' + EDITS[1][0]
+                  + '                continue\n'
+                  + 'def meaningful(text):\n' + EDITS[2][0] + '    return []\n')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'scripts').mkdir()
+            (root / 'scripts/contact_research.py').write_text(source)
+            with patch.object(runner, 'ROOT', root), \
+                    patch.object(install_kvk_api_validation, 'patched_source', side_effect=lambda value: value):
+                with self.assertRaisesRegex(RuntimeError, 'telefoonidentiteit'):
+                    runner.main()
+
+    def test_controller_repair_opens_identity_sources_with_blank_main_fields_and_reuses_pages(self):
+        result = {'website': '', 'route_notes': {'identity': {'urls': ['https://example.nl/kvk']}},
+                  'research_dossier': {'identity_status': 'unconfirmed', 'possible_matches': [
+                      {'bron_url': 'https://example.nl/candidate'}]}}
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.object(evidence, 'fetch_page', side_effect=lambda url: {'url': url, 'text': 'exact identity proof'}) as fetch:
+            path = Path(folder) / 'result.json'
+            first = evidence.controller_repair_evidence(path, result, [])
+            second = evidence.controller_repair_evidence(path, result, [])
+        self.assertEqual(first, second)
+        self.assertEqual(fetch.call_count, 2)
+        self.assertEqual([page['url'] for page in first], ['https://example.nl/kvk', 'https://example.nl/candidate'])
+        self.assertEqual(result['website'], '')
+
+    def test_controller_repair_is_bounded_and_keeps_blocked_sources_explicit(self):
+        result = {'route_notes': {'identity': {'urls': [f'https://example.nl/{i}' for i in range(9)]}}}
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.object(evidence, 'fetch_page', side_effect=lambda url: {'url': url, 'blocked': '403'}) as fetch:
+            pages = evidence.controller_repair_evidence(Path(folder) / 'result.json', result, [])
+        self.assertEqual(fetch.call_count, 4)
+        self.assertTrue(all('blocked' in page and 'text' not in page for page in pages))
+
+    def test_precheck_reuse_requires_exact_lane_and_hash_bound_artifact(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'result.json'
+            marker = path.with_name(path.name + '.precheck-ok.json')
+            marker.write_text(json.dumps({'scope': {'queue_kind': 'global_review', 'review_unusable': True,
+                                                   'review_approved': False, 'review_grade': 1}}))
+            valid = types.SimpleNamespace(validated_draft_path=lambda value: Path(folder) / 'draft.json')
+            with patch.dict(sys.modules, {'contact_agent_precheck': valid}):
+                self.assertTrue(runner.reusable_precheck(path, ['--review-unusable', '--review-grade', '1']))
+                self.assertFalse(runner.reusable_precheck(path, []))
+                self.assertFalse(runner.reusable_precheck(path, ['--review-approved']))
+            changed = types.SimpleNamespace(validated_draft_path=lambda value: None)
+            with patch.dict(sys.modules, {'contact_agent_precheck': changed}):
+                self.assertFalse(runner.reusable_precheck(path, ['--review-unusable']))
+
+    def test_cached_precheck_still_executes_validate_apply_and_checks_stop(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'result.json'
+            path.write_text('{}')
+            with patch.object(runner, 'COMPLETED', Path(folder) / 'completed'), \
+                    patch.object(runner, 'reusable_precheck', return_value=True), \
+                    patch.object(runner, 'is_enabled', return_value=True), \
+                    patch.object(runner, 'run_cli', return_value='') as cli:
+                self.assertTrue(runner.apply_result(path, [], threading.Lock(), 'controller'))
+                self.assertEqual([call.args[0] for call in cli.call_args_list], ['contact_validate_apply.py'])
+            path.write_text('{}')
+            with patch.object(runner, 'COMPLETED', Path(folder) / 'completed'), \
+                    patch.object(runner, 'is_enabled', return_value=False), patch.object(runner, 'run_cli') as cli:
+                self.assertFalse(runner.apply_result(path, [], threading.Lock(), 'controller'))
+                cli.assert_not_called()
+
     def test_recovery_reopens_only_bounded_deduplicated_urls(self):
         urls = [f'https://example.org/company/{i}' for i in range(6)]
         with patch.object(evidence, 'fetch_page', side_effect=lambda url: {'url': url, 'text': 'proof'}) as fetch:

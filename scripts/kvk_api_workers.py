@@ -167,6 +167,25 @@ def save_result(path: Path, result: dict) -> None:
     os.replace(temporary, path)
 
 
+def reusable_precheck(path: Path, flags: list[str]) -> bool:
+    """Reuse the unchanged hash-bound draft; validate/apply still check live state."""
+    try:
+        from contact_agent_precheck import validated_draft_path
+        marker = json.loads(path.with_name(path.name + '.precheck-ok.json').read_text())
+        scope = marker.get('scope') or {}
+        review = '--review-unusable' in flags
+        approved = '--review-approved' in flags
+        expected = 'global_review' if review else 'global_approved_review' if approved else 'global_initial'
+        if scope.get('queue_kind') != expected or bool(scope.get('review_unusable')) != review \
+                or bool(scope.get('review_approved')) != approved:
+            return False
+        if review and scope.get('review_grade') != 1:
+            return False
+        return validated_draft_path(path) is not None
+    except (ImportError, OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
 def apply_result(path: Path, flags: list[str], apply_lock: threading.Lock, role: str,
                  check_before_precheck: bool = True) -> bool:
     COMPLETED.mkdir(parents=True, exist_ok=True)
@@ -177,7 +196,8 @@ def apply_result(path: Path, flags: list[str], apply_lock: threading.Lock, role:
     with apply_lock:
         if check_before_precheck and not is_enabled(role):
             return False
-        run_cli("contact_agent_precheck.py", str(path), *flags)
+        if not reusable_precheck(path, flags):
+            run_cli("contact_agent_precheck.py", str(path), *flags)
         if not is_enabled(role):
             return False
         shutil.copy2(path, archive_temp)
@@ -188,7 +208,7 @@ def apply_result(path: Path, flags: list[str], apply_lock: threading.Lock, role:
             raise
     os.replace(archive_temp, destination)
     path.unlink(missing_ok=True)
-    for suffix in (".luna.json", ".engine.json", ".recovery.json", ".contract.json", ".failure.json"):
+    for suffix in (".luna.json", ".engine.json", ".recovery.json", ".contract.json", ".failure.json", ".pages.json", ".repair-pages.json"):
         sidecar = path.with_suffix(suffix)
         if sidecar.exists():
             os.replace(sidecar, destination.with_suffix(suffix))
@@ -459,7 +479,8 @@ def research_one(role: str, company: dict, brief: dict, flags: list[str], valida
             repair_brief["response_error"] = f"Vorig modelantwoord ongeldig; geef één JSON-object voor KVK {kvk}."
         if previous is not None:
             repair_brief["repair"] = {"previous_result": previous, "validation_error": failure}
-            repair_brief["public_page_evidence"] = result_page_evidence(path, previous)
+            from kvk_api_evidence import controller_repair_evidence
+            repair_brief["public_page_evidence"] = controller_repair_evidence(path, previous, result_page_evidence(path, previous))
             archive = path.with_suffix(f".rejected-{recovery['attempts']}.json")
             if not archive.exists():
                 save_result(archive, previous)
@@ -511,11 +532,12 @@ def api_brief(packet: dict) -> dict:
         "planning_scope": packet.get("planning_scope"),
         "bindend": [
             "Bij een mogelijke match met onopgeloste identiteit: bewaar kandidaten met concrete bronnen en onzekerheid in research_dossier (identity_status=unconfirmed, possible_matches); laat hoofdcontactvelden leeg, lead_status=unusable, unusable_reason=identity_unconfirmed en website_status=unknown. Verwar onbevestigd niet met niet gevonden. Na bewezen bevestiging/afwijzing vervalt identity_status=unconfirmed; onderbouw de beslissing.",
-            "Bewijscontract: identity, entity_match en final_crosscheck zijn checked met concrete bevindingen; identity koppelt naam/adres aan doel-KVK via een geopende bron. lead_status=usable vereist telefoonnummer EN email, source_quality official of supported, operational_status operational en entity_role specific; anders unusable met feitelijke reden.",
+            "Bewijscontract: identity, entity_match en final_crosscheck zijn checked met concrete bevindingen; identity koppelt een geopende bron aantoonbaar aan de KvK-identiteit in company (naam/adres/doel-KVK). Letterlijk doel-KVK op elke internetbron is niet vereist; naamgelijkenis of een gedeeld adres alleen is onvoldoende. lead_status=usable vereist telefoonnummer EN email, source_quality official of supported, operational_status operational en entity_role specific; anders unusable met feitelijke reden.",
             "sources bevatten exacte URL en feitelijke note; elk gevuld contactveld heeft field_evidence met exacte bron-URL. Elk leeg veld krijgt een verklaring. contact_rejections vermeldt genoemde maar niet overgenomen contacten met value, url, reason_code (other_entity, wrong_location, wrong_kvk, publisher_contact of unverified_candidate) en note; anders lege lijsten. Verwijder geen bewijs om validatie te passeren.",
-            "route_notes bevatten status, notes en urls; status is checked, not_found, blocked of not_applicable met eerlijke reden. checks_completed=true alleen voor werkelijk uitgevoerde controle; toolfouten bewijzen geen afwezigheid.",
+            "route_notes bevatten status, notes en urls; status is checked, not_found, blocked of not_applicable met eerlijke reden. checks_completed=true alleen voor werkelijk uitgevoerde controle; toolfouten bewijzen geen afwezigheid. checks_completed betreft jouw brononderzoek, niet het uitvoeren van lokale precheck/validator-scripts: die voert de werker na je antwoord uit. Ontbrekend bewijs blijft ontbrekend.",
             "Acceptatie van ontbrekende contacten vereist vastgelegd bewijs bij search_engine, directories en website_basic, en bij een eigen site website_deep (checked, not_found of blocked). Een volledig lege contactset vereist twee geopende bedrijfsdetailbronnen; no_website/not_working minimaal drie bronnen/checks. no_website betekent geen website aangetoond.",
             "company.luna_claim/negative_claim en prior_evidence zijn eerdere claims en bewijs; public_page_evidence bevat aanvullende kandidaten. Behoud bewezen gegevens bij repair en verantwoord correcties. Bij review_unusable en opnieuw onbruikbaar: ONBRUIKBAAR_REVIEWED_V1 in conclusion_note.",
+            "research_dossier is {} na bevestiging/afwijzing van kandidaten. Alleen bij onopgeloste identiteit: identity_status=unconfirmed met concrete possible_matches; geen bevestigde hoofdcontactvelden. Bewaar overige relevante bronfeiten in sources en route_notes. Geef geen native dossierreceipt of leeg kandidaatsjabloon terug.",
         ],
         "result_schema": schema,
         "review_approved": packet.get("review_approved"),
@@ -694,6 +716,9 @@ def main() -> int:
     canonical = (ROOT / "scripts/contact_research.py").read_text()
     if patched_source(canonical) != canonical:
         raise RuntimeError("Installeer eerst het API-basiscontract; geen werker gestart.")
+    from install_kvk_contact_identity import patched_source as phone_source
+    if phone_source(canonical) != canonical:
+        raise RuntimeError("Installeer eerst de telefoonidentiteit; geen werker gestart.")
     from kvk_completion_order import patched_source as completion_source
     if completion_source(canonical) != canonical:
         raise RuntimeError("Installeer eerst de voltooiingsvolgorde; geen werker gestart.")

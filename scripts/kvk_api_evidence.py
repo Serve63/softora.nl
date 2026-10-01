@@ -4,6 +4,7 @@ import ipaddress
 import json
 import re
 import socket
+from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, unquote, urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
@@ -120,3 +121,37 @@ def repair_page_evidence(feedback):
     """
     urls = list(dict.fromkeys(url.rstrip('.,;:)') for url in re.findall(r'https?://[^\s<>"\\]+', feedback)))
     return [fetch_page(url) for url in urls[:4]]
+
+
+def controller_repair_evidence(path, result, existing):
+    """Reopen exact identity/candidate URLs once, including blank main websites."""
+    from pathlib import Path
+    urls = []
+    routes = result.get('route_notes') or result.get('research_route') or {}
+    routes = routes if isinstance(routes, dict) else {}
+    for key in ('identity', 'directories', 'final_crosscheck'):
+        stage = routes.get(key) or {}
+        stage = stage if isinstance(stage, dict) else {}
+        urls.extend(stage.get('urls') or [])
+    dossier = result.get('research_dossier') or {}
+    dossier = dossier if isinstance(dossier, dict) else {}
+    for match in dossier.get('possible_matches') or []:
+        if isinstance(match, dict):
+            urls.extend(match.get(key) for key in ('bron_url', 'telefoon_bron_url', 'email_bron_url', 'website'))
+    urls.extend(source.get('url') for source in result.get('sources') or [] if isinstance(source, dict))
+    urls = list(dict.fromkeys(url for url in urls if isinstance(url, str) and url.startswith(('https://', 'http://'))))[:4]
+    cache_path = Path(path).with_suffix('.repair-pages.json')
+    try:
+        cached = json.loads(cache_path.read_text()).get('pages') or []
+    except (OSError, ValueError, AttributeError):
+        cached = []
+    pages = {page['url']: page for page in [*cached, *existing] if isinstance(page, dict) and page.get('url')}
+    missing = [url for url in urls if url not in pages]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for page in pool.map(fetch_page, missing):
+            pages[page['url']] = page
+    selected = [pages[url] for url in urls]
+    temporary = cache_path.with_suffix('.json.partial')
+    temporary.write_text(json.dumps({'pages': selected}, ensure_ascii=False))
+    temporary.replace(cache_path)
+    return [*existing, *[page for page in selected if page not in existing]]
