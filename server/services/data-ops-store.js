@@ -7,6 +7,7 @@ const {
   buildCustomerIdentityKey,
   extensionForMimeType,
   normalizeString,
+  normalizeCustomerPayload,
   parseImageDataUrl,
   resolveRecordId,
   sanitizeStorageSegment,
@@ -509,15 +510,6 @@ function createSoftoraDataOpsStore(deps = {}) {
     if (value instanceof Date) return value.getTime();
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : Date.now();
-  }
-
-  function normalizeCustomerPayload(raw = {}, index = 0) {
-    const payload = raw && typeof raw === 'object' ? { ...raw } : {};
-    payload.id = resolveRecordId(payload, `customer_${index + 1}`);
-    const phone = normalizeString(payload.telefoon || payload.tel || payload.phone || payload.contactPhone);
-    if (phone && !payload.telefoon) payload.telefoon = phone;
-    if (phone && !payload.tel) payload.tel = phone;
-    return payload;
   }
 
   function buildCustomerRow(raw, index, source) {

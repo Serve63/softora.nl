@@ -1,4 +1,5 @@
 const { createHash } = require('crypto');
+const { isProtectedContactEmail } = require('./contact-email-protection');
 
 function normalizeString(value) {
   return String(value || '').trim();
@@ -106,6 +107,28 @@ function resolveRecordId(raw = {}, fallbackPrefix = 'record') {
   return `${fallbackPrefix}_${stableHash(identity || Date.now())}`;
 }
 
+function normalizeCustomerPayload(raw = {}, index = 0) {
+  const payload = raw && typeof raw === 'object' ? { ...raw } : {};
+  payload.id = resolveRecordId(payload, `customer_${index + 1}`);
+  const phone = normalizeString(payload.telefoon || payload.tel || payload.phone || payload.contactPhone);
+  if (phone && !payload.telefoon) payload.telefoon = phone;
+  if (phone && !payload.tel) payload.tel = phone;
+  let rejected = false;
+  for (const field of ['email', 'contactEmail']) {
+    if (!isProtectedContactEmail(payload[field])) continue;
+    payload[field] = '';
+    rejected = true;
+  }
+  if (rejected && !normalizeString(payload.email || payload.contactEmail)) {
+    // The explicit missing marker also prevents legacy UI domain guessing.
+    payload.email = '—';
+    payload.mail = false;
+    payload.canMail = false;
+    payload.emailVerificationStatus = 'protected';
+  }
+  return payload;
+}
+
 function parseImageDataUrl(value) {
   const raw = normalizeString(value).replace(/\s+/g, '');
   const match = raw.match(/^data:(image\/(?:png|jpe?g|webp));base64,([a-z0-9+/=]+)$/i);
@@ -144,6 +167,7 @@ module.exports = {
   getChunkMetaKey,
   getChunkPrefix,
   normalizeString,
+  normalizeCustomerPayload,
   parseImageDataUrl,
   readChunkedStateValue,
   resolveRecordId,
