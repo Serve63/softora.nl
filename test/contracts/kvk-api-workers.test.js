@@ -6,10 +6,16 @@ const { createKvkApiWorkersService } = require('../../server/services/kvk-api-wo
 
 const root = path.join(__dirname, '../..');
 
-test('API worker and evidence profile regressions pass without paid requests', () => {
+test('API worker, evidence and recovery queue regressions pass without paid requests', () => {
   const { spawnSync } = require('node:child_process');
-  const result = spawnSync('python3', ['-m', 'unittest', 'discover', '-s', 'test', '-p', 'kvk_api_*test.py'], { cwd: root, encoding: 'utf8', timeout: 30000 });
+  const result = spawnSync('python3', ['-m', 'unittest', 'discover', '-s', 'test', '-p', 'kvk_api_*test.py', '-v'], { cwd: root, encoding: 'utf8', timeout: 30000 });
   assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
+  // Keep the previously missed cross-location failure and restart cases in this gate.
+  for (const regression of ['test_last_failed_company_advances_executable_location_and_both_write_gates',
+    'test_old_mapping_failure_rechecks_saved_answer_until_apply_without_new_research',
+    'test_disabled_start_never_fetches_work']) {
+    assert.match(result.stderr, new RegExp(`${regression}[^\\n]+ \\.\\.\\. ok`));
+  }
 });
 
 function response() {

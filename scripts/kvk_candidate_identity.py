@@ -1,4 +1,5 @@
 """Preserve possible matches as evidence, never as confirmed company contacts."""
+import re
 from urllib.parse import urlsplit
 
 FIELDS = ('bedrijfsnaam', 'adres', 'telefoonnummer', 'telefoon_bron_url',
@@ -11,6 +12,25 @@ def http_url(value):
         return parsed.scheme in ('http', 'https') and bool(parsed.hostname)
     except ValueError:
         return False
+
+
+def website_url(value):
+    """Accept an ordinary bare domain without asserting ownership or reachability."""
+    value = str(value or '').strip()
+    if not value:
+        return ''
+    if re.search(r'\s|[\x00-\x1f\\]', value):
+        raise ValueError('Mogelijke website bevat ongeldige tekens')
+    parsed = urlsplit(value)
+    if not parsed.scheme:
+        value = 'https:' + value if value.startswith('//') else 'https://' + value
+        parsed = urlsplit(value)
+    host = (parsed.hostname or '').encode('idna').decode('ascii')
+    if (parsed.scheme not in ('http', 'https') or parsed.username or parsed.password
+            or not re.fullmatch(r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}', host)):
+        raise ValueError('Mogelijke website vereist een http(s)-URL met domeinnaam')
+    parsed.port  # Reject malformed ports before storing a candidate link.
+    return value
 
 
 def normalize_matches(values):
@@ -26,8 +46,7 @@ def normalize_matches(values):
         for field in ('telefoonnummer', 'email'):
             if item[field] and not http_url(item[field.replace('nummer', '') + '_bron_url']):
                 raise ValueError(f'Mogelijke {field} vereist eigen bron-URL')
-        if item['website'] and not http_url(item['website']):
-            raise ValueError('Mogelijke website vereist een http(s)-URL')
+        item['website'] = website_url(item['website'])
         matches.append(item)
     return matches
 
@@ -49,8 +68,6 @@ def from_answer(company, answer):
         for field in ('telefoonnummer', 'email'):
             if not http_url(item[field.replace('nummer', '') + '_bron_url']):
                 item[field] = ''
-        if item['website'] and not http_url(item['website']):
-            item['website'] = 'https://' + item['website']
         return normalize_matches([item])
     return []
 
