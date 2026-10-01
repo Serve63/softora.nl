@@ -9,6 +9,7 @@ const {
 const {
   createPremiumDatabaseCinematicJobsCoordinator,
 } = require('./premium-database-cinematic-jobs');
+const { registerMailAnalyticsRoutes } = require('../routes/mail-analytics');
 const { createMailboxService } = require('./mailbox');
 const { createPublicContactService } = require('./public-contact');
 const {
@@ -68,6 +69,10 @@ function createServerAppFeatureWiring(context, dependencies = {}) {
     coldmailCampaignService.setWebdesignPreparationCoordinator(premiumDatabaseWebdesignJobsCoordinator);
   }
   const mailboxCoordinator = createMailboxService(featureRouteOptions.mailbox || {});
+  registerMailAnalyticsRoutes(app, {
+    getSupabaseClient: featureRouteOptions.mailbox?.getSupabaseClient,
+    requirePremiumAdminApiAccess: featureRouteOptions.premiumRouteRuntime?.requirePremiumAdminApiAccess,
+  });
   const publicContactCoordinator = createPublicContactService(
     featureRouteOptions.publicContact || {}
   );

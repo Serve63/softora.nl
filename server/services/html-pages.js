@@ -4,7 +4,6 @@ const { applyPublicSeoHeadDefaults } = require('./public-seo');
 const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
 const { createPremiumSidebarShell } = require('./premium-sidebar-shell');
 const { renderPremiumSettingsShell } = require('./premium-settings-shell');
-
 const LOCAL_FONT_VERSION = '20260409a';
 const LOCAL_FONT_STYLESHEET_HREF = `/assets/fonts.css?v=${LOCAL_FONT_VERSION}`;
 const LOCAL_FONT_PRELOAD_LINKS = [
@@ -17,13 +16,14 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
 const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909b';
-const PREMIUM_PERSONNEL_THEME_VERSION = '20260927-locked';
-const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260927-locked';
+const PREMIUM_PERSONNEL_THEME_VERSION = '20261001-mail-system';
+const PREMIUM_SIDEBAR_PREFILL_VERSION = '20261001-mail-system';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
-const PREMIUM_SIDEBAR_LINKS_VERSION = '20260927-locked';
+const PREMIUM_SIDEBAR_LINKS_VERSION = '20261001-mail-system';
 const PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content';
 const PREMIUM_SIDEBAR_STABILITY_ASSETS = [
+  '<link rel="stylesheet" href="/assets/premium-mail-system-menu.css?v=20261001a">',
   `<link rel="stylesheet" href="/assets/premium-sidebar-stability.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
   `<link rel="stylesheet" href="/assets/premium-sidebar-mobile.css?v=${PREMIUM_SIDEBAR_STABILITY_VERSION}">`,
   `<link rel="stylesheet" href="/assets/premium-sidebar-autopilot.css?v=${PREMIUM_SIDEBAR_AUTOPILOT_VERSION}">`,
@@ -102,7 +102,6 @@ html{scrollbar-gutter:stable;}
 </style>`,
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
-
 function applySeoAutomationExcludedRouteDirectives(htmlRaw) {
   let html = String(htmlRaw || '');
   if (!html) return html;
