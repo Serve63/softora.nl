@@ -10,10 +10,12 @@ test('API worker, evidence and recovery queue regressions pass without paid requ
   const { spawnSync } = require('node:child_process');
   const result = spawnSync('python3', ['-m', 'unittest', 'discover', '-s', 'test', '-p', 'kvk_api_*test.py', '-v'], { cwd: root, encoding: 'utf8', timeout: 30000 });
   assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
-  // Keep the previously missed cross-location failure and restart cases in this gate.
+  // Keep queue, provider availability and parallel repair cases in this gate.
   for (const regression of ['test_last_failed_company_advances_executable_location_and_both_write_gates',
     'test_old_mapping_failure_rechecks_saved_answer_until_apply_without_new_research',
-    'test_disabled_start_never_fetches_work']) {
+    'test_disabled_start_never_fetches_work',
+    'test_capacity_failure_keeps_peers_writing_and_retries_without_rejecting_company',
+    'test_slow_controller_repair_does_not_hold_the_database_writer']) {
     assert.match(result.stderr, new RegExp(`${regression}[^\\n]+ \\.\\.\\. ok`));
   }
 });
