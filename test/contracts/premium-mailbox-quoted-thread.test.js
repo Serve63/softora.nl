@@ -42,6 +42,57 @@ function proofOptions(overrides = {}) {
   };
 }
 
+const excerptHeader = 'Op 1 okt 2026, om 08:36 heeft Servé Creusen <serve@websoftora.com> het volgende geschreven:';
+const excerptParent = () => parent({ accountEmail: 'serve@websoftora.com',
+  date: '2026-10-01T06:36:30.000Z',
+  body: 'Goedendag,\n\nIk kan ook de online preview doorsturen, zodat je zelf door het ontwerp kunt scrollen.' });
+const excerptOptions = { incomingAt: '2026-10-01T07:10:40.000Z' };
+
+test('een letterlijk geselecteerd Apple Mail-fragment verdwijnt bij unieke afzender- en verzendtijdbewijzen', () => {
+  const body = `Hi Servé,\n\nIk wil best eens kijken naar jouw online preview.\n\n${excerptHeader}\n\nonline preview doorsturen`;
+  const result = quotedThread.stripProvenQuotedOutbound(body, [excerptParent()], excerptOptions);
+  assert.equal(result.body, 'Hi Servé,\n\nIk wil best eens kijken naar jouw online preview.');
+  assert.deepEqual(result.matchedMessages, [excerptParent()]);
+});
+
+test('een fragment blijft zichtbaar zonder exacte identiteit, tijd, volledige tekst of unieke sent-copy', () => {
+  const body = `Mijn antwoord.\n\n${excerptHeader}\n\nonline preview doorsturen`;
+  const cases = [
+    [body, []],
+    [body, [excerptParent(), { ...excerptParent(), id: 'sent:other', messageId: '<other@example.nl>' }]],
+    [body, [{ ...excerptParent(), accountEmail: 'martijn@websoftora.com' }]],
+    [body, [{ ...excerptParent(), email: 'someone@example.nl' }]],
+    [body, [{ ...excerptParent(), date: '2026-10-01T06:37:00.000Z' }]],
+    [body, [{ ...excerptParent(), date: '' }]],
+    [body.replace('online preview doorsturen', 'online preview aanpassen'), [excerptParent()]],
+    [body.replace('online preview doorsturen', 'preview'), [excerptParent()]],
+    [body + '\nMijn aanvullende vraag moet blijven.', [excerptParent()]],
+    [body.replace('serve@websoftora.com', 'thirdparty@example.nl'), [excerptParent()]],
+    [body.replace('Op 1 okt 2026, om 08:36', 'Op 2 okt 2026, om 08:36'), [excerptParent()]],
+  ];
+  for (const [incoming, parents] of cases) {
+    assert.equal(quotedThread.stripProvenQuotedOutbound(incoming, parents, excerptOptions).body, incoming);
+  }
+  assert.equal(quotedThread.stripProvenQuotedOutbound(body, [excerptParent()], {
+    incomingAt: '2026-10-01T06:00:00Z',
+  }).body, body);
+});
+
+test('fragmentbewijs ondersteunt Engelse headers en beschermt veranderde links en woorddelen', () => {
+  const header = 'On Thursday, October 1st, 2026 at 8:36 AM, Servé <serve@websoftora.com> wrote:';
+  const sent = excerptParent();
+  assert.equal(quotedThread.stripProvenQuotedOutbound(`Bedankt.\n${header}\n> online preview doorsturen`,
+    [sent], excerptOptions).body, 'Bedankt.');
+  for (const body of [
+    'Ik kan ook de online preview doorsturenlater, zodat je kunt kijken.',
+    'Bekijk de online preview op https://example.nl/original.',
+  ]) {
+    const excerpt = body.includes('doorsturenlater') ? 'online preview doorsturen' : 'online preview op https://example.nl/changed';
+    const incoming = `Bedankt.\n${excerptHeader}\n${excerpt}`;
+    assert.equal(quotedThread.stripProvenQuotedOutbound(incoming, [{ ...sent, body }], excerptOptions).body, incoming);
+  }
+});
+
 test('bewezen Gmail-parent verwijdert ook de over twee regels gesplitste replyheader', () => {
   const body = wrappedReply();
   const before = quotedThread.findQuotedSegments(body);
