@@ -2,12 +2,12 @@ const crypto = require('node:crypto');
 const { SEARCHER_INSTRUCTIONS, CONTROLLER_INSTRUCTIONS } = require('./kvk-luna-searcher-prompt');
 
 const TABLE = 'softora_kvk_api_budget';
-const MODEL = 'gpt-6-sol';
+const MODEL = 'gpt-6.1-sol';
 // All workers run through Codex on the local ChatGPT subscription; the paid API is not used.
-const MODEL_LABEL = 'Searcher: Codex Sol 6 xhigh · Controleur: Codex Sol 6 xhigh';
+const MODEL_LABEL = 'Searcher: Codex Sol 6.1 xhigh · Controleur: Codex Sol 6.1 xhigh';
 const ROLE_MODELS = {
-  searcher: { model: MODEL, modelLabel: 'Codex Sol 6 xhigh', reasoningEffort: 'xhigh' },
-  controller: { model: MODEL, modelLabel: 'Codex Sol 6 xhigh', reasoningEffort: 'xhigh' },
+  searcher: { model: MODEL, modelLabel: 'Codex Sol 6.1 xhigh', reasoningEffort: 'xhigh' },
+  controller: { model: MODEL, modelLabel: 'Codex Sol 6.1 xhigh', reasoningEffort: 'xhigh' },
 };
 const STALE_MS = 120000;
 const ROLES = new Set(['searcher', 'controller', 'robot']);

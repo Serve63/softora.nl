@@ -155,5 +155,21 @@ class RobotRunnerTests(unittest.TestCase):
         importlib.reload(robot)
 
 
+    def test_an_exhausted_active_location_is_topped_up_from_the_next_locations_in_order(self):
+        packet = json.dumps({'bedrijven': [{'kvk_nummer': '00000001'}]})
+        with patch.object(robot, 'run_cli', return_value=packet), \
+                patch.object(robot, 'read_locations_ahead', return_value=['00000005', '00000001', '00000006']) as ahead:
+            kvks = robot.Planning.read_planning(4)
+        ahead.assert_called_once_with(3)
+        self.assertEqual(kvks, ['00000001', '00000005', '00000006'])
+
+    def test_a_full_active_location_never_looks_ahead(self):
+        packet = json.dumps({'bedrijven': [{'kvk_nummer': f'{i:08}'} for i in range(1, 5)]})
+        with patch.object(robot, 'run_cli', return_value=packet), \
+                patch.object(robot, 'read_locations_ahead') as ahead:
+            self.assertEqual(len(robot.Planning.read_planning(4)), 4)
+        ahead.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()

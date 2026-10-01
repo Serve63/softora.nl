@@ -41,6 +41,12 @@ WORKERS = max(1, min(8, int(os.environ.get('SOFTORA_ROBOT_WORKERS') or 4)))
 # The planning is read once per window instead of once per company; a window
 # older than this is read afresh so a changed planning location is followed.
 PLANNING_REFRESH_SECONDS = 60
+# When the active planning location has no open company left, the Robot works
+# ahead on the next locations of the same planning order (already imported and
+# not yet completed), so their easy companies are done before the Searchers
+# arrive. It never jumps over the planning order.
+LOCATIONS_AHEAD = 3
+IDLE_SECONDS = 60
 POLL_SECONDS = 5
 IMPORT_LOCK = threading.Lock()
 
@@ -77,6 +83,31 @@ def identity_for(kvk):
     return {key: row[key] for key in FIELDS}
 
 
+def read_locations_ahead(limit, locations_ahead=LOCATIONS_AHEAD):
+    """Open companies of the next planning locations after the active one, in planning order."""
+    import contact_research as research
+    import serve_dashboard as dashboard
+    state = dashboard.load_json(dashboard.STATE_PATH, {})
+    imported = set(state.get('processed_location_codes') or []) | set(state.get('kvk_search_completed_location_codes') or [])
+    completed = set(state.get('contact_search_completed_location_codes') or [])
+    locations = {str(item.get('woonplaatscode')): item for item in dashboard.load_json(dashboard.LOCATIONS_PATH, [])}
+    order = dashboard.ordered_location_codes()
+    active = str(dashboard.fast_live_active_location_code() or '')
+    following = order[order.index(active) + 1:] if active in order else []
+    kvks, used = [], 0
+    with research.connect() as connection:
+        for code in following:
+            if used >= locations_ahead or len(kvks) >= limit:
+                break
+            if code not in imported or code in completed or code not in locations:
+                continue
+            filters, params = research.active_location_filters(locations[code])
+            rows = research.fetch_next(connection, limit - len(kvks), filters, params)
+            used += 1
+            kvks += [str(row['kvk_nummer']) for row in rows]
+    return kvks
+
+
 class Planning:
     """The open planning head in order, read once per window rather than per company."""
 
@@ -90,7 +121,10 @@ class Planning:
     def read_planning(limit):
         packet = json.loads(run_cli('contact_research.py', 'planning-next', '--fast-head',
                                     '--limit', str(limit), '--json'))
-        return [str(company['kvk_nummer']) for company in packet.get('bedrijven', [])]
+        kvks = [str(company['kvk_nummer']) for company in packet.get('bedrijven', [])]
+        if len(kvks) < limit:
+            kvks += [kvk for kvk in read_locations_ahead(limit - len(kvks)) if kvk not in kvks]
+        return kvks
 
     def take(self, count, busy):
         """Up to `count` open companies from the head, skipping finished, claimed and running ones."""
@@ -289,8 +323,9 @@ def main():
                             kvk = str(identity['kvk_nummer'])
                             running[kvk] = (pool.submit(research, identity, stop), identity)
                     if not running:
-                        report('robot', 'Actuele planning onderzocht; wacht op verwerking van de resultaten.', halt=True)
-                        time.sleep(POLL_SECONDS)
+                        # Nothing open in the active and the next locations: stay on and look again later.
+                        report('robot', 'Planning en volgende gebieden onderzocht; wacht op nieuw werk.')
+                        time.sleep(IDLE_SECONDS)
                         continue
                     try:
                         report('robot', status({kvk: identity for kvk, (_f, identity) in running.items()}),
