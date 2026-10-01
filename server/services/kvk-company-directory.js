@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
 const { directoryDossier } = require('./kvk-directory-candidates');
+const { normalizeProtectedContactEmail } = require('./contact-email-protection');
 
 const DIRECTORY_TABLE = 'softora_kvk_company_directory';
 const UNUSED_DIRECTORY_VIEW = 'softora_kvk_unused_company_directory';
@@ -227,7 +228,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
       lead_status: normalizedField(row?.lead_status || 'unresearched', 40),
       unusable_reason: normalizedField(row?.unusable_reason, 80),
       telefoonnummer: normalizedField(row?.telefoonnummer, 100),
-      email: normalizedField(row?.email, 320),
+      email: normalizeProtectedContactEmail(normalizedField(row?.email, 320)),
       website: normalizedField(row?.website, 2000),
       website_status: normalizedField(row?.website_status || 'unknown', 40),
       woonplaats: normalizedField(row?.woonplaats || row?.plaats, 200),

@@ -6,6 +6,16 @@
   "use strict";
 
   function fallbackNormalizeString(value) { return String(value || "").trim(); }
+  function getContactEmail(customer) {
+    for (const value of [customer && customer.email, customer && customer.contactEmail]) {
+      const raw = fallbackNormalizeString(value);
+      if (!raw) continue;
+      if (/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(raw)) return raw;
+      const compact = raw.toLowerCase().replace(/&[^;\s]{1,32};/g, "").replace(/[^a-z]/g, "");
+      if (!/emailprotected|emailprotection|cfemail/.test(compact)) return raw;
+    }
+    return "—";
+  }
   function fallbackNormalizeSearchValue(value) { return fallbackNormalizeString(value).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim(); }
   function resolveHelpers(helpers) {
     const options = helpers && typeof helpers === "object" ? helpers : {};
@@ -93,5 +103,5 @@
     });
   }
 
-  return { getPhotoHeaderCount, getLoadMoreState, getNextVisibleLimit, getVisibleRows, hasUsedColdCalling, isColdcallingStatusFilter, mapColdCallingOutcomeText, matchesColdcallingStatusFilter, mergeCustomersWithResponsible };
+  return { getContactEmail, getPhotoHeaderCount, getLoadMoreState, getNextVisibleLimit, getVisibleRows, hasUsedColdCalling, isColdcallingStatusFilter, mapColdCallingOutcomeText, matchesColdcallingStatusFilter, mergeCustomersWithResponsible };
 });

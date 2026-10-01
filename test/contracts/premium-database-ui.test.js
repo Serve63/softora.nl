@@ -5242,7 +5242,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /state\.activeStatus === "instantly"/);
   assert.match(pageSource, /if \(isColdcallingStatusFilter\(state\.activeStatus\)\) return matchesColdcallingStatusFilter\(customer, state\.activeStatus\);/);
   assert.match(pageSource, /return outreachController\.matchesStatusFilter\(customer, state\.activeStatus, hasUsedColdCalling, hasUsedColdMailing\);/);
-  assert.match(pageSource, /assets\/premium-database-table-helpers\.js\?v=20260923-owner/);
+  assert.match(pageSource, /assets\/premium-database-table-helpers\.js\?v=20261001-email-guard/);
   assert.match(pageSource, /function hasUsedColdCalling\(customer\) \{ return databaseTableHelpers\.hasUsedColdCalling\(customer, getTableHelperOptions\(\)\); \}/);
   assert.match(pageSource, /function matchesColdcallingStatusFilter\(customer, activeStatus\) \{ return databaseTableHelpers\.matchesColdcallingStatusFilter\(customer, activeStatus, getTableHelperOptions\(\)\); \}/);
   assert.match(tableHelpersSource, /function mapColdCallingOutcomeText\(text, helpers\)/);
