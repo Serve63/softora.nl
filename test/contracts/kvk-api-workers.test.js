@@ -117,7 +117,8 @@ test('robot writes only its own usable finds, via the guarded import, never via 
 test('robot and searchers never research the same company twice', () => {
   const robot = fs.readFileSync(path.join(root, 'scripts/kvk_robot_v5.py'), 'utf8');
   const workers = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
-  assert.match(robot, /skip = completed \| searcher_claims\(\)/);
+  // Finished, Searcher-claimed and currently running companies are all skipped.
+  assert.match(robot, /skip = completed_kvks\(\) \| searcher_claims\(\) \| set\(busy\)/);
   // A short dashboard hiccup never switches the Robot off.
   assert.match(robot, /if transient_control_failure\(error\):\n\s+# A short dashboard hiccup[^\n]*\n\s+time\.sleep\(15\)\n\s+continue/);
   assert.match(workers, /if kvk in in_flight or path\.exists\(\) or robot_busy\(kvk\):/);
