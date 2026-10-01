@@ -502,6 +502,31 @@ test('ready AI mail still deduplicates a proven sent copy while preserving unkno
   assert.match(campaign.getRootMessagePresentation(body,{...incoming,threadMessages:[]}).body,/eerdere concrete voorstel/);
 });
 
+test('selected-text replies deduplicate in ready AI root and timeline cards without changing the source', () => {
+  const campaign = require('../../assets/premium-mailbox-campaign-inbox');
+  const parent = { id: 'sent:excerpt', messageId: '<excerpt@example.nl>', folder: 'sent', direction: 'sent',
+    accountEmail: 'serve@websoftora.com', email: 'serve@websoftora.com', date: '2026-10-01T06:36:30.000Z',
+    body: 'Goedendag,\n\nIk kan ook de online preview doorsturen, zodat je zelf door het ontwerp kunt scrollen.' };
+  const authored = 'Hi Servé,\n\nIk wil best eens kijken naar jouw online preview.\n\nStuur de link svp naar contact@example.nl.\n\nIk laat zeker nog iets van mij horen…';
+  const body = `${authored}\n\nGroetjes,\nElly\n\nOp 1 okt 2026, om 08:36 heeft Servé Creusen <serve@websoftora.com> het volgende geschreven:\n\nonline preview doorsturen`;
+  const labels = body.split('\n').map(line => ['Groetjes,', 'Elly'].includes(line) ? 'signature' : 'authored');
+  const incoming = { ...message, body, accountEmail: 'serve@websoftora.com', date: '2026-10-01T07:10:40.000Z',
+    inReplyTo: '', threadMessages: [parent],
+    aiPresentation: { ...ready.aiPresentation, sourceBody: body, decision: { labels, contacts: [] } } };
+  const original = structuredClone(incoming);
+  assert.equal(campaign.getRootMessagePresentation(body, incoming).body, authored);
+  const views = [];
+  campaign.renderThreadMessages({ ...incoming, threadMessages: [parent, { ...incoming, bodyLoaded: true }] },
+    String, () => ({ date: 'Vandaag', time: '09:10' }), { renderMessageBody: view => { views.push(view.body); return view.body; } });
+  assert.ok(views.includes(authored));
+  assert.ok(views.includes(parent.body));
+  assert.match(campaign.getRootMessagePresentation(body, { ...incoming, threadMessages: [] }).body,
+    /het volgende geschreven:[\s\S]*online preview doorsturen/);
+  assert.match(campaign.getRootMessagePresentation(body, { ...incoming,
+    threadMessages: [{ ...parent, accountEmail: 'martijn@websoftora.com' }] }).body, /het volgende geschreven/);
+  assert.deepEqual(incoming, original);
+});
+
 test('sent-copy proof survives AI removing signature lines inside that quote', () => {
   const campaign = require('../../assets/premium-mailbox-campaign-inbox');
   const parent = { id:'sent:parent', messageId:'<parent@example.nl>', folder:'sent', direction:'sent',
