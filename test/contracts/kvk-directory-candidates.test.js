@@ -23,7 +23,7 @@ function response() {
     json(payload) { this.payload = payload; return this; } };
 }
 
-test('candidate contacts survive protected directory sync, read and table rendering', async () => {
+test('candidate evidence survives protected sync without appearing as directory contacts', async () => {
   let stored;
   const service = createKvkCompanyDirectoryService({ kvkDatabaseSyncToken: 'test-token',
     upsertDirectoryRows: async (rows) => { stored = rows; return { ok: true }; },
@@ -42,25 +42,27 @@ test('candidate contacts survive protected directory sync, read and table render
   const read = response();
   await service.sendGetDirectoryResponse({ query: {} }, read);
   const html = companyRowHtml(read.payload.rows[0]);
-  for (const text of ['0101234567', 'info@example.nl', 'example.nl', 'nog te controleren',
-    'Adresverschil', 'https://example.nl/contact']) assert.ok(html.includes(text), text);
-  assert.doesNotMatch(html, /Nog niet bevestigd|Niet gevonden/);
+  assert.match(html, /Ter controle/);
+  assert.equal((html.match(/<tr>/g) || []).length, 1);
+  assert.equal((html.match(/<td[ >]/g) || []).length, 7);
+  assert.equal((html.match(/aria-label="Niet bevestigd">—/g) || []).length, 3);
+  assert.doesNotMatch(html, /0101234567|info@example\.nl|example\.nl|Mogelijke match|<details|<summary/);
+  assert.deepEqual(read.payload.rows[0].research_dossier, row().research_dossier);
 });
 
-test('multiple matches stay individually numbered and malicious content is escaped', () => {
+test('multiple unconfirmed matches never leak into rows while approved contacts stay visible', () => {
   const item = row([candidate({ bedrijfsnaam: '<SCRIPT>attack</SCRIPT>', email: '', email_bron_url: '' }),
     candidate({ telefoonnummer: '', telefoon_bron_url: '', email: 'second@example.nl', website: 'javascript:alert(1)' })]);
   item.research_dossier = directoryDossier(item);
   const html = companyRowHtml(item);
-  assert.match(html, /Mogelijke match 1/);
-  assert.match(html, /Mogelijke match 2/);
-  assert.match(html, /second@example.nl/);
-  assert.match(html, /&lt;SCRIPT&gt;/);
-  assert.doesNotMatch(html, /<script|href="javascript:/i);
+  assert.match(html, /Ter controle/);
+  assert.doesNotMatch(html, /Mogelijke match|second@example\.nl|SCRIPT|attack|<details|href="javascript:/i);
   item.research_dossier.possible_matches[0].website = 'javascript:alert(1)';
   assert.doesNotMatch(companyRowHtml(item), /href="javascript:/i);
   const approved = { ...item, lead_status: 'usable', unusable_reason: '', telefoonnummer: '0201234567' };
   assert.deepEqual(directoryDossier(approved), {});
+  assert.match(companyRowHtml(approved), /0201234567/);
+  assert.equal(require('../../assets/kvk-database-total-found').companyStatus({ ...item, unusable_review_grade: 2 }).label, 'Afgekeurd');
   assert.doesNotMatch(companyRowHtml(approved), /second@example.nl|0101234567/);
   const unsourced = row([candidate({ telefoon_bron_url: 'javascript:alert(1)', email_bron_url: '' })]);
   const dossier = directoryDossier(unsourced);

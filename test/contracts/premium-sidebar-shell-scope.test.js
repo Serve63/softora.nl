@@ -605,7 +605,7 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
   assert.doesNotMatch(directoryShellSource, /<p class="eyebrow">Softora Database<\/p>/);
   assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260930-candidate-contacts/);
-  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidate-contacts/);
+  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20261001-clean-results/);
   assert.doesNotMatch(directoryShellSource, /<iframe/);
   assert.match(
     directoryStyleSource,
@@ -625,7 +625,7 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   );
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven"/);
   assert.match(themeSource, /pathname === "\/kvk-database-bedrijven\.html"/);
-  assert.match(dashboardSource, /assets\/kvk-database-total-found\.js\?v=20260930-candidate-contacts/);
+  assert.match(dashboardSource, /assets\/kvk-database-total-found\.js\?v=20261001-clean-results/);
   assert.match(directoryScriptSource, /params\.get\(SIDEBAR_CONTENT_PARAM\) === '1'/);
   assert.match(directoryScriptSource, /browserWindow\.location\?\.assign\(directoryContentPageUrl\(category\)\)/);
   assert.match(directoryContentSource, /href="\/premium-kvk-database\?softora_sidebar_content=1"/);
@@ -1454,10 +1454,10 @@ test('dashboard owns refresh lifetime while preserving the existing sidebar shel
 });
 
 
-test('KVK shell and embedded directory load the same candidate contact assets', () => {
+test('KVK shell and embedded directory load the same compact result renderer', () => {
   for (const name of ['premium-kvk-company-directory-shell.html', 'premium-kvk-company-directory.html', 'premium-kvk-database.html']) {
     const source = readRepoFile(name);
-    assert.match(source, /kvk-database-total-found\.js\?v=20260930-candidate-contacts/);
+    assert.match(source, /kvk-database-total-found\.js\?v=20261001-clean-results/);
     assert.match(source, /kvk-database-total-found\.css\?v=20260930-candidate-contacts/);
   }
 });
