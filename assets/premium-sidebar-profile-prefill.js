@@ -11,6 +11,7 @@
     var NAV_STATE_KEY = "softora_premium_sidebar_nav_state_v1";
     var NAV_STATE_TTL_MS = 1000 * 60 * 60 * 24;
     var persistedSessionSnapshot = null;
+
     function readCookieValue(name) {
         var needle = String(name || "").trim() + "=";
         if (!needle) return "";
@@ -23,6 +24,7 @@
         }
         return "";
     }
+
     function isLeadsPagePath(path) {
         var p = String(path || "").toLowerCase();
         return p.indexOf("/premium-leads") === 0 || p.indexOf("/premium-ai-coldmailing") === 0;
@@ -59,7 +61,6 @@
         if (p.indexOf("/premium-ai-lead-generator") === 0) return "coldcalling";
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
-        if (p.indexOf("/premium-mail-analytics") === 0) return "mail_analytics";
         if (p.indexOf("/premium-database") === 0) return "database";
         if (p === "/mailbox" || p.indexOf("/premium-mailbox") === 0) return "mailbox";
         if (p.indexOf("/premium-websitegenerator") === 0 || p.indexOf("/premium-websitepreview") === 0) return "websitegenerator";
