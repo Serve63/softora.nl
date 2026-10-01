@@ -198,15 +198,16 @@ def apply_result(path: Path, flags: list[str], apply_lock: threading.Lock, role:
 
 
 class Heartbeat:
-    def __init__(self, role: str, kvk: str):
+    def __init__(self, role: str, kvk: str, message=None):
         self.role, self.kvk = role, kvk
+        self.message = message
         self.stop = threading.Event()
         self.thread = threading.Thread(target=self.run, daemon=True)
 
     def run(self) -> None:
         while not self.stop.wait(30):
             try:
-                report(self.role, f"{CODEX_LABEL} onderzoekt {self.kvk}", self.kvk)
+                report(self.role, self.message() if self.message else f"{CODEX_LABEL} onderzoekt {self.kvk}", self.kvk)
             except Exception:
                 pass  # The dashboard shows a stale heartbeat as inactive.
 
@@ -687,6 +688,9 @@ def main() -> int:
     from kvk_completion_order import patched_source as completion_source
     if completion_source(canonical) != canonical:
         raise RuntimeError("Installeer eerst de voltooiingsvolgorde; geen werker gestart.")
+    from install_kvk_worker_queue import patched_source as queue_source
+    if queue_source(canonical) != canonical:
+        raise RuntimeError("Installeer eerst de herstelwachtrij; geen werker gestart.")
     from install_kvk_candidates import patch, RESEARCH_EDITS, HANDOFF_EDITS
     if patch(canonical, RESEARCH_EDITS) != canonical:
         raise RuntimeError("Installeer eerst het kandidaatbewijs; geen werker gestart.")

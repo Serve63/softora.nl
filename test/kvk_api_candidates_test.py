@@ -179,6 +179,25 @@ class CandidateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             canonical(value)
 
+    def test_bare_candidate_domain_is_normalized_without_confirming_identity(self):
+        for domain in ('voorbeeld.nl', 'www.voorbeeld.nl/contact', '//voorbeeld.nl/contact'):
+            value = ambiguous()
+            value['mogelijke_matches'][0]['website'] = domain
+            result = canonical(value)
+            self.assertTrue(validate_review(result))
+            self.assertEqual(result['website'], '')
+            self.assertEqual(result['lead_status'], 'unusable')
+            self.assertTrue(result['research_dossier']['possible_matches'][0]['website'].startswith('https://'))
+            self.assertEqual(value['mogelijke_matches'][0]['website'], domain)
+
+    def test_candidate_url_normalization_refuses_unsafe_or_malformed_values(self):
+        for domain in ('javascript:alert(1)', 'data:text/html,x', '/contact', 'geen website',
+                       'https://user:secret@voorbeeld.nl', 'https://voorbeeld.nl:bad', 'voorbeeld.nl\\evil'):
+            value = ambiguous()
+            value['mogelijke_matches'][0]['website'] = domain
+            with self.subTest(domain=domain), self.assertRaises(ValueError):
+                canonical(value)
+
     def test_installer_does_not_guess_after_source_drift(self):
         installed = '\n'.join(new for _, new in RESEARCH_EDITS)
         self.assertEqual(patch(installed, RESEARCH_EDITS), installed)
