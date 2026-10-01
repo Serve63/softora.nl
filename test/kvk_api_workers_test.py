@@ -337,9 +337,9 @@ class WorkerTests(unittest.TestCase):
             answer, urls = runner.codex_research({'kvk_nummer': '00000001'}, 'INSTRUCTIES')
         self.assertEqual((answer, urls), ({'kvk_nummer': '00000001'}, ['https://voorbeeld.nl/contact']))
 
-    def test_controller_uses_luna_xhigh(self):
+    def test_controller_uses_sol_xhigh(self):
         def run(command, **kwargs):
-            self.assertIn('gpt-6-luna', command)
+            self.assertIn('gpt-6-sol', command)
             self.assertIn('model_reasoning_effort=xhigh', command)
             Path(command[command.index('-o') + 1]).write_text('{}')
             return types.SimpleNamespace(returncode=0, stdout='', stderr='')
@@ -407,7 +407,7 @@ class WorkerTests(unittest.TestCase):
             call.assert_not_called()
         control.assert_called_once_with(company, {'contract': 'x'}, 'INSTRUCTIES')
         path = runner.pending_path('controller', company['kvk_nummer'], [])
-        self.assertEqual(runner.json.loads(path.with_suffix('.engine.json').read_text()), {'engine': 'codex', 'model': 'gpt-6-luna', 'reasoning_effort': 'xhigh'})
+        self.assertEqual(runner.json.loads(path.with_suffix('.engine.json').read_text()), {'engine': 'codex', 'model': 'gpt-6-sol', 'reasoning_effort': 'xhigh'})
 
     def test_a_searcher_answer_for_a_company_the_robot_already_found_is_set_aside_without_stopping(self):
         company = self.packet['bedrijven'][0]
