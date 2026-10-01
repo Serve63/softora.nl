@@ -31,6 +31,7 @@ async function runPremiumDatabaseWebdesignBatchWorker(options = {}, deps = {}) {
     processBatchJobsForWorker,
     serializeBatch,
     bulkWorkerBatchLimit,
+    nightlyMailStockService,
   } = deps;
 
   pruneJobs();
@@ -74,6 +75,7 @@ async function runPremiumDatabaseWebdesignBatchWorker(options = {}, deps = {}) {
   }
 
   try {
+    const nightlyStock = nightlyMailStockService ? await nightlyMailStockService.runDueCheck() : null;
     const batchLimit = Math.max(
       1,
       Math.min(bulkWorkerBatchLimit, Math.floor(Number(options.batchLimit) || bulkWorkerBatchLimit))
@@ -88,7 +90,7 @@ async function runPremiumDatabaseWebdesignBatchWorker(options = {}, deps = {}) {
       return createBatchStorageUnavailableResult('runnable batches lezen', new Error('Geen batchlijst ontvangen'));
     }
 
-    const result = createEmptyWorkerResult();
+    const result = createEmptyWorkerResult(nightlyStock ? { nightlyStock } : {});
     for (const batch of runnableBatches) {
       if (!batch || !batch.id || !batch.ownerKey) continue;
       const chunksResult = await loadBatchChunks(batch.ownerKey, batch.id);
@@ -138,8 +140,28 @@ async function runPremiumDatabaseWebdesignBatchWorker(options = {}, deps = {}) {
   }
 }
 
+async function sendBatchWorkerResponse(req, res, runBatchWorker, nightlyMailStockService) {
+  if (req.query?.mailStockStatus === '1' && nightlyMailStockService) {
+    return sendMailStockStatusResponse(res, nightlyMailStockService);
+  }
+  const result = await runBatchWorker({
+    batchLimit: req.query?.batchLimit || req.body?.batchLimit,
+    jobLimit: req.query?.jobLimit || req.body?.jobLimit,
+    concurrency: req.query?.concurrency || req.body?.concurrency,
+  });
+  const statusCode = Math.max(100, Math.min(599, Number(result.statusCode) || (result.ok ? 200 : 500)));
+  return res.status(statusCode).json(result);
+}
+
+async function sendMailStockStatusResponse(res, nightlyMailStockService) {
+  try { return res.status(200).json(await nightlyMailStockService.getStatus({ includeInventory: true })); }
+  catch (_error) { return res.status(503).json({ ok: false, code: 'MAIL_STOCK_STATUS_UNAVAILABLE' }); }
+}
+
 module.exports = {
   WEBDESIGN_BULK_WORKER_LEASE_TTL_SECONDS,
   WEBDESIGN_BULK_WORKER_LOCK_KEY,
   runPremiumDatabaseWebdesignBatchWorker,
+  sendBatchWorkerResponse,
+  sendMailStockStatusResponse,
 };

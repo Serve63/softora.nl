@@ -3,6 +3,18 @@ const assert = require('node:assert/strict');
 
 const { createAiRemoteService } = require('../../server/services/ai-remote');
 
+test('image budget preflight rejects an actual provider request before the paid transport', async () => {
+  const { service, state } = createService();
+  let checked;
+  await assert.rejects(service.generateWebsitePreviewImageWithAi({ host: 'softora.nl', imageSize: '1024x1536',
+    disableReferenceImages: true, beforeImageRequest: async (request) => {
+      checked = request; throw new Error('budget preflight rejected');
+    },
+  }), /budget preflight rejected/);
+  assert.equal(checked.imageSize, '1024x1536');
+  assert.equal(state.fetchJsonCalls.length, 0);
+});
+
 function createService(overrides = {}) {
   const state = {
     fetchJsonCalls: [],

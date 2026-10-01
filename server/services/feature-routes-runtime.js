@@ -67,6 +67,8 @@ const {
 } = require('./premium-database-mail-ready-snapshot');
 const { createPremiumDatabaseCustomersPageCoordinator } = require('./premium-database-customers-page');
 const { createInstantlyQueueRegistrationService } = require('./instantly-queue-registration');
+const { createNightlyMailStockStore } = require('../repositories/nightly-mail-stock');
+const { createNightlyMailStockService } = require('./nightly-mail-stock');
 const { createKvkDatabaseSnapshotService } = require('./kvk-database-snapshot');
 const { createKvkDatabaseControlService } = require('./kvk-database-control');
 const { createKvkDatabaseUploadService } = require('./kvk-database-upload');
@@ -128,6 +130,10 @@ function registerFeatureRoutes(app, deps = {}) {
     getUiStateValues: deps.getUiStateValues,
     setUiStateValues: deps.setUiStateValues,
   });
+  premiumDatabaseWebdesignJobsCoordinator?.setNightlyMailStockService?.(createNightlyMailStockService({
+    store: createNightlyMailStockStore({ getSupabaseClient: whoopHealth.getSupabaseClient }),
+    dataOpsStore: deps.dataOpsStore, snapshotService: premiumDatabaseMailReadySnapshotService,
+  }));
   if (typeof instantly?.instantlyOutreachService?.setMailReadySnapshotService === 'function') {
     instantly.instantlyOutreachService.setMailReadySnapshotService(premiumDatabaseMailReadySnapshotService);
   }
@@ -297,6 +303,7 @@ function registerFeatureRoutes(app, deps = {}) {
     coordinator: premiumDatabaseWebdesignJobsCoordinator,
     cronSecret: mailboxCronSecret,
     requirePremiumApiAccess: premiumRouteRuntime?.requirePremiumApiAccess,
+    requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,
   });
   registerPremiumDatabaseCinematicJobRoutes(app, {
     coordinator: premiumDatabaseCinematicJobsCoordinator,

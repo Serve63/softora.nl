@@ -1,0 +1,235 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { PGlite } = require('@electric-sql/pglite');
+const { localNight, inventory, OWNER_KEY, budgetChargeCents, assertApprovedImageRequest, createNightlyMailStockService } = require('../../server/services/nightly-mail-stock');
+const { runPremiumDatabaseWebdesignBatchWorker, sendBatchWorkerResponse } = require('../../server/services/premium-database-webdesign-batch-worker');
+
+const customer = (id, provider = 'softora') => ({ id, bedrijf: `Company ${id}`, email: `${id}@${id}.example`, dom: `${id}.example`, webdesignMailProvider: provider });
+const snapshot = (ready = [], available = [], instantlyReady = []) => ({ ok: true, customers: ready, availableCustomers: available, instantlyReadyCustomers: instantlyReady });
+const silent = { info() {}, warn() {}, error() {} };
+async function approvedRequest() {
+  const png = await require('sharp')({ create: { width: 12, height: 16, channels: 3, background: '#ffffff' } }).png().toBuffer();
+  return { imageModel: 'gpt-image-2.5-sunburst', imageSize: '1024x1536', imageQuality: 'medium', prompt: 'Test preview',
+    referenceImages: [{ dataUrl: `data:image/png;base64,${png.toString('base64')}` }] };
+}
+
+test('midnight uses Amsterdam local time in summer and winter, including the DST change', () => {
+  assert.deepEqual(localNight('2026-10-01T22:00:00Z'), { day: '2026-10-02', hour: 0 });
+  assert.deepEqual(localNight('2026-12-01T23:00:00Z'), { day: '2026-12-02', hour: 0 });
+  assert.deepEqual(localNight('2026-10-25T22:59:59Z'), { day: '2026-10-25', hour: 23 });
+  assert.deepEqual(localNight('2026-10-25T23:00:00Z'), { day: '2026-10-26', hour: 0 });
+});
+
+test('inventory deduplicates identities across providers and counts running designs without an email in the job', () => {
+  const one = customer('one'), pending = customer('pending', 'instantly');
+  const stock = inventory(snapshot([one], [pending], [{ ...one, id: 'alias', webdesignMailProvider: 'instantly' }]), [
+    { payload: { customer: { id: 'pending', bedrijf: pending.bedrijf, dom: pending.dom, webdesignMailProvider: 'instantly' } } },
+    { payload: { kind: 'bulk_webdesign_chunk', targets: [{ customer: pending, status: 'pending' }] } },
+  ]);
+  assert.deepEqual(stock.ready, { softora: 1, instantly: 0 });
+  assert.deepEqual(stock.pending, { softora: 0, instantly: 1 });
+});
+
+function fixture(stock, time = '2026-10-01T22:00:00Z') {
+  const control = { enabled: true, softora_target: 200, instantly_target: 200, approved_cents: 100000, held_cents: 0, charged_cents: 0 };
+  const plans = [], batches = [], chunks = [];
+  const store = {
+    readControl: async () => control, readActiveJobs: async () => [], readPlan: async () => plans,
+    allocate: async (row, provider, keys) => { plans.push({ customer: row, provider, identity_keys: keys }); return { allocated: true }; },
+    recordCheck: async (day, result) => { control.last_check_day = day; control.last_result = result; },
+    reserve: async () => ({ reserved: true }), settle: async () => ({ settled: true }),
+  };
+  const dataOpsStore = {
+    getWebdesignBatch: async () => batches[0] || null,
+    upsertWebdesignBatch: async (value) => { batches.push(value); return { ok: true }; },
+    upsertWebdesignBatchChunk: async (value) => { chunks.push(value); return { ok: true }; },
+    listOutboundRecipientGuardKeys: async () => [],
+  };
+  const service = createNightlyMailStockService({ store, dataOpsStore, snapshotService: { invalidate() {}, buildMailReadySnapshot: async () => stock },
+    now: () => Date.parse(time), logger: silent, imageModel: 'gpt-image-2.5-sunburst' });
+  return { service, control, plans, batches, chunks, store, dataOpsStore };
+}
+
+test('midnight divides unassigned companies between both deficits and cannot create another batch', async () => {
+  const ready = Array.from({ length: 198 }, (_, i) => customer(`s${i}`));
+  const instantly = Array.from({ length: 199 }, (_, i) => customer(`i${i}`, 'instantly'));
+  const f = fixture(snapshot(ready, [customer('sa'), customer('sb'), customer('sc'), customer('ia', 'instantly'), customer('ib', 'instantly')], instantly));
+  const result = await f.service.runDueCheck();
+  assert.deepEqual(result.added, { softora: 2, instantly: 1 });
+  assert.deepEqual(result.missing, { softora: 0, instantly: 0 });
+  assert.equal(f.batches.length, 1);
+  assert.equal(f.batches[0].ownerKey, OWNER_KEY);
+  assert.equal(f.batches[0].total, 3);
+  assert.equal(f.chunks[0].targets[2].customer.webdesignMailProvider, 'instantly');
+  assert.equal(f.plans[2].customer.id, 'sc');
+  assert.equal((await f.service.runDueCheck()).reason, 'already_checked');
+  assert.equal(f.plans.length, 3);
+});
+
+test('a full pool never generates extra work and a source shortage remains an explicit shortage', async () => {
+  const f = fixture(snapshot(Array.from({ length: 205 }, (_, i) => customer(`s${i}`)), [{ ...customer('sa'), hasPhoto: true }, customer('ia', 'instantly')]));
+  const result = await f.service.runDueCheck();
+  assert.deepEqual(result.added, { softora: 0, instantly: 1 });
+  assert.deepEqual(result.missing, { softora: 0, instantly: 199 });
+});
+
+test('outside midnight, disabled automation, or unavailable inventory never creates a batch', async () => {
+  const f = fixture(snapshot([], [customer('sa')]), '2026-10-01T21:59:59Z');
+  assert.equal((await f.service.runDueCheck()).reason, 'outside_midnight_hour');
+  assert.equal(f.plans.length, 0);
+  const disabled = fixture(snapshot([], [customer('sa')]));
+  disabled.control.enabled = false;
+  assert.equal((await disabled.service.runDueCheck()).reason, 'disabled');
+  const broken = fixture({ ok: false });
+  assert.equal((await broken.service.runDueCheck()).ok, false);
+  assert.equal(broken.plans.length, 0);
+  assert.equal(broken.control.last_check_day, undefined);
+});
+
+test('an interrupted plan is resumed before marking the day checked', async () => {
+  const f = fixture(snapshot([], [customer('sa')]));
+  let failing = true;
+  f.dataOpsStore.upsertWebdesignBatchChunk = async (chunk) => { if (failing) return { ok: false }; f.chunks.push(chunk); return { ok: true }; };
+  assert.equal((await f.service.runDueCheck()).ok, false);
+  assert.equal(f.plans.length, 1);
+  assert.equal(f.control.last_check_day, undefined);
+  failing = false;
+  assert.equal((await f.service.runDueCheck()).ok, true);
+  assert.equal(f.plans.length, 1);
+  assert.equal(f.batches.length, 1);
+});
+
+test('budget and outbound guard failures prevent the image provider call', async () => {
+  for (const failure of ['budget', 'outbound', 'guard-unavailable']) {
+    const f = fixture(snapshot([], [customer('sa')]));
+    if (failure === 'budget') f.store.reserve = async () => ({ reserved: false });
+    else f.dataOpsStore.listOutboundRecipientGuardKeys = async () => failure === 'outbound' ? ['id:sa'] : null;
+    let calls = 0;
+    await assert.rejects(f.service.generate({ id: 'job', customer: customer('sa') }, async () => { calls++; }), (error) => error.noAutomaticWebdesignRetry === true);
+    assert.equal(calls, 0);
+  }
+});
+
+test('a provider error keeps its monetary reservation and prohibits another paid attempt', async () => {
+  const f = fixture(snapshot([], [customer('sa')]));
+  const settlements = [];
+  f.store.settle = async (...args) => { settlements.push(args); return { settled: false }; };
+  const request = await approvedRequest();
+  await assert.rejects(f.service.generate({ id: 'job', customer: customer('sa') }, async (beforeRequest) => { await beforeRequest(request); throw new Error('provider disconnected'); }),
+    (error) => error.noAutomaticWebdesignRetry === true);
+  assert.equal(settlements.length, 1);
+  assert.equal(settlements[0][2], null);
+});
+
+test('unusable websites fail before paying, refund the unused reservation and cannot automatically retry', async () => {
+  const f = fixture(snapshot([], [customer('sa')]));
+  const settlements = [];
+  f.store.settle = async (...args) => { settlements.push(args); return { settled: true }; };
+  await assert.rejects(f.service.generate({ id: 'job', customer: customer('sa') }, async () => { throw new Error('website unreachable'); }),
+    (error) => error.noAutomaticWebdesignRetry === true);
+  assert.equal(settlements[0][2], 0);
+});
+
+test('request policy bounds the actual model, quality, prompt, number and dimensions before the paid call', async () => {
+  const request = await approvedRequest();
+  await assertApprovedImageRequest(request);
+  for (const change of [{ imageModel: 'unpriced-model' }, { imageQuality: 'max' }, { imageSize: '2160x3840' },
+    { prompt: 'a'.repeat(32769) }, { referenceImages: [request.referenceImages[0], request.referenceImages[0]] }]) {
+    await assert.rejects(assertApprovedImageRequest({ ...request, ...change }), /aanvraagbudget/);
+  }
+  const wide = await require('sharp')({ create: { width: 1201, height: 16, channels: 3, background: '#ffffff' } }).png().toBuffer();
+  await assert.rejects(assertApprovedImageRequest({ ...request, referenceImages: [{ dataUrl: `data:image/png;base64,${wide.toString('base64')}` }] }), /afmetingen/);
+});
+
+test('successful paid usage is settled and the same image survives an unavailable cost write', async () => {
+  const request = await approvedRequest();
+  const payload = { model: request.imageModel, quality: 'medium', size: '1024x1536', image: { dataUrl: 'data:image/png;base64,test' },
+    usage: { input_tokens: 3000, input_tokens_details: { text_tokens: 1000, image_tokens: 2000 }, output_tokens: 3000 } };
+  for (const broken of [false, true]) {
+    const f = fixture(snapshot([], [customer('sa')]));
+    const settlements = [];
+    f.store.settle = async (...args) => { settlements.push(args); if (broken) throw new Error('db disconnected'); return { settled: true }; };
+    let calls = 0;
+    const result = await f.service.generate({ id: 'job', customer: customer('sa', 'instantly') }, async (beforeRequest) => {
+      calls++; await beforeRequest(request); return payload;
+    });
+    assert.equal(result, payload);
+    assert.equal(calls, 1);
+    assert.equal(settlements[0][2], 23);
+    assert.equal(settlements[0][3].model, request.imageModel);
+    if (broken) assert.equal(settlements[1][2], null);
+  }
+});
+
+test('image usage accounting does not discount cached tokens on direct Image API requests', () => {
+  const charge = budgetChargeCents({ model: 'gpt-image-2.5-sunburst', usage: {
+    input_tokens_details: { text_tokens: 1000, image_tokens: 2000 }, output_tokens: 3000,
+  } });
+  assert.equal(charge, 23);
+  assert.equal(budgetChargeCents({ model: 'unpriced-model', usage: {} }), null);
+  assert.equal(budgetChargeCents(null), null);
+});
+
+test('overlapping worker invocations cannot run the midnight planner before claiming the durable lease', async () => {
+  let planned = 0;
+  const result = await runPremiumDatabaseWebdesignBatchWorker({}, {
+    pruneJobs() {}, requiresPersistentBatchStorage: () => true,
+    createBatchStorageUnavailableResult: () => ({ ok: false }),
+    backgroundWorkerLeaseStore: { claimBackgroundWorkerLease: async () => ({ ok: true, acquired: false }), releaseBackgroundWorkerLease: async () => ({ ok: true }) },
+    nightlyMailStockService: { runDueCheck: async () => { planned++; } },
+  });
+  assert.equal(result.reason, 'coalesced');
+  assert.equal(planned, 0);
+});
+
+test('the authenticated stock status branch only reads status and never invokes the worker', async () => {
+  const res = { status(code) { this.code = code; return this; }, json(value) { this.value = value; return this; } };
+  await sendBatchWorkerResponse({ query: { mailStockStatus: '1' } }, res, async () => { throw new Error('worker must not run'); },
+    { getStatus: async () => ({ ok: true, enabled: true }) });
+  assert.equal(res.code, 200);
+  assert.equal(res.value.enabled, true);
+});
+
+test('SQL budget, capacity, cross-provider identity locks and permissions survive restarts', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`create role anon; create role authenticated; create role service_role;
+      create table public.softora_outbound_recipient_guards (guard_key text primary key, permanent boolean, expires_at timestamptz);
+      create table public.softora_webdesign_jobs (job_id text primary key, owner_key text, customer_id text, status text, payload jsonb);`);
+    await db.exec(fs.readFileSync(path.join(__dirname, '../../supabase/migrations/20261001165857_nightly_mail_stock.sql'), 'utf8'));
+    const call = async (sql, args) => (await db.query(sql, args)).rows[0].result;
+    const allocate = (row, keys) => call("select public.softora_mail_stock_allocate($1::jsonb,$2,$3,'mail_stock_20261002') result", [JSON.stringify(row), row.webdesignMailProvider, keys]);
+    const addJob = (row, jobId) => db.query('insert into public.softora_webdesign_jobs values($1,$2,$3,\'running\',$4::jsonb)', [jobId, OWNER_KEY, row.id, JSON.stringify({ customer: row })]);
+    const reserve = (id, jobId, readyIds = []) => call('select public.softora_mail_stock_reserve($1,$2,$3) result', [id, jobId, readyIds]);
+    const settle = (id, jobId, cents) => call('select public.softora_mail_stock_settle($1,$2,$3,null) result', [id, jobId, cents]);
+    const a = customer('a'), b = customer('b'), c = customer('c', 'instantly');
+    assert.equal((await allocate(a, ['id:a','email:shared@example.test'])).allocated, false);
+    await db.exec("update public.softora_mail_stock_control set enabled=true,softora_target=1,approved_cents=1000;");
+    assert.equal((await allocate(a, ['id:a','email:shared@example.test'])).allocated, true);
+    assert.equal((await allocate(c, ['id:c','email:shared@example.test'])).allocated, false);
+    assert.equal((await allocate(b, ['id:b','email:b@example.test'])).allocated, true);
+    await addJob(a, 'job-a'); await addJob(b, 'job-b');
+    assert.equal((await reserve(a.id, 'wrong-job')).reserved, false);
+    assert.equal((await reserve(a.id, 'job-a')).reserved, true);
+    assert.equal((await reserve(a.id, 'job-a')).reserved, false);
+    assert.equal((await reserve(b.id, 'job-b')).reserved, false);
+    assert.equal((await settle(a.id, 'job-a', 20)).settled, true);
+    assert.equal((await settle(a.id, 'job-a', 20)).existing, true);
+    await db.exec('update public.softora_mail_stock_control set approved_cents=2000;');
+    assert.equal((await reserve(b.id, 'job-b')).reason, 'target_full');
+    await db.exec('update public.softora_mail_stock_control set softora_target=2,approved_cents=1000;');
+    assert.equal((await reserve(b.id, 'job-b', ['a'])).reserved, false); // Only EUR 9.80 remains.
+    await db.exec('update public.softora_mail_stock_control set approved_cents=2000;');
+    assert.equal((await reserve(b.id, 'job-b', ['a'])).reserved, true);
+    assert.equal((await settle(b.id, 'job-b', null)).settled, false);
+    const control = (await db.query('select * from public.softora_mail_stock_control')).rows[0];
+    assert.equal(Number(control.charged_cents), 20);
+    assert.equal(Number(control.held_cents), 1000);
+    assert.equal(control.enabled, false);
+    const permissions = (await db.query(`select has_table_privilege('anon','public.softora_mail_stock_control','SELECT') anon_read,
+      has_function_privilege('authenticated','public.softora_mail_stock_reserve(text,text,text[])','EXECUTE') member_execute`)).rows[0];
+    assert.equal(permissions.anon_read, false); assert.equal(permissions.member_execute, false);
+  } finally { await db.close(); }
+});

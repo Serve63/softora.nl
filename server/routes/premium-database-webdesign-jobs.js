@@ -6,6 +6,8 @@ function registerPremiumDatabaseWebdesignJobRoutes(app, deps = {}) {
     typeof deps.requirePremiumApiAccess === 'function'
       ? deps.requirePremiumApiAccess
       : (_req, _res, next) => next();
+  const requireAdmin = deps.requirePremiumAdminApiAccess || ((_req, res) => res.status(403).json({ ok: false }));
+  app.get('/api/premium-database/mail-stock', requireAdmin, (req, res) => coordinator.getMailStockStatusResponse(req, res));
 
   function requireCronAccess(req, res, next) {
     if (!cronSecret) {

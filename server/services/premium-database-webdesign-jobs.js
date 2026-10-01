@@ -1,7 +1,7 @@
 const { deliverWebdesignImage, createWebdesignDeliveryInterruptedError } = require('./premium-database-webdesign-delivery');
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 const { randomUUID } = require('crypto');
-const { runPremiumDatabaseWebdesignBatchWorker } = require('./premium-database-webdesign-batch-worker');
+const { runPremiumDatabaseWebdesignBatchWorker, sendBatchWorkerResponse, sendMailStockStatusResponse } = require('./premium-database-webdesign-batch-worker');
 const { buildWebdesignGenerationProvenance, normalizeWebdesignVariant } = require('./design-photo-generation-policy');
 const { assignWebdesignOwner } = require('./webdesign-owner-assignment');
 const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
@@ -570,6 +570,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   let processingWakeAt = 0;
   const inlineProcessingJobIds = new Set();
   let mailReadySnapshotService = initialMailReadySnapshotService;
+  let nightlyMailStockService = null;
 
   function pruneJobs() {
     const currentTime = now();
@@ -1221,7 +1222,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     if (isExpiredJob(job)) throw createExpiredWebdesignJobError();
 
     await deliverWebdesignImage(job, {
-      aiToolsCoordinator, persistJob, requiresPersistentJobStorage, persistGeneratedPhoto, logger,
+      aiToolsCoordinator, persistJob, requiresPersistentJobStorage, persistGeneratedPhoto, logger, nightlyMailStockService,
       storageRetrySleep: deps.storageRetrySleep,
       assertActive: () => {
         if (job.processingTimedOut) throw createWebdesignDeliveryInterruptedError();
@@ -2366,7 +2367,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function runBatchWorker(options = {}) {
     return runPremiumDatabaseWebdesignBatchWorker(options, {
-      logger,
+      logger, nightlyMailStockService,
       backgroundWorkerLeaseStore,
       pruneJobs,
       requiresPersistentBatchStorage,
@@ -2381,13 +2382,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   async function runBatchWorkerResponse(req, res) {
-    const result = await runBatchWorker({
-      batchLimit: req.query?.batchLimit || req.body?.batchLimit,
-      jobLimit: req.query?.jobLimit || req.body?.jobLimit,
-      concurrency: req.query?.concurrency || req.body?.concurrency,
-    });
-    const statusCode = Math.max(100, Math.min(599, Number(result.statusCode) || (result.ok ? 200 : 500)));
-    return res.status(statusCode).json(result);
+    return sendBatchWorkerResponse(req, res, runBatchWorker, nightlyMailStockService);
   }
 
   async function cancelBatchResponse(req, res) {
@@ -2605,7 +2600,9 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     listJobsResponse,
     runBatchWorker,
     runBatchWorkerResponse,
+    getMailStockStatusResponse: (_req, res) => sendMailStockStatusResponse(res, nightlyMailStockService),
     setMailReadySnapshotService,
+    setNightlyMailStockService: (service) => { nightlyMailStockService = service; },
     startBatchResponse,
     startJob,
     startJobResponse,
