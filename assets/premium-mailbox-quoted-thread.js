@@ -490,6 +490,51 @@
     return 0;
   }
 
+  const EXCERPT_MONTHS = [
+    ['jan', 'januari', 'january'], ['feb', 'februari', 'february'], ['mrt', 'maart', 'mar', 'march'],
+    ['apr', 'april'], ['mei', 'may'], ['jun', 'juni', 'june'], ['jul', 'juli', 'july'],
+    ['aug', 'augustus', 'august'], ['sep', 'sept', 'september'], ['okt', 'oktober', 'oct', 'october'],
+    ['nov', 'november'], ['dec', 'december'],
+  ];
+
+  function matchesExcerptHeader(header, message, options) {
+    if (!isReplyHeaderLine(header)) return false;
+    const emails = String(header || '').toLowerCase().match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/g) || [];
+    const sender = String(message && (message.email || message.accountEmail) || '').trim().toLowerCase();
+    if (emails.length !== 1 || !sender || emails[0] !== sender) return false;
+    const date = /\b(\d{1,2})\s+([a-z]+)\.?\s+(\d{4})\b/i.exec(header);
+    const reverseDate = date ? null : /\b([a-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b/i.exec(header);
+    const monthName = (date ? date[2] : reverseDate?.[1] || '').toLowerCase();
+    const month = EXCERPT_MONTHS.findIndex((names) => names.includes(monthName)) + 1;
+    const day = Number(date ? date[1] : reverseDate?.[2]);
+    const year = Number(date ? date[3] : reverseDate?.[3]);
+    const time = /\b(\d{1,2}):(\d{2})(?:\s*([ap])\.?m\.?)?\b/i.exec(header);
+    const timestamp = getMessageTimestamp(message);
+    if (!month || !day || !year || !time || !timestamp) return false;
+    const hour = time[3] ? Number(time[1]) % 12 + (time[3].toLowerCase() === 'p' ? 12 : 0) : Number(time[1]);
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: options.headerTimeZone || 'Europe/Amsterdam', hourCycle: 'h23',
+      year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+    }).formatToParts(new Date(timestamp));
+    const sent = Object.fromEntries(parts.map((part) => [part.type, Number(part.value)]));
+    return sent.year === year && sent.month === month && sent.day === day &&
+      sent.hour === hour && sent.minute === Number(time[2]);
+  }
+
+  function containsLiteralExcerpt(quotedValue, message) {
+    // Selected-text replies need the reverse comparison. Preserve URLs and
+    // punctuation here: altered quotes and personal additions are never copies.
+    const literal = (value) => String(value || '').replace(/^\s*(?:>\s*)+/gm, '')
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+    const excerpt = literal(quotedValue);
+    if (excerpt.length < 16 || excerpt.split(/\s+/).length < 3) return false;
+    const sent = literal(getAuthoredPrefix(message && (message.body || message.text || '')));
+    const index = sent.indexOf(excerpt);
+    if (index < 0) return false;
+    return !/[\p{L}\p{N}]/u.test(sent[index - 1] || '') &&
+      !/[\p{L}\p{N}]/u.test(sent[index + excerpt.length] || '');
+  }
+
   function findExactProvenOutbound(quotedValue, outboundMessages, options = {}) {
     const quotedText = normalizeMatchText(quotedValue);
     if (!quotedText) return null;
@@ -516,6 +561,8 @@
           message && (message.body || message.text || '')
         ));
         if (!bodyText) return false;
+        if (options.quoteHeader && matchesExcerptHeader(options.quoteHeader, message, options) &&
+          containsLiteralExcerpt(quotedValue, message)) return true;
         const exactScopedDirectParent = options.directParentScopeProven === true &&
           exactDirectParent;
         if (quotedText === bodyText) return bodyText.length >= 8 || exactScopedDirectParent;
@@ -557,7 +604,9 @@
     const removed = [];
     const matchedMessages = [];
     parsed.segments.forEach((segment) => {
-      const match = findExactProvenOutbound(stripQuotedEnvelope(segment.text), outboundMessages, options);
+      const match = findExactProvenOutbound(stripQuotedEnvelope(segment.text), outboundMessages, {
+        ...options, quoteHeader: segment.header,
+      });
       if (!match) return;
       const expandedStart = getProvenWrappedGmailHeaderStart(parsed.lines, segment);
       removed.push(expandedStart < segment.start ? { ...segment, start: expandedStart } : segment);
