@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "pages": {
+    "premium-mail-analytics.html": { "delivery": "isolated-document", "targetReadyMs": 3000, "readinessContract": "test/contracts/mail-analytics.test.js", "requiredData": ["/api/mailbox/analytics"], "requiredImages": [], "freshness": "60-second server cache; fetchedAt visible; no numbers on failure", "isolationReason": "Read-only admin reporting page with its own cancellable request lifecycle" },
     "actieve-opdrachten.html": {
       "delivery": "legacy-document",
       "targetReadyMs": 3000

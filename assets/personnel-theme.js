@@ -29,9 +29,7 @@
     let premiumSidebarProfileResolved = !isPremiumPersonnelContext;
     let sidebarLeadsRefreshRequestId = 0, sidebarLeadsZeroSnapshotStreak = 0;
     window[sidebarCountCacheKey] = sidebarCountCacheState;
-
     function isPremiumDashboardPath(path) { const p = String(path || "").toLowerCase().replace(/\/+$/, ""); return p === "/premium-personeel-dashboard" || p === "/premium-personeel-dashboard.html"; } function enforceDashboardAiChatScope() { if (isPremiumDashboardPath(window.location && window.location.pathname)) return; document.querySelectorAll("#dashboardAiChat, .dashboard-ai-chat").forEach(function (element) { if (element && element.parentNode) element.parentNode.removeChild(element); }); } enforceDashboardAiChatScope(); if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", enforceDashboardAiChatScope, { once: true }); } else { (typeof requestAnimationFrame === "function" ? requestAnimationFrame : window.setTimeout)(enforceDashboardAiChatScope); }
-
     try {
         if (isPremiumPersonnelContext) {
             const raw = sessionStorage.getItem(PREMIUM_SIDEBAR_SESSION_STORAGE_KEY);
@@ -521,6 +519,7 @@
         if (p.indexOf("/premium-coldmailing-lead") === 0) return "coldmailing";
         if (p.indexOf("/premium-bevestigingsmails") === 0) return "coldmailing";
         if (p.indexOf("/premium-klanten") === 0) return "customers";
+        if (p.indexOf("/premium-mail-analytics") === 0) return "mail_analytics";
         if (p.indexOf("/premium-database") === 0) return "database"; if (p === "/lead-radar") return "lead_radar";
         if (p === "/mailbox" || p.indexOf("/premium-mailbox") === 0) return "mailbox"; if (p.indexOf("/premium-samenvatten") === 0) return "summarize";
         if (p.indexOf("/premium-websitegenerator") === 0) {
@@ -926,7 +925,7 @@
         pruneDeprecatedSidebarLinks(sidebar); syncPremiumSidebarManagementLinks(sidebar, activeKey);
         syncStaticSidebarActiveState(sidebar, activeKey); activateMailboxSidebarLink(sidebar); activateFacebookAdsSidebarLink(sidebar);
         decorateComingSoonSidebarLinks();
-        neutralizeSidebarAnchors();
+        window.SoftoraPremiumSidebarLinks.mountMailSystemMenu(sidebar, activeKey); neutralizeSidebarAnchors();
         schedulePremiumSidebarStability(sidebar);
         sidebar.dataset.sidebarReady = "true";
     }
@@ -947,7 +946,7 @@
             syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
             pruneDeprecatedSidebarLinks(sidebar);
             decorateComingSoonSidebarLinks();
-            neutralizeSidebarAnchors();
+            window.SoftoraPremiumSidebarLinks.mountMailSystemMenu(sidebar, activeKey); neutralizeSidebarAnchors();
             schedulePremiumSidebarFit(sidebar);
             return;
         }
@@ -973,7 +972,7 @@
         syncPremiumSidebarAdminLinks(sidebar, premiumSessionSnapshot, activeKey);
         pruneDeprecatedSidebarLinks(sidebar);
         decorateComingSoonSidebarLinks();
-        neutralizeSidebarAnchors();
+        window.SoftoraPremiumSidebarLinks.mountMailSystemMenu(sidebar, activeKey); neutralizeSidebarAnchors();
         sidebar.dataset.sidebarReady = "true";
         schedulePremiumSidebarFit(sidebar);
     }
@@ -1218,7 +1217,7 @@
                     activeKey
                 );
                 decorateComingSoonSidebarLinks();
-                neutralizeSidebarAnchors();
+                window.SoftoraPremiumSidebarLinks.mountMailSystemMenu(sidebar, activeKey); neutralizeSidebarAnchors();
             }
         }
 

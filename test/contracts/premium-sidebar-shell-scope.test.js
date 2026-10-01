@@ -524,8 +524,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260927-locked'/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260927-locked'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20261001-mail-system'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20261001-mail-system'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909b'/);
@@ -1475,4 +1475,18 @@ test('Lead Radar, Facebook ads and Google ads use the shared disabled sidebar st
   }
   assert.match(readRepoFile('assets/personnel-theme.js'), /function activateFacebookAdsSidebarLink\(sidebar\) \{ if \(PREMIUM_SIDEBAR_COMING_SOON_KEYS.has\("ads_facebook"\)\) return;/);
   assert.match(readRepoFile('assets/premium-sidebar-profile-prefill.js'), /sharedLinks.COMING_SOON_KEYS.indexOf\(link.key\)/);
+});
+
+
+test('Mailsysteem owns a keyboard-operable submenu, retains sending and mailbox routes, and selects Analytics', () => {
+  const links = readRepoFile('assets/premium-sidebar-links.js');
+  assert.match(links, /function mountMailSystemMenu/);
+  assert.match(links, /button type="button"[\s\S]*aria-expanded="false"[\s\S]*aria-controls="sidebar-mail-system-children"/);
+  assert.match(links, /label.textContent = 'Verzendingen'/);
+  assert.match(links, /href: '\/premium-mail-analytics'/);
+  assert.match(links, /children.hidden = false/);
+  assert.match(links, /group.dataset.activeKey !== activeKey/);
+  assert.match(readRepoFile('assets/personnel-theme.js'), /mountMailSystemMenu\(sidebar, activeKey\)/);
+  assert.match(readRepoFile('assets/premium-sidebar-profile-prefill.js'), /premium-mail-analytics/);
+  assert.match(readRepoFile('assets/premium-mail-system-menu.css'), /children\[hidden\][^{]*\{display:none!important/);
 });
