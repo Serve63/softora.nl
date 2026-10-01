@@ -18,6 +18,17 @@ function createResponseRecorder() {
   };
 }
 
+test('website pipeline carries the internal image-budget gate through to the image provider', async () => {
+  const gate = () => {};
+  let captured;
+  const { coordinator } = createFixture({ generateWebsitePreviewImageWithAi: async (scan) => {
+    captured = scan; return { dataUrl: 'data:image/png;base64,test' };
+  } });
+  await coordinator.runWebsitePreviewGeneratePipeline('https://softora.nl', { beforeImageRequest: gate, imageSize: '1024x1536' });
+  assert.equal(captured.beforeImageRequest, gate);
+  assert.equal(captured.imageSize, '1024x1536');
+});
+
 function createFixture(overrides = {}) {
   const activities = [];
   const loggerCalls = [];

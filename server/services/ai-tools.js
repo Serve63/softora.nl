@@ -142,6 +142,7 @@ function createAiToolsCoordinator(deps = {}) {
       disableReferenceImages: !usesHomepageScreenshot && options.disableReferenceImages === true,
       referenceImageMode,
       requireReferenceImages: usesHomepageScreenshot || options.requireReferenceImages === true,
+      ...(typeof options.beforeImageRequest === 'function' ? { beforeImageRequest: options.beforeImageRequest } : {}),
       referenceImageFidelity: usesHomepageScreenshot ? 'high' : '',
       ...(usesHomepageScreenshot
         ? {

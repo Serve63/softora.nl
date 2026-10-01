@@ -1,5 +1,6 @@
 const { buildWebsiteImageGenerationMetadata } = require('./website-image-generation-cost');
 const { buildWebdesignPipelineOptions } = require('./design-photo-generation-policy');
+const { OWNER_KEY } = require('./nightly-mail-stock');
 
 function createWebdesignDeliveryInterruptedError() {
   return Object.assign(new Error(
@@ -8,7 +9,7 @@ function createWebdesignDeliveryInterruptedError() {
 }
 
 async function deliverWebdesignImage(job, {
-  aiToolsCoordinator, persistJob, requiresPersistentJobStorage, persistGeneratedPhoto, assertActive,
+  aiToolsCoordinator, persistJob, requiresPersistentJobStorage, persistGeneratedPhoto, assertActive, nightlyMailStockService,
   storageRetrySleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   logger = console,
 }) {
@@ -27,10 +28,16 @@ async function deliverWebdesignImage(job, {
   assertActive();
   let payload;
   try {
-    payload = await aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, buildWebdesignPipelineOptions({
+    const generate = (beforeImageRequest) => aiToolsCoordinator.runWebsitePreviewGeneratePipeline(job.websiteUrl, {
+      ...buildWebdesignPipelineOptions({
       source: 'premium-database',
       company: job.customer.bedrijf, domain: job.customer.dom,
-    }));
+      }), ...(beforeImageRequest ? { beforeImageRequest } : {}),
+    });
+    if (job.ownerKey === OWNER_KEY) {
+      if (!nightlyMailStockService) throw createWebdesignDeliveryInterruptedError();
+      payload = await nightlyMailStockService.generate(job, generate);
+    } else payload = await generate();
   } catch (error) {
     // Preserve existing provider/reference rejection retries, but not a process
     // deadline which leaves the provider operation running with an unknown result.

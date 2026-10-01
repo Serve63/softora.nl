@@ -193,6 +193,7 @@ test('premium database webdesign job routes expose persistent bulk endpoints', (
   registerPremiumDatabaseWebdesignJobRoutes(app, { coordinator: {} });
 
   assert.deepEqual(routes, [
+    ['GET', '/api/premium-database/mail-stock'],
     ['POST', '/api/premium-database/webdesign-photo-jobs'],
     ['GET', '/api/premium-database/webdesign-photo-jobs'],
     ['GET', '/api/premium-database/webdesign-photo-jobs/:jobId'],
@@ -205,6 +206,23 @@ test('premium database webdesign job routes expose persistent bulk endpoints', (
     ['POST', '/api/premium-database/webdesign-photo-batches/:batchId/cancel'],
     ['GET', '/api/premium-database/webdesign-photo-batches/:batchId'],
   ]);
+});
+
+test('mail stock status requires admin access and denies access when no admin gate is wired', async () => {
+  let handlers;
+  let reads = 0;
+  const app = { post() {}, get(pathname, ...value) { if (pathname === '/api/premium-database/mail-stock') handlers = value; } };
+  const coordinator = { getMailStockStatusResponse: (_req, res) => { reads++; return res.status(200).json({ ok: true }); } };
+  registerPremiumDatabaseWebdesignJobRoutes(app, { coordinator });
+  assert.equal((await callRouteHandlers(handlers, {})).statusCode, 403);
+  assert.equal(reads, 0);
+  registerPremiumDatabaseWebdesignJobRoutes(app, { coordinator,
+    requirePremiumAdminApiAccess: (req, res, next) => req.admin ? next() : res.status(403).json({ ok: false }),
+  });
+  assert.equal((await callRouteHandlers(handlers, { admin: false })).statusCode, 403);
+  assert.equal(reads, 0);
+  assert.equal((await callRouteHandlers(handlers, { admin: true })).statusCode, 200);
+  assert.equal(reads, 1);
 });
 
 test('premium database webdesign bulk runner cron route requires CRON_SECRET bearer access', async () => {

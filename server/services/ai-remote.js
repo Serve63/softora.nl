@@ -1118,7 +1118,7 @@ function createAiRemoteService(deps = {}) {
       referenceImageCount: referenceImages.length,
     });
     const imageGenerationTimeoutMs = resolveOpenAiImageGenerationTimeoutMs();
-
+    await scan.beforeImageRequest?.({ imageModel, imageSize: primaryImageSize, imageQuality, prompt, referenceImages });
     const attempts = [
       { imageModel, imageSize: primaryImageSize },
       ...(fallbackImageSize ? [{ imageModel, imageSize: fallbackImageSize }] : []),
