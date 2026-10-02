@@ -20,6 +20,7 @@ test('toekomst copyright opens the legal chooser while keeping the article and p
 
 test('legal chooser links all three choices to public pages', () => {
   const doc = parseDocument(read('assets/juridisch/index.html'));
+  assert.equal(DomUtils.textContent(DomUtils.findOne((node) => node.name === 'h1', doc.children)), 'ALLES HELDER GEREGELD.');
   const choices = DomUtils.findAll((node) => node.name === 'a' && node.attribs.class?.includes('legal-card '), doc.children);
   assert.deepEqual(choices.map((node) => node.attribs.href), ['/algemene-voorwaarden', '/privacybeleid', '/bedrijfsgegevens']);
   assert.equal(getIndexablePublicHtmlFileFromPath('/algemene-voorwaarden'), 'premium-algemene-voorwaarden.html');
