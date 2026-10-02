@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { after, before, test } = require('node:test');
+const { parseDocument, DomUtils } = require('htmlparser2');
 const { createPreviewServer } = require('../../scripts/blog-local-preview');
 const { getSeoContentItems, buildSeoContentArticleHtml, getSeoContentPathForItem } = require('../../server/services/seo-content');
 
@@ -90,8 +91,7 @@ test('local blog serves real article content and local assets without conversion
 test('every local article preserves canonical reading content, FAQ and working section anchors', async () => {
   const now = new Date('2026-10-02T12:00:00+02:00');
   const items = ['blog', 'kennisbank'].flatMap((collection) => getSeoContentItems({ collection, now }));
-  const paragraphText = (body) => [...body.matchAll(/<p>([\s\S]*?)<\/p>/g)]
-    .map((match) => match[1].replace(/<[^>]*>/g, ''));
+  const paragraphText = (body) => DomUtils.getElementsByTagName('p', parseDocument(body)).map(DomUtils.textContent);
   for (const item of items) {
     const response = await fetch(origin + '/blog/' + item.slug);
     assert.equal(response.status, 200, item.slug);

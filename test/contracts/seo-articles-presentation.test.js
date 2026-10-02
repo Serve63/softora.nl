@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { before, after, test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
+const { parseDocument, DomUtils } = require('htmlparser2');
 const express = require('express');
 const { registerPublicPageRoutes } = require('../../server/routes/public-pages');
 const { renderOverviewHtml, renderArticleHtml, publishedArticles } = require('../../server/services/seo-articles-presentation');
@@ -22,7 +23,7 @@ before(async () => {
 });
 after(async () => { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); });
 const graph = (html) => JSON.parse(html.match(/<script\b[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/)[1])['@graph'];
-const paragraphs = (html) => [...html.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((match) => match[1].replace(/<[^>]*>/g, ''));
+const paragraphs = (html) => DomUtils.getElementsByTagName('p', parseDocument(html)).map(DomUtils.textContent);
 
 test('public overview and all 52 article routes serve the approved layout with their original content and SEO', async () => {
   assert.equal(articles.length, 52);
