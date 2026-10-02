@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#f8f7f4">
+  <meta name="theme-color" content="#f8f6f2">
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
   <link rel="icon" type="image/png" href="/assets/softora-favicon-round.png?v=20260616a" sizes="any">
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
@@ -20,58 +20,65 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Contact met Softora">
   <meta name="twitter:description" content="Bespreek je website, software of AI-oplossing rechtstreeks met Softora.">
-  <link rel="stylesheet" href="/assets/fonts.css?v=20260409a">
+  <link rel="preload" href="/assets/fonts/oswald-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/entry/start.css?v=login-menu-20260922">
   <link rel="stylesheet" href="/assets/custom-selects.css?v=20260511a">
-  <link rel="stylesheet" href="/assets/contact-page.css?v=20260826j">
+  <link rel="stylesheet" href="/assets/contact-page.css?v=20261003a">
+  <script src="/assets/entry/contact-menu.js?v=login-menu-20260922" defer></script>
   <script src="/assets/custom-selects.js?v=20260511a" defer></script>
   <script src="/assets/contact-page.js?v=20260826c" defer></script>
 </head>
-<body>
+<body class="contact-page">
   <a class="contact-skip-link" href="#contact-form">Ga naar het contactformulier</a>
-  <nav id="navbar" aria-label="Hoofdnavigatie" data-softora-public-seo="internal-links">
-    <a href="/" class="logo" aria-label="Softora homepage">SOFTORA.NL</a>
-    <div class="nav-links">
-      <a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" class="magnetic-btn magnetic nav-start-btn" data-softora-conversion="public-cta" data-softora-conversion-page="/contact" data-softora-conversion-target="whatsapp">Start Project</a>
-    </div>
-  </nav>
-  <main>
-    <section class="contact-hero" aria-labelledby="contact-title">
-      <div class="contact-intro">
-        <p class="contact-eyebrow">Een goed project begint met een helder gesprek</p>
-        <h1 id="contact-title">Stel je <span>vraag.</span></h1>
-        <p class="contact-lead">Een nieuwe website, maatwerksoftware of een slimme AI-flow? Deel kort waar je nu staat en wat er beter moet. Je krijgt een concrete eerste reactie, zonder verkooppraat.</p>
-        <div class="contact-direct" aria-label="Directe contactmogelijkheden">
-          <div>
-            <span class="contact-direct-label">E-mail</span>
-            <strong>info@softora.nl</strong>
+  <div class="page">
+    <header data-softora-public-seo="internal-links">
+      <a class="brand" href="https://www.softora.nl/" aria-label="Softora homepage">SOFTORA.NL</a>
+      <div class="header-actions">
+        <details class="login-menu">
+          <summary class="login-link"><svg class="login-person" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>Inloggen<svg class="login-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></summary>
+          <div class="login-options contact-options" aria-label="Kies je omgeving">
+            <div class="contact-menu-label">WAAR WIL JE INLOGGEN?</div>
+            <a class="contact-option login-option" href="/seo-login">
+              <span class="contact-option-icon login-avatar login-avatar--seo" aria-hidden="true"></span>
+              <span class="contact-option-copy"><strong>SEO Solution</strong><span>Naar jouw SEO-omgeving</span></span>
+            </a>
+            <a class="contact-option login-option" href="/chatbot-login">
+              <span class="contact-option-icon login-avatar" aria-hidden="true"></span>
+              <span class="contact-option-copy"><strong>Chatbot</strong><span>Jouw chatbot beheren</span></span>
+            </a>
+            <p class="login-status" role="status" hidden></p>
           </div>
-          <div>
-            <span class="contact-direct-label">Telefoon</span>
-            <strong>+31 6 43 26 27 92</strong>
-          </div>
-          <div>
-            <span class="contact-direct-label">Vestiging</span>
-            <strong>Oisterwijk, Nederland</strong>
-            <span class="contact-status-dot" aria-hidden="true"></span>
-          </div>
-        </div>
-        <div class="contact-founders" aria-label="De oprichters van Softora">
-          <div class="contact-founder-photos">
-            <span class="contact-founder-photo contact-founder-photo--serve">
-              <img src="/assets/softora-team-serve-creusen.jpg" alt="Servé Creusen, medeoprichter van Softora en direct aanspreekpunt" width="1600" height="1200" loading="lazy" decoding="async" fetchpriority="low">
-            </span>
-            <span class="contact-founder-photo contact-founder-photo--martijn">
-              <img src="/assets/softora-team-martijn-van-de-ven.png" alt="Martijn van de Ven, medeoprichter van Softora en direct aanspreekpunt" width="632" height="632" loading="lazy" decoding="async" fetchpriority="low">
-            </span>
-          </div>
-          <p><strong>Rechtstreeks contact.</strong><br>Je spreekt met Servé of Martijn, de mensen die meedenken én bouwen.</p>
-        </div>
+        </details>
+      <details class="contact-menu">
+        <summary class="contact">Contact <span class="contact-chevron" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg></span></summary>
+        <nav class="contact-options" aria-label="Contactmogelijkheden">
+          <div class="contact-menu-label">LATEN WE KENNISMAKEN</div>
+          <a href="#contact-form" class="contact-option">
+            <span class="contact-option-icon contact-avatar contact-avatar--form" aria-hidden="true"></span>
+            <span class="contact-option-copy"><strong>Contactformulier</strong><span>Vertel ons over je plannen.</span></span>
+            <span class="contact-option-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></span>
+          </a>
+          <a href="https://wa.me/31643262792" target="_blank" rel="noopener noreferrer" class="contact-option" data-softora-conversion="public-cta" data-softora-conversion-page="/contact" data-softora-conversion-target="whatsapp">
+            <span class="contact-option-icon contact-avatar contact-avatar--message" aria-hidden="true"></span>
+            <span class="contact-option-copy"><strong>Stuur een bericht</strong><span>Stuur ons een bericht.</span></span>
+            <span class="contact-option-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></span>
+          </a>
+          <a href="tel:+31643262792" class="contact-option">
+            <span class="contact-option-icon contact-avatar contact-avatar--phone" aria-hidden="true"></span>
+            <span class="contact-option-copy"><strong>Telefonisch contact</strong><span>06 4326 2792</span></span>
+
+          </a>
+        </nav>
+      </details>
       </div>
-      <div class="contact-form-card">
-        <div class="contact-form-heading">
-          <span>Projectintake</span>
-          <p>We lezen ieder bericht zelf.</p>
+    </header>
+    <main class="contact-main" id="inhoud">
+      <section class="contact-content" aria-labelledby="contact-title">
+        <div class="contact-heading">
+          <h1 id="contact-title">STEL JE <span>VRAAG.</span></h1>
+          <p>Vertel ons waar we je mee kunnen helpen.</p>
         </div>
+        <div class="contact-form-card">
         <form id="contact-form" novalidate>
           <div class="contact-field-grid">
             <label class="contact-field">
@@ -101,8 +108,8 @@
             </label>
           </div>
           <label class="contact-field">
-            <span>Wat wil je verbeteren of bouwen?</span>
-            <textarea id="contact-message" name="message" rows="6" maxlength="4000" placeholder="Vertel kort wat er nu speelt, wat je doel is en wanneer je wilt starten." required></textarea>
+            <span>Je bericht</span>
+            <textarea id="contact-message" name="message" rows="5" maxlength="4000" placeholder="Waar kunnen we je mee helpen?" required></textarea>
           </label>
           <label class="contact-honeypot" aria-hidden="true">
             <span>Website</span>
@@ -110,29 +117,20 @@
           </label>
           <div class="contact-submit-row">
             <button type="submit" data-contact-submit data-softora-conversion="public-form-submit" data-softora-conversion-page="/contact" data-softora-conversion-target="whatsapp" data-softora-whatsapp-action="submit" data-softora-whatsapp-url="https://wa.me/31643262792">Verstuur je bericht <span aria-hidden="true">↗</span></button>
-            <p>Door te versturen ga je akkoord met ons <a href="/privacybeleid">privacybeleid</a>.</p>
+            <p>Je gegevens behandelen we volgens ons <a href="/privacybeleid">privacybeleid</a>.</p>
           </div>
           <p class="contact-form-status" data-contact-status role="status" aria-live="polite"></p>
         </form>
         <section class="contact-success" data-contact-success hidden tabindex="-1" aria-labelledby="contact-success-title">
           <span class="contact-success-mark" aria-hidden="true">✓</span>
-          <p class="contact-eyebrow">Bericht ontvangen</p>
+          <p class="contact-success-label">Bericht ontvangen</p>
           <h2 id="contact-success-title">Dank je. We komen bij je terug.</h2>
           <p>Je bericht staat veilig bij Softora. Wil je iets aanvullen? Ons e-mailadres is info@softora.nl.</p>
         </section>
-      </div>
-    </section>
-    <section class="contact-next" aria-labelledby="contact-next-title">
-      <div class="contact-next-heading">
-        <p class="contact-eyebrow">Na je bericht</p>
-        <h2 id="contact-next-title">Van idee naar een heldere volgende stap.</h2>
-      </div>
-      <ol class="contact-next-steps">
-        <li><span>01</span><div><strong>We lezen je context</strong><p>We kijken naar je doel, huidige situatie en de vraag achter de vraag.</p></div></li>
-        <li><span>02</span><div><strong>Je krijgt een eerlijke reactie</strong><p>We zeggen wat logisch is, wat nog onduidelijk is en of Softora past.</p></div></li>
-        <li><span>03</span><div><strong>We bepalen de eerste stap</strong><p>Bij een goede match maken we scope, aanpak en vervolg concreet.</p></div></li>
-      </ol>
-    </section>
-  </main>
+
+        </div>
+      </section>
+    </main>
+  </div>
 </body>
 </html>
