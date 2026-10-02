@@ -265,7 +265,7 @@ test('page smoke: public kennisbank article is crawlable HTML', async () => {
   assert.equal(response.status, 200);
   assert.match(html, /<!DOCTYPE html>/i);
   assert.match(html, /Wat is bedrijfssoftware op maat\?/);
-  assert.match(html, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/kennisbank\/wat-is-bedrijfssoftware-op-maat">/);
+  assert.match(html, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/blog\/wat-is-bedrijfssoftware-op-maat">/);
   assert.match(html, /data-softora-public-seo="structured-data"/);
 });
 

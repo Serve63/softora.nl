@@ -161,9 +161,9 @@ test('quality version 2 gebruikt alleen eigen secties, optionele FAQ en veilige 
 test('weekly SEO batch heeft planning, money-page links, beelden en claim-safety op orde', () => {
   const weeklyPaths = [
     '/blog/ai-automatisering-leadkwalificatie-mkb',
-    '/kennisbank/wat-is-leadkwalificatie',
+    '/blog/wat-is-leadkwalificatie',
     '/blog/website-leadgeneratie-mkb-meten',
-    '/kennisbank/wat-is-crm-datakwaliteit',
+    '/blog/wat-is-crm-datakwaliteit',
     '/regio/midden-brabant',
   ];
   const plan = getSeoContentPublicationPlan({ now: new Date('2026-06-01T12:00:00.000Z') });
@@ -173,9 +173,9 @@ test('weekly SEO batch heeft planning, money-page links, beelden en claim-safety
     weeklyPlan.map((entry) => `${entry.publishedAt}:${entry.status}:${entry.path}`),
     [
       '2026-06-02:scheduled:/blog/ai-automatisering-leadkwalificatie-mkb',
-      '2026-06-03:scheduled:/kennisbank/wat-is-leadkwalificatie',
+      '2026-06-03:scheduled:/blog/wat-is-leadkwalificatie',
       '2026-06-04:scheduled:/blog/website-leadgeneratie-mkb-meten',
-      '2026-06-05:scheduled:/kennisbank/wat-is-crm-datakwaliteit',
+      '2026-06-05:scheduled:/blog/wat-is-crm-datakwaliteit',
       '2026-06-08:scheduled:/regio/midden-brabant',
     ]
   );
@@ -201,9 +201,9 @@ test('weekly SEO batch heeft planning, money-page links, beelden en claim-safety
 test('volgende weekly SEO batch heeft planning, money-page links, beelden en claim-safety op orde', () => {
   const nextWeeklyPaths = [
     '/blog/ai-processen-automatiseren-zonder-controle-verliezen',
-    '/kennisbank/wat-is-een-ai-workflow',
+    '/blog/wat-is-een-ai-workflow',
     '/blog/website-crm-koppeling-leadopvolging-mkb',
-    '/kennisbank/wat-is-een-sales-pipeline-crm',
+    '/blog/wat-is-een-sales-pipeline-crm',
     '/vergelijkingen/crm-op-maat-vs-standaard-crm',
   ];
   const plan = getSeoContentPublicationPlan({ now: new Date('2026-06-08T12:00:00.000Z') });
@@ -213,9 +213,9 @@ test('volgende weekly SEO batch heeft planning, money-page links, beelden en cla
     weeklyPlan.map((entry) => `${entry.publishedAt}:${entry.status}:${entry.path}`),
     [
       '2026-06-09:scheduled:/blog/ai-processen-automatiseren-zonder-controle-verliezen',
-      '2026-06-10:scheduled:/kennisbank/wat-is-een-ai-workflow',
+      '2026-06-10:scheduled:/blog/wat-is-een-ai-workflow',
       '2026-06-11:scheduled:/blog/website-crm-koppeling-leadopvolging-mkb',
-      '2026-06-12:scheduled:/kennisbank/wat-is-een-sales-pipeline-crm',
+      '2026-06-12:scheduled:/blog/wat-is-een-sales-pipeline-crm',
       '2026-06-15:scheduled:/vergelijkingen/crm-op-maat-vs-standaard-crm',
     ]
   );
@@ -241,9 +241,9 @@ test('volgende weekly SEO batch heeft planning, money-page links, beelden en cla
 test('derde weekly SEO batch heeft planning, money-page links, beelden en claim-safety op orde', () => {
   const thirdWeeklyPaths = [
     '/blog/ai-automatisering-offerte-opvolging-mkb',
-    '/kennisbank/wat-is-offerte-automatisering',
+    '/blog/wat-is-offerte-automatisering',
     '/blog/chatbot-crm-koppeling-leads-opvolgen',
-    '/kennisbank/wat-is-een-klantportaal',
+    '/blog/wat-is-een-klantportaal',
     '/regio/tilburg-ai-automatisering',
   ];
   const plan = getSeoContentPublicationPlan({ now: new Date('2026-06-15T12:00:00.000Z') });
@@ -253,9 +253,9 @@ test('derde weekly SEO batch heeft planning, money-page links, beelden en claim-
     weeklyPlan.map((entry) => `${entry.publishedAt}:${entry.status}:${entry.path}`),
     [
       '2026-06-16:scheduled:/blog/ai-automatisering-offerte-opvolging-mkb',
-      '2026-06-17:scheduled:/kennisbank/wat-is-offerte-automatisering',
+      '2026-06-17:scheduled:/blog/wat-is-offerte-automatisering',
       '2026-06-18:scheduled:/blog/chatbot-crm-koppeling-leads-opvolgen',
-      '2026-06-19:scheduled:/kennisbank/wat-is-een-klantportaal',
+      '2026-06-19:scheduled:/blog/wat-is-een-klantportaal',
       '2026-06-22:scheduled:/regio/tilburg-ai-automatisering',
     ]
   );
@@ -281,9 +281,9 @@ test('derde weekly SEO batch heeft planning, money-page links, beelden en claim-
 test('vierde weekly SEO batch heeft planning, money-page links, beelden en claim-safety op orde', () => {
   const fourthWeeklyPaths = [
     '/blog/ai-automatisering-klantintake-mkb',
-    '/kennisbank/wat-is-procesautomatisering',
+    '/blog/wat-is-procesautomatisering',
     '/blog/website-laten-maken-tilburg-leadgeneratie',
-    '/kennisbank/wat-is-een-crm-integratie',
+    '/blog/wat-is-een-crm-integratie',
     '/branches/adviesbureaus',
   ];
   const plan = getSeoContentPublicationPlan({ now: new Date('2026-06-22T12:00:00.000Z') });
@@ -293,9 +293,9 @@ test('vierde weekly SEO batch heeft planning, money-page links, beelden en claim
     weeklyPlan.map((entry) => `${entry.publishedAt}:${entry.status}:${entry.path}`),
     [
       '2026-06-23:scheduled:/blog/ai-automatisering-klantintake-mkb',
-      '2026-06-24:scheduled:/kennisbank/wat-is-procesautomatisering',
+      '2026-06-24:scheduled:/blog/wat-is-procesautomatisering',
       '2026-06-25:scheduled:/blog/website-laten-maken-tilburg-leadgeneratie',
-      '2026-06-26:scheduled:/kennisbank/wat-is-een-crm-integratie',
+      '2026-06-26:scheduled:/blog/wat-is-een-crm-integratie',
       '2026-06-29:scheduled:/branches/adviesbureaus',
     ]
   );
@@ -322,9 +322,9 @@ test('vijfde weekly SEO batch heeft planning, money-page links, beelden en claim
   const fifthWeeklyPaths = [
     '/branches/adviesbureaus',
     '/blog/crm-taken-reminders-automatiseren-mkb',
-    '/kennisbank/wat-is-lead-scoring',
+    '/blog/wat-is-lead-scoring',
     '/blog/ai-telefonie-menselijke-overdracht',
-    '/kennisbank/wat-is-chatbot-overdracht',
+    '/blog/wat-is-chatbot-overdracht',
   ];
   const plan = getSeoContentPublicationPlan({ now: new Date('2026-06-29T12:00:00.000Z') });
   const weeklyPlan = plan.filter((entry) => fifthWeeklyPaths.includes(entry.path));
@@ -334,9 +334,9 @@ test('vijfde weekly SEO batch heeft planning, money-page links, beelden en claim
     [
       '2026-06-29:live:/branches/adviesbureaus',
       '2026-06-30:scheduled:/blog/crm-taken-reminders-automatiseren-mkb',
-      '2026-07-01:scheduled:/kennisbank/wat-is-lead-scoring',
+      '2026-07-01:scheduled:/blog/wat-is-lead-scoring',
       '2026-07-02:scheduled:/blog/ai-telefonie-menselijke-overdracht',
-      '2026-07-03:scheduled:/kennisbank/wat-is-chatbot-overdracht',
+      '2026-07-03:scheduled:/blog/wat-is-chatbot-overdracht',
     ]
   );
 
@@ -809,4 +809,27 @@ test('publieke SEO-image gate blokkeert externe of zwakke servicepagina-afbeeldi
     issues.map((issue) => issue.type).sort(),
     ['external-seo-image', 'weak-image-alt', 'weak-image-filename'].sort()
   );
+});
+
+
+test('approved shared article contact menu permits only its exact tracked destinations and safe WhatsApp target', () => {
+  const { renderOverviewHtml } = require('../../server/services/seo-articles-presentation');
+  const html = renderOverviewHtml();
+  const audit = (candidate) => auditConversionCtas({ pages: [{ path: '/blog', html: candidate }] });
+  assert.deepEqual(audit(html), []);
+  assert.ok(audit(html.replace('tel:+31643262792', 'tel:+31999999999')).some((issue) => issue.type === 'non-whatsapp-conversion-link'));
+  assert.ok(audit(html.replace('data-softora-conversion-target="phone"', '')).some((issue) => issue.type === 'untracked-conversion-link'));
+  assert.ok(audit(html.replace('target="_blank" rel="noopener noreferrer"', '')).some((issue) => issue.type === 'whatsapp-link-missing-new-tab-safety'));
+  assert.ok(audit(html.replace('https://wa.me/31643262792', 'https://wa.me/31643262792?text=test')).some((issue) => issue.type === 'whatsapp-link-prefilled-message'));
+  assert.ok(audit(html.replace('data-softora-articles-layout="v1"', '')).some((issue) => issue.type === 'public-cta-visible-whatsapp-label'));
+  assert.ok(audit(html.replace('<header class="site-header">', '<div class="site-header">').replace('</header>', '</div>')).some((issue) => issue.type === 'non-whatsapp-conversion-link'));
+  assert.ok(audit(html.replace('data-softora-navigation="article-link"', '').replace('href="/blog/ai-automatisering-offerte-vergelijken"', 'href="/contact"')).some((issue) => issue.type === 'lead-cta-not-whatsapp'));
+});
+
+test('only intentionally decorative images can omit alternative text', () => {
+  const image = '<img src="/assets/seo-content/ai-automatisering-workflow-softora.jpg" alt="" width="1600" height="1000" loading="lazy" decoding="async" fetchpriority="low">';
+  const audit = (html) => auditSeoImages({ pages: [{ path: '/blog', html }] });
+  assert.ok(audit(image).some((issue) => issue.type === 'weak-image-alt'));
+  assert.deepEqual(audit(image.replace('<img ', '<img role="presentation" ')), []);
+  assert.ok(audit(image.replace('<img ', '<img role="presentation" ').replace('alt=""', 'alt="placeholder"')).some((issue) => issue.type === 'weak-image-alt'));
 });

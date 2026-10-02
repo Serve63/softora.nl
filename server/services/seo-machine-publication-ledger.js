@@ -91,7 +91,7 @@ function extractDateModified(htmlRaw) {
 function hasVisiblePublishedDate(htmlRaw, publishedAt) {
   const date = escapeRegExp(String(publishedAt || ''));
   if (!date) return false;
-  return new RegExp(`>\\s*${date}\\s*<`, 'i').test(String(htmlRaw || ''));
+  return new RegExp(`>\\s*${date}\\s*<|<time\\b[^>]*\\bdatetime=["']${date}["'][^>]*>[^<]*\\S[^<]*</time>`, 'i').test(String(htmlRaw || ''));
 }
 
 function extractSitemapLocations(xmlRaw) {

@@ -711,8 +711,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
     vercelConfig.installCommand,
     'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.4 @img/sharp-linux-arm64@0.35.4 @img/sharp-libvips-linux-arm64@1.3.3'
   );
-  const standardIncludeFiles = '{*.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-x64/**,node_modules/@img/sharp-libvips-linux-x64/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}';
-  const personalSiteIncludeFiles = '{*.html,personal-sites/**,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/**}';
+  const standardIncludeFiles = '{*.html,assets/articles/*.html,assets/entry/toekomst.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-x64/**,node_modules/@img/sharp-libvips-linux-x64/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}';
+  const personalSiteIncludeFiles = '{*.html,assets/articles/*.html,assets/entry/toekomst.html,personal-sites/**,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/**}';
   Object.entries(vercelConfig.functions).forEach(([functionPath, functionConfig]) => {
     assert.equal(
       functionConfig.includeFiles,
@@ -958,6 +958,10 @@ test('SEO experience and attribution changes preserve publication, source and co
   assert.match(quality, /missing-contextual-money-link/);
   assert.match(quality, /lead-cta-not-whatsapp/);
   assert.match(quality, /excludeAssignedArticleAuthorFromClaims/);
+  assert.match(quality, /anchor\.href === hrefs\[target\] && anchor\.label === labels\[target\]/);
+  assert.match(quality, /hasCompleteConversionTracking\(anchor\.attrs, target\)/);
+  assert.match(quality, /item\.title\.replace/);
+  assert.match(quality, /publicPaths\.has\(canonicalTarget\)/);
   assert.match(quality, /frontstage-private-founder-name/);
   const authors = readRepoFile('server/services/seo-content-article-authors.js');
   assert.match(authors, /ARTICLE_AUTHOR_ASSIGNMENTS\[slug\]/);

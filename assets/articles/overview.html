@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <!-- SEO_HEAD -->
+  <link rel="stylesheet" href="/assets/articles/overview.css?v=articles-20261002">
+  <link rel="stylesheet" href="/assets/articles/header.css?v=articles-20261002">
+  <script src="/assets/public-conversion-tracking.js?v=20260601a" defer></script>
+  <script src="/assets/entry/contact-menu.js" defer></script>
+  <script src="/assets/articles/overview.js?v=articles-20261002" defer></script>
+</head>
+<body data-softora-articles-layout="v1">
+  <a class="skip-link" href="#hoofdinhoud">Naar de inhoud</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <!-- SITE_HEADER -->
+    </div>
+  </header>
+
+  <main id="hoofdinhoud" class="page-container">
+    <section class="articles" aria-labelledby="articles-title">
+      <div class="articles-heading">
+        <div class="heading-group">
+          <h1 id="articles-title">Alle artikelen</h1>
+          <span class="article-total"><!-- ARTICLE_COUNT --></span>
+        </div>
+        <form class="search" role="search">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+          <input id="article-search" type="search" placeholder="Zoek een artikel..." aria-label="Zoek artikelen" autocomplete="off">
+        </form>
+      </div>
+      <div class="filter-bar" role="group" aria-label="Filter artikelen op onderwerp">
+        <button class="filter active" type="button" data-filter="all" aria-pressed="true">Alles</button>
+        <button class="filter" type="button" data-filter="websites" aria-pressed="false">Websites</button>
+        <button class="filter" type="button" data-filter="ai-automatisering" aria-pressed="false">AI & automatisering</button>
+        <button class="filter" type="button" data-filter="software-crm" aria-pressed="false">Software & CRM</button>
+        <button class="filter" type="button" data-filter="ai-contact" aria-pressed="false">Chatbots & telefonie</button>
+      </div>
+      <div class="list-info">
+        <p id="result-count" role="status" aria-live="polite" aria-atomic="true"><!-- RESULT_COUNT --></p>
+        <span>Nieuwste eerst</span>
+      </div>
+      <div id="article-list" class="article-list">
+        <!-- ARTICLE_LIST -->
+      </div>
+      <div id="empty-state" class="empty-state" hidden>
+        <h3>Geen artikelen gevonden</h3>
+        <p>Probeer een ander zoekwoord of bekijk alle onderwerpen.</p>
+        <button id="reset-filters" class="secondary-button" type="button">Bekijk alle artikelen</button>
+      </div>
+      <div class="load-more-wrap">
+        <button id="load-more" class="secondary-button" type="button" hidden>Meer artikelen <span aria-hidden="true">↓</span></button>
+      </div>
+    </section>
+
+  </main>
+
+</body>
+</html>

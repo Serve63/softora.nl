@@ -19,7 +19,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       'Softora bouwt snelle websites, bedrijfssoftware en AI automatisering voor ondernemers die meer aanvragen, minder handwerk en slimmere groei willen.',
     kind: 'home',
     legacyPaths: ['/premium-website'],
-    relatedLinks: ['/diensten', '/website-laten-maken', '/blog', '/kennisbank'],
+    relatedLinks: ['/diensten', '/website-laten-maken', '/blog'],
   },
   {
     fileName: 'contact.html',
@@ -66,11 +66,11 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     relatedLinks: [
       '/blog/website-laten-maken-kosten-2026',
       '/blog/website-laten-maken-mkb-paginas',
-      '/kennisbank/wat-is-een-conversiegerichte-website',
+      '/blog/wat-is-een-conversiegerichte-website',
       '/website-laten-maken-oisterwijk',
       '/crm-systeem-op-maat',
       '/pakketten',
-      '/kennisbank',
+      '/blog',
     ],
   },
   {
@@ -98,9 +98,9 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     relatedLinks: [
       '/crm-systeem-op-maat',
       '/maatwerk-platform',
-      '/kennisbank/wat-is-bedrijfssoftware-op-maat',
+      '/blog/wat-is-bedrijfssoftware-op-maat',
       '/ai-automatisering',
-      '/kennisbank/wat-is-offerte-automatisering',
+      '/blog/wat-is-offerte-automatisering',
       '/vergelijkingen/maatwerk-software-vs-standaard-software',
     ],
   },
@@ -120,12 +120,12 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/ai-automatisering',
       '/chatbot-laten-maken',
       '/voicesoftware-op-maat',
-      '/kennisbank/wat-is-bedrijfssoftware-op-maat',
-      '/kennisbank/wat-is-een-crm-systeem',
+      '/blog/wat-is-bedrijfssoftware-op-maat',
+      '/blog/wat-is-een-crm-systeem',
       '/blog/crm-systeem-op-maat-spreadsheets-vervangen',
-      '/kennisbank/wat-is-een-sales-pipeline-crm',
-      '/kennisbank/wat-is-crm-datakwaliteit',
-      '/kennisbank/wat-is-een-klantportaal',
+      '/blog/wat-is-een-sales-pipeline-crm',
+      '/blog/wat-is-crm-datakwaliteit',
+      '/blog/wat-is-een-klantportaal',
       '/vergelijkingen/crm-op-maat-vs-standaard-crm',
       '/blog/ai-automatisering-mkb-waar-beginnen',
     ],
@@ -147,7 +147,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/voicesoftware-op-maat',
       '/ai-telefonist',
       '/bedrijfssoftware-op-maat',
-      '/kennisbank/wat-is-ai-automatisering',
+      '/blog/wat-is-ai-automatisering',
       '/blog/ai-automatisering-mkb-waar-beginnen',
       '/blog/ai-automatisering-leadopvolging',
     ],
@@ -164,7 +164,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/bedrijfssoftware-op-maat',
       '/crm-systeem-op-maat',
       '/ai-automatisering',
-      '/kennisbank/wat-is-bedrijfssoftware-op-maat',
+      '/blog/wat-is-bedrijfssoftware-op-maat',
       '/vergelijkingen/maatwerk-software-vs-standaard-software',
     ],
   },
@@ -184,7 +184,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
       '/chatbot-laten-maken',
       '/ai-automatisering',
       '/crm-systeem-op-maat',
-      '/kennisbank/wat-is-een-ai-telefonist',
+      '/blog/wat-is-een-ai-telefonist',
       '/blog/ai-automatisering-mkb-waar-beginnen',
       '/blog/ai-telefonie-menselijke-overdracht',
     ],
@@ -202,7 +202,7 @@ const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
     kind: 'service',
     serviceName: 'Voicesoftware op maat',
     relatedLinks: [
-      '/kennisbank/ai-telefonist-crm-koppeling',
+      '/blog/ai-telefonist-crm-koppeling',
       '/blog/ai-telefonist-kosten-mkb',
       '/ai-telefonist',
       '/crm-systeem-op-maat',
@@ -719,23 +719,22 @@ const PUBLIC_SEO_LINK_LABELS = Object.freeze({
   '/chatbot-laten-maken': 'Chatbot laten maken',
   '/pakketten': 'Pakketten',
   '/over-softora': 'Over Softora',
-  '/blog': 'Blog',
-  '/kennisbank': 'Kennisbank',
+  '/blog': 'Artikelen',
   '/blog/ai-automatisering-mkb-waar-beginnen': 'AI automatisering voor het MKB',
   '/blog/website-laten-maken-kosten-2026': 'Website laten maken kosten 2026',
   '/blog/website-laten-maken-mkb-paginas': 'MKB website pagina’s',
   '/blog/chatbot-laten-maken-wanneer-zinvol': 'Wanneer is een chatbot slim?',
-  '/kennisbank/wat-is-bedrijfssoftware-op-maat': 'Wat is bedrijfssoftware op maat?',
-  '/kennisbank/wat-is-een-conversiegerichte-website': 'Wat is een conversiegerichte website?',
-  '/kennisbank/wat-is-een-ai-telefonist': 'Wat is een AI telefonist?',
+  '/blog/wat-is-bedrijfssoftware-op-maat': 'Wat is bedrijfssoftware op maat?',
+  '/blog/wat-is-een-conversiegerichte-website': 'Wat is een conversiegerichte website?',
+  '/blog/wat-is-een-ai-telefonist': 'Wat is een AI telefonist?',
   '/regio/oisterwijk': 'Softora in Oisterwijk',
 });
 
 function getPublicSeoInternalLinks(entry) {
   if (!entry || entry.kind === 'legal') return [];
-  const fallbackLinks = ['/diensten', '/blog', '/kennisbank', '/pakketten'];
+  const fallbackLinks = ['/diensten', '/blog', '/pakketten'];
   const candidates = [...(entry.relatedLinks || []), ...fallbackLinks]
-    .map(normalizePublicPath)
+    .map((href) => normalizePublicPath(href).replace(/^\/kennisbank(?=\/|$)/, '/blog'))
     .filter((pathName) => pathName && pathName !== entry.path);
   const seen = new Set();
   return candidates

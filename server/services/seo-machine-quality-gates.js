@@ -145,7 +145,9 @@ function buildSeoLinkGraph(pagesRaw = []) {
     const sourcePath = normalizeInternalPath(page.path);
     if (!sourcePath || !publicPaths.has(sourcePath)) continue;
 
-    for (const targetPath of new Set(extractInternalLinksFromHtml(page.html))) {
+    for (const rawTarget of new Set(extractInternalLinksFromHtml(page.html))) {
+      const canonicalTarget = rawTarget.replace(/^\/kennisbank(?=\/|$)/, '/blog');
+      const targetPath = publicPaths.has(canonicalTarget) ? canonicalTarget : rawTarget;
       if (targetPath === sourcePath || !publicPaths.has(targetPath)) continue;
       outgoingByPath.get(sourcePath).add(targetPath);
       incomingByPath.get(targetPath).add(sourcePath);
@@ -709,6 +711,26 @@ function isArticleSectionNavigation(anchor, html) {
   return Boolean(heading && stripHtmlTags(heading[1]) === anchor.label);
 }
 
+function isArticleLinkNavigation(anchor) {
+  if (getAttrValue(anchor.attrs, 'data-softora-navigation') !== 'article-link' || !/^\/blog\/[a-z0-9-]+$/.test(anchor.href)) return false;
+  const item = require('./seo-content').getSeoContentItem('blog', anchor.href.split('/')[2]);
+  if (!item) return false;
+  const title = item.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return anchor.label === title || anchor.label === title + ' ' + item.readTime + ' lezen';
+}
+
+function isSharedArticleContactOption(anchor, html, pathName) {
+  if (!/^\/blog(?:\/|$)/.test(pathName) || !html.includes('data-softora-articles-layout="v1"')) return false;
+  const target = getAttrValue(anchor.attrs, 'data-softora-contact-menu');
+  const hrefs = { whatsapp: 'https://wa.me/31643262792', phone: 'tel:+31643262792', 'contact-form': 'https://www.softora.nl/contact' };
+  const labels = { whatsapp: 'WhatsApp Stuur ons een bericht.', phone: 'Telefonisch contact 06 4326 2792', 'contact-form': 'Contactformulier Vertel ons over je plannen.' };
+  const header = html.match(/<header\b[^>]*>([\s\S]*?)<\/header>/)?.[1] || '';
+  return anchor.href === hrefs[target] && anchor.label === labels[target]
+    && hasCompleteConversionTracking(anchor.attrs, target)
+    && getAttrValue(anchor.attrs, 'data-softora-conversion-page') === pathName
+    && extractAnchorEntries(header).some((entry) => entry.attrs === anchor.attrs);
+}
+
 function auditConversionCtas({ pages = [] } = {}) {
   const issues = [];
 
@@ -722,7 +744,7 @@ function auditConversionCtas({ pages = [] } = {}) {
     const leadCtaButtons = buttons.filter((button) => isLeadCtaLabel(button.label));
     const trackedWhatsappButtons = leadCtaButtons.filter(isTrackedWhatsappButton);
     const whatsappChannelLabels = [
-      ...conversionLinks.filter((anchor) => hasVisibleWhatsappCtaLabel(anchor.label)),
+      ...conversionLinks.filter((anchor) => hasVisibleWhatsappCtaLabel(anchor.label) && !isSharedArticleContactOption(anchor, html, pathName)),
       ...leadCtaButtons.filter((button) => hasVisibleWhatsappCtaLabel(button.label)),
       ...extractCtaHelperTextEntries(html).filter((entry) => hasVisibleWhatsappCtaLabel(entry.label)),
     ];
@@ -749,7 +771,8 @@ function auditConversionCtas({ pages = [] } = {}) {
       (anchor) =>
         !isMartijnWhatsappHref(anchor.href) &&
         !hasPrefilledWhatsappMessage(anchor.href) &&
-        !isPurposeLimitedArchiveContactLink(anchor, pathName)
+        !isPurposeLimitedArchiveContactLink(anchor, pathName) &&
+        !isSharedArticleContactOption(anchor, html, pathName)
     );
     if (nonWhatsappLinks.length > 0) {
       issues.push({
@@ -768,12 +791,13 @@ function auditConversionCtas({ pages = [] } = {}) {
         message: `${pathName} heeft een WhatsApp-link zonder target="_blank" en veilige rel-attributen.`,
       });
     }
-    const leadCtaLinks = anchors.filter((anchor) => isLeadCtaLabel(anchor.label) && !isArticleSectionNavigation(anchor, html));
+    const leadCtaLinks = anchors.filter((anchor) => isLeadCtaLabel(anchor.label) && !isArticleSectionNavigation(anchor, html) && !isArticleLinkNavigation(anchor));
     const nonWhatsappLeadCtas = leadCtaLinks.filter(
       (anchor) =>
         !isMartijnWhatsappHref(anchor.href) &&
         !hasPrefilledWhatsappMessage(anchor.href) &&
-        !isPurposeLimitedArchiveContactLink(anchor, pathName)
+        !isPurposeLimitedArchiveContactLink(anchor, pathName) &&
+        !isSharedArticleContactOption(anchor, html, pathName)
     );
     if (nonWhatsappLeadCtas.length > 0) {
       issues.push({
@@ -867,7 +891,7 @@ function auditSeoImages({ pages = [], checkAllImages = false, requireLocalImages
         });
       }
       const minimumAltLength = checkAllImages ? 30 : 55;
-      if (alt.length < minimumAltLength || /placeholder|binnenkort|foto|image|afbeelding/i.test(alt)) {
+      if (!(alt === '' && getAttrValue(image.attrs, 'role') === 'presentation') && (alt.length < minimumAltLength || /placeholder|binnenkort|foto|image|afbeelding/i.test(alt))) {
         issues.push({
           type: 'weak-image-alt',
           path: pathName,
