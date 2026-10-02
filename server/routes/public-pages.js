@@ -15,6 +15,7 @@ const {
   getSeoContentItem,
 } = require('../services/seo-content');
 const { renderOverviewHtml, renderArticleHtml } = require('../services/seo-articles-presentation');
+const { publicLandingRetirementMiddleware } = require('../services/public-landing-retirement');
 
 function appendOriginalQuery(pathname, originalUrl) {
   const basePath = String(pathname || '').trim() || '/';
@@ -91,6 +92,7 @@ function registerPersonalSiteRoutes(app, { personalSitesDirectory } = {}) {
 }
 
 function registerPublicPageRoutes(app, deps) {
+  app.use(publicLandingRetirementMiddleware);
   const { personalSitesDirectory } = deps;
   const seoContentCollectionPaths = getSeoContentCollectionPaths();
   const seoContentArticlePaths = seoContentCollectionPaths.map((collectionPath) => `${collectionPath}/:slug`);

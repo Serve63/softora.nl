@@ -18,6 +18,7 @@ const {
 } = require('../../server/services/public-seo');
 
 const root = path.join(__dirname, '../..');
+const { RETIRED_PUBLIC_LANDINGS, EMPTY_LANDING_COLLECTIONS } = require('../../server/services/public-landing-retirement');
 const KNOWN_FILES = new Set([
   ...INDEXABLE_PUBLIC_SEO_PAGES.map((entry) => entry.fileName),
   'premium-personeel-dashboard.html',
@@ -145,9 +146,10 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   });
 
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/diensten<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/pakketten<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/website-laten-maken-oisterwijk<\/loc>/);
+  for (const removedPath of [...Object.keys(RETIRED_PUBLIC_LANDINGS), ...EMPTY_LANDING_COLLECTIONS]) {
+    assert.ok(!sitemap.includes(`<loc>https://www.softora.nl${removedPath}</loc>`), `${removedPath} must be absent`);
+  }
+  assert.equal([...sitemap.matchAll(/<loc>https:\/\/www\.softora\.nl\/blog\/[^<]+<\/loc>/g)].length, 52);
   for (const excludedPath of ['/website', '/bedrijfssoftware', '/voicesoftware', '/chatbot']) {
     assert.equal(getIndexablePublicSeoPageByPath(excludedPath), null);
     assert.doesNotMatch(sitemap, new RegExp(`<loc>https://www\\.softora\\.nl${excludedPath}</loc>`));
@@ -156,20 +158,6 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
     sitemap,
     /<loc>https:\/\/www\.softora\.nl\/bedrijfssoftware-op-maat<\/loc>\s*<lastmod>2026-09-21<\/lastmod>/
   );
-  assert.match(
-    sitemap,
-    /<loc>https:\/\/www\.softora\.nl\/crm-systeem-op-maat<\/loc>\s*<lastmod>2026-08-28<\/lastmod>/
-  );
-  assert.match(
-    sitemap,
-    /<loc>https:\/\/www\.softora\.nl\/ai-automatisering<\/loc>\s*<lastmod>2026-07-23<\/lastmod>/
-  );
-  assert.match(
-    sitemap,
-    /<loc>https:\/\/www\.softora\.nl\/ai-telefonist<\/loc>\s*<lastmod>2026-08-23<\/lastmod>/
-  );
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-automatisering<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/ai-telefonist<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/over-softora<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog<\/loc>/);
   assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog\/ai-automatisering-mkb-waar-beginnen<\/loc>/);

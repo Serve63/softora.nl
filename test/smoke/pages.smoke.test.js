@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { startTestServer } = require('../testlib/server-process');
 const { pageSmokeTargets } = require('../../server/routes/manifest');
+const { RETIRED_PUBLIC_LANDINGS, EMPTY_LANDING_COLLECTIONS, isRetiredPublicLanding } = require('../../server/services/public-landing-retirement');
+const { publishedArticles } = require('../../server/services/seo-articles-presentation');
 
 let serverRef = null;
 
@@ -21,7 +23,7 @@ for (const target of pageSmokeTargets) {
   test(`page smoke: ${target.path}`, async () => {
     const response = await fetch(`${serverRef.baseUrl}${target.path}`, { cache: 'no-store' });
     const html = await response.text();
-    assert.equal(response.status, 200, target.path);
+    assert.equal(response.status, target.status || 200, target.path);
     assert.match(html, /<!DOCTYPE html>/i, target.path);
     const matchesPrimaryMarker = html.includes(target.marker);
     const matchesLoginFallback = target.allowLoginFallback && html.includes('Softora | Personeel Login');
@@ -34,16 +36,10 @@ for (const target of pageSmokeTargets) {
 
 const unlockedPublicSeoPaths = [
   '/contact',
-  '/diensten',
-  '/ai-automatisering',
   '/website-laten-maken',
-  '/website-laten-maken-oisterwijk',
   '/website',
-  '/pakketten',
   '/bedrijfssoftware',
   '/bedrijfssoftware-op-maat',
-  '/crm-systeem-op-maat',
-  '/ai-telefonist',
   '/chatbot-laten-maken',
   '/voicesoftware-op-maat',
   '/over-softora',
@@ -176,7 +172,7 @@ for (const target of [
     const response = await fetch(`${serverRef.baseUrl}${target.path}`, { cache: 'no-store' });
     const html = await response.text();
 
-    assert.equal(response.status, 200, target.path);
+    assert.equal(response.status, target.status || 200, target.path);
     assert.match(html, new RegExp(target.marker), `${target.path} mist de verwachte inhoud.`);
     assert.match(
       html,
@@ -294,54 +290,53 @@ test('page smoke: linked kennisbank articles do not 404', async () => {
   }
 });
 
-test('page smoke: public vergelijkingen hub and article are crawlable HTML', async () => {
-  const hubResponse = await fetch(`${serverRef.baseUrl}/vergelijkingen`, {
-    cache: 'no-store',
+for (const retiredPath of Object.keys(RETIRED_PUBLIC_LANDINGS)) {
+  test(`page smoke: ${retiredPath} and aliases are permanently removed`, async () => {
+    for (const alias of [retiredPath, `${retiredPath}/`, `${retiredPath}.html`, `${retiredPath.toUpperCase()}?source=old`, retiredPath.replace(/-/g, '%2D')]) {
+      for (const method of ['GET', 'HEAD']) {
+        const response = await fetch(`${serverRef.baseUrl}${alias}`, { method, redirect: 'manual' });
+        assert.equal(response.status, 410, `${method} ${alias}`);
+        assert.equal(response.headers.get('location'), null, alias);
+        assert.match(response.headers.get('x-robots-tag'), /noindex/);
+        assert.match(response.headers.get('content-type'), /text\/html/);
+        if (method === 'GET') assert.match(await response.text(), /Deze pagina is verwijderd/);
+      }
+    }
   });
-  const hubHtml = await hubResponse.text();
-  const articleResponse = await fetch(`${serverRef.baseUrl}/vergelijkingen/website-laten-maken-vs-zelf-maken`, {
-    cache: 'no-store',
-  });
-  const articleHtml = await articleResponse.text();
+}
 
-  assert.equal(hubResponse.status, 200);
-  assert.match(hubHtml, /Kiezen tussen digitale oplossingen/);
-  assert.match(hubHtml, /href="\/vergelijkingen\/website-laten-maken-vs-zelf-maken"/);
-
-  assert.equal(articleResponse.status, 200);
-  assert.match(articleHtml, /<!DOCTYPE html>/i);
-  assert.match(articleHtml, /Website laten maken of zelf maken: wat is slimmer\?/);
-  assert.match(
-    articleHtml,
-    /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/vergelijkingen\/website-laten-maken-vs-zelf-maken">/
-  );
-  assert.match(articleHtml, /data-softora-public-seo="conversion-cta"/);
+test('page smoke: empty landing collections redirect to the retained article library', async () => {
+  for (const collection of EMPTY_LANDING_COLLECTIONS) {
+    for (const alias of [collection, `${collection}/`, `${collection}.html`]) {
+      const response = await fetch(`${serverRef.baseUrl}${alias}?source=old`, { redirect: 'manual' });
+      assert.equal(response.status, 301, alias);
+      assert.equal(response.headers.get('location'), '/blog?source=old');
+    }
+  }
 });
 
-test('page smoke: public branche article is crawlable service HTML', async () => {
-  const response = await fetch(`${serverRef.baseUrl}/branches/installateurs`, {
-    cache: 'no-store',
-  });
-  const html = await response.text();
-
-  assert.equal(response.status, 200);
-  assert.match(html, /<!DOCTYPE html>/i);
-  assert.match(html, /Websites en automatisering voor installateurs/);
-  assert.match(html, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/branches\/installateurs">/);
-  assert.match(html, /"@type":"Service"/);
-});
-
-test('page smoke: public regio article is crawlable service HTML', async () => {
-  const response = await fetch(`${serverRef.baseUrl}/regio/tilburg`, {
-    cache: 'no-store',
-  });
-  const html = await response.text();
-
-  assert.equal(response.status, 200);
-  assert.match(html, /<!DOCTYPE html>/i);
-  assert.match(html, /Website laten maken en AI automatisering in Tilburg/);
-  assert.match(html, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/regio\/tilburg">/);
-  assert.match(html, /"areaServed":\{"@type":"AdministrativeArea","name":"Tilburg"\}/);
+test('page smoke: all 52 articles stay public with working links and sitemap entries', async () => {
+  const articles = publishedArticles(new Date('2026-10-02T12:00:00Z'));
+  assert.equal(articles.length, 52);
+  const sitemap = await (await fetch(`${serverRef.baseUrl}/sitemap.xml`)).text();
+  for (const retiredPath of [...Object.keys(RETIRED_PUBLIC_LANDINGS), ...EMPTY_LANDING_COLLECTIONS]) {
+    assert.ok(!sitemap.includes(`<loc>http://127.0.0.1:${new URL(serverRef.baseUrl).port}${retiredPath}</loc>`), retiredPath);
+  }
+  for (const article of articles) {
+    const articlePath = `/blog/${article.slug}`;
+    assert.ok(sitemap.includes(`${articlePath}</loc>`), articlePath);
+    const response = await fetch(`${serverRef.baseUrl}${articlePath}`, { redirect: 'manual' });
+    const html = await response.text();
+    assert.equal(response.status, 200, articlePath);
+    assert.match(html, /<h1\b/);
+    assert.ok(html.includes(`www.softora.nl${articlePath}`) || html.includes(`${serverRef.baseUrl}${articlePath}`));
+    for (const [, href] of html.matchAll(/<a\b[^>]*href="([^"]+)"/g)) {
+      const url = new URL(href, serverRef.baseUrl);
+      if (![new URL(serverRef.baseUrl).host, 'www.softora.nl', 'softora.nl'].includes(url.host)) continue;
+      assert.ok(!isRetiredPublicLanding(url.pathname), `${articlePath} links to ${href}`);
+      assert.ok(!EMPTY_LANDING_COLLECTIONS.includes(url.pathname), `${articlePath} links to an empty collection`);
+    }
+  }
 });
 
 test('page smoke: /favicon.ico serves the stable Softora search favicon', async () => {

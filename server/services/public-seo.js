@@ -9,6 +9,7 @@ const SOFTORA_REGION = 'Noord-Brabant';
 const { getSeoContentPublicPaths, getSeoContentSitemapEntries } = require('./seo-content');
 const { addPublicWhatsappWidgetIfMissing } = require('./public-whatsapp-widget');
 const { isSeoAutomationExcludedPath } = require('./seo-machine-route-policy');
+const { isRemovedFromPublicSitemap } = require('./public-landing-retirement');
 
 const INDEXABLE_PUBLIC_SEO_PAGES = Object.freeze([
   {
@@ -444,7 +445,7 @@ function buildPublicSeoSitemapXml({ knownHtmlPageFiles, siteOrigin = DEFAULT_SIT
   const urlItems = entries
     .filter((entry) => {
       const pathName = normalizePublicPath(entry.path);
-      if (!pathName || isSeoAutomationExcludedPath(pathName) || seenPaths.has(pathName)) return false;
+      if (!pathName || isSeoAutomationExcludedPath(pathName) || isRemovedFromPublicSitemap(pathName) || seenPaths.has(pathName)) return false;
       seenPaths.add(pathName);
       return true;
     })
