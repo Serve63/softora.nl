@@ -15,7 +15,6 @@ test('desktop chooser allocates space to all sections without clipping overflow'
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
  assert.match(css,/grid-template-rows:204px minmax\(300px,2fr\) minmax\(130px,1fr\)/);
  assert.match(css,/\.toekomst-ai \.intro\{padding:112px 0 16px/);
- assert.match(css,/\.toekomst-ai \.intro\{padding-top:100px\}/);
  assert.match(css,/height:100svh;min-height:640px/);
  assert.doesNotMatch(css,/\.toekomst-ai (?:body|\.page)\{[^}]*overflow:hidden/);
 });
@@ -96,8 +95,10 @@ test('toekomst service cards omit the numbered badges', () => {
  assert.equal((html.match(/class="choice"/g)||[]).length,5);
 });
 
-test('toekomst mobile header hides login and uses a compact contact button', () => {
+test('toekomst mobile header and intro stay compact', () => {
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
+ assert.match(css,/@media\(max-width:760px\)\{\.toekomst-ai \.intro\{padding-top:20px\}\}/);
+ assert.doesNotMatch(css,/\.toekomst-ai \.intro\{padding-top:100px\}/);
  const mobile=css.slice(css.indexOf('/* Mobile chooser:'));
  assert.match(mobile,/^\/\*[^]*?@media\(max-width:760px\)\{/);
  assert.match(mobile,/\.toekomst-ai \.login-menu\{display:none\}/);
@@ -114,5 +115,5 @@ test('toekomst mobile features the first website card and shortens the meeting b
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
  assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
- assert.match(html,/ai-medewerker\.css\?v=mobile-chooser-20261002/);
+ assert.match(html,/ai-medewerker\.css\?v=mobile-spacing-20261002/);
 });
