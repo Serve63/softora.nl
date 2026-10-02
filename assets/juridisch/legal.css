@@ -1,0 +1,62 @@
+.legal-page .page { max-width: 1220px; height: auto; min-height: 100svh; padding: 0 44px; }
+.legal-page header { height: 100px; }
+.legal-page main { display: flex; flex-direction: column; justify-content: center; min-height: auto; max-height: none; margin: 0; gap: 0; padding: 56px 0 70px; }
+.skip-link { position: absolute; z-index: 20; top: -70px; left: 24px; padding: 14px 20px; border-radius: 8px; background: var(--wine); color: white; }
+.skip-link:focus { top: 16px; }
+.back-link { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; color: #766b71; font-size: 12px; }
+.back-link:hover { color: var(--wine); }
+.legal-intro { margin-bottom: 40px; }
+.legal-eyebrow { margin: 0 0 18px; color: var(--wine); font-size: 9px; font-weight: 600; letter-spacing: 2px; }
+.legal-intro h1 { font-size: clamp(48px, 5.5vw, 76px); line-height: 1.12; letter-spacing: -1.8px; }
+.legal-intro h1 span { color: var(--wine); }
+.legal-intro > p:last-child { margin: 22px 0 0; color: #82787e; font-size: 13px; line-height: 1.9; }
+.legal-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.legal-card { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; min-height: 282px; padding: 28px; border: 1px solid #dfd3da; border-radius: 16px; transition: transform .2s, border-color .2s; }
+.legal-card--terms { background: #f2e6eb; }
+.legal-card--privacy { background: #e9ebe1; border-color: #d9ddce; }
+.legal-card--company { background: #f0e6db; border-color: #e3d5c5; }
+.legal-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 26px; border: 1px solid #8b22521c; border-radius: 12px; background: #ffffff75; color: var(--wine); }
+.legal-icon svg { width: 29px; height: 29px; }
+.legal-card h2 { font-family: Inter, sans-serif; font-size: clamp(18px, 1.7vw, 22px); font-weight: 600; letter-spacing: -.5px; line-height: 1.3; }
+.legal-card p { margin: 13px 0 28px; font-size: 12px; line-height: 1.8; color: #766b71; }
+.legal-card-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: auto; padding-top: 18px; border-top: 1px solid #8b22521c; color: var(--wine); font-size: 11px; font-weight: 500; }
+.legal-card-action > span { font-size: 22px; line-height: 1; }
+.legal-card:is(:hover,:focus-visible) { border-color: var(--wine); transform: translateY(-4px); }
+.legal-contact { margin: 30px 0 0; color: #82787e; font-size: 12px; line-height: 1.9; }
+.legal-contact a, .company-details a { color: var(--wine); text-decoration: underline; text-underline-offset: 4px; }
+.company-page .legal-intro h1 { font-size: clamp(40px, 5vw, 66px); }
+.company-details { max-width: 800px; padding: 32px; border: 1px solid #e6dfe1; border-radius: 16px; background: #fffdf8; }
+.company-details h2 { font-family: Inter, sans-serif; font-size: 21px; font-weight: 600; letter-spacing: -.4px; }
+.company-details dl { margin: 22px 0 0; }
+.company-details dl > div { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; padding: 17px 0; border-top: 1px solid #e6dfe1; font-size: 13px; line-height: 1.7; }
+.company-details dt { color: #82787e; }
+.company-details dd { margin: 0; overflow-wrap: anywhere; }
+.legal-page footer { flex-wrap: wrap; }
+.legal-page .legal-copyright { display: inline-flex; align-items: center; min-height: 44px; color: #998b93; font-size: 8px; letter-spacing: .8px; }
+.legal-page .legal-copyright:hover { color: var(--wine); }
+.legal-page .footer-home { display: inline-flex; align-items: center; min-height: 44px; color: #766b71; font-size: 11px; }
+@media (max-width: 900px) {
+  .legal-choices { gap: 12px; }
+  .legal-card { padding: 22px; }
+  .legal-card-action { font-size: 10px; }
+}
+@media (max-width: 760px) {
+  .legal-page .page { padding: 0 20px; }
+  .legal-page header { height: 84px; }
+  .legal-page main { justify-content: flex-start; padding: 36px 0 40px; }
+  .legal-page .brand { font-size: 26px; }
+  .back-link { gap: 7px; font-size: 11px; }
+  .company-page .back-link { max-width: 130px; }
+  .legal-intro { margin-bottom: 28px; }
+  .legal-intro h1 { font-size: clamp(44px, 9vw, 62px); letter-spacing: -1.2px; }
+  .legal-intro > p:last-child { font-size: 12px; }
+  .legal-choices { grid-template-columns: 1fr; gap: 14px; }
+  .legal-card { min-height: 0; padding: 24px; }
+  .legal-icon { width: 42px; height: 42px; margin-bottom: 20px; }
+  .legal-card h2 { font-size: 21px; }
+  .legal-card p { margin-bottom: 20px; }
+  .legal-card-action { font-size: 11px; }
+  .company-page .legal-intro h1 { font-size: clamp(38px, 8.5vw, 54px); }
+  .company-details { padding: 24px; }
+  .company-details dl > div { grid-template-columns: 1fr; gap: 5px; padding: 15px 0; }
+}
