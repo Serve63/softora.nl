@@ -17,7 +17,7 @@
         const ready = await readiness.markReady({
             page: 'premium-actieve-opdrachten',
             requiredData: { activeOrders: true },
-            requiredActions: ['#createOrderBtn', '#onlyMyAssignmentsToggle', '.orders-filter-bar', '#ordersGrid'],
+            requiredActions: ['#createOrderBtn', '.orders-filter-bar', '#ordersGrid'],
             requiredImages: Array.from(contentRoot.querySelectorAll('img:not([loading="lazy"])')),
             actionsBound: () => doc.documentElement?.dataset.softoraOrdersActionsBound === 'true',
         });

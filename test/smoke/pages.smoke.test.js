@@ -527,17 +527,13 @@ test('page smoke: premium-ai-coldmailing.html keeps personal assignment filter o
 test('page smoke: premium-actieve-opdrachten.html starts directly on openstaande opdrachten', () => {
   const html = fs.readFileSync(path.join(repoRoot, 'premium-actieve-opdrachten.html'), 'utf8');
   const script = fs.readFileSync(path.join(repoRoot, 'assets/premium-actieve-opdrachten.js'), 'utf8');
-  const assignmentFilterScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-filter.js'), 'utf8');
-  const assignmentPagesScript = fs.readFileSync(path.join(repoRoot, 'assets/premium-personal-assignment-pages.js'), 'utf8');
-  const source = `${html}\n${assignmentFilterScript}\n${script}\n${assignmentPagesScript}`;
+  const source = `${html}\n${script}`;
+  assert.doesNotMatch(html, /onlyMyAssignmentsToggle|Enkel mijn toewijzingen bekijken|premium-personal-assignment-(?:filter|pages)/);
+  assert.doesNotMatch(script, /order-delivery|order-assignee/);
   assert.doesNotMatch(html, /data-order-filter="open"/, 'Openstaande opdrachten-tab hoort niet meer zichtbaar te zijn.');
   assert.doesNotMatch(html, /data-order-filter="open_leads"/, 'Openstaande leads-tab hoort niet meer zichtbaar te zijn.');
-  assert.match(html, /assets\/premium-personal-assignment-filter\.css\?v=20260511a/, 'Persoonlijke toewijzingsstijl ontbreekt op opdrachten.');
-  assert.match(html, /assets\/premium-personal-assignment-filter\.js\?v=20260722a/, 'Persoonlijke toewijzingsscript ontbreekt op opdrachten.');
-  assert.match(html, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/, 'Opdrachten-toggle ontbreekt.');
   assert.doesNotMatch(html, /assets\/premium-active-order-open-leads\.js/, 'Openstaande leads asset mag niet in de eerste laadroute staan.');
   assert.doesNotMatch(html, /assets\/premium-active-order-manual-open-leads\.js/, 'Handmatige openstaande leads asset mag niet in de eerste laadroute staan.');
-  assert.match(html, /assets\/premium-personal-assignment-pages\.js\?v=20260922b/, 'Opdrachten pagina-asset voor persoonlijke toewijzingen ontbreekt.');
   assert.match(html, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/, 'Aanmaken-knop hoort neutraal te zijn.');
   const createButtonHtml = html.match(/<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?<\/button>/)?.[0] || '';
   assert.doesNotMatch(createButtonHtml, /<svg\b/, 'Aanmaken-knop hoort geen plus-icoon meer te tonen.');
@@ -545,10 +541,9 @@ test('page smoke: premium-actieve-opdrachten.html starts directly on openstaande
   assert.doesNotMatch(html, />Openstaande leads<\/span>/, 'Openstaande leads mag niet meer zichtbaar zijn.');
   assert.match(html, />Openstaande opdrachten<\/span>/, 'Primaire tab hoort Openstaande opdrachten te tonen.');
   assert.match(source, /Geen openstaande opdrachten\./, 'Lege-state hoort bij de nieuwe tablabel te passen.');
-  assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./, 'Persoonlijke lege-state voor opdrachten ontbreekt.');
   assert.match(source, /let activeOrderFilter = 'in_progress';/, 'Standaardfilter hoort op openstaande opdrachten te staan.');
   assert.match(html, /assets\/premium-active-orders-boot\.js\?v=20260922c"><\/script>/, 'Bootstrap hoort direct te starten.');
-  assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20260922d"><\/script>/, 'Opdrachten-script hoort direct te starten.');
+  assert.match(html, /assets\/premium-actieve-opdrachten\.js\?v=20261002a"><\/script>/, 'Opdrachten-script hoort direct te starten.');
 });
 
 test('page smoke: premium-actieve-opdrachten.html renders without a blocking boot loader', () => {
