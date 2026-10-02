@@ -26,6 +26,17 @@ test('legal chooser links all three choices to public pages', () => {
   assert.equal(getIndexablePublicHtmlFileFromPath('/algemene-voorwaarden'), 'premium-algemene-voorwaarden.html');
   assert.equal(getIndexablePublicHtmlFileFromPath('/privacybeleid'), 'premium-privacy-policy.html');
   for (const text of ['Algemene voorwaarden', 'Privacybeleid', 'Bedrijfsgegevens']) assert.ok(DomUtils.textContent(doc).includes(text));
+  const images = choices.map((choice) => DomUtils.findOne((node) => node.name === 'img', choice.children));
+  assert.deepEqual(images.map((node) => node.attribs.src), ['/assets/juridisch/terms-3d-v1.webp', '/assets/juridisch/privacy-3d-v1.webp', '/assets/juridisch/company-3d-v1.webp']);
+  for (const image of images) {
+    assert.equal(image.attribs.alt, '');
+    assert.equal(image.attribs.width, '512');
+    assert.equal(image.attribs.height, '512');
+    assert.ok(fs.existsSync(path.join(root, image.attribs.src)));
+  }
+  const css = read('assets/juridisch/legal.css');
+  assert.match(css, /\.legal-card:is\(:hover,:focus-visible\) \.legal-visual img/);
+  assert.match(css, /prefers-reduced-motion:\s*no-preference/);
 });
 
 test('public company identifiers match Softora bookkeeping and omit its internal tax account number', () => {
