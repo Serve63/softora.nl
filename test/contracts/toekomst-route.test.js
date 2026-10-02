@@ -115,7 +115,7 @@ test('toekomst mobile features the first website card and shortens the meeting b
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
  assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
- assert.match(html,/ai-medewerker\.css\?v=personnel-footer-20261002/);
+ assert.match(html,/ai-medewerker\.css\?v=login-mascots-20261002/);
 });
 
 test('toekomst footer uses a quiet centered article link with a direct blog destination', () => {
@@ -131,4 +131,19 @@ test('toekomst footer uses a quiet centered article link with a direct blog dest
  assert.match(footer,/<a class="footer-personnel" href="\/premium-personeel-login">Personeel<\/a>/);
  assert.ok(fs.existsSync(path.join(root,'premium-personeel-login.html')));
  assert.match(css,/\.toekomst-ai \.footer-personnel\{display:none\}/);
+});
+
+test('toekomst login menu uses lightweight transparent figures for both destinations', () => {
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ const menu=html.match(/<div class="login-options contact-options"[^]*?<p class="login-status"/)?.[0] || '';
+ assert.doesNotMatch(menu,/<svg/);
+ for(const destination of ['seo','chatbot']) {
+  const option=menu.match(new RegExp('<a class="contact-option login-option" href="/'+destination+'-login">([^]*?)</a>'))?.[1] || '';
+  assert.match(option,new RegExp('src="/assets/entry/'+destination+'-login-mascot-v1.webp" alt=""'));
+  const asset=fs.readFileSync(path.join(root,'assets/entry',destination+'-login-mascot-v1.webp'));
+  assert.equal(asset.toString('ascii',8,12),'WEBP');
+  assert.equal(asset.toString('ascii',12,16),'VP8X');
+  assert.ok(asset[20] & 0x10,'Login figure must preserve transparency');
+  assert.ok(asset.length<20000,'Login figure should stay below 20 KB');
+ }
 });
