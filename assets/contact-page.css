@@ -183,7 +183,6 @@
 .contact-page .login-avatar--seo { background-image: url('/assets/entry/seo-login-mascot-v1.webp') !important; background-size: 85% !important; }
 .contact-page .contact-avatar--form { background-image: url('/assets/entry/contact-form-icon-v1.webp') !important; }
 .contact-page .contact-avatar--message { background-image: url('/assets/entry/contact-whatsapp-icon-v1.webp') !important; }
-.contact-page .contact-avatar--phone { background-image: url('/assets/entry/contact-phone-icon-v1.webp') !important; }
 @media (min-width: 761px) { .contact-page header { height: 58px; } }
 
 @media (max-width: 760px) {
