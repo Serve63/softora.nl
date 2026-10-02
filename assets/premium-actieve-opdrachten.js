@@ -818,7 +818,7 @@ function refreshOrderSummaryCards() {
         const order = orders[id];
         if (!order) return list;
         const ui = resolveOrderUiState(order);
-        if (!ui.isBuilt) list.push(order);
+        if (!ui.isBuilt) list.push(getCustomOrderById(id) || order);
         return list;
     }, []);
     let business = 0;

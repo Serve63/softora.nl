@@ -50,6 +50,7 @@ test('opdrachten verwijderen het persoonlijke filter uit de hoofdinhoud en behou
   assert.match(sidebar, /data-sidebar-user-name/);
   assert.match(sidebar, /data-sidebar-key="active_orders"/);
   assert.match(main, /id="createOrderBtn"/);
+  assert.match(page, /premium-actieve-opdrachten\.js\?v=20261002b/);
   assert.doesNotMatch(main, /onlyMyAssignmentsToggle|personal-assignment-toggle/);
 });
 

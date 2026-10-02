@@ -58,7 +58,7 @@ test('premium actieve opdrachten tonen compacte kaarten zonder persoonlijk filte
   assert.doesNotMatch(pageSource, /assets\/premium-personal-assignment-(?:filter|pages)\.(?:css|js)/);
   assert.doesNotMatch(scriptSource, /order-delivery|order-assignee|assigneeEl/);
 
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-screen-readiness\.js\?v=20260923a"><\/script><script src="assets\/premium-active-orders-readiness\.js\?v=20261002a"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script><script src="assets\/premium-active-orders-boot\.js\?v=20260922c"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20261002a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260922b"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-screen-readiness\.js\?v=20260923a"><\/script><script src="assets\/premium-active-orders-readiness\.js\?v=20261002a"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script><script src="assets\/premium-active-orders-boot\.js\?v=20260922c"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20261002b"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260922b"><\/script>/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-order-open-leads\.js/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-order-manual-open-leads\.js/);
   assert.match(pageSource, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/);
@@ -385,4 +385,36 @@ test('premium opdrachtdossier ondersteunt inline A4 bewerken en slaat edits veil
   assert.match(styleSource, /\.dossier-add-button/);
   assert.doesNotMatch(source, /window\.localStorage/);
   assert.doesNotMatch(source, /window\.sessionStorage/);
+});
+
+
+test('opdrachtentellers gebruiken de volledige omschrijving nadat het persoonlijke filter is verwijderd', () => {
+  const vm = require('node:vm');
+  const { scriptSource } = readActiveOrdersSources();
+  const classifier = scriptSource.slice(scriptSource.indexOf('function classifyActiveOrderProductLine('), scriptSource.indexOf('function renderSumActiveBreakdown('));
+  const refresh = scriptSource.slice(scriptSource.indexOf('function refreshOrderSummaryCards('), scriptSource.indexOf('function getNextOrderId('));
+  const records = {
+    1: { title: 'Nieuwe website + bedrijfssysteem', description: 'Bedrijfssoftware op maat' },
+    2: { title: 'Nieuwe website', description: 'Een moderne website' },
+    3: { title: 'Chatbot', description: 'Opgeleverde chatbot' },
+  };
+  const runtime = { 1: { type: records[1].title }, 2: { type: records[2].title }, 3: { type: records[3].title, isBuilt: true, isPaid: true } };
+  const cards = Object.keys(records).map(id => ({ id: `order-${id}`, querySelector() { return { textContent: '€100' }; } }));
+  const elements = { sumTotal: {}, sumDelivered: {} };
+  let breakdown;
+  const context = {
+    document: { querySelectorAll() { return cards; }, getElementById(id) { return elements[id] || null; } },
+    orders: runtime,
+    getCustomOrderById(id) { return records[id]; },
+    resolveOrderUiState(order = {}) { return { isBuilt: Boolean(order.isBuilt), isPaid: Boolean(order.isPaid) }; },
+    renderSumActiveBreakdown(...values) { breakdown = values; },
+    getOrderFilterGroupForCard(card) { return runtime[card.id.replace('order-', '')].isBuilt ? 'completed' : 'in_progress'; },
+    moneyToNumber() { return 100; },
+    updateOrderFilterCounts() {},
+    applyOrderFilter() {},
+  };
+  vm.runInNewContext(`${classifier}\n${refresh}\nrefreshOrderSummaryCards();`, context);
+  assert.deepEqual(breakdown, [2, 1, 0, 0]);
+  assert.equal(elements.sumTotal.textContent, '€200');
+  assert.equal(elements.sumDelivered.textContent, '1');
 });
