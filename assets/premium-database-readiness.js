@@ -35,7 +35,7 @@
         ]);
         root.performance?.mark?.('softora:database:metrics-checked');
         const verified = metrics?.getMetricReadiness?.();
-        const metricsReady = verified?.roi === true && verified?.stats === true && METRIC_IDS.every((id) => {
+        const metricsReady = verified?.roi === true && verified?.stats === true && verified?.combined === true && METRIC_IDS.every((id) => {
             const value = doc.getElementById(id)?.textContent?.trim();
             return value && value !== '--';
         });
