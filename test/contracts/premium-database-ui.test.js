@@ -2527,7 +2527,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(systemMailCountScriptSource, /function readMailCountFromStats\(stats\)/);
   assert.match(systemMailCountScriptSource, /"centralGuardTotalSent"/);
   assert.match(systemMailCountScriptSource, /"systemTotalSent"/);
-  assert.match(systemMailCountScriptSource, /renderSystemMailCount\(lastStatsMailCount, lastStatsMailCount === null\)/);
+  assert.match(systemMailCountScriptSource, /renderSystemMailCount\(null, true\)/);
   assert.doesNotMatch(systemMailCountScriptSource, /Math\.max\(rememberedCount \|\| 0, calculatedCount\)/);
   assert.match(systemMailCountScriptSource, /function renderRoiCalculator\(mailCount, isLoading\)/);
   assert.match(systemMailCountScriptSource, /const COLDMAIL_STATS_URL = "\/api\/coldmailing\/stats\?includeRecipients=1";/);
@@ -2936,7 +2936,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
   assert.match(pageSource, /assets\/premium-database-filter-groups\.css\?v=20260923-softora-purple/);
-  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20260924-stable-metrics/);
+  assert.match(pageSource, /assets\/premium-database-system-mail-count\.js\?v=20261003-complete-count/);
   assert.match(pageSource, /assets\/premium-database-autopilot-toggle\.js\?v=20260716a/);
   assert.match(filterGroupsCssSource, /\.status-filter-group\s*\{/);
   assert.doesNotMatch(filterGroupsCssSource, /\.status-filter-group--coldmail/);
@@ -3149,7 +3149,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /renderPage\(\); releaseDatabaseBootShell\(\);/);
   assert.match(pageSource, /softoraDatabaseActionsBound = 'true';[\s\S]*databaseReadiness: window\.SoftoraDatabaseReadiness/);
   assert.match(pageSource, /premium-screen-readiness\.js\?v=20260923a/);
-  assert.match(pageSource, /premium-database-readiness\.js\?v=20260923-provider-readmodel/);
+  assert.match(pageSource, /premium-database-readiness\.js\?v=20261003-complete-count/);
   assert.match(pageSource, /SoftoraPremiumBootTiming\?\.release\(databaseBootStartedAt, 0\)/);
   assert.match(webdesignActionScriptSource, /async function preloadPhotoImages\(customers, limit, timeoutMs\)/);
   assert.match(webdesignActionScriptSource, /function waitForPhotoImage\(photo, timeoutMs, loadKey\)/);
@@ -3236,7 +3236,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260923-ready-sync"><\/script><script src="assets\/premium-database-boot\.js\?v=20260923-provider-readmodel"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260927a"><\/script><script src="assets\/premium-readmodel-store\.js\?v=20260924c"><\/script><script src="assets\/premium-readmodel-client\.js\?v=20260924a"><\/script><script src="assets\/premium-screen-snapshot\.js\?v=20260927a"><\/script><script src="assets\/premium-database-screen-snapshot\.js\?v=20260927a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20260924-stable-metrics"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260923-ready-sync"><\/script><script src="assets\/premium-database-boot\.js\?v=20260923-provider-readmodel"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260927a"><\/script><script src="assets\/premium-readmodel-store\.js\?v=20260924c"><\/script><script src="assets\/premium-readmodel-client\.js\?v=20260924a"><\/script><script src="assets\/premium-screen-snapshot\.js\?v=20260927a"><\/script><script src="assets\/premium-database-screen-snapshot\.js\?v=20260927a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20261003-complete-count"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);

@@ -166,7 +166,7 @@ test('partial inventory and photo preparation cannot publish intermediate rows o
   assert.equal(isPreparing({ remoteCustomersLoaded: true, photoRestorePending: false, dataLoading: false }), false);
   assert.equal(isPreparing({ remoteCustomersLoaded: false, dataUnavailable: true }), false, 'errors remain visible');
   const page = fs.readFileSync(path.join(repoRoot, 'premium-database.html'), 'utf8');
-  assert.match(page, /dataLoading: preparing \|\| state\.photoRestoreFailed, normalizeString, isColdmailTestCompany, outreachController, databaseContactStatus/);
+  assert.match(page, /dataLoading: preparing \|\| state\.photoRestoreFailed \|\| !state\.canonicalInventoryReady \|\| state\.dataUnavailable, normalizeString, isColdmailTestCompany, outreachController, databaseContactStatus/);
   assert.match(page, /if \(!preparing\) publishMailReadyCounts\(\); if \(!preparing && window\.SoftoraDatabaseSentRegister\.render/);
 });
 
@@ -228,8 +228,9 @@ test('Mailsysteem shows its subtitle and complete mail totals from the first pai
   assert.match(page, /<div class="page-sub" id="top-sub">De AI koppelt alle data slim aan elkaar\.<\/div>/);
   const metrics = fs.readFileSync(path.join(repoRoot, 'assets/premium-database-system-mail-count.js'), 'utf8');
   assert.match(metrics, /function applyBootstrapState\(\) \{\n\s+if \(bootstrapStateApplied\) return;\n\s+bootstrapStateApplied = true;\n\s+applyRememberedInstantlyCounts\(\);/);
-  assert.match(metrics, /if \(completeCount && instantlyCountsFromMemory\) \{/, 'the first complete count replaces the remembered one');
-  assert.match(metrics, /if \(completeCount\) \{\n\s+const store = lastKnownStore\(\);\n\s+if \(store\) store\.rememberLastKnown\(INSTANTLY_COUNTS_KEY/);
+  assert.match(metrics, /lastInstantlyMailCount = getInstantlySystemMailSentCount\(customers, helpers \|\| \{\}\);/, 'the complete inventory replaces the old channel count');
+  assert.match(metrics, /combinedTotal !== softoraTotal \+ total/, 'only coherent saved channel pairs are restored');
+  assert.match(metrics, /if \(value !== null && value !== undefined\) rememberCompleteMailCount\(count\);/, 'only a complete newly rendered pair is remembered');
   assert.match(metrics, /remembered\.dayKey === getAmsterdamDateKey\(new Date\(\)\)/, "today's Instantly count only applies on the same Amsterdam day");
 });
 

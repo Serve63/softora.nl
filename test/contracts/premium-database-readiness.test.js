@@ -22,7 +22,7 @@ function environment() {
     SoftoraDatabaseSystemMailCount: {
       refreshTodaySentCount: async () => { events.push('stats'); },
       loadPersistedDealCount: async () => { events.push('roi'); },
-      getMetricReadiness: () => ({ roi: true, stats: true }),
+      getMetricReadiness: () => ({ roi: true, stats: true, combined: true }),
     },
     SoftoraScreenReadiness: {
       markReady: async (input) => { events.push('ready'); return input.actionsBound(); },
@@ -48,15 +48,23 @@ test('Mailsysteem records readiness only after inventory, metrics, actions and v
 
 test('Mailsysteem reuses already verified stats and ROI reads during readiness', async () => {
   const env = environment();
-  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: true, stats: true, statsFresh: true });
+  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: true, stats: true, combined: true, statsFresh: true });
   assert.equal(await env.readiness.publish({ state: env.state }), true);
   assert.deepEqual(env.events, ['ready']);
+});
+
+test('Mailsysteem cannot claim readiness until the combined channel total is complete', async () => {
+  const env = environment();
+  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: true, stats: true, statsFresh: true, combined: false });
+  assert.equal(await env.readiness.publish({ state: env.state }), false);
+  assert.ok(env.events.includes('mail-metrics-unavailable'));
+  assert.ok(!env.events.includes('ready'));
 });
 
 test('Mailsysteem fetches ROI when its initial verified read is still missing', async () => {
   const env = environment();
   let roiVerified = false;
-  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: roiVerified, stats: true, statsFresh: true });
+  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: roiVerified, stats: true, combined: true, statsFresh: true });
   env.root.SoftoraDatabaseSystemMailCount.loadPersistedDealCount = async () => {
     env.events.push('roi');
     roiVerified = true;
@@ -98,7 +106,7 @@ test('Mailsysteem waits for persisted inventory, spreadsheet and photo jobs befo
 
 test('Mailsysteem does not claim readiness from old bootstrap numbers after a failed live metric read', async () => {
   const env = environment();
-  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: false, stats: true });
+  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: false, stats: true, combined: true });
   assert.equal(await env.readiness.publish({ state: env.state }), false);
   assert.ok(env.events.includes('mail-metrics-unavailable'));
   assert.ok(!env.events.includes('ready'));
@@ -110,7 +118,7 @@ test('Mailsysteem retries a transient metric failure and publishes readiness aft
   let delay;
   let roiVerified = false;
   env.root.setTimeout = (callback, ms) => { retry = callback; delay = ms; return 1; };
-  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: roiVerified, stats: true });
+  env.root.SoftoraDatabaseSystemMailCount.getMetricReadiness = () => ({ roi: roiVerified, stats: true, combined: true });
   assert.equal(await env.readiness.publish({ state: env.state }), false);
   assert.equal(delay, 2000);
   roiVerified = true;

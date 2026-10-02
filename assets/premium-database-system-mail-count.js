@@ -1,4 +1,7 @@
-(function () {
+(function (root, factory) {
+    if (typeof module === "object" && module.exports) module.exports = factory;
+    else root.SoftoraDatabaseSystemMailCount = factory(root);
+})(typeof window !== "undefined" ? window : globalThis, function (window) {
     const ROI_STATE_SCOPE = "premium_database_mail_roi";
     const ROI_STATE_KEY = "premium_database_mail_roi_v1";
     const ROI_APPOINTMENTS_KEY = "premium_database_mail_appointments_v1";
@@ -16,7 +19,8 @@
     let roiAppointmentsCount = 0;
     let roiAppointmentsDirty = false;
     let lastStatsMailCount = null;
-    let lastInstantlyMailCount = 0;
+    let lastInstantlyMailCount = null;
+    let instantlyCountVerified = false;
     let lastRenderedMailCount = null;
     let roiDealsCount = 0;
     let roiStateLoadPromise = null;
@@ -27,13 +31,10 @@
     let roiDirtySinceLoad = false;
     let roiNeedsRemoteSync = false;
     let bootstrapStateApplied = false;
-    // The Instantly part of the totals is counted from all ~20k customers, which
-    // arrive after the first paint. The last complete count is remembered so the
-    // metrics show the right numbers from the start instead of jumping
-    // (docs/platform-performance.md); the next complete count replaces it.
+    // Restore only a complete pair of channel totals. Mixing a remembered
+    // Instantly subtotal with an early Softora read exposes partial metrics.
     const INSTANTLY_COUNTS_KEY = "mailsysteem-instantly-counts";
     const INSTANTLY_COUNTS_MAX_AGE_MS = 36 * 60 * 60 * 1000;
-    let instantlyCountsFromMemory = false;
 
     function fallbackNormalizeString(value) {
         return value === null || value === undefined ? "" : String(value).trim();
@@ -233,7 +234,8 @@
     }
 
     function getCombinedSystemMailCount() {
-        return lastStatsMailCount === null ? null : lastStatsMailCount + lastInstantlyMailCount;
+        return !statsReadVerified || !instantlyCountVerified || lastStatsMailCount === null || lastInstantlyMailCount === null
+            ? null : lastStatsMailCount + lastInstantlyMailCount;
     }
 
     function getRootDocument() {
@@ -249,13 +251,22 @@
         const store = lastKnownStore();
         const remembered = store ? store.readLastKnown(INSTANTLY_COUNTS_KEY, INSTANTLY_COUNTS_MAX_AGE_MS) : null;
         const total = readNonNegativeInteger(remembered && remembered.total);
-        if (total === null) return;
-        lastInstantlyMailCount = Math.max(lastInstantlyMailCount, total);
+        const softoraTotal = readNonNegativeInteger(remembered && remembered.softoraTotal);
+        const combinedTotal = readNonNegativeInteger(remembered && remembered.combinedTotal);
+        if (total === null || softoraTotal === null || combinedTotal !== softoraTotal + total) return;
+        lastRenderedMailCount = combinedTotal;
         const today = readNonNegativeInteger(remembered.today);
         if (today !== null && remembered.dayKey === getAmsterdamDateKey(new Date())) {
             lastInstantlyTodaySentCount = lastInstantlyTodaySentCount === null ? today : Math.max(lastInstantlyTodaySentCount, today);
         }
-        instantlyCountsFromMemory = true;
+    }
+
+    function rememberCompleteMailCount(count) {
+        const store = lastKnownStore();
+        if (store) store.rememberLastKnown(INSTANTLY_COUNTS_KEY, {
+            total: lastInstantlyMailCount, softoraTotal: lastStatsMailCount, combinedTotal: count,
+            today: lastInstantlyTodaySentCount, dayKey: getAmsterdamDateKey(new Date())
+        });
     }
 
     function applyBootstrapState() {
@@ -279,7 +290,6 @@
             if (hardBounces !== null) { lastHardBouncesCount = hardBounces; lastBounceObservationMs = Date.parse(mailStats.bounceStatsUpdatedAt) || 0; }
             if (totalSent !== null) {
                 lastStatsMailCount = lastStatsMailCount === null ? totalSent : Math.max(lastStatsMailCount, totalSent);
-                lastRenderedMailCount = lastRenderedMailCount === null ? totalSent : Math.max(lastRenderedMailCount, totalSent);
             }
             if (dealCount !== null && !roiDirtySinceLoad) roiDealsCount = dealCount;
             if (!roiAppointmentsDirty) roiAppointmentsCount = clampDealCount(roi.appointmentCount);
@@ -600,12 +610,12 @@
             renderRoiCalculator(null, true);
             return;
         }
-        // Dit is een all-time teller: een tijdelijke/partiële response mag een
-        // eerder bewezen cumulatief totaal nooit zichtbaar terugzetten.
-        const stableCount = lastRenderedMailCount === null ? count : Math.max(lastRenderedMailCount, count);
-        lastRenderedMailCount = stableCount;
-        element.textContent = stableCount.toLocaleString("nl-NL");
-        renderRoiCalculator(stableCount, false);
+        // Only complete channel totals reach this renderer; a fresh complete
+        // count may correct an older saved total in either direction.
+        lastRenderedMailCount = count;
+        if (value !== null && value !== undefined) rememberCompleteMailCount(count);
+        element.textContent = count.toLocaleString("nl-NL");
+        renderRoiCalculator(count, false);
     }
 
     // The sent register is a versioned read model: an unchanged register is
@@ -640,15 +650,15 @@
             const payload = result.payload;
             if (!result.response.ok || !payload || payload.ok === false) throw new Error(payload && (payload.message || payload.error) || "Coldmail statistieken laden mislukt.");
             const stats = payload.stats || {};
-            statsReadVerified = true;
-            statsReadVerifiedAtMs = Date.now();
+            const systemMailCount = readMailCountFromStats(stats);
+            statsReadVerified = systemMailCount !== null;
+            statsReadVerifiedAtMs = statsReadVerified ? Date.now() : 0;
             if (window.SoftoraDatabaseSentRegister) {
                 window.SoftoraDatabaseSentRegister.accept(stats.sentRegister);
                 lastStatsMailCount = stats.sentRegister.total;
             }
             const sentToday = readTodaySentCountFromStats(stats);
             const instantlySentToday = readInstantlyTodaySentCountFromStats(stats);
-            const systemMailCount = readMailCountFromStats(stats);
             renderTodaySentCount(sentToday, instantlySentToday, false);
             applyLiveBounceStats(stats);
             if (systemMailCount !== null) {
@@ -665,7 +675,7 @@
             if (window.SoftoraDatabaseSentRegister) { window.SoftoraDatabaseSentRegister.markFailed(); window.dispatchEvent(new Event("softora:sent-register")); }
             renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, lastTodaySentCount === null && lastInstantlyTodaySentCount === null);
             renderHardBouncesCount(lastHardBouncesCount, lastHardBouncesCount === null);
-            renderSystemMailCount(lastStatsMailCount, lastStatsMailCount === null);
+            renderSystemMailCount(null, true);
             if (typeof console !== "undefined" && typeof console.warn === "function") console.warn("Vandaag verstuurd laden mislukt:", error && error.message ? error.message : error);
             return lastTodaySentCount;
         }).finally(function () {
@@ -742,39 +752,27 @@
         applyBootstrapState();
         bindRoiControls();
         bindTodaySentRefresh();
-        const completeCount = Boolean(helpers && helpers.dataLoading === false);
-        if (completeCount && instantlyCountsFromMemory) {
-            // The first complete count replaces the remembered one, so a stale number never sticks.
-            instantlyCountsFromMemory = false;
+        if (!(helpers && helpers.dataLoading)) {
             lastInstantlyMailCount = getInstantlySystemMailSentCount(customers, helpers || {});
+            instantlyCountVerified = true;
             lastInstantlyTodaySentCount = getInstantlySystemMailSentTodayCount(customers, helpers || {});
             renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, false);
-        } else if (!(helpers && helpers.dataLoading)) {
-            lastInstantlyMailCount = Math.max(lastInstantlyMailCount, getInstantlySystemMailSentCount(customers, helpers || {}));
-            const instantlyTodayCount = getInstantlySystemMailSentTodayCount(customers, helpers || {});
-            lastInstantlyTodaySentCount = lastInstantlyTodaySentCount === null
-                ? instantlyTodayCount
-                : Math.max(lastInstantlyTodaySentCount, instantlyTodayCount);
-            renderTodaySentCount(lastTodaySentCount, lastInstantlyTodaySentCount, false);
-        }
-        if (completeCount) {
-            const store = lastKnownStore();
-            if (store) store.rememberLastKnown(INSTANTLY_COUNTS_KEY, { total: lastInstantlyMailCount,
-                today: lastInstantlyTodaySentCount, dayKey: getAmsterdamDateKey(new Date()) });
-        }
+        } else instantlyCountVerified = false;
         const rootDocument = getRootDocument();
         const element = rootDocument && rootDocument.getElementById("systemMailSentCount");
         if (!element) return;
         element.title = "Softora en Instantly samen; handmatig als verzonden gemarkeerde records tellen mee.";
-        renderSystemMailCount(getCombinedSystemMailCount(), lastStatsMailCount === null);
+        const combinedCount = getCombinedSystemMailCount();
+        renderSystemMailCount(combinedCount, combinedCount === null);
     }
 
-    window.SoftoraDatabaseSystemMailCount = {
+    return {
         getMetricReadiness: function () {
             const statsAgeMs = Date.now() - statsReadVerifiedAtMs;
             return {
                 roi: roiReadVerified,
                 stats: statsReadVerified,
+                combined: getCombinedSystemMailCount() !== null,
                 statsFresh: statsReadVerified && statsReadVerifiedAtMs > 0 && statsAgeMs >= 0 && statsAgeMs <= STATS_READINESS_FRESH_MS
             };
         },
@@ -790,4 +788,4 @@
         renderRoiCalculator: renderRoiCalculator,
         render: render
     };
-})();
+});
