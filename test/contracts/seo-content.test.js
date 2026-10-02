@@ -113,7 +113,7 @@ test('seo content exposes blog and kennisbank paths for crawl and sitemap discov
   assert.ok(publicPaths.includes('/blog/ai-automatisering-mkb-waar-beginnen'));
   assert.ok(publicPaths.includes('/blog/website-laten-maken-kosten-2026'));
   assert.ok(publicPaths.includes('/blog/chatbot-laten-maken-wanneer-zinvol'));
-  assert.ok(publicPaths.includes('/kennisbank/wat-is-bedrijfssoftware-op-maat'));
+  assert.ok(publicPaths.includes('/blog/wat-is-bedrijfssoftware-op-maat'));
   assert.ok(publicPaths.includes('/vergelijkingen/website-laten-maken-vs-zelf-maken'));
   assert.ok(publicPaths.includes('/vergelijkingen/ai-telefonist-vs-receptionist'));
   assert.ok(publicPaths.includes('/branches/installateurs'));
@@ -141,9 +141,9 @@ test('seo content houdt future-dated publicaties uit routes en sitemap tot publi
   const afterWeeklyBatch = new Date('2026-06-08T12:00:00.000Z');
   const scheduledPaths = [
     '/blog/ai-automatisering-leadkwalificatie-mkb',
-    '/kennisbank/wat-is-leadkwalificatie',
+    '/blog/wat-is-leadkwalificatie',
     '/blog/website-leadgeneratie-mkb-meten',
-    '/kennisbank/wat-is-crm-datakwaliteit',
+    '/blog/wat-is-crm-datakwaliteit',
     '/regio/midden-brabant',
   ];
 
@@ -214,9 +214,9 @@ test('CRM kennisbankcluster ondersteunt sales pipeline en datakwaliteit richting
     assert.match(page.html, /href="\/crm-systeem-op-maat"/, `${page.path} moet de CRM money page ondersteunen.`);
   }
 
-  const crmSystem = pages.find((page) => page.path === '/kennisbank/wat-is-een-crm-systeem').html;
-  const dataQuality = pages.find((page) => page.path === '/kennisbank/wat-is-crm-datakwaliteit').html;
-  const salesPipeline = pages.find((page) => page.path === '/kennisbank/wat-is-een-sales-pipeline-crm').html;
+  const crmSystem = pages.find((page) => page.path === '/blog/wat-is-een-crm-systeem').html;
+  const dataQuality = pages.find((page) => page.path === '/blog/wat-is-crm-datakwaliteit').html;
+  const salesPipeline = pages.find((page) => page.path === '/blog/wat-is-een-sales-pipeline-crm').html;
 
   assert.match(crmSystem, /Let op pipeline en datakwaliteit/);
   assert.match(crmSystem, /href="\/kennisbank\/wat-is-crm-datakwaliteit"/);
@@ -275,9 +275,9 @@ test('seo content houdt de volgende wekelijkse batch uit public routes tot publi
   const afterNextBatch = new Date('2026-06-15T12:00:00.000Z');
   const nextBatchPaths = [
     '/blog/ai-processen-automatiseren-zonder-controle-verliezen',
-    '/kennisbank/wat-is-een-ai-workflow',
+    '/blog/wat-is-een-ai-workflow',
     '/blog/website-crm-koppeling-leadopvolging-mkb',
-    '/kennisbank/wat-is-een-sales-pipeline-crm',
+    '/blog/wat-is-een-sales-pipeline-crm',
     '/vergelijkingen/crm-op-maat-vs-standaard-crm',
   ];
 
@@ -313,9 +313,9 @@ test('seo content houdt de derde wekelijkse batch uit public routes tot publicat
   const afterThirdBatch = new Date('2026-06-22T12:00:00.000Z');
   const thirdBatchPaths = [
     '/blog/ai-automatisering-offerte-opvolging-mkb',
-    '/kennisbank/wat-is-offerte-automatisering',
+    '/blog/wat-is-offerte-automatisering',
     '/blog/chatbot-crm-koppeling-leads-opvolgen',
-    '/kennisbank/wat-is-een-klantportaal',
+    '/blog/wat-is-een-klantportaal',
     '/regio/tilburg-ai-automatisering',
   ];
 
@@ -351,9 +351,9 @@ test('seo content houdt de vierde wekelijkse batch uit public routes en sitemap 
   const afterFourthBatch = new Date('2026-06-29T12:00:00.000Z');
   const fourthBatchPaths = [
     '/blog/ai-automatisering-klantintake-mkb',
-    '/kennisbank/wat-is-procesautomatisering',
+    '/blog/wat-is-procesautomatisering',
     '/blog/website-laten-maken-tilburg-leadgeneratie',
-    '/kennisbank/wat-is-een-crm-integratie',
+    '/blog/wat-is-een-crm-integratie',
     '/branches/adviesbureaus',
   ];
 
@@ -420,9 +420,9 @@ test('seo content houdt de vijfde wekelijkse batch uit public routes en sitemap 
   const fifthBatchPaths = [
     '/branches/adviesbureaus',
     '/blog/crm-taken-reminders-automatiseren-mkb',
-    '/kennisbank/wat-is-lead-scoring',
+    '/blog/wat-is-lead-scoring',
     '/blog/ai-telefonie-menselijke-overdracht',
-    '/kennisbank/wat-is-chatbot-overdracht',
+    '/blog/wat-is-chatbot-overdracht',
   ];
   const newSupportPaths = fifthBatchPaths.slice(1);
 
@@ -552,7 +552,7 @@ test('seo content article pages render Article schema and self canonicals', () =
   );
   assert.match(html, /data-content-cluster="ai-automatisering"/);
   assert.match(html, /AI automatisering voor het MKB: waar begin je\?/);
-  assert.match(html, /href="\/blog">Terug naar blog<\/a>/);
+  assert.match(html, /href="\/blog">Terug naar artikelen<\/a>/);
   assert.match(html, /href="\/ai-telefonist"/);
   assert.match(html, /data-softora-public-seo="conversion-cta"/);
   assert.match(
@@ -928,7 +928,7 @@ test('current live seo content keeps weak pages supported by contextual incoming
     const hrefs = Array.from(page.html.matchAll(/href=["']([^"'?#]+)(?:[?#][^"']*)?["']/g))
       .map((match) => match[1])
       .filter((href) => href.startsWith('/'))
-      .map((href) => href.replace(/\/$/, '') || '/');
+      .map((href) => href.replace(/\/$/, '').replace(/^\/kennisbank(?=\/|$)/, '/blog') || '/');
 
     for (const href of hrefs) {
       if (href !== page.path && publicPaths.has(href)) {
@@ -968,20 +968,20 @@ test('seo linkmachine run date keeps fresh support articles above orphan risk', 
   const incoming = new Map(pages.map((page) => [page.path, new Set()]));
 
   for (const page of pages) {
-    for (const href of extractInternalLinksFromHtml(page.html)) {
+    for (const href of extractInternalLinksFromHtml(page.html).map((href) => href.replace(/^\/kennisbank(?=\/|$)/, '/blog'))) {
       if (href !== page.path && publicPaths.has(href)) incoming.get(href).add(page.path);
     }
   }
 
   for (const pathName of [
     '/blog/ai-telefonist-voor-afspraakintake',
-    '/kennisbank/wat-is-interne-linkstructuur',
-    '/kennisbank/wat-is-leadkwalificatie',
+    '/blog/wat-is-interne-linkstructuur',
+    '/blog/wat-is-leadkwalificatie',
   ]) {
     assert.ok(incoming.get(pathName).size >= 3, `${pathName} heeft te weinig live contextuele ingangen.`);
   }
 
-  const internalLinkStructure = pages.find((page) => page.path === '/kennisbank/wat-is-interne-linkstructuur');
+  const internalLinkStructure = pages.find((page) => page.path === '/blog/wat-is-interne-linkstructuur');
   assert.ok(internalLinkStructure.html.includes('href="/bedrijfssoftware-op-maat"'));
   assert.ok(internalLinkStructure.html.includes('href="/crm-systeem-op-maat"'));
   assert.ok(internalLinkStructure.html.includes('href="/ai-automatisering"'));
@@ -1000,20 +1000,20 @@ test('seo content heeft een dagelijkse publicatiebuffer die pas live komt op pub
   assert.ok(scheduled.length >= 7, 'De contentmachine moet minimaal een week vooruit gepland zijn.');
   assert.ok(plan.every((item) => item.cluster), 'Elke publicatie moet aan een cluster hangen.');
   assert.ok(scheduled.some((item) => item.path === '/blog/website-laten-maken-mkb-paginas'));
-  assert.ok(scheduled.some((item) => item.path === '/kennisbank/wat-is-ai-automatisering'));
+  assert.ok(scheduled.some((item) => item.path === '/blog/wat-is-ai-automatisering'));
   assert.ok(scheduled.some((item) => item.path === '/vergelijkingen/maatwerk-software-vs-standaard-software'));
-  assert.ok(scheduled.some((item) => item.path === '/kennisbank/wat-is-een-crm-systeem'));
+  assert.ok(scheduled.some((item) => item.path === '/blog/wat-is-een-crm-systeem'));
   assert.ok(scheduled.some((item) => item.path === '/blog/ai-automatisering-leadopvolging'));
   assert.ok(scheduled.some((item) => item.path === '/blog/ai-telefonist-voor-afspraakintake'));
-  assert.ok(scheduled.some((item) => item.path === '/kennisbank/wat-is-interne-linkstructuur'));
+  assert.ok(scheduled.some((item) => item.path === '/blog/wat-is-interne-linkstructuur'));
 
   assert.ok(!getSeoContentPublicPaths({ now: beforeLaunch }).includes('/vergelijkingen/chatbot-vs-livechat'));
-  assert.ok(!getSeoContentPublicPaths({ now: beforeLaunch }).includes('/kennisbank/wat-is-een-crm-systeem'));
+  assert.ok(!getSeoContentPublicPaths({ now: beforeLaunch }).includes('/blog/wat-is-een-crm-systeem'));
   assert.ok(getSeoContentPublicPaths({ now: afterLaunch }).includes('/vergelijkingen/chatbot-vs-livechat'));
-  assert.ok(getSeoContentPublicPaths({ now: afterWeekTwo }).includes('/kennisbank/wat-is-een-crm-systeem'));
+  assert.ok(getSeoContentPublicPaths({ now: afterWeekTwo }).includes('/blog/wat-is-een-crm-systeem'));
   assert.ok(getSeoContentPublicPaths({ now: afterWeekTwo }).includes('/blog/ai-automatisering-leadopvolging'));
   assert.ok(getSeoContentPublicPaths({ now: afterWeekTwo }).includes('/blog/ai-telefonist-voor-afspraakintake'));
-  assert.ok(getSeoContentPublicPaths({ now: afterWeekTwo }).includes('/kennisbank/wat-is-interne-linkstructuur'));
+  assert.ok(getSeoContentPublicPaths({ now: afterWeekTwo }).includes('/blog/wat-is-interne-linkstructuur'));
   assert.ok(
     getSeoContentSitemapEntries({ now: afterLaunch }).some((entry) => entry.path === '/vergelijkingen/chatbot-vs-livechat')
   );
@@ -1024,7 +1024,7 @@ test('seo content heeft een dagelijkse publicatiebuffer die pas live komt op pub
   );
   assert.ok(
     getSeoContentSitemapEntries({ now: afterWeekTwo }).some(
-      (entry) => entry.path === '/kennisbank/wat-is-interne-linkstructuur'
+      (entry) => entry.path === '/blog/wat-is-interne-linkstructuur'
     )
   );
 });
@@ -1096,7 +1096,7 @@ test('interne-linkgids gebruikt native quality v2 zonder generieke opvulling', (
   assert.equal(item.growthEventKind, 'other_growth_action');
   assert.ok(item.wordCount >= 850);
   assert.equal(item.faq.length, 0);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-interne-linkstructuur">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/wat-is-interne-linkstructuur">/);
   assert.match(html, /"dateModified":"2026-09-23"/);
   assert.match(html, /Er is geen vast ideaal aantal links/);
   assert.match(html, /Voorbeeld, geen klantresultaat/);
@@ -1140,7 +1140,7 @@ test('CRM-integratiegids gebruikt een toetsbaar contract en twee verschillende b
     assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
     assert.ok(fs.statSync(imagePath).size < 300 * 1024);
   }
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-een-crm-integratie">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/wat-is-een-crm-integratie">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /"dateModified":"2026-08-12"/);
   assert.match(html, /"@type":"FAQPage"/);
@@ -1222,7 +1222,7 @@ test('conversiegerichte-websitegids bewaakt de route tot bevestigde overdracht',
   const imagePath = path.join(repoRoot, item.image.src.replace(/^\//, ''));
   assert.deepEqual(readJpegDimensions(imagePath), { width: 1600, height: 900 });
   assert.ok(fs.statSync(imagePath).size < 300 * 1024);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-een-conversiegerichte-website">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/wat-is-een-conversiegerichte-website">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /"dateModified":"2026-09-06"/);
   assert.match(html, /"@type":"FAQPage"/);
@@ -1502,7 +1502,7 @@ test('AI-telefonist definitiegids maakt techniek, taakgrens en menselijk herstel
   assert.ok(item.informationGain.includes('zesveldige gesprekskaart'));
   assert.ok(item.sections.length >= 10);
   assert.equal(item.sources.length, 6);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-een-ai-telefonist">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/wat-is-een-ai-telefonist">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /"datePublished":"2026-05-20"/);
   assert.match(html, /"dateModified":"2026-08-22"/);
@@ -1515,7 +1515,7 @@ test('AI-telefonist definitiegids maakt techniek, taakgrens en menselijk herstel
   assert.doesNotMatch(html, /altijd bereikbaar|foutloze gesprekken|volledig autonoom|garandeert afspraken|AVG-proof/i);
 
   const sitemapEntry = getSeoContentSitemapEntries({ now })
-    .find((entry) => entry.path === '/kennisbank/wat-is-een-ai-telefonist');
+    .find((entry) => entry.path === '/blog/wat-is-een-ai-telefonist');
   assert.equal(sitemapEntry.images.length, 1);
   assert.equal(sitemapEntry.images[0].loc, '/assets/seo-content/ai-klantcontact-chatbot-telefonie-softora.jpg');
 });
@@ -1558,7 +1558,7 @@ test('AI-telefonist CRM-gids maakt events, duplicatecontrole en herstel toetsbaa
   }
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/ai-telefonist-crm-koppeling">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/ai-telefonist-crm-koppeling">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /<meta property="og:image:width" content="1600">/);
   assert.match(html, /<meta property="og:image:height" content="900">/);
@@ -1573,7 +1573,7 @@ test('AI-telefonist CRM-gids maakt events, duplicatecontrole en herstel toetsbaa
   assert.doesNotMatch(html, /foutloze koppeling|volledig autonome route|gegarandeerde opvolging|altijd beschikbaar/i);
 
   const sitemapEntry = getSeoContentSitemapEntries({ now })
-    .find((entry) => entry.path === '/kennisbank/ai-telefonist-crm-koppeling');
+    .find((entry) => entry.path === '/blog/ai-telefonist-crm-koppeling');
   assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
     '/assets/seo-content/ai-telefonist-crm-routering-softora.jpg',
     '/assets/seo-content/ai-telefonist-crm-herstelroute-softora.jpg',
@@ -1603,7 +1603,7 @@ test('AI-telefonist acceptatiegids scheidt gesprek, audio, actie, overdracht en 
   assert.ok(item.wordCount >= 1500);
   assert.equal(item.visualQualityVersion, undefined);
   assert.equal(item.secondaryImage, undefined);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/ai-telefonist-acceptatietest-opstellen">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/ai-telefonist-acceptatietest-opstellen">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /"datePublished":"2026-08-25"/);
   assert.match(html, /"@type":"FAQPage"/);
@@ -1618,7 +1618,7 @@ test('AI-telefonist acceptatiegids scheidt gesprek, audio, actie, overdracht en 
   assert.match(html, /Het doel is niet om perfecte verstaanbaarheid, foutloze acties of gegarandeerde bereikbaarheid te beloven/);
 
   const sitemapEntry = getSeoContentSitemapEntries({ now })
-    .find((entry) => entry.path === '/kennisbank/ai-telefonist-acceptatietest-opstellen');
+    .find((entry) => entry.path === '/blog/ai-telefonist-acceptatietest-opstellen');
   assert.equal(sitemapEntry.lastmod, '2026-08-25');
 });
 
@@ -1661,7 +1661,7 @@ test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs t
   }
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-procesautomatisering">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/wat-is-procesautomatisering">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /<meta property="og:image:width" content="1600">/);
   assert.match(html, /<meta property="og:image:height" content="900">/);
@@ -1686,7 +1686,7 @@ test('procesautomatiseringsgids maakt proceskaart, foutpad en acceptatiebewijs t
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
 
   const sitemapEntry = getSeoContentSitemapEntries({ now })
-    .find((entry) => entry.path === '/kennisbank/wat-is-procesautomatisering');
+    .find((entry) => entry.path === '/blog/wat-is-procesautomatisering');
   assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
     '/assets/seo-content/procesautomatisering-proceskaart-softora.jpg',
     '/assets/seo-content/procesautomatisering-foutpad-softora.jpg',
@@ -1725,7 +1725,7 @@ test('klantportaalgids maakt taken, rechten en uitzonderingen toetsbaar', () => 
   }
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/wat-is-een-klantportaal">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/wat-is-een-klantportaal">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /<meta property="og:image:width" content="1600">/);
   assert.match(html, /<meta property="og:image:height" content="900">/);
@@ -1742,7 +1742,7 @@ test('klantportaalgids maakt taken, rechten en uitzonderingen toetsbaar', () => 
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
 
   const sitemapEntry = getSeoContentSitemapEntries({ now })
-    .find((entry) => entry.path === '/kennisbank/wat-is-een-klantportaal');
+    .find((entry) => entry.path === '/blog/wat-is-een-klantportaal');
   assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
     '/assets/seo-content/klantportaal-rechtenwerktafel-softora.jpg',
     '/assets/seo-content/klantportaal-toegangsflow-controle-softora.jpg',
@@ -1823,7 +1823,7 @@ test('website-migratiegids maakt URL-besluiten, livebewijs en herstel controleer
   assert.ok(item.informationGain.includes('migratiekaart'));
   assert.ok(item.wordCount >= 850);
   assert.equal(item.faq.length, 0);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/website-migratie-zonder-seo-verlies">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/website-migratie-zonder-seo-verlies">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /<meta property="og:image:width" content="1600">/);
   assert.match(html, /<meta property="og:image:height" content="1000">/);
@@ -1843,7 +1843,7 @@ test('website-migratiegids maakt URL-besluiten, livebewijs en herstel controleer
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
 
   const sitemapEntry = getSeoContentSitemapEntries({ now })
-    .find((entry) => entry.path === '/kennisbank/website-migratie-zonder-seo-verlies');
+    .find((entry) => entry.path === '/blog/website-migratie-zonder-seo-verlies');
   assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
     '/assets/seo-content/website-leads-analytics-softora.jpg',
   ]);
@@ -2135,7 +2135,7 @@ test('chatbot-acceptatietest maakt bron, grenzen, acties, herstel en go-no-go co
 
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 1);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/chatbot-acceptatietest-opstellen">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/chatbot-acceptatietest-opstellen">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /<meta property="og:image:width" content="1672">/);
   assert.match(html, /<meta property="og:image:height" content="941">/);
@@ -2153,7 +2153,7 @@ test('chatbot-acceptatietest maakt bron, grenzen, acties, herstel en go-no-go co
   assert.doesNotMatch(html, /<section class="artikel-faq"/);
 
   const sitemapEntry = getSeoContentSitemapEntries({ now })
-    .find((entry) => entry.path === '/kennisbank/chatbot-acceptatietest-opstellen');
+    .find((entry) => entry.path === '/blog/chatbot-acceptatietest-opstellen');
   assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
     '/assets/seo-content/chatbot-acceptatietest-scenario-bewijs-softora.jpg',
     '/assets/seo-content/chatbot-acceptatietest-herstelroute-softora.jpg',
@@ -2190,7 +2190,7 @@ test('CRM-migratiegids maakt selectie, proefmigratie, cutover en rollback contro
   assert.ok(fs.statSync(heroPath).size < 500 * 1024);
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);
   assert.equal((html.match(/<figure class="artikel-support-image">/g) || []).length, 0);
-  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/kennisbank\/crm-migratie-stappenplan">/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/crm-migratie-stappenplan">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
   assert.match(html, /<meta property="og:image:width" content="1600">/);
   assert.match(html, /<meta property="og:image:height" content="900">/);
@@ -2211,7 +2211,7 @@ test('CRM-migratiegids maakt selectie, proefmigratie, cutover en rollback contro
   assert.doesNotMatch(html, /<section class="artikel-faq"/);
 
   const sitemapEntry = getSeoContentSitemapEntries({ now })
-    .find((entry) => entry.path === '/kennisbank/crm-migratie-stappenplan');
+    .find((entry) => entry.path === '/blog/crm-migratie-stappenplan');
   assert.deepEqual(sitemapEntry.images.map((image) => image.loc), [
     '/assets/seo-content/crm-migratie-controlebrug-softora.jpg',
   ]);

@@ -14,6 +14,7 @@ const {
   getSeoContentCollectionPaths,
   getSeoContentItem,
 } = require('../services/seo-content');
+const { renderOverviewHtml, renderArticleHtml } = require('../services/seo-articles-presentation');
 
 function appendOriginalQuery(pathname, originalUrl) {
   const basePath = String(pathname || '').trim() || '/';
@@ -157,10 +158,16 @@ function registerPublicPageRoutes(app, deps) {
     return res.redirect(301, appendOriginalQuery('/blog', req.originalUrl));
   });
 
+  app.get('/kennisbank', (req, res) => res.redirect(301, appendOriginalQuery('/blog', req.originalUrl)));
+  app.get('/kennisbank/:slug', (req, res, next) => {
+    const item = getSeoContentItem('kennisbank', req.params.slug);
+    return item ? res.redirect(301, appendOriginalQuery(`/blog/${item.slug}`, req.originalUrl)) : next();
+  });
+
   app.get(seoContentCollectionPaths, (req, res, next) => {
     const collection = String(req.path || '').replace(/^\//, '');
     const publicBaseUrl = deps.getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
-    const html = buildSeoContentIndexHtml(collection, { siteOrigin: publicBaseUrl });
+    const html = collection === 'blog' ? renderOverviewHtml({ siteOrigin: publicBaseUrl }) : buildSeoContentIndexHtml(collection, { siteOrigin: publicBaseUrl });
     if (!html) return next();
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
@@ -176,7 +183,7 @@ function registerPublicPageRoutes(app, deps) {
     if (!item) return next();
 
     const publicBaseUrl = deps.getEffectivePublicBaseUrl(req) || 'https://www.softora.nl';
-    const html = buildSeoContentArticleHtml(item, { siteOrigin: publicBaseUrl });
+    const html = collection === 'blog' ? renderArticleHtml(item, { siteOrigin: publicBaseUrl }) : buildSeoContentArticleHtml(item, { siteOrigin: publicBaseUrl });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
     return res.status(200).send(html);

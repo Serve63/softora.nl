@@ -1,0 +1,60 @@
+/* Toekomst header styles from entry/start.css and entry/ai-medewerker.css,
+   scoped to the articles layout so the article layout keeps its own styles. */
+.site-header { --wine: #8b2252; background: #f8f6f2; color: #201b21; font-size: 16px; line-height: normal; }
+.site-header .header-inner { width: 100%; max-width: 1440px; height: 58px; margin-inline: auto; padding: 0 clamp(25px, 3vw, 48px); display: flex; align-items: center; justify-content: space-between; }
+.site-header .brand { position: relative; font-family: Oswald, sans-serif; font-size: 26px; letter-spacing: -1px; font-weight: 700; color: #161316; line-height: normal; }
+.site-header .brand::after { content: ''; position: absolute; left: 0; bottom: -5px; width: 38px; height: 2px; background: var(--wine); }
+.site-header .header-actions { position: relative; z-index: 10; display: flex; align-items: center; gap: 10px; }
+.site-header .login-menu, .site-header .contact-menu { position: relative; }
+.site-header .contact-menu { z-index: 10; }
+.site-header summary { list-style: none; cursor: pointer; user-select: none; }
+.site-header summary::-webkit-details-marker { display: none; }
+.site-header summary:focus-visible { outline: 3px solid #b85b86; outline-offset: 4px; }
+.site-header .login-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 39px; padding: 9px 16px; border: 1px solid #dfd3da; border-radius: 99px; color: #74435d; background: #fffafc80; font-size: 11px; font-weight: 500; white-space: nowrap; transition: background .2s, border-color .2s; }
+.site-header .login-link svg { width: 15px; height: 15px; }
+.site-header .login-person { stroke-width: 2; }
+.site-header .login-link:hover { background: #f1e6ec; border-color: #cba9bc; }
+.site-header .login-link .login-chevron { width: 12px; height: 12px; margin-left: 3px; stroke-width: 1.8; transition: transform .2s; }
+.site-header .login-menu[open] .login-chevron { transform: rotate(180deg); }
+.site-header .login-menu[open] .login-link { background: #f1e6ec; border-color: #cba9bc; }
+.site-header .contact { min-height: 39px; min-width: 116px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 6px 8px 6px 18px; border: 1px solid #792046; border-radius: 99px; background: var(--wine); color: #fff; font-family: Inter, sans-serif; font-size: 11px; font-weight: 500; letter-spacing: .1px; box-shadow: inset 0 1px 0 #ffffff18, 0 4px 12px #68203e12; transition: background .2s, box-shadow .2s; }
+.site-header .contact:hover, .site-header .contact-menu[open] .contact { background: #752047; box-shadow: inset 0 1px 0 #ffffff18, 0 5px 16px #68203e22; }
+.site-header .contact-chevron { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; padding: 0; color: #fff; background: #ffffff15; }
+.site-header .contact-chevron svg { width: 13px; height: 13px; stroke-width: 1.6; transition: transform .2s; }
+.site-header .contact-menu[open] .contact-chevron svg { transform: rotate(180deg); }
+.site-header .contact-options { position: absolute; top: calc(100% + 13px); right: 0; width: 278px; max-width: calc(100vw - 40px); padding: 6px; background: #fffdfb; border: 1px solid #e9dfe3; border-radius: 15px; box-shadow: 0 12px 32px -12px #3b172825; transform-origin: top right; }
+.site-header .contact-menu[open] .contact-options, .site-header .login-menu[open] .login-options { animation: article-header-reveal .18s ease-out; }
+.site-header .contact-menu-label { padding: 10px 10px 7px; color: #9b7b8c; font-size: 8px; font-weight: 600; letter-spacing: 1.5px; }
+.site-header .contact-options .contact-option { display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 10px 9px; min-height: 61px; border: 1px solid transparent; border-radius: 13px; transition: background .2s, border-color .2s; }
+.site-header .contact-option + .contact-option { margin-top: 3px; }
+.site-header .contact-options .contact-option:hover { background: #faf3f6; border-color: #f0e6eb; }
+.site-header .contact-option-icon { width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center; border-radius: 7px; color: #fff; background: #8b2252; }
+.site-header .contact-option-icon svg { width: 21px; height: 21px; stroke-width: 2; }
+.site-header .whatsapp-icon { background: #168447; }
+.site-header .whatsapp-icon svg { fill: currentColor; stroke: none; }
+.site-header .contact-option-copy { display: flex; flex-direction: column; gap: 4px; }
+.site-header .contact-option-copy strong { color: #30202b; font-size: 12px; font-weight: 600; letter-spacing: -.2px; }
+.site-header .contact-option-copy > span { color: #93818b; font-size: 10px; line-height: 1.4; }
+.site-header .contact-option-arrow { margin-left: auto; color: #8b2252; display: flex; flex-shrink: 0; }
+.site-header .contact-option-arrow svg { width: 15px; height: 15px; stroke-width: 1.5; transition: transform .2s; }
+.site-header .contact-option:hover .contact-option-arrow svg { transform: translate(2px, -2px); }
+.site-header .contact-option:focus-visible { outline-offset: 1px; }
+.site-header .login-options { width: 247px; }
+.site-header .login-options .login-avatar { width: 36px; height: 36px; background: transparent; border-radius: 0; }
+.site-header .login-avatar img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.site-header .login-options .login-option { width: 100%; font: inherit; background: transparent; text-align: left; cursor: pointer; }
+.site-header .login-options .login-option:focus-visible { outline: 2px solid var(--wine); outline-offset: 0; }
+.site-header .login-status { margin: 6px 10px 10px; padding-top: 10px; border-top: 1px solid #eee5e9; font-size: 10px; line-height: 1.5; color: #897581; }
+@keyframes article-header-reveal { from { opacity: 0; transform: translateY(-5px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (max-width: 760px) {
+  .site-header .header-inner { max-width: 1640px; height: 82px; padding-inline: 20px; gap: 10px; }
+  .site-header .brand { font-size: 27px; }
+  .site-header .brand::after { width: 45px; }
+  .site-header .header-actions { gap: 8px; }
+  .site-header .login-menu { display: none; }
+  .site-header .contact { min-height: 36px; min-width: 94px; padding: 6px 8px 6px 14px; gap: 8px; font-size: 10px; }
+  .site-header .contact-chevron { width: 22px; height: 22px; }
+}
+@media (max-width: 380px) { .site-header .brand { font-size: 24px; } }
+@media (max-width: 360px) { .site-header .header-inner { padding-inline: 14px; } }
+@media (prefers-reduced-motion: reduce) { .site-header *, .site-header *::before, .site-header *::after { transition: none !important; animation: none !important; } }

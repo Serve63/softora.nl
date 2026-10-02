@@ -238,18 +238,18 @@ test('live route gate accepts one proven visual for a non-blog Quality V2 refres
     ''
   );
   const result = await runSeoMachineLiveRouteCheck({
-    url: URL.replace('/blog/', '/kennisbank/'),
+    url: URL,
     liveCommit: LIVE_COMMIT,
     fetchImpl: async (url) => {
       const requested = String(url);
-      if (requested === URL.replace('/blog/', '/kennisbank/')) {
-        return new Response(html.replaceAll(URL, URL.replace('/blog/', '/kennisbank/')), {
+      if (requested === URL) {
+        return new Response(html, {
           status: 200,
           headers: { 'content-type': 'text/html' },
         });
       }
       return makeFetch({
-        sitemap: buildSitemap().replaceAll(URL, URL.replace('/blog/', '/kennisbank/')),
+        sitemap: buildSitemap(),
       })(url);
     },
     contentItems: [{

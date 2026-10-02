@@ -1,4 +1,4 @@
-const { renderContentNavigation, renderReadingNavigation, sectionId } = require('./seo-content-reading-layout');
+const { getBackLabelForCollection, renderContentNavigation, renderReadingNavigation, sectionId } = require('./seo-content-reading-layout');
 const { SEO_CONTENT_AUTHOR, buildContributorSchema, buildReviewSchema, hasSupportedReview } = require('./seo-content-attribution');
 const { SEO_CONTENT_QUALITY_V2_ITEMS } = require('./seo-content-quality-v2');
 const { WEBSITE_PROPOSAL_CONTENT_ITEM } = require('./seo-content-website-proposal');
@@ -21,7 +21,7 @@ const SEO_CONTENT_COLLECTIONS = Object.freeze({
   blog: Object.freeze({
     key: 'blog',
     path: '/blog',
-    title: 'Softora Blog over websites, software en AI groei',
+    title: 'Softora Artikelen over websites, software en AI groei',
     description:
       'Praktische inzichten over websites, AI automatisering, bedrijfssoftware, chatbots en digitale groei voor ondernemers.',
     eyebrow: 'Inzichten',
@@ -984,7 +984,7 @@ const SEO_CONTENT_ITEMS = Object.freeze(require('./seo-content-article-authors')
     relatedLinks: Object.freeze([
       Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
       Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'Kennisbank', href: '/kennisbank' }),
+      Object.freeze({ label: 'Artikelen', href: '/blog' }),
       Object.freeze({ label: 'Zakelijke dienstverleners', href: '/branches/zakelijke-dienstverleners' }),
       Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
     ]),
@@ -2115,7 +2115,7 @@ function getSeoContentCollection(collectionRaw) {
 }
 
 function getSeoContentCollectionPaths() {
-  return Object.values(SEO_CONTENT_COLLECTIONS).map((collection) => collection.path);
+  return Object.values(SEO_CONTENT_COLLECTIONS).filter((collection) => collection.key !== 'kennisbank').map((collection) => collection.path);
 }
 
 function getSeoContentPillars() {
@@ -2456,25 +2456,23 @@ function getSeoContentItem(collectionRaw, slugRaw, options = {}) {
   const collection = String(collectionRaw || '').trim().toLowerCase();
   const slug = String(slugRaw || '').trim().toLowerCase();
   if (!collection || !slug) return null;
-  return getSeoContentItems({ collection, now: options.now }).find((item) => item.slug === slug) || null;
+  return getSeoContentItems({ now: options.now }).find((item) => item.slug === slug && (item.collection === collection || (collection === 'blog' && item.collection === 'kennisbank'))) || null;
 }
 
 function getSeoContentPathForItem(item) {
   const collection = getSeoContentCollection(item && item.collection);
   if (!collection || !item || !item.slug) return '';
-  return `${collection.path}/${item.slug}`;
+  return `${item.collection === 'kennisbank' ? '/blog' : collection.path}/${item.slug}`;
 }
 
 function getSeoContentPublicPaths(options = {}) {
   const collectionPaths = getSeoContentCollectionPaths();
   const itemPaths = getSeoContentItems(options).map(getSeoContentPathForItem).filter(Boolean);
-  return [...collectionPaths, ...itemPaths, '/premium-blog'];
+  return [...collectionPaths, ...itemPaths, '/premium-blog', '/kennisbank', ...getSeoContentItems({ ...options, collection: 'kennisbank' }).map((item) => `/kennisbank/${item.slug}`)];
 }
 
 function getSeoContentSitemapEntries(options = {}) {
-  const collectionEntries = Object.values(SEO_CONTENT_COLLECTIONS).map((collection) => ({
-    path: collection.path,
-  }));
+  const collectionEntries = getSeoContentCollectionPaths().map((path) => ({ path }));
   const itemEntries = getSeoContentItems(options).map((item) => ({
     path: getSeoContentPathForItem(item),
     lastmod: item.updatedAt || item.publishedAt,
@@ -2704,16 +2702,6 @@ function renderContentClusterNav() {
   ].join('\n');
 }
 
-function getBackLabelForCollection(collection) {
-  if (!collection) return 'overzicht';
-  if (collection.key === 'blog') return 'blog';
-  if (collection.key === 'kennisbank') return 'kennisbank';
-  if (collection.key === 'vergelijkingen') return 'vergelijkingen';
-  if (collection.key === 'branches') return 'branches';
-  if (collection.key === 'regio') return 'regio';
-  return 'overzicht';
-}
-
 function buildMainEntityForItem(item, site, canonicalUrl) {
   const cluster = getSeoContentClusterForItem(item);
   const image = getSeoContentImageForItem(item);
@@ -2807,7 +2795,7 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
   if (!collection) return '';
   const site = normalizeSiteOrigin(siteOrigin);
   const canonicalUrl = buildAbsoluteUrl(site, collection.path);
-  const items = getSeoContentItems({ collection: collection.key, now });
+  const items = collection.key === 'blog' ? getSeoContentItems({ now }).filter((item) => ['blog', 'kennisbank'].includes(item.collection)).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || a.slug.localeCompare(b.slug)) : getSeoContentItems({ collection: collection.key, now });
   const structuredData = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -2851,8 +2839,7 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
     '    </div>',
     '  </section>',
     '  <div class="filter-bar" aria-label="Content onderdelen">',
-    `    <a class="filter-tab${collection.key === 'blog' ? ' active' : ''}" href="/blog">Blog</a>`,
-    `    <a class="filter-tab${collection.key === 'kennisbank' ? ' active' : ''}" href="/kennisbank">Kennisbank</a>`,
+    `    <a class="filter-tab${collection.key === 'blog' ? ' active' : ''}" href="/blog">Artikelen</a>`,
     `    <a class="filter-tab${collection.key === 'vergelijkingen' ? ' active' : ''}" href="/vergelijkingen">Vergelijkingen</a>`,
     `    <a class="filter-tab${collection.key === 'branches' ? ' active' : ''}" href="/branches">Branches</a>`,
     `    <a class="filter-tab${collection.key === 'regio' ? ' active' : ''}" href="/regio">Regio</a>`,
@@ -2870,7 +2857,7 @@ function buildSeoContentIndexHtml(collectionRaw, { siteOrigin = DEFAULT_SITE_ORI
       { label: 'Bekijk vergelijkingen', href: '/vergelijkingen' },
       { label: 'Bekijk branches', href: '/branches' },
       { label: 'Bekijk regio', href: '/regio' },
-      { label: collection.key === 'blog' ? 'Bekijk de kennisbank' : 'Bekijk de blog', href: collection.key === 'blog' ? '/kennisbank' : '/blog' },
+      { label: 'Bekijk alle artikelen', href: '/blog' },
     ]),
     renderCollectionConversionCta(collection),
     '</main>',
@@ -2958,7 +2945,7 @@ function renderSeoParagraph(paragraph) {
 
 function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
   if (!item) return '';
-  const collection = getSeoContentCollection(item.collection);
+  const collection = getSeoContentCollection(item.collection === 'kennisbank' ? 'blog' : item.collection);
   if (!collection) return '';
   const site = normalizeSiteOrigin(siteOrigin);
   const pathName = getSeoContentPathForItem(item);
