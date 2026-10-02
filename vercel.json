@@ -144,6 +144,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/chatbot", "destination": "/assets/chatbot-landing/index.html" },
+    { "source": "/seo-solution", "destination": "/assets/seo-solution/index.html" },
     { "source": "/nieuwe-website", "destination": "/assets/website-showcase/index.html" },
     { "source": "/seo-login", "destination": "/assets/seo-login/index.html" },
     { "source": "/voicesoftware", "destination": "/assets/voicesoftware/index.html" },

@@ -18,11 +18,12 @@ test('desktop chooser allocates space to all sections without clipping overflow'
  assert.match(css,/height:100svh;min-height:640px/);
  assert.doesNotMatch(css,/\.toekomst-ai (?:body|\.page)\{[^}]*overflow:hidden/);
 });
-test('SEO login is linked and explicitly unavailable until accounts are connected', () => {
+test('SEO login stays separate from the landing page and unavailable until accounts are connected', () => {
  const config=JSON.parse(fs.readFileSync(path.join(root,'vercel.json'),'utf8'));
  assert.ok(config.rewrites.some(r=>r.source==='/seo-login' && r.destination==='/assets/seo-login/index.html'));
  const entry=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  assert.match(entry,/href="\/seo-login"/);
+ assert.match(entry,/<a class="choice" href="\/seo-solution"/);
  const login=fs.readFileSync(path.join(root,'assets/seo-login/index.html'),'utf8');
  assert.match(login,/SEO-accountkoppeling is binnenkort beschikbaar/);
  assert.match(login,/type="password"[^>]*disabled/);
@@ -61,7 +62,7 @@ test('toekomst uses SEO Solution consistently', () => {
 
 test('final chooser labels and direct product destinations stay intact', () => {
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
- for(const route of ['nieuwe-website','seo-login','chatbot-login','voicesoftware']) assert.match(html,new RegExp('<a class="choice" href="/'+route+'"'));
+ for(const route of ['nieuwe-website','seo-solution','chatbot','voicesoftware']) assert.match(html,new RegExp('<a class="choice" href="/'+route+'"'));
  assert.doesNotMatch(html,/<a[^>]*class="ai-feature"/);
  for(const file of ['assets/entry/toekomst.html','assets/seo-login/index.html']) {
   const content=fs.readFileSync(path.join(root,file),'utf8');
@@ -111,7 +112,7 @@ test('toekomst mobile features the first website card and shortens the meeting b
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
  const mobile=css.slice(css.indexOf('/* Mobile chooser:'));
  const choices=Array.from(html.matchAll(/<a class="choice" href="([^"]+)"/g),m=>m[1]);
- assert.deepEqual(choices,['/nieuwe-website','/bedrijfssoftware','/voicesoftware','/chatbot-login','/seo-login']);
+ assert.deepEqual(choices,['/nieuwe-website','/bedrijfssoftware','/voicesoftware','/chatbot','/seo-solution']);
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
  assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
