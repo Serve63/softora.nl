@@ -200,7 +200,7 @@ const SEO_CONTENT_MIN_WORDS_BY_COLLECTION = Object.freeze({
   regio: 1100,
 });
 
-const SEO_CONTENT_ITEMS = Object.freeze([
+const SEO_CONTENT_ITEMS = Object.freeze(require('./seo-content-article-authors').withSeoArticleAuthors([
   Object.freeze({
     collection: 'blog',
     slug: 'ai-automatisering-mkb-waar-beginnen',
@@ -2052,7 +2052,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'Wat is een CRM-integratie?', href: '/kennisbank/wat-is-een-crm-integratie' }),
     ]),
   }),
-]);
+]));
 
 function normalizeSiteOrigin(valueRaw = DEFAULT_SITE_ORIGIN) {
   const raw = String(valueRaw || '').trim() || DEFAULT_SITE_ORIGIN;
@@ -2889,7 +2889,7 @@ function renderAuthorityBlock(item) {
   const author = item.author || SEO_CONTENT_AUTHOR;
   return [
     '    <aside class="artikel-eeat" data-softora-public-seo="eeat" aria-label="Over deze uitleg">',
-    `      <p>Van <a href="/over-softora">${escapeHtml(author.name)}</a>. <a href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-author-contact" data-softora-conversion-page="${escapeHtml(getSeoContentPathForItem(item))}" data-softora-conversion-target="whatsapp">Een vraag over deze uitleg?</a></p>`,
+    `      <p>Van <a href="/over-softora" data-softora-public-seo="article-author">${escapeHtml(author.name)}</a>. <a href="${MARTIJN_WHATSAPP_URL}" target="_blank" rel="noopener noreferrer" data-softora-conversion="content-author-contact" data-softora-conversion-page="${escapeHtml(getSeoContentPathForItem(item))}" data-softora-conversion-target="whatsapp">Een vraag over deze uitleg?</a></p>`,
     ...(hasSupportedReview(item) ? [`      <p>Inhoudelijk gecontroleerd door ${escapeHtml(item.reviewedBy.name)} op ${escapeHtml(item.reviewEvidence.reviewedAt.slice(0, 10))}.</p>`] : []),
     '    </aside>',
   ].join('\n');
@@ -3026,7 +3026,7 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     '      <div class="artikel-meta-dot"></div>',
     `      <span>${escapeHtml(item.readTime)}</span>`,
     '      <div class="artikel-meta-dot"></div>',
-    `      <span>${escapeHtml((item.author || SEO_CONTENT_AUTHOR).name)}</span>`,
+    `      <span data-softora-public-seo="article-author">${escapeHtml((item.author || SEO_CONTENT_AUTHOR).name)}</span>`,
     '    </div>',
     `    <p class="artikel-intro">${escapeHtml(item.summary)}</p>`,
     renderReadingNavigation(item, escapeHtml),

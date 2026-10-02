@@ -405,6 +405,29 @@ test('seo machine scant ook publieke SEO-pagina’s op onbewezen claims', () => 
   assert.deepEqual(auditClaimSafety({ pages }), []);
 });
 
+test('assigned article authors are allowed while body claims and unrelated founder mentions stay checked', () => {
+  const item = getSeoContentItems({ now: new Date('2026-10-02') }).find((entry) => entry.slug === 'website-laten-maken-kosten-2026');
+  assert.equal(item.author.name, 'Servé Creusen');
+  const page = { path: getSeoContentPathForItem(item), html: buildSeoContentArticleHtml(item) };
+  assert.deepEqual(auditClaimSafety({ pages: [page] }), []);
+  assert.deepEqual(auditClaimSafety({ pages: [{ ...page, html: page.html + '<p>Servé Creusen staat op de voorkant.</p>' }] })
+    .map((issue) => issue.type), ['frontstage-private-founder-name']);
+  assert.deepEqual(auditClaimSafety({ pages: [{ ...page, html: page.html + '<p>Softora garandeert nummer 1 in Google.</p>' }] })
+    .map((issue) => issue.type), ['guaranteed-seo-or-business-result']);
+  const byline = '<span data-softora-public-seo="article-author">Servé Creusen</span>';
+  for (const path of ['/diensten', '/blog/unknown-article', '/blog/ai-automatisering-mkb-waar-beginnen']) {
+    assert.deepEqual(auditClaimSafety({ pages: [{ path, html: byline }] }).map((issue) => issue.type), ['frontstage-private-founder-name']);
+  }
+  assert.deepEqual(auditClaimSafety({ pages: [{ ...page,
+    html: '<span data-softora-public-seo="article-author">Servé Creusen garandeert nummer 1 in Google.</span>' }] })
+    .map((issue) => issue.type).sort(), ['frontstage-private-founder-name', 'guaranteed-seo-or-business-result'].sort());
+  const schema = { '@type': 'Article', author: { '@type': 'Person', name: item.author.name },
+    description: 'Softora garandeert nummer 1 in Google.' };
+  assert.deepEqual(auditClaimSafety({ pages: [{ ...page,
+    html: '<script type="application/ld+json">' + JSON.stringify(schema) + '</script>' }] })
+    .map((issue) => issue.type), ['guaranteed-seo-or-business-result']);
+});
+
 test('publieke losse HTML-bronnen sturen niet richting gevaarlijke claimvoorbeelden', () => {
   const customerFacingHtmlFiles = fs
     .readdirSync(repoRoot)
