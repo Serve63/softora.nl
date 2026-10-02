@@ -49,6 +49,52 @@ LOCATIONS_AHEAD = 3
 IDLE_SECONDS = 60
 POLL_SECONDS = 5
 IMPORT_LOCK = threading.Lock()
+# Covers discovery plus the two existing bounded Codex assistance attempts.
+COMPANY_TIMEOUT_SECONDS = 1800
+RETRY_DELAYS = (30, 120, 600, 1800)
+
+
+class CompanyResearchError(RuntimeError):
+    """A failed engine attempt, never a negative verdict about the company."""
+
+
+class CompanyRetries:
+    """Persist technical failures separately from completed research across restarts."""
+
+    def __init__(self, clock=time.time):
+        self.clock = clock
+        self.pending = {path.parent.name: json.loads(path.read_text())
+                        for path in QUEUE.glob('*/failure.json')}
+
+    def failed(self, kvk, error):
+        attempts = int(self.pending.get(kvk, {}).get('attempts', 0)) + 1
+        state = {'attempts': attempts, 'retry_at': self.clock() + RETRY_DELAYS[min(attempts - 1, len(RETRY_DELAYS) - 1)],
+                 'error': str(error)[:300]}
+        folder = QUEUE / kvk
+        folder.mkdir(parents=True, exist_ok=True)
+        save_result(folder / 'failure.json', state)
+        self.pending[kvk] = state
+
+    def succeeded(self, kvk):
+        (QUEUE / kvk / 'failure.json').unlink(missing_ok=True)
+        self.pending.pop(kvk, None)
+
+    def waiting(self):
+        return {kvk for kvk, state in self.pending.items() if state['retry_at'] > self.clock()}
+
+
+def collect_finished(running, retries):
+    """An engine failure only retries its company; data/validation failures still stop safely."""
+    for kvk, (future, _identity) in list(running.items()):
+        if not future.done():
+            continue
+        del running[kvk]
+        try:
+            if future.result():
+                retries.succeeded(kvk)
+        except CompanyResearchError as error:
+            retries.failed(kvk, error)
+            print(f'Robot herprobeert {kvk}: {error}', flush=True)
 
 
 def enabled():
@@ -126,9 +172,9 @@ class Planning:
             kvks += [kvk for kvk in read_locations_ahead(limit - len(kvks)) if kvk not in kvks]
         return kvks
 
-    def take(self, count, busy):
+    def take(self, count, busy, waiting=()):
         """Up to `count` open companies from the head, skipping finished, claimed and running ones."""
-        skip = completed_kvks() | searcher_claims() | set(busy)
+        skip = completed_kvks() | searcher_claims() | set(busy) | set(waiting)
         stale = self.read_at is None or self.clock() - self.read_at > PLANNING_REFRESH_SECONDS
         if stale or sum(kvk not in skip for kvk in self.window) < count:
             # Read current planning afresh; never resume an obsolete location or fixed list.
@@ -148,14 +194,31 @@ class Planning:
 
 
 def terminate(process):
-    if process.poll() is not None:
+    # An exited engine can leave a hung discovery grandchild in its session.
+    # Stop the entire session even when its leader has already exited.
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        process.wait()
         return
-    os.killpg(process.pid, signal.SIGTERM)
+    except PermissionError:
+        if process.poll() is None:
+            raise
+        return
     try:
         process.wait(timeout=8)
     except subprocess.TimeoutExpired:
+        pass
+    try:
         os.killpg(process.pid, signal.SIGKILL)
-        process.wait()
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        # Darwin can report EPERM when SIGTERM left only reaped/zombie members.
+        # A still-running leader must never be treated as successfully stopped.
+        if process.poll() is None:
+            raise
+    process.wait()
 
 
 def research(identity, stop):
@@ -183,14 +246,21 @@ def research(identity, stop):
     if stop.is_set():
         return False
     with (folder / 'runner.log').open('a') as log:
-        child = subprocess.Popen(command, cwd=ROOT, stdout=log, stderr=log, start_new_session=True)
+        # The server identity judge uses pay-as-you-go API calls. Keep it off;
+        # optional Codex assistance continues through the existing subscription.
+        environment = dict(os.environ, ROBOT_AI_JUDGE='0')
+        child = subprocess.Popen(command, cwd=ROOT, stdout=log, stderr=log,
+                                 start_new_session=True, env=environment)
+        deadline = time.monotonic() + COMPANY_TIMEOUT_SECONDS
         try:
             while child.poll() is None:
                 if stop.wait(1):
                     terminate(child)
                     return False
+                if time.monotonic() >= deadline:
+                    raise CompanyResearchError(f'Tijdlimiet bereikt bij {kvk}; bewijs en foutlog bewaard.')
             if child.returncode:
-                raise RuntimeError(f'Robot v5 stopte bij {kvk}; voortgang en foutlog bewaard.')
+                raise CompanyResearchError(f'Bedrijfsproces faalde bij {kvk}; voortgang en foutlog bewaard.')
         finally:
             terminate(child)
     result_for(attempt, kvk)  # refuses a run that does not describe this company
@@ -291,6 +361,7 @@ def main():
         stop = threading.Event()
         running = {}  # kvk -> (future, identity)
         planning = Planning()
+        retries = CompanyRetries()
         initialized = False
         with ThreadPoolExecutor(WORKERS) as pool:
             while True:
@@ -304,14 +375,7 @@ def main():
                         time.sleep(POLL_SECONDS)
                         continue
                     stop.clear()
-                    failure = None
-                    for kvk, (future, _identity) in list(running.items()):
-                        if future.done():
-                            del running[kvk]
-                            if future.exception() is not None:
-                                failure = failure or future.exception()
-                    if failure is not None:
-                        raise failure
+                    collect_finished(running, retries)
                     if not running:
                         # Results finished before finds were imported are written first.
                         for checkpoint in QUEUE.glob('*/completed.json'):
@@ -319,16 +383,21 @@ def main():
                                 import_completed(checkpoint)
                     free = WORKERS - len(running)
                     if free:
-                        for identity in planning.take(free, running):
+                        for identity in planning.take(free, running, retries.waiting()):
                             kvk = str(identity['kvk_nummer'])
                             running[kvk] = (pool.submit(research, identity, stop), identity)
                     if not running:
                         # Nothing open in the active and the next locations: stay on and look again later.
-                        report('robot', 'Planning en volgende gebieden onderzocht; wacht op nieuw werk.')
-                        time.sleep(IDLE_SECONDS)
+                        message = (f'{len(retries.pending)} bedrijfsprocessen wachten op een nieuwe poging; robot blijft aan.'
+                                   if retries.pending else 'Planning en volgende gebieden onderzocht; wacht op nieuw werk.')
+                        report('robot', message)
+                        time.sleep(POLL_SECONDS if retries.pending else IDLE_SECONDS)
                         continue
                     try:
-                        report('robot', status({kvk: identity for kvk, (_f, identity) in running.items()}),
+                        message = status({kvk: identity for kvk, (_f, identity) in running.items()})
+                        if retries.pending:
+                            message += f' · {len(retries.pending)} wachten op een nieuwe poging'
+                        report('robot', message[:1200],
                                next(iter(running)))
                     except Exception as error:
                         if not transient_control_failure(error):
