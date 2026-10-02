@@ -95,3 +95,24 @@ test('toekomst service cards omit the numbered badges', () => {
  assert.doesNotMatch(html,/class="choice-number"/);
  assert.equal((html.match(/class="choice"/g)||[]).length,5);
 });
+
+test('toekomst mobile header hides login and uses a compact contact button', () => {
+ const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
+ const mobile=css.slice(css.indexOf('/* Mobile chooser:'));
+ assert.match(mobile,/^\/\*[^]*?@media\(max-width:760px\)\{/);
+ assert.match(mobile,/\.toekomst-ai \.login-menu\{display:none\}/);
+ assert.match(mobile,/\.toekomst-ai \.contact-menu \.contact\{min-height:36px;min-width:94px;/);
+ assert.match(mobile,/\.toekomst-ai \.contact-menu \.contact-chevron\{width:22px;height:22px\}/);
+});
+
+test('toekomst mobile features the first website card and shortens the meeting banner', () => {
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
+ const mobile=css.slice(css.indexOf('/* Mobile chooser:'));
+ const choices=Array.from(html.matchAll(/<a class="choice" href="([^"]+)"/g),m=>m[1]);
+ assert.deepEqual(choices,['/nieuwe-website','/bedrijfssoftware','/voicesoftware','/chatbot-login','/seo-login']);
+ assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
+ assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
+ assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
+ assert.match(html,/ai-medewerker\.css\?v=mobile-chooser-20261002/);
+});
