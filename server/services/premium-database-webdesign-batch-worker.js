@@ -1,7 +1,18 @@
 const { randomUUID } = require('crypto');
+const { OWNER_KEY } = require('./nightly-mail-stock');
 
 const WEBDESIGN_BULK_WORKER_LOCK_KEY = 'premium-webdesign-bulk-worker';
 const WEBDESIGN_BULK_WORKER_LEASE_TTL_SECONDS = 900;
+
+function resolveWorkerConcurrency(batch, options = {}, { bulkWorkerConcurrency = 2, processingConcurrency = 6 } = {}) {
+  const limit = batch?.ownerKey === OWNER_KEY ? Math.min(4, processingConcurrency) : bulkWorkerConcurrency;
+  return Math.max(1, Math.min(limit, Math.floor(Number(options.concurrency) || limit)));
+}
+
+function resolveWorkerJobLimit(batch, options, concurrency, bulkWorkerJobLimit) {
+  const limit = batch?.ownerKey === OWNER_KEY ? concurrency : Math.min(concurrency, bulkWorkerJobLimit);
+  return Math.max(1, Math.min(limit, Math.floor(Number(options.jobLimit) || limit)));
+}
 
 function createEmptyWorkerResult(patch = {}) {
   return {
@@ -31,6 +42,8 @@ async function runPremiumDatabaseWebdesignBatchWorker(options = {}, deps = {}) {
     processBatchJobsForWorker,
     serializeBatch,
     bulkWorkerBatchLimit,
+    bulkWorkerConcurrency = 2,
+    processingConcurrency = 6,
     nightlyMailStockService,
   } = deps;
 
@@ -49,6 +62,7 @@ async function runPremiumDatabaseWebdesignBatchWorker(options = {}, deps = {}) {
     );
   }
 
+  const invocationStartedAt = Date.now();
   const lockToken = randomUUID();
   let lease;
   try {
@@ -91,8 +105,11 @@ async function runPremiumDatabaseWebdesignBatchWorker(options = {}, deps = {}) {
     }
 
     const result = createEmptyWorkerResult(nightlyStock ? { nightlyStock } : {});
+    // A job can take 600 seconds. Never start another wave in an 800s function.
     for (const batch of runnableBatches) {
+      if (result.batchCount || Date.now() - invocationStartedAt > 100000) break;
       if (!batch || !batch.id || !batch.ownerKey) continue;
+      if (batch.ownerKey === OWNER_KEY && ['disabled', 'budget_exhausted', 'stock_check_unavailable'].includes(nightlyStock?.reason)) continue;
       const chunksResult = await loadBatchChunks(batch.ownerKey, batch.id);
       if (chunksResult.error) continue;
       const drivenBefore = await driveBatch(batch, chunksResult.chunks || []);
@@ -102,7 +119,9 @@ async function runPremiumDatabaseWebdesignBatchWorker(options = {}, deps = {}) {
           drivenBefore.storageError.error
         );
       }
-      const workerResult = await processBatchJobsForWorker(drivenBefore.batch, drivenBefore.chunks, options);
+      const concurrency = resolveWorkerConcurrency(batch, options, { bulkWorkerConcurrency, processingConcurrency });
+      const waveOptions = { ...options, concurrency, jobLimit: Math.min(concurrency, Math.max(1, Number(options.jobLimit) || concurrency)) };
+      const workerResult = await processBatchJobsForWorker(drivenBefore.batch, drivenBefore.chunks, waveOptions);
       if (workerResult.storageError) {
         return createBatchStorageUnavailableResult(
           workerResult.storageError.action || 'batch-worker opslaan',
@@ -159,6 +178,7 @@ async function sendMailStockStatusResponse(res, nightlyMailStockService) {
 }
 
 module.exports = {
+  resolveWorkerConcurrency, resolveWorkerJobLimit,
   WEBDESIGN_BULK_WORKER_LEASE_TTL_SECONDS,
   WEBDESIGN_BULK_WORKER_LOCK_KEY,
   runPremiumDatabaseWebdesignBatchWorker,
