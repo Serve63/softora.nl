@@ -61,7 +61,7 @@ test('iedere publieke vaste pagina houdt meetbaar contact via widget of explicie
       siteOrigin: 'https://www.softora.nl',
     });
 
-    const verify = ['/bedrijfssoftware-op-maat', '/chatbot-laten-maken'].includes(entry.path)
+    const verify = ['/bedrijfssoftware-op-maat', '/chatbot-laten-maken', '/contact'].includes(entry.path)
       ? assertHasHeaderContact : assertHasOneSitewideWidget;
     verify(once, entry.path);
     verify(twice, entry.path);
