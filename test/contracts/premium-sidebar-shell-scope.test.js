@@ -43,6 +43,16 @@ test('Extra-modules keren buiten hun inhoudsframe terug naar de volledige instel
   }
 });
 
+test('opdrachten verwijderen het persoonlijke filter uit de hoofdinhoud en behouden de sidebar', () => {
+  const page = readRepoFile('premium-actieve-opdrachten.html');
+  const sidebar = page.match(/<aside\b[\s\S]*?<\/aside>/)?.[0] || '';
+  const main = page.match(/<main\b[\s\S]*?<\/main>/)?.[0] || '';
+  assert.match(sidebar, /data-sidebar-user-name/);
+  assert.match(sidebar, /data-sidebar-key="active_orders"/);
+  assert.match(main, /id="createOrderBtn"/);
+  assert.doesNotMatch(main, /onlyMyAssignmentsToggle|personal-assignment-toggle/);
+});
+
 test('sidebarbestemmingen houden pagina-inhoud zichtbaar na boot en bij late data', () => {
   const sections = {
     'premium-personeel-dashboard.html': ['kpi-card', 'panel', 'dashboard-ai-management-status-panel', 'chart-bar'],

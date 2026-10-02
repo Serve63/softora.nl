@@ -1071,7 +1071,6 @@ function applyOrderUiStateToCard(id) {
     const barEl = document.getElementById(`bar-${id}`);
     const btnEl = document.getElementById(`btn-${id}`);
     const completeBtnEl = document.getElementById(`complete-btn-${id}`);
-    const assigneeEl = document.getElementById(`assignee-${id}`);
     const ui = resolveOrderUiState(order);
     const pct = ui.pct;
     const status = ui.status;
@@ -1123,10 +1122,6 @@ function applyOrderUiStateToCard(id) {
             btnEl.classList.remove('claimed');
         }
         setOpenDossierButtonContent(btnEl);
-    }
-
-    if (assigneeEl) {
-        assigneeEl.textContent = claimInfo.by || 'Nog niet geclaimd';
     }
 
     if (completeBtnEl) {
@@ -1254,10 +1249,7 @@ function createCustomOrderCardElement(record) {
     const isDelivered = ui.isBuilt;
     const isPaid = ui.isPaid;
     const clientLine = [record.clientName, record.location].filter(Boolean).join(' — ');
-    const claimInfo = getOrderClaimInfo(id);
-    const deliveryTime = String(record.deliveryTime || '').trim();
     const amountText = Math.max(1, Math.round(Number(record.amount) || 0)).toLocaleString('nl-NL');
-    const deliveryLabel = deliveryTime || 'Nog niet opgegeven';
     const title = String(record.title || 'Opdracht').trim() || 'Opdracht';
     const description = String(record.description || 'Geen extra omschrijving.').trim() || 'Geen extra omschrijving.';
 
@@ -1281,12 +1273,6 @@ function createCustomOrderCardElement(record) {
     appendTextElement(info, 'div', 'order-client', clientLine || 'Nieuwe opdracht');
     appendTextElement(info, 'div', 'order-title', title);
     appendTextElement(info, 'div', 'order-desc', description);
-
-    const delivery = document.createElement('div');
-    delivery.className = 'order-delivery';
-    appendTextElement(delivery, 'strong', '', 'Oplevertijd');
-    delivery.appendChild(document.createTextNode(deliveryLabel));
-    info.appendChild(delivery);
 
     const price = document.createElement('div');
     price.className = 'order-price';
@@ -1316,9 +1302,6 @@ function createCustomOrderCardElement(record) {
         completeBtn.textContent = 'Factuur betaald';
         actions.appendChild(completeBtn);
     }
-
-    const assignee = appendTextElement(actions, 'div', 'order-assignee', claimInfo.by || 'Nog niet geclaimd');
-    assignee.id = `assignee-${id}`;
 
     main.append(info, price, actions);
     card.appendChild(main);

@@ -284,11 +284,11 @@ test('Dashboard and Opdrachten load readiness checks before releasing their boot
   assert.match(dashboard, /id="aiManagementConfigSave"/);
   assert.match(dashboardCore, /if \(!isPremiumDashboardScreenReadyForRelease\(\)\) return false;/);
   assert.match(ordersPage, /premium-screen-readiness\.js\?v=20260923a/);
-  assert.match(ordersPage, /premium-active-orders-readiness\.js\?v=20260922b/);
+  assert.match(ordersPage, /premium-active-orders-readiness\.js\?v=20261002a/);
   assert.match(orders, /remoteUiStateLoaded === true\);/);
   assert.match(ordersBoot, /readiness\.publish\(\{ dataComplete: dataComplete === true \}\)/);
   assert.match(ordersReadiness, /await readiness\.markReady\(/);
-  assert.match(ordersReadiness, /requiredActions: \['#createOrderBtn', '#onlyMyAssignmentsToggle', '\.orders-filter-bar', '#ordersGrid'\]/);
+  assert.match(ordersReadiness, /requiredActions: \['#createOrderBtn', '\.orders-filter-bar', '#ordersGrid'\]/);
   assert.match(ordersReadiness, /softoraOrdersActionsBound === 'true'/);
   assert.match(orders, /dataset\.softoraOrdersActionsBound = 'true';/);
   assert.match(ordersBoot, /readiness\.status === 'loading'\) return false/);
