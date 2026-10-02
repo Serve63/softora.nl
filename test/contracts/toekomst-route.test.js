@@ -115,7 +115,7 @@ test('toekomst mobile features the first website card and shortens the meeting b
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
  assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
- assert.match(html,/ai-medewerker\.css\?v=articles-footer-20261002/);
+ assert.match(html,/ai-medewerker\.css\?v=personnel-footer-20261002/);
 });
 
 test('toekomst footer uses a quiet centered article link with a direct blog destination', () => {
@@ -128,4 +128,7 @@ test('toekomst footer uses a quiet centered article link with a direct blog dest
  assert.match(css,/@media\(max-width:760px\)\{\s*\.toekomst-ai footer\{grid-template-columns:minmax\(0,1fr\);justify-items:center;/);
  assert.match(css,/\.toekomst-ai \.articles-link\{grid-row:1\}/);
  assert.match(css,/\.toekomst-ai \.footer-copyright\{grid-row:2\}/);
+ assert.match(footer,/<a class="footer-personnel" href="\/premium-personeel-login">Personeel<\/a>/);
+ assert.ok(fs.existsSync(path.join(root,'premium-personeel-login.html')));
+ assert.match(css,/\.toekomst-ai \.footer-personnel\{display:none\}/);
 });
