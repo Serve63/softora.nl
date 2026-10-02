@@ -537,14 +537,14 @@ test('seo content article pages render Article schema and self canonicals', () =
   assert.match(html, /"articleSection":"AI automatisering"/);
   assert.match(html, /"image":\[\{"@type":"ImageObject","contentUrl":"https:\/\/www\.softora\.nl\/assets\/seo-content\/ai-automatisering-workflow-softora\.jpg"/);
   assert.match(html, /"wordCount":\d{3,}/);
-  assert.match(html, /"author":\{"@type":"Organization","name":"Softora"/);
+  assert.match(html, /"author":\{"@type":"Person","name":"Martijn van de Ven"/);
   assert.doesNotMatch(html, /"reviewedBy"/);
   assert.match(html, /"@type":"FAQPage"/);
   assert.match(html, /Wanneer is AI automatisering voor het MKB interessant voor mijn bedrijf\?/);
   assert.doesNotMatch(html, /Wanneer is AI automatisering voor het MKB: waar begin je\? interessant/);
   assert.match(html, /data-softora-public-seo="eeat"/);
   assert.match(html, /data-softora-public-seo="faq"/);
-  assert.match(html, />Softora<\/span>/);
+  assert.match(html, /data-softora-public-seo="article-author">Martijn van de Ven<\/span>/);
   assert.match(html, /<figure class="artikel-img">/);
   assert.match(
     html,
@@ -1062,7 +1062,8 @@ test('seo content bewaakt unieke slugs, clusters en interne links', () => {
     } else {
       assert.ok(item.wordCount >= getSeoContentMinimumWordCount(item), `${item.slug} verliest bestaande inhoud.`);
     }
-    assert.ok(item.author && item.author.name === 'Softora', `${item.slug} mist auteur.`);
+    const names = ['blog', 'kennisbank'].includes(item.collection) ? ['Martijn van de Ven', 'Servé Creusen'] : ['Softora'];
+    assert.ok(item.author && names.includes(item.author.name), `${item.slug} mist auteur.`);
     assert.equal(item.reviewedBy, undefined, `${item.slug} krijgt geen verzonnen review.`);
     assert.ok(Array.isArray(item.faq), `${item.slug} mist een geldige FAQ-collectie.`);
     if (Number(item.qualityVersion) < 2) {

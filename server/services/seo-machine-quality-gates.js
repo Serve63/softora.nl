@@ -12,6 +12,7 @@ const DEFAULT_COMMERCIAL_TARGETS = Object.freeze([
 
 const { auditKeywordEvidence } = require('./seo-machine-keyword-evidence');
 const { hasSupportedReview } = require('./seo-content-attribution');
+const { excludeAssignedArticleAuthorFromClaims } = require('./seo-content-article-authors');
 
 const DEFAULT_MONEY_PAGE_INCOMING_REQUIREMENTS = Object.freeze({
   '/diensten': 8,
@@ -81,7 +82,7 @@ const DEFAULT_UNSUPPORTED_CLAIM_RULES = Object.freeze([
   Object.freeze({
     type: 'frontstage-private-founder-name',
     pattern: /\bServ[eé]\s+Creusen\b/i,
-    message: 'noemt Servé Creusen in publieke SEO-content terwijl de voorkant op Martijn/Softora moet leunen.',
+    message: 'noemt Servé Creusen buiten een vastgelegde auteurvermelding in publieke SEO-content.',
   }),
 ]);
 
@@ -401,7 +402,7 @@ function auditClaimSafety({ items = [], pages = [], rules = DEFAULT_UNSUPPORTED_
   for (const page of Array.isArray(pages) ? pages : []) {
     issues.push(
       ...auditTextClaimSafety({
-        textRaw: page.html || page.text || '',
+        textRaw: excludeAssignedArticleAuthorFromClaims(page.html || page.text || '', page.path),
         pathName: page.path,
         rules,
       })

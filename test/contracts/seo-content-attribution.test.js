@@ -3,13 +3,20 @@ const assert = require('node:assert/strict');
 const { SEO_CONTENT_AUTHOR, hasSupportedReview, buildReviewSchema } = require('../../server/services/seo-content-attribution');
 const { enrichSeoContentItem, getSeoContentItem, buildSeoContentArticleHtml } = require('../../server/services/seo-content');
 
-test('default content attribution identifies Softora without inventing a human writer or reviewer', () => {
+test('article attribution uses the assigned person without inventing an editorial review', () => {
   const item = getSeoContentItem('blog', 'ai-automatisering-mkb-waar-beginnen');
   const html = buildSeoContentArticleHtml(item);
-  assert.deepEqual(item.author, SEO_CONTENT_AUTHOR);
+  assert.equal(item.author.type, 'Person');
+  assert.equal(item.author.name, 'Martijn van de Ven');
   assert.equal(item.reviewedBy, undefined);
-  assert.match(html, /"author":\{"@type":"Organization","name":"Softora"/);
+  assert.match(html, /"author":\{"@type":"Person","name":"Martijn van de Ven"/);
   assert.doesNotMatch(html, /"reviewedBy"|"lastReviewed"|Inhoudelijk gecontroleerd door/);
+});
+
+test('service and location content keeps Softora as its default author', () => {
+  const item = enrichSeoContentItem({ collection: 'regio', slug: 'region-fixture', qualityVersion: 2,
+    title: 'Regional service', sections: [] });
+  assert.deepEqual(item.author, SEO_CONTENT_AUTHOR);
 });
 
 test('a supported human review is explicit, current, visible and on WebPage schema', () => {

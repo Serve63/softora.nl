@@ -957,6 +957,12 @@ test('SEO experience and attribution changes preserve publication, source and co
   assert.match(quality, /missing-content-sources/);
   assert.match(quality, /missing-contextual-money-link/);
   assert.match(quality, /lead-cta-not-whatsapp/);
+  assert.match(quality, /excludeAssignedArticleAuthorFromClaims/);
+  assert.match(quality, /frontstage-private-founder-name/);
+  const authors = readRepoFile('server/services/seo-content-article-authors.js');
+  assert.match(authors, /ARTICLE_AUTHOR_ASSIGNMENTS\[slug\]/);
+  assert.match(authors, /text\.trim\(\) === author\.name/);
+  assert.match(authors, /node\.author\.name === author\.name/);
 });
 
 test('agent rules keep the instant-screen standard for personnel pages', () => {
