@@ -11,6 +11,8 @@ const routes = {
   '/seo-login': '/assets/seo-login/index.html',
   '/chatbot': '/assets/chatbot-landing/index.html',
   '/chatbot-login': '/assets/chatbot-login/index.html',
+  '/voicesoftware': '/assets/voicesoftware/index.html',
+  '/bedrijfssoftware': '/bedrijfssoftware.html',
 };
 const contentTypes = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -31,7 +33,8 @@ function createPreviewServer() {
       const pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
       const target = routes[pathname] || pathname;
       const file = path.resolve(root, '.' + target);
-      if (!target.startsWith('/assets/') || target.split('/').some((part) => part.startsWith('.')) || !file.startsWith(path.join(root, 'assets') + path.sep)) throw new Error('Unavailable preview path');
+      const isBusinessLanding = pathname === '/bedrijfssoftware' && file === path.join(root, 'bedrijfssoftware.html');
+      if (!isBusinessLanding && (!target.startsWith('/assets/') || target.split('/').some((part) => part.startsWith('.')) || !file.startsWith(path.join(root, 'assets') + path.sep))) throw new Error('Unavailable preview path');
       const type = contentTypes[path.extname(file).toLowerCase()];
       if (!type) throw new Error('Unavailable preview type');
       const contents = await fs.readFile(file);

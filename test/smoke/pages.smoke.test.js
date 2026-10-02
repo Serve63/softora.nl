@@ -135,7 +135,8 @@ test('page smoke: /bedrijfssoftware is de publieke noindex overtuigingspagina', 
 
   assert.equal(pageResponse.status, 200);
   assert.equal(pageResponse.headers.get('x-robots-tag'), 'noindex, nofollow');
-  assert.match(html, /Bedrijfssoftware op maat die <em>voor je werkt\.<\/em>/);
+  assert.match(html, /Grip op je werk\.<br>Ruimte voor<br>/);
+  assert.match(html, /professional-services\.js/);
   assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
   assert.doesNotMatch(html, /rel="canonical"/);
   assert.doesNotMatch(html, /data-softora-structured-data/);

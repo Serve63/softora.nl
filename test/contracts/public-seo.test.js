@@ -615,18 +615,19 @@ test('money pages verwerken actuele GSC-zoeksignalen in normale content', () => 
 test('bedrijfssoftware overtuigingspagina maakt het knelpunt en de eerste oplossing concreet', () => {
   const source = fs.readFileSync(path.join(root, 'bedrijfssoftware.html'), 'utf8');
 
-  assert.match(source, /<title>Bedrijfssoftware die voor je werkt \| Softora<\/title>/);
-  assert.match(source, /<meta name="robots" content="noindex, follow">/);
-  assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware">/);
-  assert.match(source, /administratieve taken en repetitieve taken/);
-  assert.match(source, /tijd krijgt voor wat echt telt/);
-  assert.match(source, /Je schakelt steeds tussen verschillende systemen/);
-  assert.match(source, /We bepalen waar tijd verloren gaat of fouten ontstaan/);
-  assert.match(source, /bouwen daarvoor een eerste werkende oplossing/);
-  assert.match(source, /De mensen die ermee werken gebruiken de oplossing/);
-  assert.match(source, /We brengen je werkproces en systemen in kaart/);
-  assert.match(source, /We bepalen welke knelpunten er zijn/);
-  assert.match(source, /De oplossing wordt in de praktijk getest/);
+  assert.match(source, /<title>Bedrijfssoftware — Meer grip, minder gedoe \| Softora<\/title>/);
+  assert.match(source, /<meta name="robots" content="noindex, nofollow">/);
+  assert.doesNotMatch(source, /rel="canonical"|application\/ld\+json/);
+  assert.match(source, /Minder zoeken, overtypen en schakelen tussen losse systemen/);
+  assert.match(source, /de handeling die jouw team het meeste tijd kost/);
+  assert.match(source, /We brengen de handelingen, systemen en knelpunten in kaart/);
+  assert.match(source, /bouwen de belangrijkste stappen/);
+  assert.match(source, /Je team test de oplossing/);
+  assert.match(source, /Je werk begrijpen/);
+  assert.match(source, /Een gerichte eerste versie/);
+  assert.match(source, /In de praktijk verbeteren/);
+  assert.match(source, /href="\/bedrijfssoftware-op-maat"/);
+  assert.match(source, /data-softora-public-seo="internal-links"/);
 });
 
 test('voicesoftware page owns its internal links inside the page content', () => {
