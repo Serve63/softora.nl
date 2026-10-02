@@ -37,6 +37,9 @@ test('legal chooser links all three choices to public pages', () => {
   const css = read('assets/juridisch/legal.css');
   assert.match(css, /\.legal-card:is\(:hover,:focus-visible\) \.legal-visual img/);
   assert.match(css, /prefers-reduced-motion:\s*no-preference/);
+  const desktopIconWidth = Number(css.match(/\.legal-visual img \{[^}]*width:\s*min\(100%,\s*(\d+)px\)/)?.[1]);
+  assert.ok(desktopIconWidth > 0 && desktopIconWidth <= 180, 'Legal icons should remain secondary to their labels');
+  assert.match(read('assets/juridisch/index.html'), /legal\.css\?v=legal-icons-compact-/);
 });
 
 test('public company identifiers match Softora bookkeeping and omit its internal tax account number', () => {
