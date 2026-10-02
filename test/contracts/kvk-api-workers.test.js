@@ -19,7 +19,13 @@ test('API worker, evidence and recovery queue regressions pass without paid requ
     'test_installed_gate_accepts_rejected_format_variants_but_still_blocks_other_contacts',
     'test_controller_repair_opens_identity_sources_with_blank_main_fields_and_reuses_pages',
     'test_stop_during_inflight_write_clears_only_successful_recovery',
-    'test_cached_precheck_still_executes_validate_apply_and_checks_stop']) {
+    'test_cached_precheck_still_executes_validate_apply_and_checks_stop',
+    'test_main_keeps_running_after_a_company_timeout',
+    'test_a_hung_company_is_killed_without_a_completed_or_imported_result',
+    'test_retries_survive_restart_back_off_and_remain_eligible_after_repeated_failures',
+    'test_data_failures_still_propagate_instead_of_entering_the_retry_queue',
+    'test_finished_engine_does_not_leave_a_discovery_child_running',
+    'test_engine_cannot_enable_the_paid_identity_judge_from_an_inherited_setting']) {
     assert.match(result.stderr, new RegExp(`${regression}[^\\n]+ \\.\\.\\. ok`));
   }
 });
