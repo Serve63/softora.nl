@@ -711,9 +711,18 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
     vercelConfig.installCommand,
     'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.4 @img/sharp-linux-arm64@0.35.4 @img/sharp-libvips-linux-arm64@1.3.3'
   );
-  const standardIncludeFiles = '{*.html,assets/articles/*.html,assets/entry/toekomst.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/sharp-linux-x64/**,node_modules/@img/sharp-libvips-linux-x64/**,node_modules/@img/sharp-linux-arm64/**,node_modules/@img/sharp-libvips-linux-arm64/**}';
+  const standardIncludeFiles = '{*.html,assets/articles/*.html,assets/entry/toekomst.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/{sharp-linux-x64,sharp-libvips-linux-x64,sharp-linux-arm64,sharp-libvips-linux-arm64}/**}';
   const personalSiteIncludeFiles = '{*.html,assets/articles/*.html,assets/entry/toekomst.html,personal-sites/**,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/**}';
   Object.entries(vercelConfig.functions).forEach(([functionPath, functionConfig]) => {
+    assert.ok(functionConfig.includeFiles.length <= 256, functionPath + ': Vercel includeFiles schema limit');
+    for (const requiredFile of [
+      'assets/articles/article.html', 'assets/articles/overview.html', 'assets/entry/toekomst.html',
+      'assets/fonts/inter.woff2', 'assets/premium-sidebar-profile-prefill.js', 'node_modules/sharp/lib/index.js',
+      'node_modules/@img/sharp-linux-x64/lib/sharp-linux-x64.node',
+      'node_modules/@img/sharp-libvips-linux-x64/lib/libvips-cpp.so.8.17.0',
+      'node_modules/@img/sharp-linux-arm64/lib/sharp-linux-arm64.node',
+      'node_modules/@img/sharp-libvips-linux-arm64/lib/libvips-cpp.so.8.17.0',
+    ]) assert.ok(path.matchesGlob(requiredFile, functionConfig.includeFiles), functionPath + ': ' + requiredFile);
     assert.equal(
       functionConfig.includeFiles,
       ['api/[...path].js', 'api/index.js'].includes(functionPath)
