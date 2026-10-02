@@ -64,3 +64,23 @@
 @media(max-width:760px){.toekomst-ai .intro{padding-top:100px}}
 
 .toekomst-ai .choice{justify-content:flex-end}
+
+/* Mobile chooser: lead with the website and keep the introduction compact. */
+@media(max-width:760px){
+ .toekomst-ai .login-menu{display:none}
+ .toekomst-ai .contact-menu .contact{min-height:36px;min-width:94px;padding:6px 8px 6px 14px;gap:8px;font-size:10px}
+ .toekomst-ai .contact-menu .contact-chevron{width:22px;height:22px}
+ .toekomst-ai .choice:last-child{grid-column:auto;height:285px}
+ .toekomst-ai .choice:last-child .choice-photo{object-position:50% 64%}
+ .toekomst-ai .choice:last-child .choice-content{max-width:none}
+ .toekomst-ai .choice:last-child::before{background:linear-gradient(180deg,#160a181f 0%,#160a1800 25%,#21121d30 45%,#21121dde 85%,#21121df2 100%)}
+ .toekomst-ai .choice[href="/nieuwe-website"]{grid-column:1/-1;height:200px}
+ .toekomst-ai .choice[href="/nieuwe-website"] .choice-photo{object-position:50% 55%}
+ .toekomst-ai .choice[href="/nieuwe-website"] .choice-content{max-width:65%}
+ .toekomst-ai .choice[href="/nieuwe-website"]::before{background:linear-gradient(90deg,#21121dc9,#21121d25)}
+ .toekomst-ai .meet-softora{height:200px;min-height:0;padding:20px 22px;border-radius:12px}
+ .toekomst-ai .meet-label{margin-bottom:10px;font-size:8px;letter-spacing:1.4px}
+ .toekomst-ai .meet-heading h2{font-size:clamp(22px,6vw,28px);letter-spacing:-.4px}
+ .toekomst-ai .meet-link{margin-top:16px;padding:9px 14px;gap:20px;font-size:11px}
+ .toekomst-ai .meet-link svg{width:17px;height:17px}
+}
