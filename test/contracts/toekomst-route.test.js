@@ -115,5 +115,17 @@ test('toekomst mobile features the first website card and shortens the meeting b
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
  assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
- assert.match(html,/ai-medewerker\.css\?v=mobile-spacing-20261002/);
+ assert.match(html,/ai-medewerker\.css\?v=articles-footer-20261002/);
+});
+
+test('toekomst footer uses a quiet centered article link with a direct blog destination', () => {
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
+ const footer=html.match(/<footer>[^]*?<\/footer>/)?.[0] || '';
+ assert.match(footer,/<a class="articles-link" href="https:\/\/www\.softora\.nl\/blog"><span>Bekijk onze artikelen<\/span><svg[^>]*aria-hidden="true"/);
+ assert.doesNotMatch(footer,/Artikelen lezen|↗/);
+ assert.match(css,/\.toekomst-ai footer\{display:grid;grid-template-columns:minmax\(0,1fr\) auto minmax\(0,1fr\);/);
+ assert.match(css,/@media\(max-width:760px\)\{\s*\.toekomst-ai footer\{grid-template-columns:minmax\(0,1fr\);justify-items:center;/);
+ assert.match(css,/\.toekomst-ai \.articles-link\{grid-row:1\}/);
+ assert.match(css,/\.toekomst-ai \.footer-copyright\{grid-row:2\}/);
 });
