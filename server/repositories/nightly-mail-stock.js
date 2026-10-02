@@ -24,14 +24,15 @@ function createNightlyMailStockStore({ getSupabaseClient = () => null } = {}) {
     },
     async readPlan(batchId) {
       return result(client().from('softora_mail_stock_generations').select('customer_id,provider,customer,status,identity_keys')
-        .eq('batch_id', batchId).order('created_at', { ascending: true }));
+        .eq('batch_id', batchId).order('created_at', { ascending: true }).order('customer_id', { ascending: true }));
     },
     async readActiveJobs() {
-      const rows = await result(client().from('softora_webdesign_jobs').select('customer_id,payload')
+      const rows = await result(client().from('softora_webdesign_jobs').select('customer_id,payload,created_at')
         .in('status', ['queued', 'running']).limit(5000));
       if (!Array.isArray(rows) || rows.length >= 5000) throw new Error('Actieve ontwerpvoorraad niet volledig leesbaar.');
-      return rows;
+      return rows.filter((row) => row.payload?.kind === 'bulk_webdesign_chunk' || Date.now() - Date.parse(row.created_at) <= 6 * 60 * 60000);
     },
+    reconcile() { return rpc('softora_mail_stock_reconcile', {}); },
     allocate(customer, provider, identityKeys, batchId) {
       return rpc('softora_mail_stock_allocate', { p_customer: customer, p_provider: provider, p_keys: identityKeys, p_batch_id: batchId });
     },

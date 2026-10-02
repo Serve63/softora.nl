@@ -91,13 +91,43 @@ function createNightlyMailStockService({ store, dataOpsStore, snapshotService, n
         inventory(await readInventory(true), await store.readActiveJobs())) } : {}),
     };
   }
+  async function materializePlan(planned, batchId) {
+    const existing = await dataOpsStore.getWebdesignBatch(OWNER_KEY, batchId);
+    const chunks = await dataOpsStore.listWebdesignBatchChunks(OWNER_KEY, batchId);
+    if (!Array.isArray(chunks)) throw new Error('Aanvulblokken niet volledig leesbaar.');
+    const included = new Set(chunks.flatMap((chunk) => chunk.targets.map((target) => target.customer.id)));
+    const missing = planned.filter((row) => ['planned', 'reserved'].includes(row.status) && !included.has(row.customer.id));
+    let total = chunks.reduce((sum, chunk) => sum + chunk.targets.length, 0);
+    let index = chunks.reduce((max, chunk) => Math.max(max, chunk.index + 1), 0);
+    const createdAt = existing?.createdAt || now();
+    for (let start = 0; start < missing.length; start += 100) {
+      const targets = missing.slice(start, start + 100).map((row, offset) => ({
+        index: total + offset, status: 'pending', customer: { ...row.customer, webdesignMailProvider: row.provider },
+        websiteUrl: row.customer.website || row.customer.dom, variant: 'v2-visual-dna', updatedAt: now(),
+      }));
+      const saved = await dataOpsStore.upsertWebdesignBatchChunk({ ownerKey: OWNER_KEY, batchId, index, status: 'queued', createdAt, targets });
+      if (saved?.ok !== true) throw new Error('Aanvulblok niet veilig opgeslagen.');
+      total += targets.length; index++;
+    }
+    if (total && (!existing || missing.length || total !== existing.total)) {
+      const saved = await dataOpsStore.upsertWebdesignBatch({ ...existing, id: batchId, ownerKey: OWNER_KEY, status: 'running',
+        total, expectedChunks: index, uploadedTargets: total, createdAt, startedAt: existing?.startedAt || now(),
+        finishedAt: null, summary: {}, lastError: '' });
+      if (saved?.ok !== true) throw new Error('Aanvulbatch niet veilig opgeslagen.');
+    }
+  }
   async function runDueCheck() {
     const { day, hour } = localNight(now());
-    if (hour !== 0) return { skipped: true, reason: 'outside_midnight_hour' };
     try {
       const control = await store.readControl();
       if (!control.enabled) return { skipped: true, reason: 'disabled' };
-      if (control.last_check_day === day) return { skipped: true, reason: 'already_checked', day };
+      if (control.last_check_day !== day && hour !== 0) return { skipped: true, reason: 'outside_midnight_hour' };
+      if (control.last_check_day === day && control.last_result?.status === 'complete') return { skipped: true, reason: 'already_checked', day };
+      const lastCheckAt = Date.parse(control.last_result?.checkedAt || '');
+      if (control.last_check_day === day && now() - lastCheckAt < 5 * 60000) return { skipped: true, reason: 'check_cooldown', day };
+      if (Number(control.charged_cents) + Number(control.held_cents) + 1000 > Number(control.approved_cents)) return { skipped: true, reason: 'budget_exhausted' };
+      await store.reconcile();
+      accountingUncertain = false;
       const snapshot = await readInventory(true);
       const stock = inventory(snapshot, await store.readActiveJobs());
       const targets = { softora: control.softora_target, instantly: control.instantly_target };
@@ -105,7 +135,7 @@ function createNightlyMailStockService({ store, dataOpsStore, snapshotService, n
       const batchId = `mail_stock_${day.replace(/-/g, '')}`;
       let planned = await store.readPlan(batchId);
       if (!Array.isArray(planned)) throw new Error('Nachtelijk aanvulplan niet leesbaar.');
-      for (const row of planned) {
+      for (const row of planned.filter((row) => row.status === 'planned' || row.status === 'reserved')) {
         if (addUnique(row.customer, stock.used)) deficit[row.provider] = Math.max(0, deficit[row.provider] - 1);
       }
       const added = { softora: 0, instantly: 0 };
@@ -120,25 +150,10 @@ function createNightlyMailStockService({ store, dataOpsStore, snapshotService, n
         deficit[provider] -= 1; added[provider] += 1;
       }
       planned = await store.readPlan(batchId);
-      const existing = await dataOpsStore.getWebdesignBatch(OWNER_KEY, batchId);
-      if (planned.length && !existing) {
-        const createdAt = now();
-        for (let start = 0; start < planned.length; start += 100) {
-          const index = Math.floor(start / 100);
-          const chunk = { ownerKey: OWNER_KEY, batchId, index, status: 'queued', createdAt,
-            targets: planned.slice(start, start + 100).map((row, offset) => ({
-              index: start + offset, status: 'pending', customer: { ...row.customer, webdesignMailProvider: row.provider },
-              websiteUrl: row.customer.website || row.customer.dom, variant: 'v2-visual-dna', updatedAt: createdAt,
-            })) };
-          if ((await dataOpsStore.upsertWebdesignBatchChunk(chunk))?.ok !== true) throw new Error('Aanvulblok niet veilig opgeslagen.');
-        }
-        const saved = await dataOpsStore.upsertWebdesignBatch({ id: batchId, ownerKey: OWNER_KEY, status: 'running',
-          total: planned.length, expectedChunks: Math.ceil(planned.length / 100), uploadedTargets: planned.length,
-          createdAt, startedAt: createdAt, summary: {}, lastError: '' });
-        if (saved?.ok !== true) throw new Error('Aanvulbatch niet veilig opgeslagen.');
-      }
+      await materializePlan(planned, batchId);
       const summary = { day, checkedAt: new Date(now()).toISOString(), ready: stock.ready, pending: stock.pending,
         added, missing: deficit, planned: planned.length, batchId: planned.length ? batchId : null };
+      summary.status = Object.keys(targets).every((provider) => stock.ready[provider] >= targets[provider]) ? 'complete' : 'replenishing';
       await store.recordCheck(day, summary);
       logger.info?.('[NightlyMailStock][check]', summary);
       return { ok: true, ...summary };
@@ -147,29 +162,34 @@ function createNightlyMailStockService({ store, dataOpsStore, snapshotService, n
       return { ok: false, reason: 'stock_check_unavailable' };
     }
   }
-  async function generate(job, generateImage) {
+  async function generate(job, generateImage, markPaidAttempt = async () => {}) {
     if (accountingUncertain) throw halted('Automatische aanvulling wacht op zekere kostenafrekening.');
     if (!/^gpt-image-2\.5-(sunburst|flare)(-\d{4}-\d{2}-\d{2})?$/.test(imageModel)) throw halted('Automatische aanvulling heeft geen gecontroleerd beeldtarief.');
-    // Recheck availability and guards before reserving money, never count raw photos.
-    const snapshot = await readInventory(true);
-    const current = snapshot.availableCustomers.find((row) => row.id === job.customer.id);
-    const provider = providerOf(job.customer);
-    const control = await store.readControl();
-    const stock = inventory(snapshot);
-    if (!current || (fixedProvider(current) && fixedProvider(current) !== provider) || stock.ready[provider] >= control[`${provider}_target`]) throw halted('Aanvulling niet meer nodig of bedrijf niet meer beschikbaar.');
-    const keys = buildGuardKeysForRow(current);
-    const blocked = await dataOpsStore.listOutboundRecipientGuardKeys(keys, {
-      bypassReadFailureCooldown: true, suppressReadFailureCooldown: true,
-    });
-    if (!Array.isArray(blocked) || blocked.length) throw halted('Verzendbeveiliging blokkeert deze automatische aanvulling.');
-    const reservation = await store.reserve(job.customer.id, job.id, stock.readyIds[provider]);
-    if (reservation.reserved !== true) throw halted('Automatische aanvulling gestopt door budget- of herhaalbeveiliging.');
-    let payload, paidRequestStarted = false;
-    const beforeImageRequest = async (request) => { await assertApprovedImageRequest(request); paidRequestStarted = true; };
-    try { payload = await generateImage(beforeImageRequest); }
-    catch (error) {
-      if (paidRequestStarted) accountingUncertain = true;
-      await store.settle(job.customer.id, job.id, paidRequestStarted ? null : 0, null).catch(() => {});
+    let payload, reserved = false, paidRequestStarted = false;
+    const beforeImageRequest = async (request) => {
+      await assertApprovedImageRequest(request);
+      // Preparation is unpaid. Reserve durably only at the actual provider boundary.
+      const snapshot = await readInventory(true);
+      const current = snapshot.availableCustomers.find((row) => row.id === job.customer.id);
+      const provider = providerOf(job.customer);
+      const control = await store.readControl();
+      const stock = inventory(snapshot);
+      if (!current || (fixedProvider(current) && fixedProvider(current) !== provider) || stock.ready[provider] >= control[`${provider}_target`]) throw halted('Aanvulling niet meer nodig of bedrijf niet meer beschikbaar.');
+      const keys = buildGuardKeysForRow(current);
+      const blocked = await dataOpsStore.listOutboundRecipientGuardKeys(keys, { bypassReadFailureCooldown: true, suppressReadFailureCooldown: true });
+      if (!Array.isArray(blocked) || blocked.length) throw halted('Verzendbeveiliging blokkeert deze automatische aanvulling.');
+      const reservation = await store.reserve(job.customer.id, job.id, stock.readyIds[provider]);
+      if (reservation.reserved !== true) throw halted('Automatische aanvulling gestopt door budget- of herhaalbeveiliging.');
+      reserved = true;
+      await markPaidAttempt();
+      paidRequestStarted = true;
+      logger.info?.('[NightlyMailStock][provider-start]', { jobId: job.id, customerId: job.customer.id });
+    };
+    try {
+      payload = await generateImage(beforeImageRequest);
+      if (!paidRequestStarted) throw halted('Beeldgenerator heeft de budgetcontrole niet uitgevoerd.');
+    } catch (error) {
+      if (reserved) await store.settle(job.customer.id, job.id, paidRequestStarted ? null : 0, null).catch(() => { accountingUncertain = true; });
       error.noAutomaticWebdesignRetry = true;
       throw error;
     }

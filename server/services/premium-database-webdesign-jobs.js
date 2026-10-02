@@ -1,7 +1,7 @@
 const { deliverWebdesignImage, createWebdesignDeliveryInterruptedError } = require('./premium-database-webdesign-delivery');
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 const { randomUUID } = require('crypto');
-const { runPremiumDatabaseWebdesignBatchWorker, sendBatchWorkerResponse, sendMailStockStatusResponse } = require('./premium-database-webdesign-batch-worker');
+const { runPremiumDatabaseWebdesignBatchWorker, sendBatchWorkerResponse, sendMailStockStatusResponse, resolveWorkerConcurrency, resolveWorkerJobLimit } = require('./premium-database-webdesign-batch-worker');
 const { buildWebdesignGenerationProvenance, normalizeWebdesignVariant } = require('./design-photo-generation-policy');
 const { assignWebdesignOwner } = require('./webdesign-owner-assignment');
 const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
@@ -2109,8 +2109,8 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
   async function processBatchJobsForWorker(batch, chunks, options = {}) {
     const changed = new Set();
-    const jobLimit = Math.max(1, Math.min(BULK_WORKER_JOB_LIMIT, Math.floor(Number(options.jobLimit) || BULK_WORKER_JOB_LIMIT)));
-    const concurrency = Math.max(1, Math.min(BULK_WORKER_CONCURRENCY, Math.floor(Number(options.concurrency) || BULK_WORKER_CONCURRENCY)));
+    const concurrency = resolveWorkerConcurrency(batch, options, { bulkWorkerConcurrency: BULK_WORKER_CONCURRENCY, processingConcurrency: PROCESSING_CONCURRENCY });
+    const jobLimit = resolveWorkerJobLimit(batch, options, concurrency, BULK_WORKER_JOB_LIMIT);
     const candidates = [];
     let loadedJobs = 0;
     let missingJobs = 0;
@@ -2377,7 +2377,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       driveBatch,
       processBatchJobsForWorker,
       serializeBatch,
-      bulkWorkerBatchLimit: BULK_WORKER_BATCH_LIMIT,
+      bulkWorkerBatchLimit: BULK_WORKER_BATCH_LIMIT, bulkWorkerConcurrency: BULK_WORKER_CONCURRENCY, processingConcurrency: PROCESSING_CONCURRENCY,
     });
   }
 

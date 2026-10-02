@@ -37,18 +37,20 @@ function fixture(stock, time = '2026-10-01T22:00:00Z') {
   const plans = [], batches = [], chunks = [];
   const store = {
     readControl: async () => control, readActiveJobs: async () => [], readPlan: async () => plans,
-    allocate: async (row, provider, keys) => { plans.push({ customer: row, provider, identity_keys: keys }); return { allocated: true }; },
+    reconcile: async () => ({ ok: true }),
+    allocate: async (row, provider, keys) => { if (plans.some(p => p.customer.id === row.id)) return { allocated: false }; plans.push({ customer: row, provider, identity_keys: keys, status: 'planned' }); return { allocated: true }; },
     recordCheck: async (day, result) => { control.last_check_day = day; control.last_result = result; },
     reserve: async () => ({ reserved: true }), settle: async () => ({ settled: true }),
   };
   const dataOpsStore = {
-    getWebdesignBatch: async () => batches[0] || null,
+    getWebdesignBatch: async () => batches.at(-1) || null,
+    listWebdesignBatchChunks: async () => chunks,
     upsertWebdesignBatch: async (value) => { batches.push(value); return { ok: true }; },
-    upsertWebdesignBatchChunk: async (value) => { chunks.push(value); return { ok: true }; },
+    upsertWebdesignBatchChunk: async (value) => { const at = chunks.findIndex(c => c.index === value.index); if (at >= 0) chunks[at] = value; else chunks.push(value); return { ok: true }; },
     listOutboundRecipientGuardKeys: async () => [],
   };
   const service = createNightlyMailStockService({ store, dataOpsStore, snapshotService: { invalidate() {}, buildMailReadySnapshot: async () => stock },
-    now: () => Date.parse(time), logger: silent, imageModel: 'gpt-image-2.5-sunburst' });
+    now: () => Date.parse(control.testTime || time), logger: silent, imageModel: 'gpt-image-2.5-sunburst' });
   return { service, control, plans, batches, chunks, store, dataOpsStore };
 }
 
@@ -64,7 +66,7 @@ test('midnight divides unassigned companies between both deficits and cannot cre
   assert.equal(f.batches[0].total, 3);
   assert.equal(f.chunks[0].targets[2].customer.webdesignMailProvider, 'instantly');
   assert.equal(f.plans[2].customer.id, 'sc');
-  assert.equal((await f.service.runDueCheck()).reason, 'already_checked');
+  assert.equal((await f.service.runDueCheck()).reason, 'check_cooldown');
   assert.equal(f.plans.length, 3);
 });
 
@@ -107,7 +109,7 @@ test('budget and outbound guard failures prevent the image provider call', async
     if (failure === 'budget') f.store.reserve = async () => ({ reserved: false });
     else f.dataOpsStore.listOutboundRecipientGuardKeys = async () => failure === 'outbound' ? ['id:sa'] : null;
     let calls = 0;
-    await assert.rejects(f.service.generate({ id: 'job', customer: customer('sa') }, async () => { calls++; }), (error) => error.noAutomaticWebdesignRetry === true);
+    await assert.rejects(f.service.generate({ id: 'job', customer: customer('sa') }, async (beforeRequest) => { await beforeRequest(await approvedRequest()); calls++; }), (error) => error.noAutomaticWebdesignRetry === true);
     assert.equal(calls, 0);
   }
 });
@@ -123,13 +125,16 @@ test('a provider error keeps its monetary reservation and prohibits another paid
   assert.equal(settlements[0][2], null);
 });
 
-test('unusable websites fail before paying, refund the unused reservation and cannot automatically retry', async () => {
+test('unusable websites fail without reserving budget and cannot automatically retry', async () => {
   const f = fixture(snapshot([], [customer('sa')]));
   const settlements = [];
+  let reservations = 0;
+  f.store.reserve = async () => { reservations++; return { reserved: true }; };
   f.store.settle = async (...args) => { settlements.push(args); return { settled: true }; };
   await assert.rejects(f.service.generate({ id: 'job', customer: customer('sa') }, async () => { throw new Error('website unreachable'); }),
     (error) => error.noAutomaticWebdesignRetry === true);
-  assert.equal(settlements[0][2], 0);
+  assert.equal(reservations, 0);
+  assert.equal(settlements.length, 0);
 });
 
 test('request policy bounds the actual model, quality, prompt, number and dimensions before the paid call', async () => {
@@ -197,13 +202,14 @@ test('SQL budget, capacity, cross-provider identity locks and permissions surviv
   try {
     await db.exec(`create role anon; create role authenticated; create role service_role;
       create table public.softora_outbound_recipient_guards (guard_key text primary key, permanent boolean, expires_at timestamptz);
-      create table public.softora_webdesign_jobs (job_id text primary key, owner_key text, customer_id text, status text, payload jsonb);`);
+      create table public.softora_webdesign_jobs (job_id text primary key, owner_key text, customer_id text, status text, payload jsonb, created_at timestamptz default now());`);
     await db.exec(fs.readFileSync(path.join(__dirname, '../../supabase/migrations/20261001165857_nightly_mail_stock.sql'), 'utf8'));
+    await db.exec(fs.readFileSync(path.join(__dirname, '../../supabase/migrations/20261002133349_nightly_mail_stock_recovery.sql'), 'utf8'));
     const call = async (sql, args) => (await db.query(sql, args)).rows[0].result;
     const allocate = (row, keys) => call("select public.softora_mail_stock_allocate($1::jsonb,$2,$3,'mail_stock_20261002') result", [JSON.stringify(row), row.webdesignMailProvider, keys]);
-    const addJob = (row, jobId) => db.query('insert into public.softora_webdesign_jobs values($1,$2,$3,\'running\',$4::jsonb)', [jobId, OWNER_KEY, row.id, JSON.stringify({ customer: row })]);
+    const addJob = (row, jobId) => db.query('insert into public.softora_webdesign_jobs(job_id,owner_key,customer_id,status,payload) values($1,$2,$3,\'running\',$4::jsonb)', [jobId, OWNER_KEY, row.id, JSON.stringify({ customer: row })]);
     const reserve = (id, jobId, readyIds = []) => call('select public.softora_mail_stock_reserve($1,$2,$3) result', [id, jobId, readyIds]);
-    const settle = (id, jobId, cents) => call('select public.softora_mail_stock_settle($1,$2,$3,null) result', [id, jobId, cents]);
+    const settle = (id, jobId, cents) => call('select public.softora_mail_stock_settle($1,$2,$3,$4::jsonb) result', [id, jobId, cents, cents === null ? null : JSON.stringify({ model: 'gpt-image-2.5-sunburst' })]);
     const a = customer('a'), b = customer('b'), c = customer('c', 'instantly');
     assert.equal((await allocate(a, ['id:a','email:shared@example.test'])).allocated, false);
     await db.exec("update public.softora_mail_stock_control set enabled=true,softora_target=1,approved_cents=1000;");
@@ -223,13 +229,126 @@ test('SQL budget, capacity, cross-provider identity locks and permissions surviv
     assert.equal((await reserve(b.id, 'job-b', ['a'])).reserved, false); // Only EUR 9.80 remains.
     await db.exec('update public.softora_mail_stock_control set approved_cents=2000;');
     assert.equal((await reserve(b.id, 'job-b', ['a'])).reserved, true);
-    assert.equal((await settle(b.id, 'job-b', null)).settled, false);
+    assert.equal((await settle(b.id, 'job-b', null)).settled, true);
     const control = (await db.query('select * from public.softora_mail_stock_control')).rows[0];
-    assert.equal(Number(control.charged_cents), 20);
-    assert.equal(Number(control.held_cents), 1000);
-    assert.equal(control.enabled, false);
+    assert.equal(Number(control.charged_cents), 1020);
+    assert.equal(Number(control.held_cents), 0);
+    assert.equal(control.enabled, true);
+    assert.equal((await reserve(b.id, 'job-b')).reserved, false); // Unknown paid outcomes are never replayed.
+    assert.equal((await db.query("select accounted_at_maximum from public.softora_mail_stock_generations where customer_id='b'")).rows[0].accounted_at_maximum, true);
     const permissions = (await db.query(`select has_table_privilege('anon','public.softora_mail_stock_control','SELECT') anon_read,
       has_function_privilege('authenticated','public.softora_mail_stock_reserve(text,text,text[])','EXECUTE') member_execute`)).rows[0];
     assert.equal(permissions.anon_read, false); assert.equal(permissions.member_execute, false);
   } finally { await db.close(); }
+});
+
+
+test('the night continues after midnight and replaces failed websites until actual ready targets are reached', async () => {
+  const available = [customer('a'), customer('b'), customer('replacement')];
+  const stock = snapshot([], available, []);
+  const f = fixture(stock);
+  f.control.softora_target = 2; f.control.instantly_target = 0;
+  await f.service.runDueCheck();
+  assert.equal(f.plans.length, 2);
+  f.plans[0].status = 'failed';
+  f.chunks[0].targets[0].status = 'error';
+  f.store.readActiveJobs = async () => f.chunks.map(chunk => ({ payload: { kind: 'bulk_webdesign_chunk', targets: chunk.targets } }));
+  f.control.testTime = '2026-10-02T00:10:00Z'; // 02:10 Amsterdam
+  const resumed = await f.service.runDueCheck();
+  assert.equal(resumed.added.softora, 1);
+  assert.equal(f.chunks.length, 2);
+  assert.equal(f.chunks[0].targets[0].status, 'error'); // History is preserved.
+  assert.equal(f.chunks[1].targets[0].customer.id, 'replacement');
+  stock.customers = [customer('b'), customer('replacement')];
+  f.chunks.forEach(chunk => chunk.targets.forEach(target => { if (target.status !== 'error') target.status = 'done'; }));
+  f.control.testTime = '2026-10-02T00:20:00Z';
+  assert.equal((await f.service.runDueCheck()).status, 'complete');
+  assert.equal((await f.service.runDueCheck()).reason, 'already_checked');
+});
+
+test('a provider boundary cannot pay after the job deadline or a failed durable marker', async () => {
+  const f = fixture(snapshot([], [customer('a')]));
+  const settlements = [];
+  f.store.settle = async (...args) => { settlements.push(args); return { settled: true }; };
+  let paid = 0;
+  await assert.rejects(f.service.generate({ id: 'job-a', customer: customer('a') }, async before => {
+    await before(await approvedRequest()); paid++;
+  }, async () => { throw new Error('job expired'); }), /job expired/);
+  assert.equal(paid, 0);
+  assert.equal(settlements[0][2], 0);
+});
+
+test('worker clamps all configured jobs and batches to one concurrent wave per invocation', async () => {
+  const waves = [];
+  const result = await runPremiumDatabaseWebdesignBatchWorker({ batchLimit: 8, jobLimit: 24, concurrency: 1 }, {
+    pruneJobs() {}, requiresPersistentBatchStorage: () => true,
+    backgroundWorkerLeaseStore: { claimBackgroundWorkerLease: async () => ({ ok: true, acquired: true }), releaseBackgroundWorkerLease: async () => ({ ok: true }) },
+    listRunnableBatches: async () => [{ id: 'one', ownerKey: 'owner' }, { id: 'two', ownerKey: 'owner' }],
+    loadBatchChunks: async () => ({ chunks: [] }), driveBatch: async batch => ({ batch, chunks: [] }),
+    processBatchJobsForWorker: async (batch, chunks, options) => { waves.push(options); return { processedJobs: 1, loadedJobs: 1, missingJobs: 0, completedTargets: 1, changedChunks: 0 }; },
+    serializeBatch: batch => batch, bulkWorkerBatchLimit: 8, bulkWorkerConcurrency: 2,
+  });
+  assert.equal(result.batchCount, 1);
+  assert.equal(waves.length, 1);
+  assert.equal(waves[0].jobLimit, 1);
+  assert.equal(waves[0].concurrency, 1);
+});
+
+
+test('stale paid reservations consume their maximum once and cannot block replacement capacity', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`create role anon; create role authenticated; create role service_role;
+      create table public.softora_outbound_recipient_guards (guard_key text primary key, permanent boolean, expires_at timestamptz);
+      create table public.softora_webdesign_jobs (job_id text primary key, owner_key text, customer_id text, status text, payload jsonb, created_at timestamptz default now());`);
+    for (const migration of ['20261001165857_nightly_mail_stock.sql', '20261002133349_nightly_mail_stock_recovery.sql']) await db.exec(fs.readFileSync(path.join(__dirname, '../../supabase/migrations', migration), 'utf8'));
+    await db.exec("update public.softora_mail_stock_control set enabled=true,softora_target=1;");
+    for (const id of ['lost', 'replacement']) {
+      await db.query("select public.softora_mail_stock_allocate($1::jsonb,'softora',$2,'mail_stock_20261002')", [JSON.stringify(customer(id)), [`id:${id}`, `email:${id}@example.test`]]);
+      await db.query("insert into public.softora_webdesign_jobs(job_id,owner_key,customer_id,status,payload) values($1,$2,$3,'running',$4::jsonb)", [`job-${id}`, OWNER_KEY, id, JSON.stringify({ customer: customer(id) })]);
+    }
+    const reserve = async id => (await db.query("select public.softora_mail_stock_reserve($1,$2,'{}'::text[]) result", [id, `job-${id}`])).rows[0].result;
+    assert.equal((await reserve('lost')).reserved, true);
+    await db.exec("update public.softora_mail_stock_generations set updated_at=now()-interval '16 minutes' where customer_id='lost'; update public.softora_webdesign_jobs set status='error' where customer_id='lost';");
+    assert.equal((await db.query('select public.softora_mail_stock_reconcile() result')).rows[0].result.reconciled, 1);
+    assert.equal((await db.query('select public.softora_mail_stock_reconcile() result')).rows[0].result.reconciled, 0);
+    assert.equal((await reserve('lost')).reserved, false);
+    assert.equal((await reserve('replacement')).reserved, true);
+    const control = (await db.query('select * from public.softora_mail_stock_control')).rows[0];
+    assert.equal(Number(control.charged_cents), 1000);
+    assert.equal(Number(control.held_cents), 1000);
+    assert.equal(control.enabled, true);
+    assert.equal((await db.query("select has_function_privilege('anon','public.softora_mail_stock_reconcile()','EXECUTE') allowed")).rows[0].allowed, false);
+  } finally { await db.close(); }
+});
+
+test('durable automatic job marker distinguishes unpaid preparation from the paid request', async () => {
+  const { deliverWebdesignImage } = require('../../server/services/premium-database-webdesign-delivery');
+  const f = fixture(snapshot([], [customer('a')]));
+  const job = { id: 'job-a', ownerKey: OWNER_KEY, customer: customer('a'), websiteUrl: 'https://a.example' };
+  const markers = [];
+  let images = 0;
+  const request = await approvedRequest();
+  await deliverWebdesignImage(job, {
+    nightlyMailStockService: f.service,
+    aiToolsCoordinator: { runWebsitePreviewGeneratePipeline: async (url, options) => {
+      assert.equal(markers.at(-1), false); // Website scan is safely repeatable after a restart.
+      await options.beforeImageRequest(request);
+      assert.equal(markers.at(-1), true); // Durable before the external paid effect.
+      return { model: request.imageModel, image: {}, usage: { input_tokens: 20, input_tokens_details: { text_tokens: 20, image_tokens: 0 }, output_tokens: 20 } };
+    } },
+    persistJob: async value => { markers.push(value.generationAttempted === true); return true; },
+    requiresPersistentJobStorage: () => true, persistGeneratedPhoto: async () => { images++; }, assertActive() {},
+  });
+  assert.equal(images, 1);
+  await assert.rejects(deliverWebdesignImage(job, {}), /onderbroken/); // A restarted worker cannot pay again.
+});
+
+
+test('nightly replenishment uses four parallel jobs while preserving manual batch concurrency', () => {
+  const { resolveWorkerConcurrency } = require('../../server/services/premium-database-webdesign-batch-worker');
+  assert.equal(resolveWorkerConcurrency({ ownerKey: OWNER_KEY }), 4);
+  assert.equal(resolveWorkerConcurrency({ ownerKey: 'owner' }), 2);
+  assert.equal(resolveWorkerConcurrency({ ownerKey: OWNER_KEY }, {}, { processingConcurrency: 1 }), 1);
+  assert.equal(resolveWorkerConcurrency({ ownerKey: OWNER_KEY }, { concurrency: 100 }), 4);
 });

@@ -19,7 +19,8 @@ async function deliverWebdesignImage(job, {
   if (!aiToolsCoordinator || typeof aiToolsCoordinator.runWebsitePreviewGeneratePipeline !== 'function') {
     throw new Error('Websitegenerator is niet beschikbaar.');
   }
-  job.generationAttempted = true;
+  const automatic = job.ownerKey === OWNER_KEY;
+  job.generationAttempted = !automatic;
   const saved = await persistJob(job);
   if (requiresPersistentJobStorage() && !saved) {
     job.generationAttempted = false; // No provider call has happened.
@@ -36,7 +37,12 @@ async function deliverWebdesignImage(job, {
     });
     if (job.ownerKey === OWNER_KEY) {
       if (!nightlyMailStockService) throw createWebdesignDeliveryInterruptedError();
-      payload = await nightlyMailStockService.generate(job, generate);
+      payload = await nightlyMailStockService.generate(job, generate, async () => {
+        assertActive();
+        job.generationAttempted = true;
+        if (!(await persistJob(job))) throw createWebdesignDeliveryInterruptedError();
+        assertActive();
+      });
     } else payload = await generate();
   } catch (error) {
     // Preserve existing provider/reference rejection retries, but not a process
