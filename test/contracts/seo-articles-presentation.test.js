@@ -32,6 +32,8 @@ test('public overview and all 52 article routes serve the approved layout with t
   assert.equal(response.headers.get('x-robots-tag'), null);
   const overview = await response.text();
   assert.match(overview, /Alle artikelen/);
+  assert.match(overview, /<a class="overview-back" href="\/toekomst" aria-label="Terug naar de keuzepagina">/);
+  assert.ok(overview.indexOf('class="overview-back"') < overview.indexOf('id="articles-title"'), 'Return link must appear above the article heading');
   assert.doesNotMatch(overview, /noindex|Kennisbank|<footer|content-menu/);
   assert.equal((overview.match(/class="article-card"/g) || []).length, 52);
   assert.equal((overview.match(/class="article-card"[^>]* hidden>/g) || []).length, 44);
