@@ -110,105 +110,44 @@ test('website money page is focused on SEO, leads and clean internal links', () 
   assert.ok(entry.relatedLinks.includes('/pakketten'));
 });
 
-test('bedrijfssoftware overtuigingspagina maakt tijdverlies en de maatwerkoplossing concreet', () => {
+test('bedrijfssoftware landing explains its own workflows and retains the noindex and supporting SEO routes', () => {
   const source = readPage('bedrijfssoftware.html');
   const entry = getRegistryEntry('premium-bedrijfssoftware.html');
-
-  assert.match(source, /<title>Bedrijfssoftware die voor je werkt \| Softora<\/title>/);
-  assert.match(
-    source,
-    /<meta name="description" content="Ontdek hoe maatwerksoftware administratieve taken, dubbel werk en onnodige omwegen binnen je bedrijf kan verminderen\./
-  );
-  assert.match(source, /<meta name="robots" content="noindex, follow">/);
-  assert.match(source, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/bedrijfssoftware">/);
+  const sharedCss = readPage('assets/service-landing/service-landing.css');
+  const pageCss = readPage('assets/service-landing/professional-services.css');
+  assert.match(source, /<title>Bedrijfssoftware — Meer grip, minder gedoe \| Softora<\/title>/);
+  assert.match(source, /<meta name="description" content="Bedrijfssoftware op maat van Softora/);
+  assert.match(source, /<meta name="robots" content="noindex, nofollow">/);
+  assert.doesNotMatch(source, /rel="canonical"|application\/ld\+json/);
   assert.match(source, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/bedrijfssoftware">/);
   assert.match(source, /<meta name="twitter:card" content="summary_large_image">/);
-  assert.match(source, /Bedrijfssoftware op maat die <em>voor je werkt\.<\/em>/);
-  assert.match(source, /administratieve taken en repetitieve taken/);
-  assert.match(source, /tijd krijgt voor wat echt telt/);
-  assert.match(source, /Meer tijd/);
-  assert.match(source, /Minder handmatig werk/);
-  assert.match(source, /Meer rust en overzicht/);
-  assert.match(source, /class="proof proof-values"/);
-  assert.match(source, /class="button button-phone" href="https:\/\/wa\.me\/31643262792"/);
-  assert.match(source, />Contact<\/a>/);
-  assert.match(source, /\.hero:after\{/);
-  assert.match(source, /background-size:auto,28px 28px/);
-  assert.match(source, /Werk dat simpel zou moeten zijn, voelt onnodig omslachtig/);
-  assert.match(source, /Je voert dezelfde gegevens meerdere keren in/);
-  assert.match(source, /Je houdt open taken zelf bij/);
-  assert.match(source, /Je schakelt steeds tussen verschillende systemen/);
-  assert.match(source, /Je controleert handmatig of alles goed gaat/);
-  assert.match(source, /Niet alles tegelijk\. Eerst één proces slimmer maken/);
-  assert.match(source, /class="approach-layout"/);
-  assert.match(source, /We brengen je werkproces en systemen in kaart/);
-  assert.match(source, /We bepalen welke knelpunten er zijn/);
-  assert.match(source, /De oplossing wordt in de praktijk getest/);
-  assert.doesNotMatch(source, /We beginnen niet met een standaardpakket of een lange lijst functies/);
-  assert.match(source, /Tijd voor wat echt telt/);
-  assert.match(source, /Minder repetitief werk/);
-  assert.match(source, /Meer rust en overzicht/);
-  assert.match(source, /Meer tijd om te ondernemen/);
-  assert.match(source, /softora-time-that-matters\.webp/);
-  assert.match(source, /<nav id="navbar">/);
-  assert.match(source, /class="nav-start-btn"[^>]*>Start Project<\/a>/);
-  assert.match(source, /<footer id="contact" class="footer">/);
-  assert.match(source, /class="footer-personnel-link" href="\/personeel-login">Personeel<\/a>/);
-  assert.doesNotMatch(source, /Wanneer is maatwerksoftware interessant\?/);
-  assert.doesNotMatch(source, /id="voor-wie"/);
-  assert.match(source, /Samen kijken welke taken slimmer en makkelijker kunnen/);
-  assert.match(source, /Plan een gesprek/);
-  assert.match(source, /Wat kost maatwerksoftware\?/);
-  assert.match(source, /Moet ik al precies weten wat ik nodig heb\?/);
-  assert.match(source, /Kunnen bestaande systemen gekoppeld worden\?/);
-  assert.match(source, /Waar beginnen we\?/);
-  assert.match(source, /href="\/crm-systeem-op-maat"/);
-  assert.match(source, /href="\/maatwerk-platform"/);
-  assert.match(source, /href="\/ai-automatisering"/);
-  assert.match(source, /href="\/kennisbank\/wat-is-offerte-automatisering"/);
-  assert.match(source, /href="\/kennisbank\/wat-is-bedrijfssoftware-op-maat"/);
-  assert.match(source, /href="\/blog\/bedrijfssoftware-laten-maken-kosten"/);
-  assert.match(source, /href="\/blog\/maatwerk-software-offerte-beoordelen"/);
+  assert.match(source, /Grip op je werk\.<br>Ruimte voor<br>/);
+  for (const text of ['Minder dubbel werk', 'Meer overzicht', 'Je werk begrijpen', 'Een gerichte eerste versie', 'In de praktijk verbeteren', 'Bedrijfssoftware op maat']) assert.ok(source.includes(text), text);
+  for (const route of ['/crm-systeem-op-maat', '/maatwerk-platform', '/ai-automatisering', '/kennisbank/wat-is-offerte-automatisering', '/kennisbank/wat-is-bedrijfssoftware-op-maat', '/blog/bedrijfssoftware-laten-maken-kosten', '/blog/maatwerk-software-offerte-beoordelen', '/blog']) assert.ok(source.includes('href="' + route + '"'), route);
   assert.match(source, /data-softora-public-seo="internal-links"/);
-  assert.match(source, /\.problem-cards\{grid-template-columns:repeat\(2,1fr\)\}/);
-  assert.match(source, /\.cards,\.problem-cards,\.faq-grid\{grid-template-columns:1fr\}/);
-  assert.match(source, /min-height:44px/);
-  assert.match(source, /@media\(prefers-reduced-motion:reduce\)/);
-  assert.doesNotMatch(source, /class="strip/);
-  assert.doesNotMatch(source, /Je bent ondernemer\. Geen menselijke koppeling\./);
-  assert.doesNotMatch(source, /Website Tool|AI Website Generator/);
-  assert.doesNotMatch(source, /href="\/premium-[^"]*"/i);
-  assert.ok(source.indexOf('Herken je deze situaties?') < source.indexOf('Zo pakken we het aan'));
-  assert.ok(source.indexOf('Zo pakken we het aan') < source.indexOf('Dit levert het op'));
-  assert.ok(source.indexOf('Dit levert het op') < source.indexOf('Samen kijken wat makkelijker kan'));
-  assert.ok(source.indexOf('Samen kijken wat makkelijker kan') < source.indexOf('Veelgestelde vragen'));
-  assert.match(source, /data-step="01">Herken je deze situaties\?<\/div>/);
-  assert.match(source, /data-step="04">Samen kijken wat makkelijker kan<\/div>/);
-
+  assert.match(source, /data-softora-conversion="public-cta" data-softora-conversion-page="\/bedrijfssoftware"/);
+  assert.match(source, /href="https:\/\/wa\.me\/31643262792"/);
+  assert.match(source, /href="https:\/\/www\.softora\.nl\/contact\?onderwerp=bedrijfssoftware"/);
+  assert.match(source, /fictief servicebedrijf/);
+  assert.match(source, /Alle gegevens zijn fictief/);
+  assert.match(source, /data-demo-complete/);
+  assert.match(source, /aria-controls="flow-result" aria-expanded="false"/);
+  assert.match(source, /aria-controls="connect-result" aria-expanded="false"/);
+  for (const question of ['Moet ik al precies weten wat ik nodig heb?', 'Kunnen we beginnen met één proces?', 'Kunnen mijn bestaande systemen blijven werken?', 'Wat kost bedrijfssoftware op maat?']) assert.ok(source.includes(question), question);
+  assert.ok(source.indexOf('id="jouw-voordeel"') < source.indexOf('id="demo"'));
+  assert.ok(source.indexOf('id="demo"') < source.indexOf('id="werkwijze"'));
+  assert.ok(source.indexOf('id="werkwijze"') < source.indexOf('id="vragen"'));
+  assert.ok(source.indexOf('id="vragen"') < source.indexOf('id="kennismaken"'));
+  assert.match(pageCss, /@media\(max-width:640px\)/);
+  assert.match(sharedCss, /@media\(prefers-reduced-motion:reduce\)/);
+  assert.match(source, /professional-services\.css/);
+  assert.match(source, /professional-services\.js/);
+  assert.doesNotMatch(source, /<style>|<script>(?!<)|mascot|poppetje|href="\/premium-/i);
   assert.equal(entry.title, 'Bedrijfssoftware op maat laten maken | Softora');
   assert.match(entry.description, /CRM, planning, offertes of een klantportaal/);
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
   assert.ok(entry.relatedLinks.includes('/blog/wat-is-offerte-automatisering'));
-
-  const graph = getStructuredDataGraph(source);
-  const service = graph.find((item) => item['@type'] === 'Service');
-  const faq = graph.find((item) => item['@type'] === 'FAQPage');
-  const breadcrumb = graph.find((item) => item['@type'] === 'BreadcrumbList');
-
-  assert.equal(service && service['@id'], 'https://www.softora.nl/bedrijfssoftware#service');
-  assert.equal(service && service.serviceType, 'Bedrijfssoftware op maat voor MKB');
-  assert.equal(faq && faq['@id'], 'https://www.softora.nl/bedrijfssoftware#faq');
-  assert.deepEqual(
-    faq.mainEntity.map((question) => question.name),
-    [
-      'Wat kost maatwerksoftware?',
-      'Moet ik al precies weten wat ik nodig heb?',
-      'Kunnen bestaande systemen gekoppeld worden?',
-      'Waar beginnen we?',
-    ]
-  );
-  assert.equal(breadcrumb && breadcrumb['@id'], 'https://www.softora.nl/bedrijfssoftware#breadcrumb');
 });
 
 test('bedrijfssoftware SEO-pagina behoudt de uitgebreide buyer-intent inhoud', () => {
