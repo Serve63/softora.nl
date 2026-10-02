@@ -9,9 +9,6 @@ function readActiveOrdersSources() {
   const assigneeScriptPath = path.join(__dirname, '../../assets/premium-active-orders-assignee.js');
   const customerDbScriptPath = path.join(__dirname, '../../assets/premium-active-orders-customer-db.js');
   const assigneeStylePath = path.join(__dirname, '../../assets/premium-active-orders-assignee.css');
-  const assignmentFilterScriptPath = path.join(__dirname, '../../assets/premium-personal-assignment-filter.js');
-  const assignmentFilterStylePath = path.join(__dirname, '../../assets/premium-personal-assignment-filter.css');
-  const assignmentPagesScriptPath = path.join(__dirname, '../../assets/premium-personal-assignment-pages.js');
   const scriptPath = path.join(__dirname, '../../assets/premium-actieve-opdrachten.js');
   const editDataScriptPath = path.join(__dirname, '../../assets/premium-active-orders-edit-data.js');
   const openLeadsScriptPath = path.join(__dirname, '../../assets/premium-active-order-open-leads.js');
@@ -21,9 +18,6 @@ function readActiveOrdersSources() {
   const assigneeScriptSource = fs.readFileSync(assigneeScriptPath, 'utf8');
   const customerDbScriptSource = fs.readFileSync(customerDbScriptPath, 'utf8');
   const assigneeStyleSource = fs.readFileSync(assigneeStylePath, 'utf8');
-  const assignmentFilterScriptSource = fs.readFileSync(assignmentFilterScriptPath, 'utf8');
-  const assignmentFilterStyleSource = fs.readFileSync(assignmentFilterStylePath, 'utf8');
-  const assignmentPagesScriptSource = fs.readFileSync(assignmentPagesScriptPath, 'utf8');
   const scriptSource = fs.readFileSync(scriptPath, 'utf8');
   const editDataScriptSource = fs.readFileSync(editDataScriptPath, 'utf8');
   const openLeadsScriptSource = fs.readFileSync(openLeadsScriptPath, 'utf8');
@@ -31,9 +25,6 @@ function readActiveOrdersSources() {
   return {
     assigneeScriptSource,
     assigneeStyleSource,
-    assignmentFilterScriptSource,
-    assignmentFilterStyleSource,
-    assignmentPagesScriptSource,
     bootScriptSource,
     customerDbScriptSource,
     pageSource,
@@ -41,7 +32,7 @@ function readActiveOrdersSources() {
     editDataScriptSource,
     openLeadsScriptSource,
     manualLeadsScriptSource,
-    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${customerDbScriptSource}\n${assignmentFilterStyleSource}\n${assignmentFilterScriptSource}\n${scriptSource}\n${editDataScriptSource}\n${assignmentPagesScriptSource}`,
+    combinedSource: `${pageSource}\n${bootScriptSource}\n${assigneeStyleSource}\n${assigneeScriptSource}\n${customerDbScriptSource}\n${scriptSource}\n${editDataScriptSource}`,
   };
 }
 
@@ -60,16 +51,14 @@ function readOrderDossierSources() {
   };
 }
 
-test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken bevestigde factuur-betaald flow', () => {
-  const { assignmentFilterStyleSource, customerDbScriptSource, pageSource, scriptSource, editDataScriptSource, openLeadsScriptSource, manualLeadsScriptSource, combinedSource: source } = readActiveOrdersSources();
+test('premium actieve opdrachten tonen compacte kaarten zonder persoonlijk filter en gebruiken bevestigde factuur-betaald flow', () => {
+  const { customerDbScriptSource, pageSource, scriptSource, editDataScriptSource, openLeadsScriptSource, manualLeadsScriptSource, combinedSource: source } = readActiveOrdersSources();
 
-  assert.match(pageSource, /assets\/premium-personal-assignment-filter\.css\?v=20260511a/);
-  assert.match(pageSource, /id="onlyMyAssignmentsToggle" data-only-my-assignments-toggle type="checkbox"/);
-  assert.match(pageSource, /Enkel mijn toewijzingen bekijken/);
-  assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle \{[\s\S]*border:\s*1px solid rgba\(139, 34, 82, 0\.2\);[\s\S]*background:\s*rgba\(255, 255, 255, 0\.78\);/);
-  assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle input\[type="checkbox"\] \{[\s\S]*border:\s*1\.5px solid rgba\(139, 34, 82, 0\.36\);[\s\S]*background:\s*#fff;/);
-  assert.match(assignmentFilterStyleSource, /\.personal-assignment-toggle input\[type="checkbox"\]::after \{[\s\S]*border-right:\s*2px solid #fff;[\s\S]*border-bottom:\s*2px solid #fff;[\s\S]*transform:\s*rotate\(45deg\) scale\(0\);/);
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-screen-readiness\.js\?v=20260923a"><\/script><script src="assets\/premium-active-orders-readiness\.js\?v=20260922b"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script><script src="assets\/premium-active-orders-boot\.js\?v=20260922c"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-personal-assignment-filter\.js\?v=20260722a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20260922d"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260922b"><\/script><script src="assets\/premium-personal-assignment-pages\.js\?v=20260922b"><\/script>/);
+  assert.doesNotMatch(pageSource, /onlyMyAssignmentsToggle|Enkel mijn toewijzingen bekijken/);
+  assert.doesNotMatch(pageSource, /assets\/premium-personal-assignment-(?:filter|pages)\.(?:css|js)/);
+  assert.doesNotMatch(scriptSource, /order-delivery|order-assignee|assigneeEl/);
+
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-screen-readiness\.js\?v=20260923a"><\/script><script src="assets\/premium-active-orders-readiness\.js\?v=20261002a"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script><script src="assets\/premium-active-orders-boot\.js\?v=20260922c"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20261002a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260922b"><\/script>/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-order-open-leads\.js/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-order-manual-open-leads\.js/);
   assert.match(pageSource, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/);
@@ -157,11 +146,9 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /const actions = document\.createElement\('div'\);[\s\S]*actions\.className = 'order-actions';/);
   assert.match(source, /executeBtn\.dataset\.order = String\(id\);[\s\S]*setOpenDossierButtonContent\(executeBtn\);/);
   assert.match(source, /if \(!ui\.isBuilt\) \{[\s\S]*completeBtn\.dataset\.orderComplete = String\(id\);[\s\S]*completeBtn\.textContent = 'Factuur betaald';/);
-  assert.match(source, /const assignee = appendTextElement\(actions, 'div', 'order-assignee', claimInfo\.by \|\| 'Nog niet geclaimd'\);[\s\S]*assignee\.id = `assignee-\$\{id\}`;/);
   assert.match(source, /completeBtnEl\.textContent = 'Factuur betaald';/);
   assert.match(source, /completeBtnEl\.hidden = isDelivered;/);
   assert.match(source, /completeBtnEl\.style\.display = isDelivered \? 'none' : '';/);
-  assert.match(source, /assigneeEl\.textContent = claimInfo\.by \|\| 'Nog niet geclaimd';/);
   assert.match(source, /setOpenDossierButtonContent\(btnEl\);/);
   assert.doesNotMatch(source, /btnEl\.innerHTML = '<svg/);
   assert.doesNotMatch(source, /wrapper\.innerHTML = renderCustomOrderCardHtml/);
@@ -227,20 +214,10 @@ test('premium actieve opdrachten tonen geen losse naam-badge meer en gebruiken b
   assert.match(source, /let customerCleanupError = null;[\s\S]*await syncCustomerDatabaseAfterOrderRemoval\(record\);[\s\S]*customerCleanupError = error;[\s\S]*refreshOrderSummaryCards\(\);[\s\S]*closeModal\(\);[\s\S]*if \(customerCleanupError\) \{[\s\S]*Project is verwijderd\. Het gekoppelde klantrecord kon niet automatisch worden opgeschoond\./);
   assert.doesNotMatch(pageSource, /assets\/premium-active-orders-leads-tab\.js/);
   assert.match(scriptSource, /document\.querySelector\('\.orders-filter-bar'\)\?\.addEventListener\('click', \(e\) => \{[\s\S]*const btn = e\.target\.closest\('\[data-order-filter\]'\);[\s\S]*setOrderFilter\(btn\.getAttribute\('data-order-filter'\)\);/);
-  assert.match(source, /const FILTER_STORAGE_PREFIX = 'softora_only_my_assignments_v1';/);
-  assert.match(source, /const FILTER_SCOPE = 'premium_assignment_filters';/);
-  assert.match(source, /function normalizeOwnerLabel\(value\) \{/);
-  assert.match(source, /\/api\/ui-state-get\?scope=\$\{encodedScope\}/);
-  assert.match(source, /JSON\.stringify\(nextPreferences\)/);
   assert.doesNotMatch(source, /localStorage/);
   assert.doesNotMatch(source, /sessionStorage/);
-  assert.match(source, /function syncActiveOrdersPage\(\) \{/);
-  assert.match(source, /function applyActiveOrdersSummary\(cards\) \{/);
   assert.match(scriptSource, /const openValue = cards\.reduce\(\(sum, card\) => \{[\s\S]*const id = getOrderFilterGroupForCard\(card\) === 'in_progress' \? Number/);
   assert.match(scriptSource, /if \(!Number\.isFinite\(id\) \|\| ui\.isPaid\) return sum;/);
-  assert.match(source, /function syncCreateOrderAgendaOptions\(\) \{/);
-  assert.match(source, /filterApi\.subscribe\(syncState\);/);
-  assert.match(source, /Geen openstaande opdrachten aan jou toegewezen\./);
   assert.doesNotMatch(scriptSource, /void fetchAgendaLeadOptions\(\)\.then/);
   assert.doesNotMatch(source, /SoftoraActiveOrdersLeadTab/);
 });
