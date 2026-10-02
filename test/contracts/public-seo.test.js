@@ -180,8 +180,8 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
     sitemap,
     /<image:loc>https:\/\/www\.softora\.nl\/assets\/seo-content\/chatbot-kosten-kostenlagen-softora\.jpg<\/image:loc>/
   );
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/kennisbank<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/kennisbank\/wat-is-bedrijfssoftware-op-maat<\/loc>/);
+  assert.doesNotMatch(sitemap, /<loc>https:\/\/www\.softora\.nl\/kennisbank(?:\/[^<]+)?<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/www\.softora\.nl\/blog\/wat-is-bedrijfssoftware-op-maat<\/loc>/);
   assert.doesNotMatch(sitemap, /premium-bedrijfssoftware/);
   assert.doesNotMatch(sitemap, /premium-blog/);
   assert.doesNotMatch(sitemap, /premium-pakketten/);
@@ -736,7 +736,8 @@ test('over softora page owns its internal links inside the page footer', () => {
   assert.match(html, /href="\/ai-automatisering"/);
   assert.match(html, /href="\/crm-systeem-op-maat"/);
   assert.match(html, /href="\/blog"/);
-  assert.match(html, /href="\/kennisbank"/);
+  assert.doesNotMatch(html, /href="\/kennisbank">Kennisbank<\/a>/);
+  assert.match(html, /href="\/blog">Artikelen<\/a>/);
   assert.doesNotMatch(html, /softora-seo-footer-links/);
   assert.doesNotMatch(html, /href="\/premium-[^"]*"/i);
 });
@@ -761,4 +762,13 @@ test('public seo registry points to existing crawlable pages with h1 and link gr
       assert.ok(links.every((link) => /^\/[a-z0-9/_-]+$/i.test(link.href)), `${entry.path} heeft geen schone interne links`);
     }
   });
+});
+
+
+test('public navigation uses one articles destination for the former blog and knowledge sections', () => {
+  for (const file of ['diensten.html', 'pakketten.html', 'bedrijfssoftware.html', 'crm-systeem-op-maat.html', 'premium-website.html', 'premium-over-softora.html']) {
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.doesNotMatch(source, /<a[^>]*href="\/(?:blog|kennisbank)"[^>]*>(?:Blog|Kennisbank)<\/a>/, file);
+    assert.match(source, /href="\/blog">Artikelen<\/a>/, file);
+  }
 });

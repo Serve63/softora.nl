@@ -48,7 +48,7 @@
       "overlap": {
         "checkedAt": "2026-08-03",
         "closestPaths": [
-          "/kennisbank/wat-is-bedrijfssoftware-op-maat",
+          "/blog/wat-is-bedrijfssoftware-op-maat",
           "/vergelijkingen/maatwerk-software-vs-standaard-software",
           "/blog/maatwerk-software-offerte-beoordelen"
         ],
@@ -82,7 +82,7 @@
           "Welke beheer- en koppelkosten komen later terug?"
         ],
         "incomingLinks": [
-          "/kennisbank/wat-is-bedrijfssoftware-op-maat",
+          "/blog/wat-is-bedrijfssoftware-op-maat",
           "/vergelijkingen/maatwerk-software-vs-standaard-software"
         ],
         "outgoingLinks": [
@@ -106,8 +106,8 @@
     {
       "id": "software-acceptance-021",
       "status": "ready",
-      "path": "/kennisbank/software-acceptatiecriteria-opstellen",
-      "contentType": "kennisbank",
+      "path": "/blog/software-acceptatiecriteria-opstellen",
+      "contentType": "blog",
       "cluster": "software-crm",
       "primaryQuery": "software acceptatiecriteria opstellen",
       "intent": "Toetsbare acceptatiecriteria en gebruikerstests voor maatwerk software opstellen",
@@ -190,9 +190,9 @@
     "id": "crm-migration-002",
     "status": "shipped",
     "shippedAt": "2026-09-09",
-    "shippedPath": "/kennisbank/crm-migratie-stappenplan",
-      "path": "/kennisbank/crm-migratie-stappenplan",
-      "contentType": "kennisbank",
+    "shippedPath": "/blog/crm-migratie-stappenplan",
+      "path": "/blog/crm-migratie-stappenplan",
+      "contentType": "blog",
       "cluster": "software-crm",
       "primaryQuery": "crm migratie stappenplan",
       "intent": "Migratie voorbereiden zonder klantdata of opvolging te verliezen",
@@ -211,8 +211,8 @@
       "overlap": {
         "checkedAt": "2026-07-17",
         "closestPaths": [
-          "/kennisbank/wat-is-een-crm-integratie",
-          "/kennisbank/wat-is-crm-datakwaliteit",
+          "/blog/wat-is-een-crm-integratie",
+          "/blog/wat-is-crm-datakwaliteit",
           "/vergelijkingen/crm-op-maat-vs-standaard-crm"
         ],
         "decision": "distinct",
@@ -245,8 +245,8 @@
           "Wanneer is een migratie voldoende getest?"
         ],
         "incomingLinks": [
-          "/kennisbank/wat-is-crm-datakwaliteit",
-          "/kennisbank/wat-is-een-crm-integratie"
+          "/blog/wat-is-crm-datakwaliteit",
+          "/blog/wat-is-een-crm-integratie"
         ],
         "outgoingLinks": [
           "/crm-systeem-op-maat",
@@ -304,7 +304,7 @@
         "closestPaths": [
           "/vergelijkingen/crm-op-maat-vs-standaard-crm",
           "/blog/crm-systeem-kosten-mkb",
-          "/kennisbank/wat-is-crm-datakwaliteit"
+          "/blog/wat-is-crm-datakwaliteit"
         ],
         "decision": "distinct",
         "rationale": "De vergelijking ondersteunt leverancierskeuze, de kostengids de totale begroting en de kennisbank datakwaliteit; deze pagina behandelt specifiek implementatiefasen, interne verantwoordelijkheden, acceptatie en de scopefactoren achter de doorlooptijd."
@@ -337,7 +337,7 @@
         ],
         "incomingLinks": [
           "/vergelijkingen/crm-op-maat-vs-standaard-crm",
-          "/kennisbank/wat-is-een-crm-systeem"
+          "/blog/wat-is-een-crm-systeem"
         ],
         "outgoingLinks": [
           "/crm-systeem-op-maat",
@@ -383,7 +383,7 @@
         "checkedAt": "2026-07-17",
         "closestPaths": [
           "/vergelijkingen/maatwerk-software-vs-standaard-software",
-          "/kennisbank/wat-is-bedrijfssoftware-op-maat",
+          "/blog/wat-is-bedrijfssoftware-op-maat",
           "/blog/crm-systeem-op-maat-spreadsheets-vervangen"
         ],
         "decision": "distinct",
@@ -417,7 +417,7 @@
         ],
         "incomingLinks": [
           "/vergelijkingen/maatwerk-software-vs-standaard-software",
-          "/kennisbank/wat-is-bedrijfssoftware-op-maat"
+          "/blog/wat-is-bedrijfssoftware-op-maat"
         ],
         "outgoingLinks": [
           "/bedrijfssoftware-op-maat",
@@ -440,8 +440,8 @@
     {
       "id": "software-accounting-005",
       "status": "ready",
-      "path": "/kennisbank/bedrijfssoftware-koppelen-boekhouding",
-      "contentType": "kennisbank",
+      "path": "/blog/bedrijfssoftware-koppelen-boekhouding",
+      "contentType": "blog",
       "cluster": "software-crm",
       "primaryQuery": "bedrijfssoftware koppelen boekhouding",
       "intent": "Integratiekeuzes tussen bedrijfssoftware en boekhouding",
@@ -460,9 +460,9 @@
       "overlap": {
         "checkedAt": "2026-07-17",
         "closestPaths": [
-          "/kennisbank/wat-is-een-crm-integratie",
+          "/blog/wat-is-een-crm-integratie",
           "/blog/website-crm-koppeling-leadopvolging-mkb",
-          "/kennisbank/wat-is-bedrijfssoftware-op-maat"
+          "/blog/wat-is-bedrijfssoftware-op-maat"
         ],
         "decision": "distinct",
         "rationale": "De kandidaat behandelt een specifieke operationele koppeling met transactiestromen, synchronisatie en uitzonderingen."
@@ -494,8 +494,8 @@
           "Hoe controleer je of synchronisatie compleet is?"
         ],
         "incomingLinks": [
-          "/kennisbank/wat-is-een-crm-integratie",
-          "/kennisbank/wat-is-bedrijfssoftware-op-maat"
+          "/blog/wat-is-een-crm-integratie",
+          "/blog/wat-is-bedrijfssoftware-op-maat"
         ],
         "outgoingLinks": [
           "/bedrijfssoftware-op-maat",
@@ -541,7 +541,7 @@
         "checkedAt": "2026-07-17",
         "closestPaths": [
           "/blog/ai-automatisering-mkb-waar-beginnen",
-          "/kennisbank/wat-is-ai-automatisering",
+          "/blog/wat-is-ai-automatisering",
           "/blog/ai-processen-automatiseren-zonder-controle-verliezen"
         ],
         "decision": "distinct",
@@ -575,7 +575,7 @@
         ],
         "incomingLinks": [
           "/blog/ai-automatisering-mkb-waar-beginnen",
-          "/kennisbank/wat-is-ai-automatisering"
+          "/blog/wat-is-ai-automatisering"
         ],
         "outgoingLinks": [
           "/ai-automatisering",
@@ -598,8 +598,8 @@
     {
       "id": "ai-implementation-007",
       "status": "ready",
-      "path": "/kennisbank/ai-automatisering-implementatieplan",
-      "contentType": "kennisbank",
+      "path": "/blog/ai-automatisering-implementatieplan",
+      "contentType": "blog",
       "cluster": "ai-automatisering",
       "primaryQuery": "ai automatisering implementatieplan",
       "intent": "Implementatievolgorde voor een beheersbare AI-workflow",
@@ -618,8 +618,8 @@
       "overlap": {
         "checkedAt": "2026-07-17",
         "closestPaths": [
-          "/kennisbank/wat-is-een-ai-workflow",
-          "/kennisbank/wat-is-procesautomatisering",
+          "/blog/wat-is-een-ai-workflow",
+          "/blog/wat-is-procesautomatisering",
           "/blog/ai-automatisering-mkb-waar-beginnen"
         ],
         "decision": "distinct",
@@ -652,7 +652,7 @@
           "Welke metingen zijn nodig na livegang?"
         ],
         "incomingLinks": [
-          "/kennisbank/wat-is-een-ai-workflow",
+          "/blog/wat-is-een-ai-workflow",
           "/blog/ai-automatisering-mkb-waar-beginnen"
         ],
         "outgoingLinks": [
@@ -697,7 +697,7 @@
         "checkedAt": "2026-07-17",
         "closestPaths": [
           "/blog/ai-processen-automatiseren-zonder-controle-verliezen",
-          "/kennisbank/wat-is-een-ai-workflow",
+          "/blog/wat-is-een-ai-workflow",
           "/blog/ai-automatisering-mkb-waar-beginnen"
         ],
         "decision": "distinct",
@@ -731,7 +731,7 @@
         ],
         "incomingLinks": [
           "/blog/ai-processen-automatiseren-zonder-controle-verliezen",
-          "/kennisbank/wat-is-een-ai-workflow"
+          "/blog/wat-is-een-ai-workflow"
         ],
         "outgoingLinks": [
           "/ai-automatisering",
@@ -912,7 +912,7 @@
         ],
         "outgoingLinks": [
           "/chatbot-laten-maken",
-          "/kennisbank/chatbot-implementatie-website-crm"
+          "/blog/chatbot-implementatie-website-crm"
         ],
         "conversionPath": "Van voorstelvergelijking naar een afgebakend gesprek over chatbotdoel, bewijs, verantwoordelijkheden en eerste versie.",
         "claimRisk": "Geen leverancier als beste aanwijzen, geen vaste besparing of foutloze werking claimen en geen juridische beoordeling suggereren.",
@@ -932,9 +932,9 @@
       "id": "chatbot-acceptance-023",
       "status": "shipped",
       "shippedAt": "2026-09-04",
-      "shippedPath": "/kennisbank/chatbot-acceptatietest-opstellen",
-      "path": "/kennisbank/chatbot-acceptatietest-opstellen",
-      "contentType": "kennisbank",
+      "shippedPath": "/blog/chatbot-acceptatietest-opstellen",
+      "path": "/blog/chatbot-acceptatietest-opstellen",
+      "contentType": "blog",
       "cluster": "ai-contact",
       "primaryQuery": "chatbot acceptatietest opstellen",
       "intent": "Een toetsbare acceptatieset voor chatbotantwoorden, acties, uitzonderingen en menselijke overdracht opstellen",
@@ -966,7 +966,7 @@
         "closestPaths": [
           "/blog/chatbot-offerte-vergelijken",
           "/blog/chatbot-crm-koppeling-leads-opvolgen",
-          "/kennisbank/wat-is-chatbot-overdracht"
+          "/blog/wat-is-chatbot-overdracht"
         ],
         "decision": "distinct",
         "rationale": "De offertemethode vraagt om acceptatiebewijs, de CRM-gids test één overdrachtsketen en de kennisbank definieert menselijke overdracht. Deze kandidaat leert een proceseigenaar zelf een volledige, reproduceerbare testset, bevindingclassificatie, hertest en go-no-go-besluit opstellen."
@@ -1003,7 +1003,7 @@
         ],
         "outgoingLinks": [
           "/chatbot-laten-maken",
-          "/kennisbank/wat-is-chatbot-overdracht"
+          "/blog/wat-is-chatbot-overdracht"
         ],
         "conversionPath": "Van een eigen acceptatieset naar een afgebakend gesprek over chatbotgrenzen, bewijs, herstel en gecontroleerde livegang.",
         "claimRisk": "Geen foutloze werking, volledige dekking of juridisch geldige acceptatie beloven; testdekking en menselijke beslissers expliciet begrenzen.",
@@ -1022,8 +1022,8 @@
     {
       "id": "chatbot-implementation-010",
       "status": "ready",
-      "path": "/kennisbank/chatbot-implementatie-website-crm",
-      "contentType": "kennisbank",
+      "path": "/blog/chatbot-implementatie-website-crm",
+      "contentType": "blog",
       "cluster": "ai-contact",
       "primaryQuery": "chatbot implementeren website crm",
       "intent": "Chatbot technisch en organisatorisch implementeren",
@@ -1043,7 +1043,7 @@
         "checkedAt": "2026-07-17",
         "closestPaths": [
           "/blog/chatbot-crm-koppeling-leads-opvolgen",
-          "/kennisbank/wat-is-chatbot-overdracht",
+          "/blog/wat-is-chatbot-overdracht",
           "/blog/chatbot-laten-maken-wanneer-zinvol"
         ],
         "decision": "distinct",
@@ -1077,7 +1077,7 @@
         ],
         "incomingLinks": [
           "/blog/chatbot-crm-koppeling-leads-opvolgen",
-          "/kennisbank/wat-is-chatbot-overdracht"
+          "/blog/wat-is-chatbot-overdracht"
         ],
         "outgoingLinks": [
           "/chatbot-laten-maken",
@@ -1147,7 +1147,7 @@
         "closestPaths": [
           "/vergelijkingen/ai-telefonist-vs-receptionist",
           "/blog/ai-telefonist-voor-afspraakintake",
-          "/kennisbank/wat-is-een-ai-telefonist"
+          "/blog/wat-is-een-ai-telefonist"
         ],
         "decision": "distinct",
         "rationale": "De vergelijking verdeelt gesprekken tussen mens en AI, de afspraakpagina behandelt één intake-use-case en de kennisbank geeft de definitie. Deze publicatie behandelt uitsluitend de vijf begrotingslagen, belvolumescenario's, gebruikseenheden, acceptatie en beheer voor een gekozen gesprekstaak."
@@ -1282,9 +1282,9 @@
       "id": "website-migration-013",
       "status": "shipped",
       "shippedAt": "2026-08-26",
-      "shippedPath": "/kennisbank/website-migratie-zonder-seo-verlies",
-      "path": "/kennisbank/website-migratie-zonder-seo-verlies",
-      "contentType": "kennisbank",
+      "shippedPath": "/blog/website-migratie-zonder-seo-verlies",
+      "path": "/blog/website-migratie-zonder-seo-verlies",
+      "contentType": "blog",
       "cluster": "websites",
       "primaryQuery": "website migratie zonder seo verlies",
       "intent": "Technische en inhoudelijke migratiecontrole voor een nieuwe website",
@@ -1311,7 +1311,7 @@
         "closestPaths": [
           "/blog/website-laten-maken-kosten-2026",
           "/blog/website-laten-maken-mkb-paginas",
-          "/kennisbank/wat-is-interne-linkstructuur"
+          "/blog/wat-is-interne-linkstructuur"
         ],
         "decision": "distinct",
         "rationale": "De kostengids behandelt budget, de paginagids de benodigde inhoudsrollen en de linkgids het blijvende linknetwerk. Deze publicatie is eigenaar van de overgang tussen oud en nieuw: inventaris, URL-mapping, redirects, canonicals, sitemap, livebewijs en herstel. De dichtstbijzijnde corpusoverlap bleef met 0,039 laag."
@@ -1343,8 +1343,8 @@
           "Welke signalen controleer je direct na migratie?"
         ],
         "incomingLinks": [
-          "/kennisbank/wat-is-een-conversiegerichte-website",
-          "/kennisbank/wat-is-interne-linkstructuur"
+          "/blog/wat-is-een-conversiegerichte-website",
+          "/blog/wat-is-interne-linkstructuur"
         ],
         "outgoingLinks": [
           "/website-laten-maken",
@@ -1366,8 +1366,8 @@
     {
       "id": "website-monitoring-028",
       "status": "ready",
-      "path": "/kennisbank/website-monitoring-na-livegang",
-      "contentType": "kennisbank",
+      "path": "/blog/website-monitoring-na-livegang",
+      "contentType": "blog",
       "cluster": "websites",
       "primaryQuery": "website monitoring",
       "intent": "Een zakelijke website na livegang technisch, organisch en op conversie-uitkomsten bewaken",
@@ -1398,7 +1398,7 @@
         "checkedAt": "2026-08-26",
         "closestPaths": [
           "/blog/website-leadgeneratie-mkb-meten",
-          "/kennisbank/wat-is-een-conversiegerichte-website",
+          "/blog/wat-is-een-conversiegerichte-website",
           "/blog/website-laten-maken-kosten-2026"
         ],
         "decision": "distinct",
@@ -1432,11 +1432,11 @@
         ],
         "incomingLinks": [
           "/blog/website-leadgeneratie-mkb-meten",
-          "/kennisbank/wat-is-een-conversiegerichte-website"
+          "/blog/wat-is-een-conversiegerichte-website"
         ],
         "outgoingLinks": [
           "/website-laten-maken",
-          "/kennisbank/website-migratie-zonder-seo-verlies"
+          "/blog/website-migratie-zonder-seo-verlies"
         ],
         "conversionPath": "Van een controleerbare monitoringskaart naar een website-scopegesprek over beheer, meetbaarheid en herstel na livegang.",
         "claimRisk": "Geen permanente uptime, volledige detectie, gegarandeerde rankings of betrouwbare leadattributie beloven; scheid technische observatie, organische richting en bewezen conversie-uitkomst.",
@@ -1580,7 +1580,7 @@
         "closestPaths": [
           "/vergelijkingen/crm-op-maat-vs-standaard-crm",
           "/blog/crm-systeem-op-maat-spreadsheets-vervangen",
-          "/kennisbank/wat-is-een-crm-systeem"
+          "/blog/wat-is-een-crm-systeem"
         ],
         "decision": "distinct",
         "rationale": "De kandidaat behandelt licentie, inrichting, migratie, koppelingen, training en beheer als total-cost-vraag."
@@ -1656,7 +1656,7 @@
       "overlap": {
         "checkedAt": "2026-07-17",
         "closestPaths": [
-          "/kennisbank/wat-is-bedrijfssoftware-op-maat",
+          "/blog/wat-is-bedrijfssoftware-op-maat",
           "/blog/maatwerk-software-offerte-beoordelen",
           "/vergelijkingen/maatwerk-software-vs-standaard-software"
         ],
@@ -1690,7 +1690,7 @@
           "Wie moet de applicatie voor livegang testen?"
         ],
         "incomingLinks": [
-          "/kennisbank/wat-is-bedrijfssoftware-op-maat",
+          "/blog/wat-is-bedrijfssoftware-op-maat",
           "/blog/maatwerk-software-offerte-beoordelen"
         ],
         "outgoingLinks": [
@@ -1839,7 +1839,7 @@
         "checkedAt": "2026-08-11",
         "closestPaths": [
           "/blog/crm-taken-reminders-automatiseren-mkb",
-          "/kennisbank/wat-is-crm-datakwaliteit",
+          "/blog/wat-is-crm-datakwaliteit",
           "/vergelijkingen/crm-op-maat-vs-standaard-crm"
         ],
         "decision": "distinct",
@@ -1877,7 +1877,7 @@
         ],
         "outgoingLinks": [
           "/crm-systeem-op-maat",
-          "/kennisbank/wat-is-crm-datakwaliteit"
+          "/blog/wat-is-crm-datakwaliteit"
         ],
         "conversionPath": "Van adoptieproblemen naar een CRM-scopegesprek over procesfit, rollen en een beheersbare eerste versie.",
         "claimRisk": "Geen gegarandeerde adoptie, productiviteitswinst of personeelsbesparing; benoem menselijke verantwoordelijkheid en meetbare gebruikssignalen.",
@@ -2066,8 +2066,8 @@
     {
       "id": "crm-roles-rights-024",
       "status": "ready",
-      "path": "/kennisbank/crm-rollen-rechten-inrichten-mkb",
-      "contentType": "kennisbank",
+      "path": "/blog/crm-rollen-rechten-inrichten-mkb",
+      "contentType": "blog",
       "cluster": "software-crm",
       "primaryQuery": "crm rollen en rechten instellen",
       "intent": "CRM-toegang per functie afbakenen voordat gebruikers worden ingericht",
@@ -2099,7 +2099,7 @@
         "closestPaths": [
           "/blog/crm-adoptie-medewerkers-mkb",
           "/blog/crm-eisen-wensenlijst-mkb",
-          "/kennisbank/wat-is-crm-datakwaliteit"
+          "/blog/wat-is-crm-datakwaliteit"
         ],
         "decision": "distinct",
         "rationale": "De adoptiepagina legt werkafspraken en training per rol vast, de eisenpagina prioriteert scenario's en de datakwaliteitspagina behandelt gegevensbruikbaarheid. Deze kandidaat maakt uitsluitend de toegangsmatrix voor bekijken, wijzigen, goedkeuren, exporteren en herstellen controleerbaar."
@@ -2136,7 +2136,7 @@
         ],
         "outgoingLinks": [
           "/crm-systeem-op-maat",
-          "/kennisbank/wat-is-crm-datakwaliteit"
+          "/blog/wat-is-crm-datakwaliteit"
         ],
         "conversionPath": "Van een controleerbare rollenmatrix naar een CRM-scopegesprek over procesfit, gegevensbereik en beheersbare inrichting.",
         "claimRisk": "Geen absolute beveiliging, compliance of juridisch juiste toegang beloven; benoem platformafhankelijkheid, menselijke goedkeuring en periodieke controle.",
@@ -2155,9 +2155,9 @@
       "id": "voice-crm-integration-025",
       "status": "shipped",
       "shippedAt": "2026-08-18",
-      "shippedPath": "/kennisbank/ai-telefonist-crm-koppeling",
-      "path": "/kennisbank/ai-telefonist-crm-koppeling",
-      "contentType": "kennisbank",
+      "shippedPath": "/blog/ai-telefonist-crm-koppeling",
+      "path": "/blog/ai-telefonist-crm-koppeling",
+      "contentType": "blog",
       "cluster": "ai-contact",
       "primaryQuery": "ai telefonist crm koppeling",
       "intent": "Gespreksuitkomsten gecontroleerd naar CRM, agenda of taken doorzetten",
@@ -2189,7 +2189,7 @@
         "closestPaths": [
           "/blog/ai-telefonist-voor-afspraakintake",
           "/blog/ai-telefonist-kosten-mkb",
-          "/kennisbank/wat-is-een-crm-integratie"
+          "/blog/wat-is-een-crm-integratie"
         ],
         "decision": "distinct",
         "rationale": "De afspraakpagina behandelt de informatievraag in het gesprek, de kostengids begroot de totale telefonieflow en de CRM-definitie legt een algemene integratie uit. Deze kandidaat behandelt uitsluitend welke call-events en gegevens veilig naar CRM of agenda gaan, hoe dubbele of mislukte levering wordt hersteld en wanneer een mens beslist."
@@ -2226,7 +2226,7 @@
         ],
         "outgoingLinks": [
           "/ai-telefonist",
-          "/kennisbank/wat-is-een-crm-integratie"
+          "/blog/wat-is-een-crm-integratie"
         ],
         "conversionPath": "Van event- en veldmapping naar een scopegesprek over één controleerbare AI-telefonieflow met herstel en menselijke eigenaar.",
         "claimRisk": "Geen foutloze koppeling, volledige beveiliging, autonome boeking of compliance beloven; benoem leveranciersevents, minimale data, menselijke goedkeuring en specialistisch advies waar nodig.",
@@ -2246,9 +2246,9 @@
       "id": "voice-acceptance-026",
       "status": "shipped",
       "shippedAt": "2026-08-25",
-      "shippedPath": "/kennisbank/ai-telefonist-acceptatietest-opstellen",
-      "path": "/kennisbank/ai-telefonist-acceptatietest-opstellen",
-      "contentType": "kennisbank",
+      "shippedPath": "/blog/ai-telefonist-acceptatietest-opstellen",
+      "path": "/blog/ai-telefonist-acceptatietest-opstellen",
+      "contentType": "blog",
       "cluster": "ai-contact",
       "primaryQuery": "ai telefonist testen",
       "intent": "Een AI telefonist met echte gespreks-, actie- en herstelscenario's accepteren vóór livegang",
@@ -2313,7 +2313,7 @@
         ],
         "incomingLinks": [
           "/blog/ai-telefonist-kosten-mkb",
-          "/kennisbank/ai-telefonist-crm-koppeling"
+          "/blog/ai-telefonist-crm-koppeling"
         ],
         "outgoingLinks": [
           "/ai-telefonist",
@@ -2336,8 +2336,8 @@
     {
       "id": "voice-monitoring-027",
       "status": "ready",
-      "path": "/kennisbank/ai-telefonist-monitoring-na-livegang",
-      "contentType": "kennisbank",
+      "path": "/blog/ai-telefonist-monitoring-na-livegang",
+      "contentType": "blog",
       "cluster": "ai-contact",
       "primaryQuery": "ai telefonist kwaliteit monitoren",
       "intent": "Na livegang afwijkingen in gesprek, audio, acties, overdracht en herstel gecontroleerd opsporen en beoordelen",
@@ -2367,8 +2367,8 @@
       "overlap": {
         "checkedAt": "2026-08-25",
         "closestPaths": [
-          "/kennisbank/ai-telefonist-acceptatietest-opstellen",
-          "/kennisbank/ai-telefonist-crm-koppeling",
+          "/blog/ai-telefonist-acceptatietest-opstellen",
+          "/blog/ai-telefonist-crm-koppeling",
           "/blog/ai-telefonist-kosten-mkb"
         ],
         "decision": "distinct",
@@ -2401,7 +2401,7 @@
           "Welke metingen tonen kwaliteit zonder omzet of klanttevredenheid te verzinnen?"
         ],
         "incomingLinks": [
-          "/kennisbank/ai-telefonist-acceptatietest-opstellen",
+          "/blog/ai-telefonist-acceptatietest-opstellen",
           "/blog/ai-telefonist-kosten-mkb"
         ],
         "outgoingLinks": [
@@ -2495,7 +2495,7 @@
         ],
         "outgoingLinks": [
           "/website-laten-maken",
-          "/kennisbank/website-migratie-zonder-seo-verlies"
+          "/blog/website-migratie-zonder-seo-verlies"
         ],
         "conversionPath": "Van een compleet contentoverdrachtsdossier naar een afgebakend websitegesprek zonder verborgen aanlever- en correctiewerk.",
         "claimRisk": "Geen vaste doorlooptijd, foutloze overdracht, ranking of conversie beloven; geen geheimen in documenten verzamelen en rechten of privacy niet als juridisch advies behandelen.",
@@ -2513,8 +2513,8 @@
     {
       "id": "website-accessibility-acceptance-030",
       "status": "ready",
-      "path": "/kennisbank/website-toegankelijkheid-testen-mkb",
-      "contentType": "kennisbank",
+      "path": "/blog/website-toegankelijkheid-testen-mkb",
+      "contentType": "blog",
       "cluster": "websites",
       "primaryQuery": "website toegankelijkheid testen",
       "intent": "Toegankelijkheidsproblemen vóór oplevering met automatische en menselijke controles aantoonbaar beoordelen",
@@ -2546,7 +2546,7 @@
         "closestPaths": [
           "/blog/website-briefing-maken-mkb",
           "/blog/website-offerte-vergelijken",
-          "/kennisbank/wat-is-een-conversiegerichte-website"
+          "/blog/wat-is-een-conversiegerichte-website"
         ],
         "decision": "distinct",
         "rationale": "De briefing maakt toegankelijkheid onderdeel van de opdracht, de offertegids vergelijkt leveranciersbewijs en de conversiegids behandelt een brede bezoekersroute. Deze kandidaat bezit uitsluitend de acceptatieset: testscope, automatische signalen, menselijke toetsenbord- en schermlezerbeoordeling, foutbewijs, herstel en hertest vóór livegang."
@@ -2583,7 +2583,7 @@
         ],
         "outgoingLinks": [
           "/website-laten-maken",
-          "/kennisbank/wat-is-een-conversiegerichte-website"
+          "/blog/wat-is-een-conversiegerichte-website"
         ],
         "conversionPath": "Van een controleerbare toegankelijkheidsacceptatieset naar een website-scopegesprek met menselijke beoordeling, herstel en hertest.",
         "claimRisk": "Geen volledige toegankelijkheid, wettelijke compliance of afwezigheid van barrières beloven; benoem steekproef, toolbeperkingen, menselijke expertise en specialistisch advies waar nodig.",
@@ -2673,7 +2673,7 @@
         ],
         "outgoingLinks": [
           "/ai-automatisering",
-          "/kennisbank/wat-is-procesautomatisering"
+          "/blog/wat-is-procesautomatisering"
         ],
         "conversionPath": "Van een gelijkgezette AI-offertematrix naar een procesgesprek over één controleerbare automatiseringsroute.",
         "claimRisk": "Geen leverancier rangschikken zonder actueel controleerbaar bewijs; geen ROI, veiligheid, foutloosheid, prijs of compliance beloven.",
@@ -2691,8 +2691,8 @@
     {
       "id": "ai-automation-change-control-032",
       "status": "ready",
-      "path": "/kennisbank/ai-automatisering-wijzigingen-beheren",
-      "contentType": "kennisbank",
+      "path": "/blog/ai-automatisering-wijzigingen-beheren",
+      "contentType": "blog",
       "cluster": "ai-automatisering",
       "primaryQuery": "ai automatisering beheren",
       "intent": "Wijzigingen aan data, modelgedrag, koppelingen en beslisgrenzen na livegang gecontroleerd beoordelen en accepteren",
@@ -2761,7 +2761,7 @@
         ],
         "outgoingLinks": [
           "/ai-automatisering",
-          "/kennisbank/wat-is-procesautomatisering"
+          "/blog/wat-is-procesautomatisering"
         ],
         "conversionPath": "Van gecontroleerd wijzigingsbeheer naar een gesprek over een begrensde AI-procesroute met eigenaarschap, heracceptatie en herstel.",
         "claimRisk": "Geen foutloze werking, volledige veiligheid of automatische compliance beloven; geen wijziging als causaal succes presenteren zonder representatieve vergelijking en livebewijs.",
@@ -2779,8 +2779,8 @@
     {
       "id": "chatbot-knowledge-governance-033",
       "status": "ready",
-      "path": "/kennisbank/chatbot-kennisbronnen-beheren",
-      "contentType": "kennisbank",
+      "path": "/blog/chatbot-kennisbronnen-beheren",
+      "contentType": "blog",
       "cluster": "ai-contact",
       "primaryQuery": "chatbot kennisbronnen beheren",
       "intent": "Bronnen, eigenaarschap, actualiteit en antwoordbewijs van een zakelijke chatbot beheersbaar houden",
@@ -2810,8 +2810,8 @@
       "overlap": {
         "checkedAt": "2026-09-04",
         "closestPaths": [
-          "/kennisbank/chatbot-acceptatietest-opstellen",
-          "/kennisbank/wat-is-chatbot-overdracht",
+          "/blog/chatbot-acceptatietest-opstellen",
+          "/blog/wat-is-chatbot-overdracht",
           "/blog/chatbot-crm-koppeling-leads-opvolgen"
         ],
         "decision": "distinct",
@@ -2844,12 +2844,12 @@
           "Welke antwoorden moet je opnieuw testen nadat een bron verandert?"
         ],
         "incomingLinks": [
-          "/kennisbank/chatbot-acceptatietest-opstellen",
+          "/blog/chatbot-acceptatietest-opstellen",
           "/blog/chatbot-crm-koppeling-leads-opvolgen"
         ],
         "outgoingLinks": [
           "/chatbot-laten-maken",
-          "/kennisbank/wat-is-chatbot-overdracht"
+          "/blog/wat-is-chatbot-overdracht"
         ],
         "conversionPath": "Van een controleerbaar bronregister naar een gesprek over een afgebakende chatbot met eigenaarschap, antwoordbewijs en herstelroute.",
         "claimRisk": "Geen volledige actualiteit, foutloze antwoorden, automatische bronverwerking of compliance beloven; onderscheid configuratie, broninhoud, verwerkingstijd en menselijke acceptatie.",
@@ -2898,7 +2898,7 @@
       "overlap": {
         "checkedAt": "2026-09-09",
         "closestPaths": [
-          "/kennisbank/crm-migratie-stappenplan",
+          "/blog/crm-migratie-stappenplan",
           "/blog/maatwerk-software-offerte-beoordelen",
           "/blog/crm-systeem-kosten-mkb"
         ],
@@ -2932,12 +2932,12 @@
           "Welk bewijs, herstelpad en nazorg hoort vóór opdrachtverlening te zijn afgesproken?"
         ],
         "incomingLinks": [
-          "/kennisbank/crm-migratie-stappenplan",
+          "/blog/crm-migratie-stappenplan",
           "/blog/crm-systeem-kosten-mkb"
         ],
         "outgoingLinks": [
           "/crm-systeem-op-maat",
-          "/kennisbank/crm-migratie-stappenplan"
+          "/blog/crm-migratie-stappenplan"
         ],
         "conversionPath": "Van een gelijkgezette migratie-offertematrix naar een scopegesprek over een controleerbare CRM-overgang.",
         "claimRisk": "Geen leverancier, prijs, doorlooptijd, foutloosheid, nul downtime of juridisch oordeel beloven; vergelijk alleen expliciete scope en controleerbaar bewijs.",

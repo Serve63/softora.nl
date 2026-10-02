@@ -121,13 +121,13 @@ test('content growth actions have an explicit machine-readable event plan', () =
     events.map((event) => [event.path, event.eventAt, event.publicationKind, event.status]),
     [
       [
-        '/kennisbank/wat-is-bedrijfssoftware-op-maat',
+        '/blog/wat-is-bedrijfssoftware-op-maat',
         '2026-09-25',
         'substantial_refresh',
         'scheduled',
       ],
       [
-        '/kennisbank/wat-is-interne-linkstructuur',
+        '/blog/wat-is-interne-linkstructuur',
         '2026-09-23',
         'other_growth_action',
         'scheduled',
@@ -151,7 +151,7 @@ test('content growth actions have an explicit machine-readable event plan', () =
         'scheduled',
       ],
       [
-        '/kennisbank/wat-is-een-crm-integratie',
+        '/blog/wat-is-een-crm-integratie',
         '2026-08-12',
         'substantial_refresh',
         'scheduled',
@@ -175,7 +175,7 @@ test('content growth actions have an explicit machine-readable event plan', () =
         'scheduled',
       ],
       [
-        '/kennisbank/wat-is-een-conversiegerichte-website',
+        '/blog/wat-is-een-conversiegerichte-website',
         '2026-09-06',
         'other_growth_action',
         'scheduled',
@@ -187,25 +187,25 @@ test('content growth actions have an explicit machine-readable event plan', () =
         'scheduled',
       ],
       [
-        '/kennisbank/wat-is-procesautomatisering',
+        '/blog/wat-is-procesautomatisering',
         '2026-09-07',
         'other_growth_action',
         'scheduled',
       ],
       [
-        '/kennisbank/wat-is-een-klantportaal',
+        '/blog/wat-is-een-klantportaal',
         '2026-08-21',
         'substantial_refresh',
         'scheduled',
       ],
       [
-        '/kennisbank/wat-is-een-ai-telefonist',
+        '/blog/wat-is-een-ai-telefonist',
         '2026-08-22',
         'substantial_refresh',
         'scheduled',
       ],
       [
-        '/kennisbank/wat-is-chatbot-overdracht',
+        '/blog/wat-is-chatbot-overdracht',
         '2026-08-27',
         'substantial_refresh',
         'scheduled',
@@ -217,7 +217,7 @@ test('content growth actions have an explicit machine-readable event plan', () =
         'scheduled',
       ],
       [
-        '/kennisbank/wat-is-lead-scoring',
+        '/blog/wat-is-lead-scoring',
         '2026-09-26',
         'substantial_refresh',
         'scheduled',
@@ -243,14 +243,14 @@ test('content growth actions have an explicit machine-readable event plan', () =
     ]
   );
   assert.equal(
-    events.find((event) => event.path === '/kennisbank/wat-is-interne-linkstructuur').publicationLane,
+    events.find((event) => event.path === '/blog/wat-is-interne-linkstructuur').publicationLane,
     'editorial'
   );
 });
 
 test('new content appears once when it also records an explicit new-url event', () => {
   const events = getSeoMachinePublicationPlan({ now: new Date('2026-08-18T12:00:00.000Z') })
-    .filter((event) => event.path === '/kennisbank/ai-telefonist-crm-koppeling');
+    .filter((event) => event.path === '/blog/ai-telefonist-crm-koppeling');
 
   assert.equal(events.length, 1);
   assert.equal(events[0].publicationKind, 'new_url');
@@ -260,7 +260,7 @@ test('new content appears once when it also records an explicit new-url event', 
 
 test('website-migratiepublicatie staat eenmaal als nieuwe URL in het machineplan', () => {
   const events = getSeoMachinePublicationPlan({ now: new Date('2026-08-26T12:00:00.000Z') })
-    .filter((event) => event.path === '/kennisbank/website-migratie-zonder-seo-verlies');
+    .filter((event) => event.path === '/blog/website-migratie-zonder-seo-verlies');
 
   assert.equal(events.length, 1);
   assert.equal(events[0].publicationKind, 'new_url');
@@ -466,4 +466,13 @@ test('cadence gate treats an observed cap breach as operations P0', () => {
   assert.equal(result.status, 'p0');
   assert.equal(result.exitCode, 1);
   assert.match(result.errors.join(' '), /geldpagina-cap.*3\/2/i);
+});
+
+
+test('a visible localized publication date is verified through its time datetime value', () => {
+  const { hasVisiblePublishedDate } = require('../../server/services/seo-machine-publication-ledger');
+  assert.equal(hasVisiblePublishedDate('<time datetime="2026-10-02">2 oktober 2026</time>', '2026-10-02'), true);
+  assert.equal(hasVisiblePublishedDate('<time datetime="2026-10-01">1 oktober 2026</time>', '2026-10-02'), false);
+  assert.equal(hasVisiblePublishedDate('<time datetime="2026-10-02"></time>', '2026-10-02'), false);
+  assert.equal(hasVisiblePublishedDate('<span>2026-10-02</span>', '2026-10-02'), true);
 });

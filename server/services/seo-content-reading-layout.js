@@ -21,7 +21,7 @@ function renderContentNavigation({ conversionPage, whatsappUrl, escapeHtml }) {
   const links = [
     ['/diensten', 'Diensten'], ['/pakketten', 'Pakketten'], ['/website-laten-maken', 'Websites'],
     ['/ai-automatisering', 'AI'], ['/bedrijfssoftware-op-maat', 'Software'], ['/blog', 'Artikelen'],
-    ['/kennisbank', 'Kennisbank'], ['/vergelijkingen', 'Vergelijkingen'], ['/branches', 'Branches'], ['/regio', 'Regio'],
+    ['/vergelijkingen', 'Vergelijkingen'], ['/branches', 'Branches'], ['/regio', 'Regio'],
   ];
   return [
     '  <a class="content-skip" href="#hoofdinhoud">Naar de inhoud</a>',
@@ -40,4 +40,10 @@ function renderContentNavigation({ conversionPage, whatsappUrl, escapeHtml }) {
   ].join('\n');
 }
 
-module.exports = { renderContentNavigation, renderReadingNavigation, sectionId };
+function getBackLabelForCollection(collection) {
+  if (!collection) return 'overzicht';
+  if (['blog', 'kennisbank'].includes(collection.key)) return 'artikelen';
+  return ['vergelijkingen', 'branches', 'regio'].includes(collection.key) ? collection.key : 'overzicht';
+}
+
+module.exports = { getBackLabelForCollection, renderContentNavigation, renderReadingNavigation, sectionId };

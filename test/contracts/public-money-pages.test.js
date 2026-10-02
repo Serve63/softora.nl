@@ -105,7 +105,7 @@ test('website money page is focused on SEO, leads and clean internal links', () 
   assert.match(entry.description, /SEO-vriendelijke website/);
   assert.ok(entry.relatedLinks.includes('/website-laten-maken-oisterwijk'));
   assert.ok(entry.relatedLinks.includes('/blog/website-laten-maken-mkb-paginas'));
-  assert.ok(entry.relatedLinks.includes('/kennisbank/wat-is-een-conversiegerichte-website'));
+  assert.ok(entry.relatedLinks.includes('/blog/wat-is-een-conversiegerichte-website'));
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/pakketten'));
 });
@@ -189,7 +189,7 @@ test('bedrijfssoftware overtuigingspagina maakt tijdverlies en de maatwerkoploss
   assert.match(entry.description, /CRM, planning, offertes of een klantportaal/);
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
   assert.ok(entry.relatedLinks.includes('/ai-automatisering'));
-  assert.ok(entry.relatedLinks.includes('/kennisbank/wat-is-offerte-automatisering'));
+  assert.ok(entry.relatedLinks.includes('/blog/wat-is-offerte-automatisering'));
 
   const graph = getStructuredDataGraph(source);
   const service = graph.find((item) => item['@type'] === 'Service');
@@ -478,7 +478,7 @@ test('ai telefonist money page answers comparison and follow-up intent', () => {
   assert.match(entry.description, /leadkwalificatie, afspraakverzoeken en CRM-opvolging/);
   assert.ok(entry.relatedLinks.includes('/voicesoftware-op-maat'));
   assert.ok(entry.relatedLinks.includes('/crm-systeem-op-maat'));
-  assert.ok(entry.relatedLinks.includes('/kennisbank/wat-is-een-ai-telefonist'));
+  assert.ok(entry.relatedLinks.includes('/blog/wat-is-een-ai-telefonist'));
 });
 
 test('voicesoftware offer distinguishes confirmed CRM delivery from call completion', () => {
@@ -499,7 +499,7 @@ test('voicesoftware offer distinguishes confirmed CRM delivery from call complet
   assert.match(css, /:focus-visible/);
   assert.equal(entry.lastmod, '2026-09-15');
   assert.equal(entry.growthEventKind, 'other_growth_action');
-  assert.ok(entry.relatedLinks.includes('/kennisbank/ai-telefonist-crm-koppeling'));
+  assert.ok(entry.relatedLinks.includes('/blog/ai-telefonist-crm-koppeling'));
   assert.ok(JSON.stringify(guide.sections).includes('voicesoftware op maat'));
   assert.ok(JSON.stringify(guide.sections).includes('/voicesoftware-op-maat'));
   assert.equal(guide.updatedAt, '2026-08-18', 'A bounded navigation addition is not a full content refresh');
@@ -564,7 +564,7 @@ test('over softora page is customer-facing and explains the company clearly', ()
   assert.match(source, /href="\/crm-systeem-op-maat"/);
   assert.match(source, /href="\/chatbot-laten-maken"/);
   assert.match(source, /href="\/blog"/);
-  assert.match(source, /href="\/kennisbank"/);
+  assert.match(source, /href="\/blog">Artikelen<\/a>/);
   assert.match(source, /data-softora-public-seo="internal-links"/);
   assert.doesNotMatch(source, /overlay|login-box|Binnenkort beschikbaar|toegangscode/i);
   assert.doesNotMatch(source, /De contentlaag krijgt straks|Volgende contentblokken|SEO-machine/i);
