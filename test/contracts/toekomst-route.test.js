@@ -116,26 +116,21 @@ test('toekomst mobile features the first website card and shortens the meeting b
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
  assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
- assert.match(html,/ai-medewerker\.css\?v=contact-icons-balanced-seo-20261002/);
+ assert.match(html,/ai-medewerker\.css\?v=contact-icons-footer-text-20261002/);
 });
 
 test('toekomst footer uses a quiet centered article link with a direct blog destination', () => {
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
  const footer=html.match(/<footer>[^]*?<\/footer>/)?.[0] || '';
- assert.match(footer,/<a class="articles-link" href="https:\/\/www\.softora\.nl\/blog"><span>Bekijk onze artikelen<\/span><svg[^>]*aria-hidden="true"/);
- assert.doesNotMatch(footer,/Artikelen lezen|↗/);
+ assert.match(footer,/<a class="articles-link" href="https:\/\/www\.softora\.nl\/blog"><span>Bekijk onze artikelen<\/span><\/a>/);
+ assert.doesNotMatch(footer,/Artikelen lezen|↗|<svg/);
  assert.match(css,/\.toekomst-ai footer\{display:grid;grid-template-columns:minmax\(0,1fr\) auto minmax\(0,1fr\);/);
  assert.match(css,/@media\(max-width:760px\)\{\s*\.toekomst-ai footer\{grid-template-columns:minmax\(0,1fr\);justify-items:center;/);
  assert.match(css,/\.toekomst-ai \.articles-link\{grid-row:1\}/);
  assert.match(css,/\.toekomst-ai \.footer-copyright\{grid-row:2\}/);
- assert.match(footer,/<a class="footer-personnel" href="\/premium-personeel-login"><span>Personeel<\/span><svg[^>]*aria-hidden="true"/);
- const arrows=Array.from(footer.matchAll(/<svg[^>]*><path d="([^"]+)"\/><\/svg>/g),match=>match[1]);
- assert.deepEqual(arrows,['M4 12 12 4M4 4h8v8','M4 12 12 4M4 4h8v8']);
- assert.equal((footer.match(/viewBox="0 0 16 16"/g)||[]).length,2);
- assert.equal((footer.match(/stroke-width="2\.25"/g)||[]).length,2);
+ assert.match(footer,/<a class="footer-personnel" href="\/premium-personeel-login"><span>Personeel<\/span><\/a>/);
  assert.match(css,/\.toekomst-ai \.articles-link,\.toekomst-ai \.footer-personnel\{[^}]*min-height:32px;[^}]*font-size:11px;[^}]*letter-spacing:0;line-height:1\.5;/);
- assert.match(css,/\.toekomst-ai \.articles-link svg,\.toekomst-ai \.footer-personnel svg\{width:14px;height:14px;/);
  assert.ok(fs.existsSync(path.join(root,'premium-personeel-login.html')));
  assert.match(css,/\.toekomst-ai \.footer-personnel\{display:none\}/);
 });
