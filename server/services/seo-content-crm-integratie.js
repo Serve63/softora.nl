@@ -103,6 +103,12 @@ const CRM_INTEGRATIE_CONTENT_ITEM = Object.freeze({
       paragraphs: Object.freeze([
         'Beschrijf eerst het moment waarop de route moet starten. Een nieuwe offerteaanvraag, gewijzigde afspraak, betaald factuurmoment of afgerond telefoongesprek zijn herkenbare gebeurtenissen. Noteer vervolgens welke beslissing of taak in CRM nodig is. Bijvoorbeeld: maak een contact en verkoopkans aan, wijs een eigenaar toe en plan alleen een vervolgstap wanneer de contactgegevens en toestemming daarvoor toereikend zijn.',
         'Microsoft adviseert in zijn actuele implementatierichtlijnen om integraties vanuit bedrijfsdoelen en systeemoverstijgende eisen te ontwerpen en daarna een passend patroon te kiezen. Dat is een bruikbaar uitgangspunt, geen garantie op een probleemloze implementatie. Formuleer per route de trigger, gewenste uitkomst, maximale aanvaardbare vertraging, betrokken rollen en gevolgen wanneer de uitwisseling niet lukt.',
+        Object.freeze({
+          text: 'Voor een websiteformulier begint het bewijs bij ontvangst, niet bij een verzendknop. De gids over website en CRM koppelen werkt de aanvraag-ID, bevestiging en zes tests voor dubbele invoer en herstel uit.',
+          links: Object.freeze([
+            Object.freeze({ anchor: 'website en CRM koppelen', href: '/blog/website-crm-koppeling-leadopvolging-mkb' }),
+          ]),
+        }),
       ]),
     }),
     Object.freeze({

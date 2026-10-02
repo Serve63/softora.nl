@@ -211,6 +211,12 @@ test('content growth actions have an explicit machine-readable event plan', () =
         'scheduled',
       ],
       [
+        '/blog/website-crm-koppeling-leadopvolging-mkb',
+        '2026-10-02',
+        'substantial_refresh',
+        'scheduled',
+      ],
+      [
         '/kennisbank/wat-is-lead-scoring',
         '2026-09-26',
         'substantial_refresh',

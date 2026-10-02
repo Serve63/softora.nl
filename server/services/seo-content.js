@@ -6,6 +6,7 @@ const { SOFTWARE_PROPOSAL_CONTENT_ITEM } = require('./seo-content-software-propo
 const { CRM_COST_CONTENT_ITEM } = require('./seo-content-crm-kosten');
 const { BUSINESS_SOFTWARE_EXPLAINER } = require('./seo-content-business-software-explainer');
 const { LEAD_SCORING_CONTENT_ITEM } = require('./seo-content-lead-scoring');
+const { WEBSITE_CRM_CONTENT_ITEM } = require('./seo-content-website-crm');
 const { buildSeoImageObject, buildSeoImagePreviewMeta, getSeoImageSitemapEntries } = require('./seo-content-image-search');
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
@@ -1294,55 +1295,7 @@ const SEO_CONTENT_ITEMS = Object.freeze([
       Object.freeze({ label: 'AI telefonist', href: '/ai-telefonist' }),
     ]),
   }),
-  Object.freeze({
-    collection: 'blog',
-    slug: 'website-crm-koppeling-leadopvolging-mkb',
-    title: 'Website en CRM koppelen voor betere MKB leadopvolging',
-    description:
-      'Waarom een website sterker wordt wanneer aanvragen direct landen in CRM, taken, statusoverzicht en meetbare opvolging.',
-    category: 'CRM',
-    intent: 'Koopintentie',
-    publishedAt: '2026-06-11',
-    updatedAt: '2026-06-11',
-    image: Object.freeze({
-      src: '/assets/seo-content/crm-datakwaliteit-klantopvolging-softora.jpg',
-      alt: 'Medewerkers bespreken CRM klantopvolging met websiteaanvragen, leadstatussen en duidelijke vervolgtaken.',
-      width: 1600,
-      height: 1000,
-    }),
-    summary:
-      'Een website-CRM-koppeling voorkomt dat aanvragen blijven hangen in losse inboxen en maakt opvolging beter zichtbaar voor het team.',
-    sections: Object.freeze([
-      Object.freeze({
-        heading: 'Een aanvraag is pas waardevol als opvolging klopt',
-        paragraphs: Object.freeze([
-          'Een MKB-website kan bezoekers aantrekken, uitleg geven en contactmomenten verzamelen. Maar als aanvragen daarna in losse mailboxen, WhatsApp-gesprekken of spreadsheets blijven hangen, wordt leadopvolging alsnog kwetsbaar.',
-          'Door de website aan CRM te koppelen, krijgt elke aanvraag sneller een plek. Het team ziet wie contact heeft opgenomen, welke dienst relevant is, welke status erbij hoort en welke vervolgstap nodig is.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Welke informatie je direct wilt vastleggen',
-        paragraphs: Object.freeze([
-          'De basis hoeft niet ingewikkeld te zijn. Naam, bedrijf, contactgegevens, dienst, vraag, bronpagina, urgentie en gewenste opvolging geven vaak al genoeg context om sneller te reageren.',
-          'Daarna kun je uitbreiden met automatische samenvattingen, leadkwalificatie, taken, agenda-acties en rapportages. De koppeling moet vooral voorkomen dat informatie opnieuw handmatig wordt overgetypt.',
-        ]),
-      }),
-      Object.freeze({
-        heading: 'Maak leadkwaliteit meetbaar',
-        paragraphs: Object.freeze([
-          'Een CRM-koppeling maakt ook duidelijk welke pagina’s passende aanvragen opleveren. Niet alleen het aantal leads telt, maar ook de kwaliteit van de vraag, de snelheid van opvolging en de stap die daarna wordt gezet.',
-          'Softora kijkt daarom naar de hele route: zoekvraag, websitepagina, CTA, aanvraag, CRM-status en actie. Zo wordt websitegroei beter verbonden met het echte verkoopproces.',
-        ]),
-      }),
-    ]),
-    relatedLinks: Object.freeze([
-      Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-      Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
-      Object.freeze({ label: 'Website leadgeneratie meten', href: '/blog/website-leadgeneratie-mkb-meten' }),
-      Object.freeze({ label: 'Wat is CRM datakwaliteit?', href: '/kennisbank/wat-is-crm-datakwaliteit' }),
-      Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
-    ]),
-  }),
+  WEBSITE_CRM_CONTENT_ITEM,
   Object.freeze({
     collection: 'kennisbank',
     slug: 'wat-is-een-sales-pipeline-crm',
