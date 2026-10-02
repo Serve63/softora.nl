@@ -1,0 +1,43 @@
+.hello-wave{font-size:22px;line-height:1}
+.chatbot-landing .hello-sticker{border-bottom-left-radius:3px}
+.chatbot-landing .growth-sticker{bottom:12%;right:-1%}
+.conversation-strip{display:flex;align-items:center;justify-content:space-between;gap:28px;border-block:1px solid var(--line);padding-block:33px;color:#655d56}
+.conversation-strip>p{font-size:10px;line-height:1.6;margin:0;color:var(--muted)}
+.conversation-strip>span{display:flex;gap:12px;align-items:center;font-size:12px;font-weight:500;letter-spacing:-.1px}
+.conversation-strip i{font-style:normal;font-weight:400;font-size:29px;color:var(--wine);line-height:1}
+.chatbot-demo .workflow-grid{align-items:center}
+.chatbot-demo .demo-context{font-size:9px!important;line-height:1.8;margin:19px 0 0 18px;color:#8c8279!important;max-width:360px!important}
+.chat-header{gap:11px;padding-block:19px}
+.chat-avatar{width:36px;height:36px;display:grid;place-items:center;background:var(--wine);color:var(--paper);border-radius:11px;font-size:27px;line-height:1;flex-shrink:0}
+.chat-header>div{flex:1;min-width:0}
+.chat-header strong{display:block;font-size:12px;font-weight:600;line-height:1.4}
+.chat-header small{display:block;font-size:8px;color:var(--muted);margin-top:3px}
+.chat-header .demo-badge{font-size:5px;letter-spacing:.8px;padding:5px}
+.chat-panel{padding:24px;min-height:387px}
+.chat-log{display:flex;flex-direction:column;gap:14px}
+.chat-bubble{max-width:91%;padding:13px 15px;font-size:11px;line-height:1.75;border-radius:13px}
+.bot-bubble{align-self:flex-start;background:#f0ebe3;border-bottom-left-radius:3px;color:#4f4740}
+.user-bubble{align-self:flex-end;background:var(--wine);color:#fffaf4;border-bottom-right-radius:3px;max-width:84%}
+.message-author{display:block;font-size:6px;font-weight:600;letter-spacing:1px;margin-bottom:4px;opacity:.7}
+.chat-followup{display:flex;flex-direction:column;gap:14px}
+.chat-followup:not([hidden]){animation:appear .25s ease}
+.chat-reply{display:flex;align-items:center;justify-content:space-between;gap:15px;width:100%;padding:12px 14px;margin-top:20px;border:1px solid #dfc5d0;border-radius:11px;background:#fffaf4;color:var(--wine);font-size:10px;text-align:left;font-weight:550;transition:background .2s}
+.chat-reply:hover{background:#f3e6ed}
+.chat-reply>span{font-size:18px;line-height:1}
+.knowledge-flow{position:relative;aspect-ratio:1.1;max-width:530px;overflow:clip}
+.knowledge-ring{position:absolute;inset:9% 9%;border:1px dashed #d4c6b7;border-radius:50%;transform:rotate(-18deg)}
+.knowledge-pill{position:absolute;display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;background:#fffdf8;padding:14px 21px;font-size:16px;font-weight:550;letter-spacing:-.5px;box-shadow:0 8px 20px #523d2b08}
+.knowledge-website{top:5%;left:14%;transform:rotate(-9deg)}
+.knowledge-questions{top:37%;right:0;transform:rotate(7deg);font-size:13px}
+.knowledge-tone{top:57%;left:2%;transform:rotate(-7deg);font-size:14px}
+.knowledge-core{position:absolute;top:29%;left:28%;width:130px;height:130px;border-radius:50%;background:var(--peach);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--wine);font-size:67px;line-height:1}
+.knowledge-core>span{font-size:6px;letter-spacing:1px;margin-top:12px;font-weight:600}
+.knowledge-answer{position:absolute;bottom:10%;right:7%;padding:16px 21px;background:var(--wine);color:var(--paper);font-size:15px;border-radius:15px 15px 4px 15px;transform:rotate(5deg);box-shadow:0 8px 20px #523d2b12;display:flex;align-items:center;gap:18px}
+.knowledge-answer>span{font-size:25px;line-height:1;color:var(--peach)}
+.knowledge-note{position:absolute;bottom:0;left:14%;font:italic 18px Georgia,serif;color:var(--muted);transform:rotate(-5deg)}
+.knowledge-star{position:absolute;top:1%;right:13%;font-size:58px;color:var(--coral);line-height:1}
+.chatbot-contact-art .contact-doodle{font-size:23px;bottom:-6px}
+@media(max-width:1150px){.conversation-strip{gap:20px}.conversation-strip>span{font-size:11px;gap:9px}.conversation-strip i{font-size:25px}.chat-panel{padding:21px}.knowledge-core{width:116px;height:116px;left:24%;top:29%;font-size:58px}.knowledge-pill{font-size:14px;padding:12px 17px}.knowledge-questions{font-size:11px}.knowledge-tone{font-size:13px}.knowledge-answer{font-size:13px;gap:14px;padding:14px 18px}}
+@media(max-width:900px){.conversation-strip{gap:16px;flex-wrap:wrap;justify-content:center}.conversation-strip>p{width:100%;text-align:center;font-size:9px}.conversation-strip>p>br{display:none}.conversation-strip>span{font-size:10px;gap:7px}.conversation-strip i{font-size:23px}.chat-header{padding:15px;gap:8px}.chat-header strong{font-size:10px}.chat-header small{font-size:7px}.chat-avatar{width:29px;height:29px;font-size:22px;border-radius:9px}.chat-header .demo-badge{font-size:4px;letter-spacing:.5px}.chat-panel{padding:19px 16px;min-height:369px}.chat-bubble{padding:11px 12px;font-size:10px}.chat-reply{font-size:9px;padding:11px}.knowledge-core{width:95px;height:95px;left:24%;top:28%;font-size:47px}.knowledge-core>span{font-size:5px;letter-spacing:.5px;margin-top:8px}.knowledge-pill{font-size:12px;padding:10px 14px}.knowledge-questions{font-size:9px}.knowledge-tone{font-size:11px}.knowledge-answer{font-size:10px;gap:10px;padding:12px 14px;right:5%}.knowledge-answer>span{font-size:20px}.knowledge-note{font-size:14px}.knowledge-star{font-size:43px}.chatbot-contact-art .contact-doodle{font-size:18px;bottom:2px}}
+@media(max-width:640px){.conversation-strip{padding-block:25px;gap:15px 20px}.conversation-strip>p{font-size:9px;margin-bottom:3px}.conversation-strip>span{font-size:10px}.conversation-strip>span:last-child{width:100%;justify-content:center}.conversation-strip i{font-size:24px}.chatbot-landing .hero-visual{margin-top:34px}.hello-wave{font-size:20px}.chatbot-landing .growth-sticker{right:0}.chatbot-demo .workflow-grid{gap:34px}.chatbot-demo .demo-context{font-size:9px!important;margin-left:0}.chat-header{padding:17px 18px;gap:10px}.chat-header strong{font-size:11px}.chat-header small{font-size:7px}.chat-avatar{width:32px;height:32px;font-size:24px}.chat-header .demo-badge{font-size:4px}.chat-panel{padding:22px 19px;min-height:364px}.chat-bubble{padding:12px 14px;font-size:11px}.chat-reply{font-size:10px;padding:12px}.knowledge-flow{order:2;width:100%;max-width:350px;margin:auto}.knowledge-core{width:110px;height:110px;left:24%;top:29%;font-size:56px}.knowledge-core>span{font-size:5px;margin-top:11px}.knowledge-pill{font-size:13px;padding:12px 17px}.knowledge-questions{font-size:10px;right:1%}.knowledge-tone{font-size:12px}.knowledge-answer{font-size:12px;gap:15px;padding:14px 18px;right:5%}.knowledge-note{font-size:15px}.knowledge-star{font-size:49px}.chatbot-contact-art .contact-doodle{font-size:19px;left:3%;bottom:-4px}.chatbot-contact-art>svg{left:49%;width:120px}}
+@media(max-width:360px){.conversation-strip>span{font-size:9px;gap:5px}.conversation-strip{gap:13px 15px}.chat-header .demo-badge{max-width:68px;white-space:normal;text-align:center;font-size:4px}.chat-header strong{font-size:10px}.chat-bubble{font-size:10px}.chat-panel{padding:19px 15px}.knowledge-core{width:95px;height:95px;font-size:48px}.knowledge-pill{font-size:11px;padding:10px 12px}.knowledge-questions{font-size:8px}.knowledge-tone{font-size:10px}.knowledge-answer{font-size:10px;padding:12px 15px;gap:10px}}
