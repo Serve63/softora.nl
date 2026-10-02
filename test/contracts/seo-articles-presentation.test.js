@@ -85,6 +85,33 @@ test('production header shares Toekomst markup and assets are available for both
   for (const asset of ['overview.css', 'article.css', 'header.css', 'overview.js', 'article.js']) assert.equal((await fetch(origin + '/assets/articles/' + asset)).status, 200, asset);
 });
 
+test('article headers constrain contact images and keep the SEO login image smaller than the chatbot', () => {
+  const css = fs.readFileSync(path.resolve(__dirname, '../../assets/articles/header.css'), 'utf8');
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+  const declarations = (selector) => rules.find(([, selectors]) => selectors.split(',').some((entry) => entry.trim() === selector))?.[2] || '';
+  for (const selector of ['.site-header .login-options .login-avatar', '.site-header .contact-options .contact-avatar']) {
+    const style = declarations(selector);
+    assert.match(style, /width:\s*36px;/, selector);
+    assert.match(style, /height:\s*36px;/, selector);
+    assert.match(style, /background:\s*transparent;/, selector);
+  }
+  for (const selector of ['.site-header .login-avatar img', '.site-header .contact-avatar img']) {
+    const style = declarations(selector);
+    assert.match(style, /width:\s*100%;/, selector);
+    assert.match(style, /height:\s*100%;/, selector);
+    assert.match(style, /object-fit:\s*contain;/, selector);
+  }
+  const seoStyle = declarations('.site-header .login-options .login-avatar--seo img');
+  assert.match(seoStyle, /width:\s*85%;/);
+  assert.match(seoStyle, /height:\s*85%;/);
+  for (const html of [renderOverviewHtml({ now }), renderArticleHtml(articles[0], { now })]) {
+    assert.match(html, /header\.css\?v=articles-icons-20261002/);
+    for (const name of ['form', 'whatsapp', 'phone']) {
+      assert.match(html, new RegExp('class="contact-option-icon contact-avatar"[^>]*><img src="/assets/entry/contact-' + name + '-icon-v1\\.webp"'));
+    }
+  }
+});
+
 test('the new presentation preserves existing claim and image checks and introduces no unsafe contact actions', () => {
   const baselineImages = new Set(auditSeoImages({ pages: articles.map((item) => ({ path: '/blog/' + item.slug, html: buildSeoContentArticleHtml(item) })) }).map((issue) => issue.type));
   for (const item of articles) {
