@@ -57,8 +57,9 @@ test('premium actieve opdrachten tonen compacte kaarten zonder persoonlijk filte
   assert.doesNotMatch(pageSource, /onlyMyAssignmentsToggle|Enkel mijn toewijzingen bekijken/);
   assert.doesNotMatch(pageSource, /assets\/premium-personal-assignment-(?:filter|pages)\.(?:css|js)/);
   assert.doesNotMatch(scriptSource, /order-delivery|order-assignee|assigneeEl/);
+  assert.match(scriptSource, /window\.SoftoraActiveOrdersSummary\.summarize\(orderIds/);
 
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-screen-readiness\.js\?v=20260923a"><\/script><script src="assets\/premium-active-orders-readiness\.js\?v=20261002a"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script><script src="assets\/premium-active-orders-boot\.js\?v=20260922c"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20261002a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260922b"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-screen-readiness\.js\?v=20260923a"><\/script><script src="assets\/premium-active-orders-readiness\.js\?v=20261002a"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script><script src="assets\/premium-active-orders-boot\.js\?v=20260922c"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-summary\.js\?v=20261002a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20261002c"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260922b"><\/script>/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-order-open-leads\.js/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-order-manual-open-leads\.js/);
   assert.match(pageSource, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/);
@@ -385,4 +386,21 @@ test('premium opdrachtdossier ondersteunt inline A4 bewerken en slaat edits veil
   assert.match(styleSource, /\.dossier-add-button/);
   assert.doesNotMatch(source, /window\.localStorage/);
   assert.doesNotMatch(source, /window\.sessionStorage/);
+});
+
+
+test('opdrachtentellers gebruiken de volledige omschrijving nadat het persoonlijke filter is verwijderd', () => {
+  const { summarize } = require('../../assets/premium-active-orders-summary');
+  const records = {
+    1: { title: 'Nieuwe website + bedrijfssysteem', description: 'Bedrijfssoftware op maat' },
+    2: { title: 'Nieuwe website', description: 'Een moderne website' },
+    3: { title: 'Chatbot', description: 'Opgeleverde chatbot' },
+  };
+  const orders = { 1: { type: records[1].title }, 2: { type: records[2].title }, 3: { type: records[3].title, isBuilt: true } };
+  const summary = summarize([1, 2, 3, 99], {
+    orders,
+    getCustomOrderById(id) { return records[id]; },
+    resolveOrderUiState(order) { return { isBuilt: Boolean(order.isBuilt) }; },
+  });
+  assert.deepEqual(summary, { total: 2, business: 1, voice: 0, chatbot: 0 });
 });

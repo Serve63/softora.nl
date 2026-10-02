@@ -719,23 +719,6 @@ function setOrderFilter(nextFilter) {
     applyOrderFilter();
 }
 
-function classifyActiveOrderProductLine(order) {
-    const hay = `${String(order?.title || '')} ${String(order?.description || '')}`.toLowerCase();
-    if (!hay.trim()) return 'other';
-    if (/chatbot|chatbots|whatsapp\s*bot|widget\s*bot|conversational\s*bot/.test(hay)) return 'chatbot';
-    if (
-        /voicesoftware|voice\s*software|voice_software|spraaksoftware|belsoftware|telefon(y|ie)|voice\s*agent|ai\s*voice|spraak\s*agent/.test(
-            hay
-        )
-    ) {
-        return 'voice';
-    }
-    if (/bedrijfssoftware|business\s*software|business_software|\bcrm\b|\berp\b/.test(hay)) {
-        return 'business';
-    }
-    return 'other';
-}
-
 function renderSumActiveBreakdown(total, business, voice, chatbot) {
     const root = document.getElementById('sumActive');
     if (!root) return;
@@ -813,24 +796,11 @@ function resolveOrderUiState(orderLike) {
 
 function refreshOrderSummaryCards() {
     const cards = Array.from(document.querySelectorAll('#ordersGrid .order-card'));
-    const activeOrders = cards.reduce((list, card) => {
-        const id = Number(String(card?.id || '').replace('order-', ''));
-        const order = orders[id];
-        if (!order) return list;
-        const ui = resolveOrderUiState(order);
-        if (!ui.isBuilt) list.push(order);
-        return list;
-    }, []);
-    let business = 0;
-    let voice = 0;
-    let chatbot = 0;
-    activeOrders.forEach((o) => {
-        const line = classifyActiveOrderProductLine(o);
-        if (line === 'business') business += 1;
-        else if (line === 'voice') voice += 1;
-        else if (line === 'chatbot') chatbot += 1;
+    const orderIds = cards.map((card) => Number(String(card?.id || '').replace('order-', '')));
+    const summary = window.SoftoraActiveOrdersSummary.summarize(orderIds, {
+        orders, getCustomOrderById, resolveOrderUiState
     });
-    renderSumActiveBreakdown(activeOrders.length, business, voice, chatbot);
+    renderSumActiveBreakdown(summary.total, summary.business, summary.voice, summary.chatbot);
     const openValue = cards.reduce((sum, card) => {
         const id = getOrderFilterGroupForCard(card) === 'in_progress' ? Number(String(card?.id || '').replace('order-', '')) : NaN;
         const order = orders[id];
