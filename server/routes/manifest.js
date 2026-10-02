@@ -10,13 +10,13 @@ const criticalFlowChecklist = Object.freeze([
 ]);
 
 const pageSmokeTargets = Object.freeze([
-  { path: '/diensten', marker: 'Digitale diensten die verkeer omzetten in leads' },
-  { path: '/ai-automatisering', marker: 'AI automatisering voor leads, taken en opvolging' },
+  { path: '/diensten', status: 410, marker: 'Deze pagina is verwijderd' },
+  { path: '/ai-automatisering', status: 410, marker: 'Deze pagina is verwijderd' },
   { path: '/bedrijfssoftware-op-maat', marker: 'Bedrijfssoftware op maat' },
   { path: '/bedrijfssoftware', marker: 'Grip op je werk.' },
   { path: '/website', marker: 'Een website die laat zien wat jouw bedrijf' },
-  { path: '/crm-systeem-op-maat', marker: 'CRM op maat laten bouwen voor sales pipeline en offertes' },
-  { path: '/ai-telefonist', marker: 'Laat geen telefoontje meer zonder opvolging' },
+  { path: '/crm-systeem-op-maat', status: 410, marker: 'Deze pagina is verwijderd' },
+  { path: '/ai-telefonist', status: 410, marker: 'Deze pagina is verwijderd' },
   { path: '/voicesoftware-op-maat', marker: 'Voicesoftware op maat' },
   { path: '/chatbot-laten-maken', marker: 'Chatbot op maat' },
   { path: '/website-laten-maken', marker: 'Website laten maken' },
