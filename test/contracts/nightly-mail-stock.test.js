@@ -175,6 +175,7 @@ test('image usage accounting does not discount cached tokens on direct Image API
   assert.equal(charge, 23);
   assert.equal(budgetChargeCents({ model: 'unpriced-model', usage: {} }), null);
   assert.equal(budgetChargeCents(null), null);
+  assert.equal(budgetChargeCents({ model: 'gpt-image-2.5-sunburst', usage: {} }), null);
 });
 
 test('overlapping worker invocations cannot run the midnight planner before claiming the durable lease', async () => {
@@ -351,4 +352,14 @@ test('nightly replenishment uses four parallel jobs while preserving manual batc
   assert.equal(resolveWorkerConcurrency({ ownerKey: 'owner' }), 2);
   assert.equal(resolveWorkerConcurrency({ ownerKey: OWNER_KEY }, {}, { processingConcurrency: 1 }), 1);
   assert.equal(resolveWorkerConcurrency({ ownerKey: OWNER_KEY }, { concurrency: 100 }), 4);
+});
+
+
+test('an already-ready company cannot pay again while the channel still has a deficit', async () => {
+  const row = customer('ready');
+  const f = fixture(snapshot([row], [row]));
+  let reservations = 0;
+  f.store.reserve = async () => { reservations++; return { reserved: true }; };
+  await assert.rejects(f.service.generate({ id: 'job', customer: row }, async before => { await before(await approvedRequest()); }), /niet meer nodig/);
+  assert.equal(reservations, 0);
 });

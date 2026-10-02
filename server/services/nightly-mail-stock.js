@@ -50,7 +50,7 @@ function budgetChargeCents(generation) {
   // Direct Image API requests have no cached-input discount. EUR accounting
   // deliberately reserves 2 EUR per USD, including a generous FX/tax margin.
   if (!/^gpt-image-2\.5-(sunburst|flare)(-\d{4}-\d{2}-\d{2})?$/.test(generation?.model || '') || !generation?.usage) return null;
-  const usage = generation.usage, details = usage.input_tokens_details;
+  const usage = generation.usage, details = usage.input_tokens_details || {};
   const usd = (details.text_tokens * 5 + details.image_tokens * 8 + usage.output_tokens * 30) / 1e6;
   return Number.isFinite(usd) && usd >= 0 ? Math.ceil(usd * 200) : null;
 }
@@ -174,7 +174,7 @@ function createNightlyMailStockService({ store, dataOpsStore, snapshotService, n
       const provider = providerOf(job.customer);
       const control = await store.readControl();
       const stock = inventory(snapshot);
-      if (!current || (fixedProvider(current) && fixedProvider(current) !== provider) || stock.ready[provider] >= control[`${provider}_target`]) throw halted('Aanvulling niet meer nodig of bedrijf niet meer beschikbaar.');
+      if (!current || stock.readyIds[provider].includes(current.id) || (fixedProvider(current) && fixedProvider(current) !== provider) || stock.ready[provider] >= control[`${provider}_target`]) throw halted('Aanvulling niet meer nodig of bedrijf niet meer beschikbaar.');
       const keys = buildGuardKeysForRow(current);
       const blocked = await dataOpsStore.listOutboundRecipientGuardKeys(keys, { bypassReadFailureCooldown: true, suppressReadFailureCooldown: true });
       if (!Array.isArray(blocked) || blocked.length) throw halted('Verzendbeveiliging blokkeert deze automatische aanvulling.');
