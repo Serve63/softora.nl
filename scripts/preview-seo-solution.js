@@ -7,6 +7,8 @@ const root = path.resolve(__dirname, '..');
 const routes = {
   '/': '/assets/entry/toekomst.html',
   '/toekomst': '/assets/entry/toekomst.html',
+  '/juridisch': '/assets/juridisch/index.html',
+  '/bedrijfsgegevens': '/assets/juridisch/bedrijfsgegevens.html',
   '/seo-solution': '/assets/seo-solution/index.html',
   '/seo-login': '/assets/seo-login/index.html',
   '/chatbot': '/assets/chatbot-landing/index.html',
