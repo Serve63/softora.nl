@@ -121,7 +121,9 @@ function createNightlyMailStockService({ store, dataOpsStore, snapshotService, n
     try {
       const control = await store.readControl();
       if (!control.enabled) return { skipped: true, reason: 'disabled' };
-      if (control.last_check_day !== day && hour !== 0) return { skipped: true, reason: 'outside_midnight_hour' };
+      // After a recorded night, recover a missed midnight once the server returns.
+      const overdue = control.last_check_day && control.last_check_day < day;
+      if (control.last_check_day !== day && hour !== 0 && !overdue) return { skipped: true, reason: 'outside_midnight_hour' };
       if (control.last_check_day === day && control.last_result?.status === 'complete') return { skipped: true, reason: 'already_checked', day };
       const lastCheckAt = Date.parse(control.last_result?.checkedAt || '');
       if (control.last_check_day === day && now() - lastCheckAt < 5 * 60000) return { skipped: true, reason: 'check_cooldown', day };

@@ -90,6 +90,77 @@ test('outside midnight, disabled automation, or unavailable inventory never crea
   assert.equal(broken.control.last_check_day, undefined);
 });
 
+test('a completed night starts again the next Amsterdam midnight after stock is consumed', async () => {
+  const stock = snapshot(Array.from({ length: 200 }, (_, i) => customer(`s${i}`)), [],
+    Array.from({ length: 200 }, (_, i) => customer(`i${i}`, 'instantly')));
+  const f = fixture(stock);
+  assert.equal((await f.service.runDueCheck()).status, 'complete');
+  assert.equal((await f.service.runDueCheck()).reason, 'already_checked');
+  stock.customers.pop();
+  stock.availableCustomers.push(customer('next-night'));
+  f.control.testTime = '2026-10-02T22:00:00Z';
+  const next = await f.service.runDueCheck();
+  assert.equal(next.day, '2026-10-03');
+  assert.equal(next.batchId, 'mail_stock_20261003');
+  assert.deepEqual(next.added, { softora: 1, instantly: 0 });
+  assert.equal(next.status, 'replenishing');
+  assert.equal((await f.service.runDueCheck()).reason, 'check_cooldown');
+  assert.equal(f.plans.length, 1);
+});
+
+test('an outage spanning midnight is caught up after recovery without duplicate plans', async () => {
+  const stock = snapshot([], [customer('catch-up')]);
+  const f = fixture(stock);
+  f.control.softora_target = 1; f.control.instantly_target = 0;
+  f.control.last_check_day = '2026-10-01';
+  f.control.last_result = { status: 'complete', checkedAt: '2026-09-30T22:00:00Z' };
+  let outage = true;
+  f.store.reconcile = async () => { if (outage) throw new Error('database unavailable'); return { ok: true }; };
+  assert.equal((await f.service.runDueCheck()).reason, 'stock_check_unavailable');
+  assert.equal(f.control.last_check_day, '2026-10-01');
+  outage = false;
+  f.control.testTime = '2026-10-02T05:15:00Z'; // 07:15 Amsterdam; the whole midnight hour was missed.
+  const recovered = await f.service.runDueCheck();
+  assert.equal(recovered.status, 'replenishing');
+  assert.equal(recovered.day, '2026-10-02');
+  assert.equal(recovered.added.softora, 1);
+  assert.equal(f.plans.length, 1);
+  assert.equal((await f.service.runDueCheck()).reason, 'check_cooldown');
+  stock.customers.push(stock.availableCustomers.pop());
+  f.plans[0].status = 'charged';
+  f.chunks[0].targets[0].status = 'done';
+  f.control.testTime = '2026-10-02T05:25:00Z';
+  assert.equal((await f.service.runDueCheck()).status, 'complete');
+  assert.equal((await f.service.runDueCheck()).reason, 'already_checked');
+  assert.equal(f.plans.length, 1);
+});
+
+test('seven nights survive scheduler restarts and the switch from summer to winter time', async () => {
+  const nights = ['2026-10-22T22:00:00Z', '2026-10-23T22:00:00Z', '2026-10-24T22:00:00Z',
+    '2026-10-25T23:00:00Z', '2026-10-26T23:00:00Z', '2026-10-27T23:00:00Z', '2026-10-28T23:00:00Z'];
+  let checkpoint = {};
+  const batchIds = new Set();
+  for (let index = 0; index < nights.length; index++) {
+    const stock = snapshot([customer('base')], [customer(`night-${index}`)]);
+    const f = fixture(stock, nights[index]); // Recreate the service; restore its durable day checkpoint.
+    Object.assign(f.control, checkpoint, { softora_target: 2, instantly_target: 0 });
+    const start = await f.service.runDueCheck();
+    assert.equal(start.day, `2026-10-${23 + index}`);
+    assert.equal(start.added.softora, 1);
+    assert.equal(batchIds.has(start.batchId), false);
+    batchIds.add(start.batchId);
+    assert.equal((await f.service.runDueCheck()).reason, 'check_cooldown');
+    stock.customers.push(stock.availableCustomers.pop());
+    f.plans[0].status = 'charged'; f.chunks[0].targets[0].status = 'done';
+    f.control.testTime = new Date(Date.parse(nights[index]) + 10 * 60000).toISOString();
+    assert.equal((await f.service.runDueCheck()).status, 'complete');
+    assert.equal((await f.service.runDueCheck()).reason, 'already_checked');
+    assert.equal(f.plans.length, 1);
+    checkpoint = { last_check_day: f.control.last_check_day, last_result: f.control.last_result };
+  }
+  assert.equal(batchIds.size, 7);
+});
+
 test('an interrupted plan is resumed before marking the day checked', async () => {
   const f = fixture(snapshot([], [customer('sa')]));
   let failing = true;
