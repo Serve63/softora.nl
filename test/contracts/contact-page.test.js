@@ -39,9 +39,11 @@ test('contact page keeps only an accessible form beneath the service chooser hea
     .replace('class="contact-option-icon contact-avatar"', 'class="contact-option-icon contact-avatar contact-avatar--message"')
     .replace('class="contact-option-icon contact-avatar"', 'class="contact-option-icon contact-avatar contact-avatar--phone"')
     .replace('<strong>WhatsApp</strong>', '<strong>Stuur een bericht</strong>')
-    .replace('target="_blank" rel="noopener noreferrer" class="contact-option"', 'target="_blank" rel="noopener noreferrer" class="contact-option" data-softora-conversion="public-cta" data-softora-conversion-page="/contact" data-softora-conversion-target="whatsapp"');
+    .replace('target="_blank" rel="noopener noreferrer" class="contact-option"', 'target="_blank" rel="noopener noreferrer" class="contact-option content-header-contact" data-softora-conversion="public-cta" data-softora-conversion-page="/contact" data-softora-conversion-target="whatsapp"');
 
   assert.ok(source.includes(expectedHeader));
+  assert.match(source, /data-softora-contact-placement="header"/);
+  assert.doesNotMatch(html, /data-softora-whatsapp-widget|public-whatsapp-widget\.css/);
   assert.match(html, /href="https:\/\/wa\.me\/31643262792"/);
   assert.equal((html.match(/<form\b/g) || []).length, 1);
   assert.match(html, /<form id="contact-form" novalidate>/);
