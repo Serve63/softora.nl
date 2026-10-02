@@ -116,7 +116,7 @@ test('toekomst mobile features the first website card and shortens the meeting b
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
  assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
- assert.match(html,/ai-medewerker\.css\?v=login-mascots-small-footer-arrows-20261002/);
+ assert.match(html,/ai-medewerker\.css\?v=contact-icons-balanced-seo-20261002/);
 });
 
 test('toekomst footer uses a quiet centered article link with a direct blog destination', () => {
@@ -153,4 +153,29 @@ test('toekomst login menu uses lightweight transparent figures for both destinat
   assert.ok(asset[20] & 0x10,'Login figure must preserve transparency');
   assert.ok(asset.length<20000,'Login figure should stay below 20 KB');
  }
+});
+
+test('toekomst contact links use transparent 3D images and keep their destinations', () => {
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ const menu=html.match(/<nav class="contact-options" aria-label="Contactmogelijkheden">[^]*?<\/nav>/)?.[0] || '';
+ for(const [name,href] of [['form','https://www.softora.nl/contact'],['whatsapp','https://wa.me/31643262792'],['phone','tel:+31643262792']]) {
+  const option=menu.match(new RegExp('<a href="'+href.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'"[^]*?</a>'))?.[0] || '';
+  assert.ok(option,'Contact destination must remain available: '+href);
+  assert.match(option,new RegExp('class="contact-option-icon contact-avatar" aria-hidden="true"><img src="/assets/entry/contact-'+name+'-icon-v1.webp" alt=""'));
+  const asset=fs.readFileSync(path.join(root,'assets/entry','contact-'+name+'-icon-v1.webp'));
+  assert.equal(asset.toString('ascii',8,12),'WEBP');
+  assert.equal(asset.toString('ascii',12,16),'VP8X');
+  assert.ok(asset[20]&0x10,'Contact icon must preserve transparency');
+  assert.ok(asset.length<20000,'Contact icon should stay below 20 KB');
+ }
+});
+
+test('toekomst reduces only the SEO login image within the shared icon column', () => {
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
+ const seo=html.match(/<a class="contact-option login-option" href="\/seo-login">[^]*?<\/a>/)?.[0] || '';
+ const chatbot=html.match(/<a class="contact-option login-option" href="\/chatbot-login">[^]*?<\/a>/)?.[0] || '';
+ assert.match(seo,/login-avatar--seo/);
+ assert.doesNotMatch(chatbot,/login-avatar--seo/);
+ assert.match(css,/\.login-avatar--seo img\{width:85%;height:85%\}/);
 });

@@ -65,9 +65,10 @@
 
 .toekomst-ai .choice{justify-content:flex-end}
 
-/* Matching 3D figures for the two login destinations. */
-.toekomst-ai .login-options .login-avatar{width:36px;height:36px;background:transparent;border-radius:0}
-.toekomst-ai .login-avatar img{display:block;width:100%;height:100%;object-fit:contain}
+/* Matching 3D figures for login destinations and contact methods. */
+.toekomst-ai .login-options .login-avatar,.toekomst-ai .contact-options .contact-avatar{width:36px;height:36px;background:transparent;border-radius:0}
+.toekomst-ai .login-avatar img,.toekomst-ai .contact-avatar img{display:block;width:100%;height:100%;object-fit:contain}
+.toekomst-ai .login-options .login-avatar--seo img{width:85%;height:85%}
 
 /* Mobile chooser: lead with the website and keep the introduction compact. */
 @media(max-width:760px){
