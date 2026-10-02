@@ -1,4 +1,7 @@
-(function () {
+(function (root, factory) {
+    if (typeof module === "object" && module.exports) module.exports = factory;
+    else root.SoftoraDatabaseSystemMailCount = factory(root);
+})(typeof window !== "undefined" ? window : globalThis, function (window) {
     const ROI_STATE_SCOPE = "premium_database_mail_roi";
     const ROI_STATE_KEY = "premium_database_mail_roi_v1";
     const ROI_APPOINTMENTS_KEY = "premium_database_mail_appointments_v1";
@@ -763,7 +766,7 @@
         renderSystemMailCount(combinedCount, combinedCount === null);
     }
 
-    window.SoftoraDatabaseSystemMailCount = {
+    return {
         getMetricReadiness: function () {
             const statsAgeMs = Date.now() - statsReadVerifiedAtMs;
             return {
@@ -785,4 +788,4 @@
         renderRoiCalculator: renderRoiCalculator,
         render: render
     };
-})();
+});

@@ -2,9 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
-
-const source = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-system-mail-count.js'), 'utf8');
+const createMetrics = require('../../assets/premium-database-system-mail-count');
 
 function environment(saved) {
   const nodes = Object.fromEntries([
@@ -25,8 +23,7 @@ function environment(saved) {
       rememberLastKnown: (key, value) => { writes.push({ key, value }); },
     },
   };
-  vm.runInNewContext(source, { window });
-  return { client: window.SoftoraDatabaseSystemMailCount, nodes, writes,
+  return { client: createMetrics(window), nodes, writes,
     respond: value => { response = value; } };
 }
 
