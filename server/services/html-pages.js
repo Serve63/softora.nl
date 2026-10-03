@@ -17,7 +17,7 @@ const LOCAL_FONT_PRELOAD_AND_STYLESHEET = [
   LOCAL_FONT_STYLESHEET_LINK,
 ].join('\n');
 const PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909b';
-const PREMIUM_PERSONNEL_THEME_VERSION = '20260927-locked';
+const PREMIUM_PERSONNEL_THEME_VERSION = '20261004a';
 const PREMIUM_SIDEBAR_PREFILL_VERSION = '20260927-locked';
 const PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a';
 const PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a';
@@ -738,6 +738,17 @@ function createHtmlPageCoordinator(options = {}) {
     }
     if (isSidebarContentFrame) {
       renderedHtml = applyPremiumSidebarContentFrameHtml(renderedHtml);
+    }
+
+    if ((hasStaticSidebar && /assets\/personnel-theme\.css/i.test(renderedHtml)) || fileName === 'premium-kvk-database.html') {
+      const themeOwner = authState && authState.authenticated
+        ? escapeHtml(String(authState.userId || authState.email || authState.id || '').trim().toLowerCase()) : '';
+      // After legacy light-only boot scripts and page CSS, before the first paint.
+      renderedHtml = injectSnippetBeforeHeadClose(renderedHtml, [
+        `<link rel="stylesheet" href="/assets/personnel-appearance.css?v=${PREMIUM_PERSONNEL_THEME_VERSION}">`,
+        '<script src="/assets/premium-readmodel-store.js?v=20260924c"></script>',
+        `<script src="/assets/personnel-appearance.js?v=${PREMIUM_PERSONNEL_THEME_VERSION}" data-theme-owner="${themeOwner}"></script>`,
+      ].join('\n'));
     }
 
     return renderedHtml;

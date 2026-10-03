@@ -1,0 +1,207 @@
+/* Loaded after page styles: also covers the legacy personnel palette aliases. */
+html[data-theme="dark"] {
+    color-scheme: dark;
+    --bg-primary: #141418 !important;
+    --bg-secondary: #1e1e24 !important;
+    --bg-tertiary: #292930 !important;
+    --bg-card: rgba(255, 255, 255, 0.04) !important;
+    --text-primary: #f1f0f4 !important;
+    --text-secondary: #c1bfca !important;
+    --text-tertiary: #a19eae !important;
+    --border: rgba(255, 255, 255, 0.12) !important;
+    --theme-control-bg: rgba(255, 255, 255, 0.05);
+    --theme-control-bg-hover: rgba(255, 255, 255, 0.1);
+    --theme-control-bg-active: rgba(255, 255, 255, 0.14);
+    --accent: #c45e8d !important;
+    --accent-light: #e083ad !important;
+    --accent-soft: rgba(196, 94, 141, 0.15) !important;
+    --sidebar-logo-color: #e083ad !important;
+    --bg: var(--bg-primary) !important;
+    --card: var(--bg-secondary) !important;
+    --card-bg: var(--bg-secondary) !important;
+    --sidebar-bg: var(--bg-secondary) !important;
+    --white: var(--bg-secondary) !important;
+    --tag: var(--bg-tertiary) !important;
+    --tag-bg: var(--bg-tertiary) !important;
+    --card-soft: var(--bg-card) !important;
+    --field-bg: var(--bg-tertiary) !important;
+    --input-bg: var(--bg-tertiary) !important;
+    --table-hover: var(--bg-card) !important;
+    --dark: var(--text-primary) !important;
+    --mid: var(--text-secondary) !important;
+    --light: var(--text-tertiary) !important;
+    --text-dark: var(--text-primary) !important;
+    --text-mid: var(--text-secondary) !important;
+    --text-light: var(--text-tertiary) !important;
+    --crimson: var(--accent) !important;
+    --crimson-light: var(--accent-light) !important;
+    --clight: var(--accent-light) !important;
+    --green: #79c7a4 !important;
+    --red: #f08b8b !important;
+    --page: var(--bg-primary) !important;
+    --panel: var(--bg-secondary) !important;
+    --panel-strong: var(--bg-secondary) !important;
+    --ink: var(--text-primary) !important;
+    --muted: var(--text-tertiary) !important;
+    --line: var(--border) !important;
+    --line-strong: rgba(255, 255, 255, 0.2) !important;
+    --surface-border: var(--border) !important;
+    --green-soft: rgba(121, 199, 164, 0.12) !important;
+    --yellow-soft: rgba(230, 180, 91, 0.12) !important;
+    --summarize-accent: var(--accent) !important;
+    --summarize-accent-dark: var(--accent-dark) !important;
+    --summarize-ink: var(--text-primary) !important;
+    --summarize-muted: var(--text-secondary) !important;
+    --summarize-border: var(--border) !important;
+    --summarize-surface: var(--bg-secondary) !important;
+    --shadow: 0 18px 40px rgba(0, 0, 0, 0.2) !important;
+}
+html[data-theme="dark"], html[data-theme="dark"] body,
+html[data-theme="dark"][data-softora-sidebar-content-frame="1"],
+html[data-theme="dark"][data-softora-sidebar-content-frame="1"] body {
+    background: var(--bg-primary) !important;
+    color: var(--text-primary);
+}
+html[data-theme="dark"] .sidebar[data-static-sidebar="1"] {
+    background: var(--bg-secondary) !important;
+    border-color: var(--border) !important;
+}
+html[data-theme="dark"] .sidebar[data-static-sidebar="1"] .sidebar-link {
+    color: var(--text-secondary) !important;
+}
+html[data-theme="dark"] .sidebar[data-static-sidebar="1"] .sidebar-link.active {
+    color: var(--text-primary) !important;
+    background: var(--accent-soft) !important;
+}
+html[data-theme="dark"] .sidebar[data-static-sidebar="1"] :is(.sidebar-section-label, .sidebar-user-role, .logout-btn) {
+    color: var(--text-tertiary) !important;
+}
+html[data-theme="dark"] .sidebar[data-static-sidebar="1"] .sidebar-user-name {
+    color: var(--text-primary) !important;
+}
+html[data-theme="dark"] .sidebar[data-static-sidebar="1"] .sidebar-logo {
+    color: var(--sidebar-logo-color) !important;
+}
+html[data-theme="dark"] .sidebar[data-static-sidebar="1"] .sidebar-footer {
+    border-color: var(--border) !important;
+}
+html[data-theme="dark"] :is(.sidebar-collapse-toggle, .sidebar-expand-toggle, .premium-sidebar-mobile-toggle, .kvk-sidebar-toggle) {
+    background: var(--bg-secondary) !important;
+    color: var(--accent-light) !important;
+    border-color: var(--border) !important;
+}
+html[data-theme="dark"] :is(.sf-btn, .photo-remove, .mail-search-control, .mail-search-more) {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border) !important;
+}
+html[data-theme="dark"] :is(.status-filter, .status-filter-group, .mail-roi-card,
+    .mail-ready-menu, .mail-ready-filter__trigger, .database-import-drop-card) {
+    background: var(--bg-secondary) !important;
+    border-color: var(--border) !important;
+}
+html[data-theme="dark"] :is(.status-filter-label, .mail-roi-value, .mail-roi-value-separator, .mail-roi-value-combined) {
+    color: var(--text-primary) !important;
+}
+html[data-theme="dark"] :is(.mail-roi-label, .mail-roi-note) { color: var(--text-tertiary) !important; }
+html[data-theme="dark"] :is(.mail-roi-step-button, .mail-roi-autopilot-toggle) {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border) !important;
+}
+html[data-theme="dark"] :is(.status-filter-divider, .mail-roi-step-divider) { background: var(--border) !important; }
+/* The company database is also opened as a standalone settings iframe. */
+html[data-theme="dark"] :is(.inventory, .research-details, .planning-details, .latest-treated-panel,
+    .planning-title-row, .inventory-footer, .planning-legend-popover, .panel-heading) {
+    background: var(--bg-secondary) !important;
+    border-color: var(--border) !important;
+}
+html[data-theme="dark"] :is(.kvk-database-shell__content, .kvk-database-shell__frame) { background: var(--bg-primary) !important; }
+html[data-theme="dark"] :is(.planning-details, .latest-treated-panel)::after {
+    background: var(--bg-secondary) !important;
+    border-color: var(--border) !important;
+}
+html[data-theme="dark"] :is(.inventory-grid, .research-grid) .stat-main strong,
+html[data-theme="dark"] .latest-treated-panel td strong { color: var(--text-primary) !important; }
+html[data-theme="dark"] .inventory-grid .stat-card:first-child strong { color: var(--accent-light) !important; }
+html[data-theme="dark"] :is(.page-intro, .fixed-section-title, .location-path,
+    .latest-treated-panel td, .latest-treated-panel td small),
+html[data-theme="dark"] :is(.inventory-grid, .research-grid) .stat-main > span { color: var(--text-secondary) !important; }
+html[data-theme="dark"] :is(.inventory-grid, .research-grid) .stat-card + .stat-card,
+html[data-theme="dark"] :is(.location-item, .latest-treated-panel td, .latest-treated-panel th) { border-color: var(--border) !important; }
+html[data-theme="dark"] :is(.planning-panel .location-button:hover, .latest-treated-panel tbody tr:hover,
+    .latest-treated-panel th, .rank, .planning-help-button, .header-controls .transfer-button) {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-secondary) !important;
+}
+html[data-theme="dark"] .location-button:is(.is-selected, .is-contact-active) { background: var(--accent-soft) !important; }
+html[data-theme="dark"] .status-box:not(.is-done):not(.is-active):not(.is-limited) { background: var(--bg-tertiary); }
+html[data-theme="dark"] .status-box.is-done { color: var(--bg-primary); }
+html[data-theme="dark"] .company-status.is-usable { background: var(--green-soft) !important; color: var(--green) !important; }
+html[data-theme="dark"] .company-status.is-unusable { background: var(--bg-tertiary) !important; color: var(--text-secondary) !important; }
+html[data-theme="dark"] :is(.num-btn, .secure-action-pin-key, .secure-action-pin-card, .secure-action-pin-slot,
+    .editor-sheet, .summarize-card, .selected-audio, .summary-empty-state, .summary-transcript button) {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border) !important;
+}
+html[data-theme="dark"] :is(.audio-dropzone, .summary-empty-icon) { background: var(--bg-tertiary) !important; }
+/* Keep document paper and authored colors faithful to the exported document. */
+@media screen {
+    html[data-theme="dark"] .word-shell {
+        --word-line: var(--border);
+        --word-ink: var(--text-primary);
+        --word-muted: var(--text-secondary);
+        --word-hover: var(--bg-tertiary);
+        --word-active-bg: var(--accent-soft);
+    }
+    html[data-theme="dark"] :is(.word-app, .word-docbar, .word-ribbon, .word-outline, .word-statusbar,
+        .word-menu, .word-contextbar, .word-table-picker, .word-dialog) {
+        background: var(--bg-secondary) !important;
+        color: var(--text-primary);
+        border-color: var(--border) !important;
+    }
+    html[data-theme="dark"] .word-workspace { background: var(--bg-tertiary) !important; }
+    html[data-theme="dark"] :is(.word-action:not(.word-action--primary), .word-chip, .word-find-input,
+        .ribbon-select, .word-table-cell) { background-color: var(--bg-tertiary) !important; border-color: var(--border) !important; }
+    html[data-theme="dark"] :is(.ribbon-btn, .word-outline-item, .ribbon-color .glyph) { color: var(--text-secondary); }
+    html[data-theme="dark"] .ribbon-sep { background: var(--border); }
+}
+html[data-theme="dark"] :is(input, select, textarea) {
+    color: var(--text-primary);
+}
+html[data-theme="dark"] :is(input, textarea)::placeholder {
+    color: var(--text-tertiary);
+}
+.personnel-theme-date {
+    display: inline-flex;
+    align-items: center;
+}
+.personnel-theme-toggle {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    margin-left: 10px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.personnel-theme-toggle:hover {
+    background: var(--bg-tertiary);
+    color: var(--accent);
+}
+.personnel-theme-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+.personnel-theme-toggle svg { width: 18px; height: 18px; }
+.personnel-theme-toggle .personnel-theme-sun { display: none; }
+html[data-theme="dark"] .personnel-theme-toggle .personnel-theme-moon { display: none; }
+html[data-theme="dark"] .personnel-theme-toggle .personnel-theme-sun { display: block; }

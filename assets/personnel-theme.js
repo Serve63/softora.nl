@@ -2282,35 +2282,33 @@
         });
     }
 
-    function forceLightTheme() {
+    function applyPersonnelTheme(mode, persist) {
+        if (window.SoftoraPersonnelAppearance) {
+            return window.SoftoraPersonnelAppearance.applyMode(mode, persist);
+        }
         root.setAttribute("data-theme-mode", "light");
         root.setAttribute("data-theme", "light");
     }
 
-    function syncThemeButtonsToLight() {
+    function syncThemeButtons() {
         themeButtons.forEach(function (button) {
             const value = String(button.dataset.themeValue || "").toLowerCase();
-            if (value === "dark") {
-                button.remove();
-                return;
-            }
-
-            const isLight = value === "light";
-            button.classList.toggle("is-active", isLight);
-            button.setAttribute("aria-pressed", isLight ? "true" : "false");
+            const isActive = value === window.SoftoraPersonnelTheme.getMode();
+            button.classList.toggle("is-active", isActive);
+            button.setAttribute("aria-pressed", isActive ? "true" : "false");
             button.addEventListener("click", function () {
-                forceLightTheme();
+                applyPersonnelTheme(value);
             });
         });
     }
 
     window.SoftoraPersonnelTheme = window.SoftoraPersonnelTheme || {};
     window.SoftoraPersonnelTheme.getMode = function getMode() {
-        return "light";
+        return window.SoftoraPersonnelAppearance ? window.SoftoraPersonnelAppearance.getMode() : "light";
     };
 
-    window.SoftoraPersonnelTheme.applyMode = function applyMode() {
-        forceLightTheme();
+    window.SoftoraPersonnelTheme.applyMode = function applyMode(mode) {
+        applyPersonnelTheme(mode);
         return Promise.resolve(true);
     };
     window.SoftoraPersonnelTheme.refreshSidebarLeadsCount = refreshSidebarLeadsCount;
@@ -2334,6 +2332,6 @@
     }
     initPremiumSidebarProfile();
     initSidebarNotificationCounts();
-    forceLightTheme();
-    syncThemeButtonsToLight();
+    applyPersonnelTheme(window.SoftoraPersonnelTheme.getMode(), false);
+    syncThemeButtons();
 })();
