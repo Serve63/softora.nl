@@ -291,7 +291,7 @@ test('webdesign bulk hides a running bar after its final successful photo refres
   const pollTimer = timers.find((timer) => Number(timer.delay) === 0);
   assert.ok(pollTimer, 'running batch should poll its final status');
   pollTimer.callback();
-  for (let index = 0; index < 6; index += 1) await Promise.resolve();
+  await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(node.hidden, true);
   const refreshTimer = timers.find((timer) => Number(timer.delay) === 100);
@@ -351,4 +351,67 @@ test('webdesign bulk close button stays visible for a completed restored batch',
 
   assert.equal(node.hidden, true);
   assert.equal(fetchCalls.some((url) => url.endsWith('/batch-done/cancel')), false);
+});
+
+test('bulk progress distinguishes processed from successful and never regresses on an older response', async () => {
+  let made = 2;
+  const { context, document } = createHarness(async (url) => {
+    if (String(url).endsWith('/run')) return { ok: true, json: async () => ({ ok: true }) };
+    return { ok: true, json: async () => ({ batches: [{ id: 'counts-50', status: 'running', total: 50, made, failed: 3, running: 1 }] }) };
+  });
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+  await controller.loadLatestBatch();
+  const parts = document.getElementById('webdesignBulkStatus').__softoraBulkParts;
+  assert.equal(parts.num.textContent, '5 / 50 verwerkt');
+  assert.equal(parts.rest.textContent, '2 gemaakt · 3 mislukt · 45 resterend · 1 bezig');
+  made = 1;
+  await controller.loadLatestBatch();
+  assert.equal(parts.num.textContent, '5 / 50 verwerkt');
+  assert.match(parts.rest.textContent, /^2 gemaakt/);
+});
+
+test('a hanging progress request times out and a later poll resumes successfully', async () => {
+  const timers = [];
+  let reads = 0;
+  const { context, document } = createHarness(async (url) => {
+    if (String(url).endsWith('/run')) return { ok: true, json: async () => ({ ok: true }) };
+    if (String(url).endsWith('/timeout-batch')) {
+      reads++;
+      if (reads === 1) return new Promise(() => {});
+      return { ok: true, json: async () => ({ batch: { id: 'timeout-batch', status: 'done', total: 2, made: 1, failed: 1 } }) };
+    }
+    return { ok: true, json: async () => ({ batches: [{ id: 'timeout-batch', status: 'running', total: 2, made: 0 }] }) };
+  }, { setTimeout(callback, delay) { const timer = { callback: () => { timer.active = false; callback(); }, delay, active: true }; timers.push(timer); return timer; }, clearTimeout(timer) { timer.active = false; } });
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+  await controller.loadLatestBatch();
+  timers.find(t => t.active && t.delay === 0).callback();
+  await new Promise(resolve => setImmediate(resolve));
+  timers.filter(t => t.active && t.delay === 0).forEach(t => t.callback());
+  timers.find(t => t.active && t.delay === 25000).callback();
+  await new Promise(resolve => setImmediate(resolve));
+  const retry = timers.find(t => t.active && t.delay === 2400);
+  assert.ok(retry, 'timeout must release the request lock and schedule another poll');
+  retry.callback();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(reads, 2);
+  assert.equal(document.getElementById('webdesignBulkStatus').__softoraBulkParts.num.textContent, '2 / 2 verwerkt');
+});
+
+test('restore keeps retrying after a long outage and eventually restores the durable batch', async () => {
+  const timers = [];
+  let reads = 0;
+  const { context, document } = createHarness(async (url) => {
+    if (String(url).endsWith('/run')) return { ok: true, json: async () => ({ ok: true }) };
+    if (++reads <= 6) throw new Error('offline');
+    return { ok: true, json: async () => ({ batches: [{ id: 'restored-long-outage', status: 'running', total: 50, made: 2, failed: 3 }] }) };
+  }, { setTimeout(callback, delay) { const timer = { callback, delay, active: true }; timers.push(timer); return timer; }, clearTimeout(timer) { timer.active = false; } });
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+  await controller.loadLatestBatch();
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const retry = timers.filter(t => t.active && t.delay !== 25000).at(-1);
+    assert.ok(retry, 'a long outage must not exhaust restoration attempts');
+    retry.active = false; retry.callback();
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(document.getElementById('webdesignBulkStatus').hidden, false);
 });

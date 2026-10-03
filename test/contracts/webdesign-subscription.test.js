@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { createPremiumDatabaseWebdesignJobsCoordinator } = require('../../server/services/premium-database-webdesign-jobs');
-const { createWebdesignSubscriptionService } = require('../../server/services/webdesign-subscription');
+const { createWebdesignSubscriptionService, isExpiredWebdesignJob } = require('../../server/services/webdesign-subscription');
 const { createKvkApiWorkersService } = require('../../server/services/kvk-api-workers');
 const { buildWebdesignJobPayload, normalizeWebdesignJobRow } = require('../../server/services/webdesign-job-payload');
 const { buildWebsiteImageGenerationMetadata } = require('../../server/services/website-image-generation-cost');
@@ -28,7 +28,7 @@ function fixture() {
       listWebdesignBatchChunks: async (_owner, id) => [...chunks.values()].filter((c) => c.batchId === id).map((c) => structuredClone(c)),
     },
   });
-  return { coordinator, rows, batches, apiCalls: () => apiCalls };
+  return { coordinator, rows, batches, chunks, apiCalls: () => apiCalls };
 }
 
 test('manual job cannot select API, stays off the API on polling and reads remote completion', async () => {
@@ -63,6 +63,74 @@ test('manual bulk carries the subscription lane into every durable target job', 
   assert.equal(f.rows.size, 1);
   assert.equal([...f.rows.values()][0].executionProvider, 'codex-subscription');
   assert.equal(f.apiCalls(), 0);
+});
+
+test('subscription batch reconciles a recovered result after its target was marked failed', async () => {
+  const f = fixture(), started = res();
+  await f.coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 2 } }, started);
+  const batchId = started.body.batch.id;
+  await f.coordinator.appendBatchChunkResponse({ premiumAuth: auth, params: { batchId }, body: { index: 0,
+    targets: ['recovered', 'peer'].map((id) => ({ customer: { id, bedrijf: id }, websiteUrl: 'https://example.nl' })) } }, res());
+  await f.coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 2, expectedChunks: 1 } }, res());
+  const [job, peer] = [...f.rows.values()];
+  job.status = 'error'; peer.status = 'error';
+  const read = async () => {
+    const response = res();
+    await f.coordinator.getBatchResponse({ premiumAuth: auth, params: { batchId } }, response);
+    return response.body.batch;
+  };
+  assert.equal((await read()).failed, 2);
+  // The result RPC reopens the parent after a late saved result arrives.
+  job.status = 'done'; job.finishedAt = Date.now();
+  f.batches.get(batchId).status = 'running';
+  const recovered = await read();
+  assert.equal(recovered.made, 1); assert.equal(recovered.failed, 1);
+  assert.equal([...f.chunks.values()][0].targets[0].status, 'done');
+  assert.equal(f.apiCalls(), 0);
+});
+
+test('a retried manual batch creation restores the same durable batch', async () => {
+  const f = fixture();
+  const request = { premiumAuth: auth, body: { total: 50, requestId: 'batch-retry-1234567890123456' } };
+  const first = res(), retry = res();
+  await f.coordinator.startBatchResponse(request, first);
+  const stored = f.batches.get(first.body.batch.id);
+  stored.status = 'running'; stored.summary = { total: 50, made: 2, done: 2 };
+  await f.coordinator.startBatchResponse(request, retry);
+  assert.equal(retry.body.batch.id, first.body.batch.id);
+  assert.equal(retry.body.batch.status, 'running');
+  assert.equal(retry.body.batch.made, 2);
+  assert.equal(f.batches.size, 1);
+});
+
+test('long subscription waits and newly delivered old jobs never expire from creation time', async () => {
+  const f = fixture(), started = res();
+  await f.coordinator.startJobResponse({ premiumAuth: auth, body: {
+    customer: { id: 'old-subscription', bedrijf: 'Bedrijf' }, websiteUrl: 'https://example.nl',
+  } }, started);
+  const id = started.body.job.id;
+  const stored = f.rows.get(id);
+  stored.createdAt = Date.now() - 48 * 3600000;
+  for (const status of ['queued', 'running', 'done']) {
+    stored.status = status;
+    stored.finishedAt = status === 'done' ? Date.now() : null;
+    const response = res();
+    await f.coordinator.getJobResponse({ premiumAuth: auth, params: { jobId: id } }, response);
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.job.status, status);
+  }
+  assert.equal(isExpiredWebdesignJob({ executionProvider: 'api', createdAt: stored.createdAt }, Date.now(), 6 * 3600000), true);
+  assert.equal(f.apiCalls(), 0);
+});
+
+test('pre-generation heartbeat checks the existing claim without claiming another job', async () => {
+  const service = createWebdesignSubscriptionService({ repository: {
+    heartbeat: async (id, token) => { assert.equal(id, 'job-1234567890123456'); assert.equal(token, claim); return { ok: true, allowed: true }; },
+    claim: () => assert.fail('Heartbeat must not claim another job'),
+  } });
+  const response = res();
+  await service.poll({ body: { claim, heartbeatJobId: 'job-1234567890123456' } }, response);
+  assert.equal(response.body.allowed, true);
 });
 
 test('manual requests cannot reuse an older API job as a subscription job', async () => {
@@ -150,6 +218,7 @@ sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location('worker', 'scripts/webdesign_subscription_worker.py')
 w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
 w.BASE = pathlib.Path(tempfile.mkdtemp())
+w.codex_binary = lambda: '/fixture/codex'
 job = {'id': 'restart-job-1234567890123456', 'claim': '${claim}'}
 folder = w.BASE / job['id']; folder.mkdir(); (folder / 'design.jpg').write_bytes(b'image')
 w.write_state({'phase': 'generating', 'job': job})
@@ -177,4 +246,59 @@ print('restart and delivery recovery OK')
   const result = spawnSync('python3', ['-c', script], { cwd: path.join(__dirname, '../..'), encoding: 'utf8', timeout: 10000 });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /restart and delivery recovery OK/);
+});
+
+test('parallel Mac slots recover PNGs, orphan children and reversible preparation without repeated generation', () => {
+  const script = `
+import importlib.util, pathlib, tempfile, json, sys, types, fcntl
+sys.dont_write_bytecode = True
+spec = importlib.util.spec_from_file_location('worker', 'scripts/webdesign_subscription_worker.py')
+w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
+w.BASE = pathlib.Path(tempfile.mkdtemp())
+job = {'id': 'png-restart-job-123456789012', 'claim': '${claim}'}
+folder = w.BASE / job['id']; folder.mkdir(); (folder / 'design.png').write_bytes(b'native-png')
+w.write_state({'phase': 'generating', 'job': job})
+w.generate = lambda *args: (_ for _ in ()).throw(AssertionError('must not regenerate'))
+w.generation_running = lambda folder: True
+w.call = lambda *args: (_ for _ in ()).throw(AssertionError('live child must finish first'))
+w.step()
+assert json.loads(w.state_file().read_text())['phase'] == 'generating'
+w.generation_running = lambda folder: False
+encoded = []
+def encode(folder):
+ encoded.append(folder); (folder / 'design.jpg').write_bytes(b'jpg')
+w.encode_result = encode
+reports = []
+w.call = lambda path, payload: (reports.append((path,payload)) or {'ok': True, 'done': True})
+w.step()
+assert len(encoded) == 1 and reports[0][0] == '/report' and 'dataUrl' in reports[0][1]
+assert json.loads(w.state_file().read_text()) == {}
+# A reversible auth/network preparation failure stays retryable before the image boundary.
+job2 = dict(job, id='slot-two-12345678901234567890')
+w.write_state({'phase': 'prepare', 'job': job2}, 1)
+w.generate = lambda *args: (_ for _ in ()).throw(OSError('reference offline'))
+try: w.step(1)
+except OSError: pass
+assert json.loads(w.state_file(1).read_text())['phase'] == 'prepare'
+assert json.loads(w.state_file(0).read_text()) == {}
+# Both slot checkpoint files remain separate; a quota pause prevents further claims.
+for event in [{'type':'error','message':"You've hit your usage limit"}, {'type':'turn.failed','error':{'message':'usage_limit_reached'}}]:
+ (folder/'codex-events.jsonl').write_text(json.dumps(event))
+ assert w.subscription_limit(folder)
+(folder/'codex-events.jsonl').write_text(json.dumps({'type':'item.completed','item':{'type':'command_execution','aggregated_output':'instructions: usage_limit_reached'}}))
+assert not w.subscription_limit(folder)
+w.write_state({'phase': 'cooldown', 'retryAt': w.time.time()+600}, 0)
+w.call = lambda *args: (_ for _ in ()).throw(AssertionError('quota must pause other slot'))
+w.step(1)
+assert json.loads(w.state_file(1).read_text())['phase'] == 'prepare'
+# Existing supervisor ownership makes the watchdog a no-op, without opening more terminals.
+with (w.BASE/'supervisor.lock').open('w') as held:
+ fcntl.flock(held, fcntl.LOCK_EX|fcntl.LOCK_NB)
+ w.subprocess.run = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError('watchdog must not relaunch a live supervisor'))
+ w.watchdog()
+print('parallel checkpoints, PNG recovery, quota and watchdog OK')
+`;
+  const result = spawnSync('python3', ['-c', script], { cwd: path.join(__dirname, '../..'), encoding: 'utf8', timeout: 10000 });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /parallel checkpoints, PNG recovery, quota and watchdog OK/);
 });

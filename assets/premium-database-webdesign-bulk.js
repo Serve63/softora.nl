@@ -9,6 +9,7 @@
     const BULK_UPLOAD_CHUNK_SIZE = 100;
     const RESTORE_DONE_BATCH_WINDOW_MS = 15 * 60 * 1000;
     const RESTORE_RETRY_DELAYS_MS = [2000, 6000, 15000, 30000];
+    const REQUEST_TIMEOUT_MS = 25000;
     const STYLE_ID = "softora-database-webdesign-bulk-style";
 
     function fallbackNormalize(value) { return String(value || "").trim(); }
@@ -57,6 +58,7 @@
         const cancelledBatchIds = new Set();
         const dismissedBatchIds = new Set();
         const uploadTriggeredBatchIds = new Set();
+        const observedMade = new Map();
         let uploadKickRunning = false, uploadKickPending = false;
         ensureStyles();
 
@@ -134,10 +136,12 @@
             const failed = Math.max(0, Number(batch && batch.failed) || 0);
             const cancelled = Math.max(0, Number(batch && batch.cancelled) || 0);
             const remaining = Math.max(0, total - made - failed - cancelled);
+            const completed = made + failed + cancelled;
+            const running = Math.max(0, Number(batch && batch.running) || 0);
             const status = fallbackNormalize(batch && batch.status).toLowerCase();
             return {
-                num: formatNumber(made) + " / " + formatNumber(total),
-                rest: status === "cancelled" ? formatNumber(cancelled || Math.max(0, total - made - failed)) + " geannuleerd" : formatNumber(remaining) + " resterend" + (failed ? " · " + formatNumber(failed) + " mislukt" : "") + (cancelled ? " · " + formatNumber(cancelled) + " geannuleerd" : "")
+                num: formatNumber(completed) + " / " + formatNumber(total) + " verwerkt",
+                rest: formatNumber(made) + " gemaakt" + (failed ? " · " + formatNumber(failed) + " mislukt" : "") + (cancelled ? " · " + formatNumber(cancelled) + " geannuleerd" : "") + " · " + formatNumber(remaining) + " resterend" + (running && status === "running" ? " · " + formatNumber(running) + " bezig" : "")
             };
         }
 
@@ -145,8 +149,8 @@
             const node = ensureStatusNode();
             if (!node || !batch) return;
             const total = Math.max(0, Number(batch.total) || 0);
-            const made = Math.max(0, Number(batch.made || batch.done) || 0);
-            const pct = total ? Math.max(0, Math.min(100, Math.round((made / total) * 100))) : 0;
+            const completed = Math.max(0, Number(batch.made || batch.done) || 0) + Math.max(0, Number(batch.failed) || 0) + Math.max(0, Number(batch.cancelled) || 0);
+            const pct = total ? Math.max(0, Math.min(100, Math.round((completed / total) * 100))) : 0;
             const visiblePct = total ? Math.max(pct, 0.12) : 0;
             const line = getStatusLine(batch);
             const parts = ensureStatusParts(node);
@@ -313,8 +317,7 @@
 
         function scheduleRestoreRetry() {
             if (activeBatchId || restoreRetryTimer || typeof global.setTimeout !== "function") return;
-            const delay = RESTORE_RETRY_DELAYS_MS[restoreRetryAttempt];
-            if (!Number.isFinite(Number(delay))) return;
+            const delay = RESTORE_RETRY_DELAYS_MS[Math.min(restoreRetryAttempt, RESTORE_RETRY_DELAYS_MS.length - 1)];
             restoreRetryAttempt += 1;
             restoreRetryTimer = global.setTimeout(function () {
                 restoreRetryTimer = null;
@@ -328,7 +331,7 @@
             if (lastWorkerKickAt && currentTime - lastWorkerKickAt < WORKER_KICK_INTERVAL_MS) return;
             lastWorkerKickAt = currentTime;
             workerKickInFlight = true;
-            fetch(RUN_ENDPOINT, {
+            requestJson(RUN_ENDPOINT, {
                 method: "POST",
                 credentials: "same-origin",
                 cache: "no-store",
@@ -345,6 +348,9 @@
         function handleBatch(batch, phase, options) {
             if (!batch || !batch.id) return;
             const batchId = normalizeString(batch.id);
+            const made = Math.max(observedMade.get(batchId) || 0, Number(batch.made || batch.done) || 0);
+            observedMade.set(batchId, made);
+            batch = Object.assign({}, batch, { made: made, done: made });
             const status = normalizeString(batch.status).toLowerCase();
             if (isTerminalBatchStatus(status) && status !== "cancelled") kickInstantlyUpload(batch);
             if (isCancelledBatch(batchId) || isDismissedBatch(batchId)) {
@@ -381,6 +387,23 @@
         }
 
         async function readJson(response) { return response.json().catch(function () { return {}; }); }
+        async function requestJson(url, options) {
+            const abort = typeof global.AbortController === "function" ? new global.AbortController() : null;
+            let timer;
+            const timeout = new Promise(function (_resolve, reject) {
+                timer = global.setTimeout(function () {
+                    if (abort) abort.abort();
+                    reject(new Error("Verbinding duurt te lang; voortgang wordt opnieuw opgehaald."));
+                }, REQUEST_TIMEOUT_MS);
+            });
+            try {
+                return await Promise.race([Promise.resolve(fetch(url, Object.assign({}, options, abort ? { signal: abort.signal } : {}))).then(async function (response) {
+                    return { response: response, payload: await readJson(response) };
+                }), timeout]);
+            } finally {
+                if (timer && typeof global.clearTimeout === "function") global.clearTimeout(timer);
+            }
+        }
         async function pollBatch(batchId) {
             const id = normalizeString(batchId || activeBatchId);
             if (!id || pollInFlight) return;
@@ -390,10 +413,10 @@
             }
             pollInFlight = true;
             try {
-                const response = await fetch(BATCH_ENDPOINT + "/" + encodeURIComponent(id), { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
-                const payload = await readJson(response);
+                const { response, payload } = await requestJson(BATCH_ENDPOINT + "/" + encodeURIComponent(id), { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
                 if (response.status === 404) {
                     if (id === activeBatchId) activeBatchId = "";
+                    scheduleRestoreRetry();
                     return;
                 }
                 if (!response.ok || !payload || !payload.batch) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk laden is mislukt.");
@@ -406,8 +429,7 @@
         }
 
         async function postJson(url, body) {
-            const response = await fetch(url, { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body || {}) });
-            const payload = await readJson(response);
+            const { response, payload } = await requestJson(url, { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body || {}) });
             if (!response.ok || !payload || !payload.batch) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk starten is mislukt.");
             return payload.batch;
         }
@@ -432,7 +454,8 @@
             const targets = (Array.isArray(customers) ? customers : []).filter(Boolean);
             const total = targets.length;
             if (!total) return null;
-            const created = await postJsonWithRetry(BATCH_ENDPOINT, { total: total });
+            const requestId = global.crypto && typeof global.crypto.randomUUID === "function" ? global.crypto.randomUUID() : "batch_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+            const created = await postJsonWithRetry(BATCH_ENDPOINT, { total: total, requestId: requestId });
             const batchId = created.id;
             cancelledBatchIds.delete(normalizeString(batchId));
             const expectedChunks = Math.ceil(total / BULK_UPLOAD_CHUNK_SIZE);
@@ -460,8 +483,7 @@
             if (restoreInFlight) return null;
             restoreInFlight = true;
             try {
-                const response = await fetch(BATCH_ENDPOINT, { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
-                const payload = await readJson(response);
+                const { response, payload } = await requestJson(BATCH_ENDPOINT, { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
                 const batches = Array.isArray(payload && payload.batches) ? payload.batches : [];
                 if (!response.ok) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk laden is mislukt.");
                 if (!batches.length) {
@@ -484,6 +506,13 @@
             }
         }
 
+        function resumeProgress() {
+            if (global.document && global.document.visibilityState === "hidden") return;
+            if (activeBatchId) schedulePoll(0);
+            else void loadLatestBatch();
+        }
+        if (typeof global.addEventListener === "function") ["online", "pageshow", "focus"].forEach(function (event) { global.addEventListener(event, resumeProgress); });
+        if (global.document && typeof global.document.addEventListener === "function") global.document.addEventListener("visibilitychange", resumeProgress);
         return { cancelActiveBatch: cancelActiveBatch, loadLatestBatch: loadLatestBatch, startBulkBatchForCustomers: startBulkBatchForCustomers };
     }
 

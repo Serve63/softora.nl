@@ -1,4 +1,4 @@
-const { isSubscriptionJob, subscriptionReuseConflict, refreshWebdesignMailReady, startManualWebdesignBatchResponse } = require('./webdesign-subscription');
+const { isSubscriptionJob, isExpiredWebdesignJob, subscriptionReuseConflict, refreshWebdesignMailReady, startManualWebdesignBatchResponse } = require('./webdesign-subscription');
 const { deliverWebdesignImage, createWebdesignDeliveryInterruptedError } = require('./premium-database-webdesign-delivery');
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 const { randomUUID } = require('crypto');
@@ -594,8 +594,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   function isExpiredJob(job, currentTime = now()) {
-    const createdAt = Number(job && job.createdAt) || 0;
-    return !createdAt || currentTime - createdAt > JOB_TTL_MS;
+    return isExpiredWebdesignJob(job, currentTime, JOB_TTL_MS);
   }
 
   function ownerKeyFromReq(req) {
@@ -1977,13 +1976,14 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     for (const chunk of chunks) {
       for (const target of chunk.targets || []) {
         const status = normalizeString(target.status).toLowerCase();
-        if ((status !== 'queued' && status !== 'running') || !target.jobId) continue;
+        if (!['queued', 'running', 'error'].includes(status) || !target.jobId) continue;
         let job = jobs.get(target.jobId);
         if (!job || isSubscriptionJob(job)) {
           const loaded = await loadPersistentJobResult(target.jobId);
           if (loaded.error) continue;
           job = loaded.job;
         }
+        if (status === 'error' && (!isSubscriptionJob(job) || job.status === 'error')) continue;
         if (!job) {
           markTarget(target, 'pending', { jobId: '', error: '' });
           changed.add(chunk.index);
@@ -2419,7 +2419,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   async function startBatchResponse(req, res) {
-    return startManualWebdesignBatchResponse(req, res, { ownerKeyFromReq, requiresPersistentBatchStorage, createBatchStorageUnavailableResult, createBatchId, now, persistBatch, serializeBatch, manualExecutionProvider });
+    return startManualWebdesignBatchResponse(req, res, { ownerKeyFromReq, requiresPersistentBatchStorage, createBatchStorageUnavailableResult, createBatchId, loadBatch, now, persistBatch, serializeBatch, manualExecutionProvider });
   }
 
   async function appendBatchChunkResponse(req, res) {

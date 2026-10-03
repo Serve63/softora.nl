@@ -1088,6 +1088,28 @@ test('website scan still refuses an actual temporary access block', async () => 
   await assert.rejects(() => service.fetchWebsitePreviewScanFromUrl('https://marketing.test'), /blokkeert geautomatiseerde serververzoeken/);
 });
 
+test('website scan accepts ordinary reCAPTCHA footer and cookie preferences', async () => {
+  for (const notice of ['Protected by reCAPTCHA &amp; Cloudflare Turnstile – Privacy Policy', 'Google reCaptcha instellingen: klik om Google reCaptcha in- of uit te schakelen.']) {
+    let calls = 0;
+    const { service } = createService({
+      extractWebsitePreviewScanFromHtml: (html) => ({ title: 'Bedrijf', bodyTextSample: html }),
+      fetchTextWithTimeout: async (url) => { calls++; return { response: { ok: true, status: 200, url, headers: { get: () => 'text/html' } },
+        text: '<html><body><h1>Bedrijf</h1><p>Onze dienstverlening voor bedrijven.</p><footer>' + notice + '</footer></body></html>' }; },
+    });
+    const result = await service.fetchWebsitePreviewScanFromUrl('https://bedrijf.test');
+    assert.equal(result.scan.title, 'Bedrijf');
+    assert.equal(calls, 1, 'ordinary captcha mentions must not trigger fallback or rejection');
+  }
+});
+
+test('website scan still refuses an actual captcha challenge', async () => {
+  const { service } = createService({ fetchTextWithTimeout: async (url) => ({
+    response: { ok: true, status: 200, url, headers: { get: () => 'text/html' } },
+    text: '<html><body>Verify you are human. Complete the CAPTCHA.</body></html>',
+  }) });
+  await assert.rejects(service.fetchWebsitePreviewScanFromUrl('https://bedrijf.test'), /blokkeert geautomatiseerde serververzoeken/);
+});
+
 test('ai remote service rejects server redirects to private metadata urls', async () => {
   const calls = [];
   const { service } = createService({

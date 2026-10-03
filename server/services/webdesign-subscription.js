@@ -1,8 +1,15 @@
 'use strict';
+const { createHash } = require('node:crypto');
 const { buildWebdesignPipelineOptions } = require('./design-photo-generation-policy');
 const { createWebsiteGenerationHelpers } = require('./website-generation');
 const { buildWebsitePreviewPromptFromScan } = createWebsiteGenerationHelpers();
 const isSubscriptionJob = (job) => job?.executionProvider === 'codex-subscription';
+function isExpiredWebdesignJob(job, currentTime, ttlMs) {
+  // Waiting on a Mac or quota must not expire a durable subscription queue.
+  if (isSubscriptionJob(job) && ['queued', 'running'].includes(job.status)) return false;
+  const referenceTime = Number(isSubscriptionJob(job) ? job.finishedAt || job.createdAt : job?.createdAt) || 0;
+  return !referenceTime || currentTime - referenceTime > ttlMs;
+}
 function subscriptionReuseConflict(input, existing) {
   if (isSubscriptionJob(input) && !isSubscriptionJob(existing)) return {
     ok: false, statusCode: 409, error: 'Er loopt al een serveropdracht voor dit bedrijf.',
@@ -24,14 +31,22 @@ async function refreshWebdesignMailReady(job, service, logger = console) {
 }
 
 async function startManualWebdesignBatchResponse(req, res, deps) {
-  const { ownerKeyFromReq, requiresPersistentBatchStorage, createBatchStorageUnavailableResult, createBatchId, now, persistBatch, serializeBatch } = deps;
+  const { ownerKeyFromReq, requiresPersistentBatchStorage, createBatchStorageUnavailableResult, createBatchId, loadBatch, now, persistBatch, serializeBatch } = deps;
   const ownerKey = ownerKeyFromReq(req);
   if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
   if (!requiresPersistentBatchStorage()) {
     const result = createBatchStorageUnavailableResult('batch-opslag controleren');
     return res.status(result.statusCode).json(result);
   }
-  const batch = { id: createBatchId(), ownerKey, executionProvider: deps.manualExecutionProvider || 'codex-subscription', status: 'queued',
+  const requestId = String(req.body?.requestId || '');
+  if (requestId && !/^[a-z0-9_-]{16,100}$/i.test(requestId)) return res.status(400).json({ ok: false, error: 'Ongeldige batchaanvraag.' });
+  const id = requestId ? 'webdesign_batch_' + createHash('sha256').update(ownerKey + ':' + requestId).digest('hex').slice(0, 32) : createBatchId();
+  if (requestId) {
+    const existing = await loadBatch(ownerKey, id);
+    if (existing.error) return res.status(503).json(createBatchStorageUnavailableResult('batch-aanvraag herstellen', existing.error));
+    if (existing.batch) return res.status(202).json({ ok: true, batch: serializeBatch(existing.batch, []) });
+  }
+  const batch = { id, ownerKey, executionProvider: deps.manualExecutionProvider || 'codex-subscription', status: 'queued',
     total: Math.max(0, Math.floor(Number(req.body?.total || 0) || 0)), expectedChunks: 0, uploadedTargets: 0,
     createdAt: now(), startedAt: null, finishedAt: null, summary: {}, lastError: '' };
   const saved = await persistBatch(batch, 'batch starten opslaan');
@@ -48,6 +63,12 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
     async poll(req, res) {
       const claim = String(req.body?.claim || '');
       if (!/^[a-f0-9-]{36}$/.test(claim)) return res.status(400).json({ ok: false, error: 'Ongeldige opdrachtoverdracht.' });
+      if (req.body?.heartbeatJobId) {
+        const id = String(req.body.heartbeatJobId);
+        if (!/^[a-z0-9_-]{16,120}$/i.test(id)) return res.status(400).json({ ok: false, error: 'Ongeldige opdracht.' });
+        const result = await repository.heartbeat(id, claim);
+        return res.json({ ok: true, allowed: result.ok === true && result.allowed === true });
+      }
       const claimed = await repository.claim(claim);
       if (!claimed.job) return res.json({ ok: true, job: null });
       const job = claimed.job;
@@ -58,7 +79,7 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
           prompt: buildWebsitePreviewPromptFromScan({ ...generationScan, referenceImageCount: 1 }),
           referenceUrls: generationScan.referenceImageUrls, company: job.customer.bedrijf } });
       } catch (error) {
-        await repository.finish(job.id, job.subscriptionClaim, 'De eigen website kon niet worden voorbereid. Probeer opnieuw.');
+        await repository.finish(job.id, job.subscriptionClaim, 'Websiteanalyse mislukt: ' + String(error.message || 'Website niet bereikbaar.').slice(0, 500));
         throw error;
       }
     },
@@ -71,7 +92,9 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
       if (!begun.ok) return res.status(409).json({ ok: false, code: begun.reason === 'saving' ? 'WEBDESIGN_SAVING' : 'WEBDESIGN_STOPPED', error: 'Opdracht is gestopt of wordt al opgeslagen.' });
       if (begun.done) return res.json({ ok: true, done: true });
       if (body.error) {
-        await repository.finish(body.jobId, body.claim, 'Codex kon het ontwerp niet maken via je abonnement. Controleer Codex op je Mac en probeer opnieuw.');
+        await repository.finish(body.jobId, body.claim, body.errorKind === 'subscription-limit'
+          ? 'Je abonnementlimiet is bereikt. De wachtrij pauzeert en controleert later opnieuw; er wordt geen API gebruikt.'
+          : 'Codex kon het ontwerp niet maken via je abonnement. Controleer Codex op je Mac en probeer opnieuw.');
         return res.json({ ok: true, done: true });
       }
       const dataUrl = String(body.dataUrl || '');
@@ -89,4 +112,4 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
   };
 }
 
-module.exports = { isSubscriptionJob, subscriptionReuseConflict, refreshWebdesignMailReady, startManualWebdesignBatchResponse, createWebdesignSubscriptionService };
+module.exports = { isSubscriptionJob, isExpiredWebdesignJob, subscriptionReuseConflict, refreshWebdesignMailReady, startManualWebdesignBatchResponse, createWebdesignSubscriptionService };
