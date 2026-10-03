@@ -1,5 +1,4 @@
 .legal-page .page { max-width: 1220px; height: auto; min-height: 100svh; padding: 0 44px; }
-.legal-page:not(.legal-chooser) header { height: 100px; }
 .legal-page main { display: flex; flex-direction: column; justify-content: center; min-height: auto; max-height: none; margin: 0; gap: 0; padding: 56px 0 70px; }
 .skip-link { position: absolute; z-index: 20; top: -70px; left: 24px; padding: 14px 20px; border-radius: 8px; background: var(--wine); color: white; }
 .skip-link:focus { top: 16px; }
@@ -45,11 +44,8 @@
 }
 @media (max-width: 760px) {
   .legal-page .page { padding: 0 20px; }
-  .legal-page:not(.legal-chooser) header { height: 84px; }
   .legal-page main { justify-content: flex-start; padding: 36px 0 40px; }
-  .legal-page:not(.legal-chooser) .brand { font-size: 26px; }
   .back-link { gap: 7px; font-size: 11px; }
-  .company-page .back-link { max-width: 130px; }
   .legal-intro { margin-bottom: 28px; }
   .legal-page:not(.company-page) .legal-intro { margin-bottom: 16px; }
   .legal-intro h1 { font-size: clamp(44px, 9vw, 62px); letter-spacing: -1.2px; }
@@ -65,13 +61,13 @@
   .company-details dl > div { grid-template-columns: 1fr; gap: 5px; padding: 15px 0; }
 }
 
-/* Keep the chooser header aligned with /toekomst while bounding its content. */
-.legal-chooser .page { max-width: 1440px; }
-.legal-chooser main { width: 100%; max-width: 1132px; align-self: center; }
-.legal-chooser .legal-intro > .back-link { margin-bottom: 16px; }
+/* Keep legal headers aligned with /toekomst while bounding their content. */
+.legal-page .page { max-width: 1440px; }
+.legal-page main { width: 100%; max-width: 1132px; align-self: center; }
+.legal-page .legal-intro > .back-link { margin-bottom: 16px; }
 @media (min-width: 761px) {
-  .legal-chooser .page { padding: 0 clamp(25px, 3vw, 48px); }
+  .legal-page .page { padding: 0 clamp(25px, 3vw, 48px); }
 }
 @media (max-width: 360px) {
-  .legal-chooser .page { padding-inline: 14px; }
+  .legal-page .page { padding-inline: 14px; }
 }

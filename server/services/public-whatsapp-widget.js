@@ -68,6 +68,11 @@ function addPublicWhatsappWidgetIfMissing(htmlRaw, { pagePath = '/' } = {}) {
   let html = String(htmlRaw || '');
   if (!html) return html;
 
+  // Legal documents offer contact in the shared menu, without a floating button.
+  if (['/algemene-voorwaarden', '/privacybeleid'].includes(pagePath)) {
+    return addConversionTrackerIfMissing(html);
+  }
+
   // Reading pages keep a persistent contact button in the header, clear of the text.
   if (/<body\b[^>]*data-softora-contact-placement=["']header["']/i.test(html)
     && /<a\b(?=[^>]*\bclass=["'][^"']*\bcontent-header-contact\b)(?=[^>]*\bhref=["']https:\/\/wa\.me\/31643262792["'])[^>]*>/i.test(html)) {
