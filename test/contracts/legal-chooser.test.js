@@ -39,7 +39,7 @@ test('legal chooser links all three choices to public pages', () => {
   assert.match(css, /prefers-reduced-motion:\s*no-preference/);
   const desktopIconWidth = Number(css.match(/\.legal-visual img \{[^}]*width:\s*min\(100%,\s*(\d+)px\)/)?.[1]);
   assert.ok(desktopIconWidth > 0 && desktopIconWidth <= 180, 'Legal icons should remain secondary to their labels');
-  assert.match(read('assets/juridisch/index.html'), /legal\.css\?v=legal-header-cleanup-/);
+  assert.match(read('assets/juridisch/index.html'), /legal\.css\?v=legal-details-/);
 });
 
 test('legal chooser shares the toekomst header and menu resources', () => {
@@ -55,8 +55,8 @@ test('legal chooser shares the toekomst header and menu resources', () => {
   const body = DomUtils.findOne((node) => node.name === 'body', doc.children);
   assert.ok(body.attribs.class.split(' ').includes('toekomst-ai'));
   const css = read('assets/juridisch/legal.css');
-  assert.match(css, /\.legal-page:not\(\.legal-chooser\) header/);
-  assert.match(css, /\.legal-chooser \.page \{ max-width: 1440px;/);
+  assert.doesNotMatch(css, /\.legal-page[^}]*header\s*\{/);
+  assert.match(css, /\.legal-page \.page \{ max-width: 1440px;/);
 });
 
 test('legal chooser puts back above its eyebrow and omits redundant actions and footer', () => {
@@ -117,7 +117,7 @@ for (const [route, file] of [['/juridisch', 'assets/juridisch/index.html'], ['/b
     const elements = DomUtils.findAll((node) => ['tag', 'script', 'style'].includes(node.type), doc.children);
     assert.equal(elements.filter((node) => node.name === 'h1').length, 1);
     const scripts = elements.filter((node) => node.name === 'script');
-    assert.deepEqual(scripts.map((node) => node.attribs.src), route === '/juridisch' ? ['/assets/entry/contact-menu.js?v=login-menu-20260922'] : []);
+    assert.deepEqual(scripts.map((node) => node.attribs.src), ['/assets/entry/contact-menu.js?v=login-menu-20260922']);
     for (const script of scripts) {
       assert.ok(Object.hasOwn(script.attribs, 'defer'));
       assert.equal(DomUtils.textContent(script), '');
@@ -130,6 +130,31 @@ for (const [route, file] of [['/juridisch', 'assets/juridisch/index.html'], ['/b
         if (ref?.startsWith('/assets/')) assert.ok(fs.existsSync(path.join(root, new URL(ref, 'http://localhost').pathname)), ref);
         if (ref?.startsWith('#')) assert.ok(elements.some((element) => element.attribs.id === ref.slice(1)), ref);
       }
+    }
+  });
+}
+
+for (const file of ['assets/juridisch/bedrijfsgegevens.html', 'premium-algemene-voorwaarden.html', 'premium-privacy-policy.html']) {
+  test(file + ' shares the toekomst header and offers back before the legal label', () => {
+    const html = read(file);
+    const doc = parseDocument(html);
+    const header = (source) => DomUtils.findOne((node) => node.name === 'header', parseDocument(source).children);
+    assert.equal(DomUtils.getOuterHTML(header(html)), DomUtils.getOuterHTML(header(read('assets/entry/toekomst.html'))));
+    for (const resource of ['/assets/entry/start.css', '/assets/entry/ai-medewerker.css', '/assets/entry/contact-menu.js']) {
+      assert.ok(html.includes(resource), resource);
+    }
+    const hasClass = (node, value) => node.attribs?.class?.split(' ').includes(value);
+    const container = DomUtils.findOne((node) => hasClass(node, file.includes('bedrijfsgegevens') ? 'legal-intro' : 'toc'), doc.children);
+    const children = container.children.filter((node) => node.type === 'tag');
+    assert.equal(children[0].name, 'a');
+    assert.ok(hasClass(children[0], 'back-link'));
+    assert.equal(children[0].attribs.href, '/juridisch');
+    assert.equal(DomUtils.textContent(children[0]).trim(), '← Terug');
+    assert.ok(hasClass(children[1], file.includes('bedrijfsgegevens') ? 'legal-eyebrow' : 'toc-title'));
+    assert.equal(DomUtils.findAll((node) => node.name === 'footer', doc.children).length, 0);
+    assert.doesNotMatch(html, /Terug naar juridisch|nav-start-btn|id="navbar"|whatsapp-widget/);
+    if (file.includes('bedrijfsgegevens')) {
+      assert.equal(DomUtils.textContent(DomUtils.findOne((node) => node.name === 'h1', doc.children)), 'ONZE BEDRIJFSGEGEVENS.');
     }
   });
 }

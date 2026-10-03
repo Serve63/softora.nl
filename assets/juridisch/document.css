@@ -1,0 +1,17 @@
+/* Use the /toekomst shell while retaining the legal documents' reading layout. */
+.legal-document .page { height: auto; min-height: 100svh; }
+.legal-document .layout { width: 100%; min-width: 0; }
+.legal-document main.content { display: block; flex: none; min-width: 0; min-height: 0; max-height: none; margin: 0; padding: 0; }
+.legal-document .terms-title, .legal-document .privacy-title { font-size: 38px; }
+.legal-document .toc { top: 24px; }
+.legal-document .toc-list a { white-space: normal; }
+.legal-document .av-section { scroll-margin-top: 24px; }
+.legal-document .back-link { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; margin-bottom: 16px; color: #766b71; font-size: 12px; }
+.legal-document .back-link:hover { color: var(--wine); }
+@media (max-width: 860px) {
+  .legal-document .terms-title, .legal-document .privacy-title { font-size: 31px; }
+}
+@media (max-width: 760px) {
+  .legal-document .layout { padding-inline: 0; }
+  .legal-document .back-link { gap: 7px; font-size: 11px; }
+}

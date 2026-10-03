@@ -833,3 +833,20 @@ test('only intentionally decorative images can omit alternative text', () => {
   assert.deepEqual(audit(image.replace('<img ', '<img role="presentation" ')), []);
   assert.ok(audit(image.replace('<img ', '<img role="presentation" ').replace('alt=""', 'alt="placeholder"')).some((issue) => issue.type === 'weak-image-alt'));
 });
+
+test('legal header permits the exact tracked WhatsApp menu option only on legal documents', () => {
+  for (const [pagePath, file] of [['/algemene-voorwaarden', 'premium-algemene-voorwaarden.html'], ['/privacybeleid', 'premium-privacy-policy.html']]) {
+    const html = applyPublicSeoHeadDefaults(fs.readFileSync(path.join(repoRoot, file), 'utf8'), file);
+    const audit = (candidate, route = pagePath) => auditConversionCtas({ pages: [{ path: route, html: candidate }] });
+    assert.deepEqual(audit(html), []);
+    for (const candidate of [
+      html.replace('class="legal-document toekomst-ai"', ''),
+      html.replace('class="contact-menu"', 'class="other-menu"'),
+      html.replace('WhatsApp</strong>', 'WhatsApp nu</strong>'),
+      html.replace('target="_blank" rel="noopener noreferrer"', ''),
+      html.replace('data-softora-conversion-target="whatsapp"', ''),
+      html.replace('https://wa.me/31643262792', 'https://wa.me/31643262792?text=test'),
+    ]) assert.ok(audit(candidate).some((issue) => issue.type === 'public-cta-visible-whatsapp-label'));
+    assert.ok(audit(html, '/other-page').some((issue) => issue.type === 'public-cta-visible-whatsapp-label'));
+  }
+});
