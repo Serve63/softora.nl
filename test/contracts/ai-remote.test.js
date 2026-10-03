@@ -1062,6 +1062,32 @@ test('ai remote service reads the Elementor kit brand colours instead of Hello E
   assert.ok(!result.scan.brandColorEvidence.some((item) => item.color === '#c36'));
 });
 
+test('website scan accepts ordinary access wording without treating it as a bot wall', async () => {
+  let calls = 0;
+  const { service } = createService({
+    extractWebsitePreviewScanFromHtml: (html, sourceUrl) => ({ title: 'Marketingbureau', h1: 'Marketingbureau', bodyTextSample: html, sourceUrl }),
+    fetchTextWithTimeout: async (url) => {
+      calls++;
+      return { response: { ok: true, status: 200, url,
+        headers: { get: () => 'text/html; charset=utf-8' } },
+      text: '<html><head><title>Marketingbureau</title></head><body><h1>Marketingbureau</h1><p>Bij ons krijgt u toegang tot diepgaande expertise en geavanceerde tools.</p></body></html>' };
+    },
+  });
+  const result = await service.fetchWebsitePreviewScanFromUrl('https://marketing.test');
+  assert.equal(calls, 1);
+  assert.equal(result.scan.title, 'Marketingbureau');
+  assert.match(result.scan.bodyTextSample, /toegang tot diepgaande expertise/);
+});
+
+test('website scan still refuses an actual temporary access block', async () => {
+  const { service } = createService({
+    fetchTextWithTimeout: async (url) => ({ response: { ok: true, status: 200, url,
+      headers: { get: () => 'text/html; charset=utf-8' } },
+    text: '<html><head><title>Access denied</title></head><body>Je toegang is tijdelijk geblokkeerd vanwege mogelijk misbruik vanaf dit IP adres.</body></html>' }),
+  });
+  await assert.rejects(() => service.fetchWebsitePreviewScanFromUrl('https://marketing.test'), /blokkeert geautomatiseerde serververzoeken/);
+});
+
 test('ai remote service rejects server redirects to private metadata urls', async () => {
   const calls = [];
   const { service } = createService({
