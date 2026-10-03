@@ -1657,6 +1657,37 @@ test('Instantly verbergt Neelis WhatsApp-autoreply uit een latere menselijke con
   assert.equal(JSON.stringify(conversations).includes('neelis-whatsapp-auto'), false);
 });
 
+test('Instantly verbergt headerloze afwezigheid en toont een later echt antwoord in hetzelfde gesprek', async () => {
+  const { service, store } = buildService();
+  const sent = service.normalizeInstantlyMessage(incoming({
+    id: 'absence-sent', email_type: '1',
+    from_address_email: 'serve-sender@example.com',
+    to_address_email_list: ['practice@example.test'],
+    body: { text: 'Ik heb een fris webdesign voor jullie gemaakt.' },
+    timestamp_email: '2026-10-03T07:42:00.000Z',
+  }));
+  const automatic = service.normalizeInstantlyMessage(incoming({
+    id: 'absence-reply', from_address_email: 'practice@example.test',
+    body: { html: '<p>Beste lezer,</p><p>De praktijk is gesloten tot maandag 19 oktober, berichten worden na die tijd beantwoord. Nieuwe aanmeldingen zijn momenteel niet mogelijk.</p>' },
+    timestamp_email: '2026-10-03T07:43:00.000Z',
+  }));
+  assert.equal(automatic.automatedReplyEvidence, false);
+  store.rows.push(sent, automatic);
+  assert.deepEqual(await service.listOwnerConversations('serve'), []);
+  assert.equal(store.rows.length, 2, 'filteren bewaart de providerbron');
+
+  store.rows.push(service.normalizeInstantlyMessage(incoming({
+    id: 'after-absence-human', from_address_email: 'practice@example.test',
+    body: { text: 'Bedankt, kun je de preview doorsturen?' },
+    timestamp_email: '2026-10-20T09:00:00.000Z',
+  })));
+  const conversations = await service.listOwnerConversations('serve');
+  assert.equal(conversations.length, 1);
+  assert.equal(conversations[0].providerMessageId, 'after-absence-human');
+  assert.deepEqual(conversations[0].threadMessages.map((message) => message.providerMessageId), ['absence-sent']);
+  assert.equal(store.rows.length, 3);
+});
+
 test('Instantly conversation listing hides seasonal closure auto-replies', async () => {
   const { service, store } = buildService();
   const sent = service.normalizeInstantlyMessage(incoming({

@@ -9,6 +9,9 @@
   const MAILBOX_SESSION_CACHE_KEY = 'mailbox_campaign_replies_v19';
   const MAILBOX_SESSION_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAILBOX_DELETION_CHANNEL = 'softora_mailbox_deletions_v1';
+  const absenceNoticeApi = global.SoftoraMailboxAbsenceNotice || (
+    typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-absence-notice.js') : null
+  );
   const ACCOUNT_OWNERS = Object.freeze({
     'serve@softora.nl': 'serve',
     'servecreusen@softora.nl': 'serve',
@@ -111,6 +114,7 @@
     ];
     return (
       provenAutomaticHeader ||
+      absenceNoticeApi?.isAbsenceNotice(stripQuotedReply(mail && (mail.body || mail.preview))) ||
       automatedSubjectPatterns.some((pattern) => pattern.test(subject)) ||
       automatedContentPatterns.some((pattern) => pattern.test(content))
     );
