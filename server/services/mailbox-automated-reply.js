@@ -1,4 +1,5 @@
 const { getAuthoredMessageText } = require('./mailbox-image-ownership');
+const { isAbsenceNotice } = require('../../assets/premium-mailbox-absence-notice');
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -89,6 +90,7 @@ function isAutomatedCampaignReply(message) {
 
   return (
     provenAutomaticHeader ||
+    isAbsenceNotice(getAuthoredMessageText(body || preview)) ||
     automatedSubjectPatterns.some((pattern) => pattern.test(subject)) ||
     automatedContentPatterns.some((pattern) => pattern.test(content))
   );

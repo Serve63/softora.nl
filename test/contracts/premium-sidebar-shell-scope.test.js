@@ -8,6 +8,15 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
+test('mailbox laadt het gedeelde afwezigheidsfilter vóór de inbox zonder sidebarwijzigingen', () => {
+  const page = readRepoFile('premium-mailbox.html');
+  const detector = page.indexOf('premium-mailbox-absence-notice.js?v=20261003a');
+  const inbox = page.indexOf('premium-mailbox-campaign-inbox.js?v=20261003a');
+  assert.ok(detector >= 0 && detector < inbox);
+  assert.match(page, /data-sidebar-key="mailbox"/);
+  assert.match(page, /data-sidebar-user-name/);
+});
+
 test('the shared deferred sidebar script keeps partial documents out of the first paint', () => {
   const source = readRepoFile('server/services/html-pages.js');
   const critical = source.split('const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [')[1].split('].join')[0];
@@ -615,15 +624,15 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(directoryShellSource, /<main class="main-content company-directory-shell__content"/);
   assert.match(directoryShellSource, /id="company-directory-table-frame"/);
   assert.doesNotMatch(directoryShellSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20260930-candidate-contacts/);
+  assert.match(directoryShellSource, /assets\/kvk-database-total-found\.css\?v=20261003-overview-style/);
   assert.match(directoryShellSource, /assets\/kvk-database-total-found\.js\?v=20261001-clean-results/);
   assert.doesNotMatch(directoryShellSource, /<iframe/);
   assert.match(
     directoryStyleSource,
     /\.company-directory-shell-page \.sidebar\s*\{[^}]*bottom:\s*0 !important;[^}]*height:\s*auto !important;[^}]*min-height:\s*0 !important;[^}]*max-height:\s*none !important;/s
   );
-  assert.match(directoryStyleSource, /height:\s*calc\(100dvh - 48px\)/);
-  assert.match(directoryStyleSource, /margin:\s*24px auto/);
+  assert.match(directoryStyleSource, /height:\s*min\(820px, calc\(100dvh - 32px\)\)/);
+  assert.match(directoryStyleSource, /margin:\s*0 auto 32px/);
   assert.match(
     directoryStyleSource,
     /\.dashboard-layout\[data-sidebar-shell="canonical"\] > main\.company-directory-shell__content\s*\{[^}]*height:\s*100dvh;[^}]*min-height:\s*0 !important;[^}]*padding:\s*0 !important;/s
@@ -882,7 +891,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie/);
   assert.match(pageSource, /<textarea id="c-body"[^>]*><\/textarea><div class="compose-body-loading" id="c-body-loading" role="status"[^>]*hidden><span class="compose-body-spinner"/);
   assert.match(pageSource, /\.compose-body-spinner \{[^}]*animation: mailbox-refresh-spin/);
-  assert.match(pageSource, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260924c/);
+  assert.match(pageSource, /assets\/premium-mailbox-campaign-inbox\.js\?v=20261003a/);
   const browserStorageAssetIndex = pageSource.indexOf('assets/premium-browser-storage.js?v=20260828b');
   const attachmentDigestAssetIndex = pageSource.indexOf('assets/premium-mailbox-attachment-digest.js?v=20260828c');
   const sendStateAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-send-state.js?v=20260831b');
@@ -1471,7 +1480,7 @@ test('KVK shell and embedded directory load the same compact result renderer', (
   for (const name of ['premium-kvk-company-directory-shell.html', 'premium-kvk-company-directory.html', 'premium-kvk-database.html']) {
     const source = readRepoFile(name);
     assert.match(source, /kvk-database-total-found\.js\?v=20261001-clean-results/);
-    assert.match(source, /kvk-database-total-found\.css\?v=20260930-candidate-contacts/);
+    assert.match(source, /kvk-database-total-found\.css\?v=20261003-overview-style/);
   }
 });
 
