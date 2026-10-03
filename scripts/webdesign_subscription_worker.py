@@ -52,8 +52,8 @@ def subscription_limit(folder):
             if "you've hit your usage limit" in line.lower():
                 return True
             continue
-        if event.get('type') == 'error' or event.get('item', {}).get('type') == 'agent_message':
-            if any(code in json.dumps(event).lower() for code in ('usage_limit_reached', 'rate_limit_exceeded', 'subscription_limit')):
+        if event.get('type') in ('error', 'turn.failed') or event.get('item', {}).get('type') == 'agent_message':
+            if any(code in json.dumps(event).lower() for code in ('usage_limit_reached', 'rate_limit_exceeded', 'subscription_limit', "you've hit your usage limit", 'usage limit reached')):
                 return True
     return False
 

@@ -194,6 +194,7 @@ sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location('worker', 'scripts/webdesign_subscription_worker.py')
 w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
 w.BASE = pathlib.Path(tempfile.mkdtemp())
+w.codex_binary = lambda: '/fixture/codex'
 job = {'id': 'restart-job-1234567890123456', 'claim': '${claim}'}
 folder = w.BASE / job['id']; folder.mkdir(); (folder / 'design.jpg').write_bytes(b'image')
 w.write_state({'phase': 'generating', 'job': job})
@@ -257,6 +258,11 @@ except OSError: pass
 assert json.loads(w.state_file(1).read_text())['phase'] == 'prepare'
 assert json.loads(w.state_file(0).read_text()) == {}
 # Both slot checkpoint files remain separate; a quota pause prevents further claims.
+for event in [{'type':'error','message':"You've hit your usage limit"}, {'type':'turn.failed','error':{'message':'usage_limit_reached'}}]:
+ (folder/'codex-events.jsonl').write_text(json.dumps(event))
+ assert w.subscription_limit(folder)
+(folder/'codex-events.jsonl').write_text(json.dumps({'type':'item.completed','item':{'type':'command_execution','aggregated_output':'instructions: usage_limit_reached'}}))
+assert not w.subscription_limit(folder)
 w.write_state({'phase': 'cooldown', 'retryAt': w.time.time()+600}, 0)
 w.call = lambda *args: (_ for _ in ()).throw(AssertionError('quota must pause other slot'))
 w.step(1)
