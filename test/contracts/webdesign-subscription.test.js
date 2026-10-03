@@ -65,6 +65,23 @@ test('manual bulk carries the subscription lane into every durable target job', 
   assert.equal(f.apiCalls(), 0);
 });
 
+test('manual requests cannot reuse an older API job as a subscription job', async () => {
+  const f = fixture();
+  const existing = { id: 'older-api-job-1234567890', ownerKey: `${auth.email}::${auth.userId}`, customer: { id: 'older-customer', bedrijf: 'Bedrijf' },
+    websiteUrl: 'https://example.nl', status: 'running', createdAt: Date.now(), startedAt: Date.now(), executionProvider: 'api' };
+  f.coordinator._jobs.set(existing.id, existing);
+  const rejected = res();
+  await f.coordinator.startJobResponse({ premiumAuth: auth, body: { customer: existing.customer, websiteUrl: existing.websiteUrl } }, rejected);
+  assert.equal(rejected.statusCode, 409);
+  assert.equal(f.apiCalls(), 0);
+  assert.equal(existing.executionProvider, 'api');
+  const byId = res();
+  await f.coordinator.startJobResponse({ premiumAuth: auth, body: { jobId: existing.id,
+    customer: { id: 'another-customer', bedrijf: 'Ander bedrijf' }, websiteUrl: existing.websiteUrl } }, byId);
+  assert.equal(byId.statusCode, 409);
+  assert.equal(f.apiCalls(), 0);
+});
+
 test('subscription payload restores dispatch, claim and subscription billing without API prices', () => {
   const generation = buildWebsiteImageGenerationMetadata({ model: 'gpt-image-2', billingMode: 'subscription' });
   const payload = buildWebdesignJobPayload({ customer: { id: 'a' }, executionProvider: 'codex-subscription', subscriptionClaim: claim, generation });

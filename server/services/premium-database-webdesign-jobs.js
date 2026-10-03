@@ -1,4 +1,4 @@
-const { isSubscriptionJob, refreshWebdesignMailReady, startManualWebdesignBatchResponse } = require('./webdesign-subscription');
+const { isSubscriptionJob, subscriptionReuseConflict, refreshWebdesignMailReady, startManualWebdesignBatchResponse } = require('./webdesign-subscription');
 const { deliverWebdesignImage, createWebdesignDeliveryInterruptedError } = require('./premium-database-webdesign-delivery');
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 const { randomUUID } = require('crypto');
@@ -1451,6 +1451,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       return createWebdesignJobStatusUnavailableResult();
     }
     if (existing) {
+      if (subscriptionReuseConflict(input, existing)) return subscriptionReuseConflict(input, existing);
       return {
         ok: true,
         statusCode: 202,
@@ -1481,6 +1482,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
           detail: 'Deze webdesign-opdracht hoort bij een andere sessie.',
         };
       }
+      if (subscriptionReuseConflict(input, existingById)) return subscriptionReuseConflict(input, existingById);
       return {
         ok: true,
         statusCode: 202,

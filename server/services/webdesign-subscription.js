@@ -3,6 +3,13 @@ const { buildWebdesignPipelineOptions } = require('./design-photo-generation-pol
 const { createWebsiteGenerationHelpers } = require('./website-generation');
 const { buildWebsitePreviewPromptFromScan } = createWebsiteGenerationHelpers();
 const isSubscriptionJob = (job) => job?.executionProvider === 'codex-subscription';
+function subscriptionReuseConflict(input, existing) {
+  if (isSubscriptionJob(input) && !isSubscriptionJob(existing)) return {
+    ok: false, statusCode: 409, error: 'Er loopt al een serveropdracht voor dit bedrijf.',
+    detail: 'Wacht tot die opdracht klaar is. Handmatige ontwerpen gebruiken uitsluitend je abonnement.',
+  };
+  return null;
+}
 
 async function refreshWebdesignMailReady(job, service, logger = console) {
   if (job.customer.webdesignMailProvider === 'instantly') { service?.invalidate?.(); return; }
@@ -82,4 +89,4 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
   };
 }
 
-module.exports = { isSubscriptionJob, refreshWebdesignMailReady, startManualWebdesignBatchResponse, createWebdesignSubscriptionService };
+module.exports = { isSubscriptionJob, subscriptionReuseConflict, refreshWebdesignMailReady, startManualWebdesignBatchResponse, createWebdesignSubscriptionService };
