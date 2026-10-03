@@ -1,5 +1,7 @@
 # Robot v8: geïsoleerde proef
 
+De eerste meetcijfers en hun grenzen staan in [BENCHMARK.md](BENCHMARK.md).
+
 Deze kandidaat verandert alleen de zwakke `cross_source_profile`-koppeling van
 de geïnstalleerde v7-engine. Een gedeelde achternaam met dezelfde contactgegevens
 ergens op twee websites bewijst niet dat beide websites het doelbedrijf bedoelen.
