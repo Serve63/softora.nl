@@ -15,7 +15,10 @@ const {
 } = require('../../server/services/premium-database-webdesign-jobs');
 
 function createPremiumDatabaseWebdesignJobsCoordinator(options = {}) {
+  // These delivery/cron contracts exercise the existing server API lane.
+  // Browser subscription dispatch has separate end-to-end contracts.
   return createCoordinatorImpl({
+    manualExecutionProvider: 'api',
     ...options,
     dataOpsStore: {
       assignWebdesignOwner: async () => 'serve@softora.nl',

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createController, formatEuroCost } = require('../../assets/premium-database-photo-batch');
 
-test('opening a Sunburst batch shows the selected medium total estimate for both selection and total without starting generation', () => {
+test('opening a manual batch shows subscription usage and the Mac requirement without starting generation', () => {
   const nodes = {
     generatePhotosButton: { disabled: false }, photoBatchChoiceButtons: [],
     photoBatchLimitInput: { value: '', focus() {} }, photoBatchAllCount: {}, photoBatchSummary: {},
@@ -15,7 +15,7 @@ test('opening a Sunburst batch shows the selected medium total estimate for both
   });
   controller.open();
   assert.equal(nodes.photoBatchAllCount.textContent, '100 bedrijven');
-  assert.equal(nodes.photoBatchSummary.textContent, '10 bedrijven · €0,40');
+  assert.equal(nodes.photoBatchSummary.textContent, '10 bedrijven · via je abonnement · Mac aan met internet');
   assert.equal(nodes.startPhotoBatchButton.disabled, true);
 });
 

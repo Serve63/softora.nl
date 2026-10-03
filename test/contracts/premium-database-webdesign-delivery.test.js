@@ -13,6 +13,7 @@ function fixture(overrides = {}) {
   let calls = 0;
   let uploads = 0;
   const coordinator = createPremiumDatabaseWebdesignJobsCoordinator({
+    manualExecutionProvider: 'api', // Existing server image/storage delivery contracts.
     processJobsInline: true,
     logger: { warn() {}, error() {} },
     storageRetrySleep: async () => {},

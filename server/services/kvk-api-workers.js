@@ -121,6 +121,10 @@ function createKvkApiWorkersService(deps = {}) {
 
   async function poll(req, res) {
     if (!tokenAllowed(req)) return res.status(401).json({ ok: false, error: 'Ongeldig worker-token.' });
+    if (req.body?.lane === 'webdesign-photo') {
+      if (!deps.subscriptionPhotos) return res.status(503).json({ ok: false, error: 'Abonnementwerker niet beschikbaar.' });
+      return handle(res, () => deps.subscriptionPhotos.poll(req, res));
+    }
     // The local Codex workers always run the instructions that ship with this server.
     return handle(res, async () => {
       const state = publicState(await readRow());
@@ -136,6 +140,10 @@ function createKvkApiWorkersService(deps = {}) {
 
   async function report(req, res) {
     if (!tokenAllowed(req)) return res.status(401).json({ ok: false, error: 'Ongeldig worker-token.' });
+    if (req.body?.lane === 'webdesign-photo') {
+      if (!deps.subscriptionPhotos) return res.status(503).json({ ok: false, error: 'Abonnementwerker niet beschikbaar.' });
+      return handle(res, () => deps.subscriptionPhotos.complete(req, res));
+    }
     return handle(res, async () => {
       const role = String(req.body?.role || '');
       if (!ROLES.has(role)) return res.status(400).json({ ok: false, error: 'Ongeldige werkrol.' });

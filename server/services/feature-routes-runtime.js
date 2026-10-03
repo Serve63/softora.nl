@@ -1,3 +1,5 @@
+const { createWebdesignSubscriptionService } = require('./webdesign-subscription');
+const { createWebdesignSubscriptionRepository } = require('../repositories/webdesign-subscription');
 const {
   registerColdcallingRoutes,
   registerColdcallingWebhookRoutes,
@@ -183,6 +185,10 @@ function registerFeatureRoutes(app, deps = {}) {
     getSupabaseClient: whoopHealth.getSupabaseClient,
     fallbackSyncToken: mailboxCronSecret,
     env: deps.env || process.env,
+    subscriptionPhotos: createWebdesignSubscriptionService({
+      repository: createWebdesignSubscriptionRepository({ getSupabaseClient: whoopHealth.getSupabaseClient }),
+      aiToolsCoordinator, coordinator: premiumDatabaseWebdesignJobsCoordinator,
+    }),
     identityJudge: createKvkRobotIdentityJudge({ getApiKey: () => (deps.env || process.env).OPENAI_API_KEY || '' }),
   });
   const kvkCompanyDirectoryCoordinator = createKvkCompanyDirectoryService({
