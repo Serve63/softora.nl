@@ -108,7 +108,7 @@
 
 .company-directory {
   --page: #f4f1ed;
-  --panel: #fffdfb;
+  --panel: #fff;
   --panel-strong: #fff;
   --ink: #252229;
   --muted: #7f7a84;
@@ -119,8 +119,11 @@
   --green: #2e735f;
   --green-soft: #e9f2ed;
   --yellow-soft: #f7efd9;
-  --shadow: 0 18px 45px rgba(44, 37, 31, 0.11);
+  --surface-border: rgba(92, 65, 78, 0.10);
+  --shadow: 0 2px 3px rgba(55, 35, 45, 0.025), 0 7px 20px -10px rgba(55, 35, 45, 0.15);
   color: var(--ink);
+  text-transform: none;
+  font-weight: 400;
 }
 
 .company-directory,
@@ -133,6 +136,7 @@
 .company-directory button,
 .company-directory input {
   font: inherit;
+  text-transform: none;
 }
 
 .company-directory button {
@@ -155,27 +159,27 @@
 .company-directory .search-field span {
   display: block;
   color: var(--muted);
-  font-size: 0.6rem;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: none;
 }
 
 .company-directory .search-field input {
   width: 100%;
-  height: 34px;
+  height: 30px;
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 7px;
   outline: 0;
   background: var(--panel-strong);
   color: var(--ink);
-  font-size: 0.68rem;
-  font-weight: 750;
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .company-directory .search-field input::placeholder {
   color: var(--muted);
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .company-directory .search-field input:focus {
@@ -185,41 +189,46 @@
 
 .company-directory table {
   width: 100%;
+  min-width: 1050px;
   border-collapse: collapse;
   table-layout: fixed;
 }
 
 .company-directory th,
 .company-directory td {
-  padding: 10px 12px;
+  padding: 4px 9px;
   overflow: hidden;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(110, 85, 97, 0.065);
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .company-directory th {
-  background: #f4f0eb;
-  color: var(--muted);
-  font-size: 0.58rem;
-  font-weight: 950;
-  text-transform: uppercase;
+  height: 31px;
+  background: #f7f4f6;
+  color: #8b7d85;
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: none;
 }
 
 .company-directory td {
-  color: #46404a;
-  font-size: 0.66rem;
-  font-weight: 760;
+  height: 31px;
+  color: #7f727a;
+  font-size: 8px;
+  font-weight: 400;
+  line-height: 1.25;
 }
 
 .company-directory td strong {
-  font-weight: 950;
+  color: #3c3037;
+  font-weight: 600;
 }
 
 .company-directory .link-like {
-  color: var(--accent-dark);
-  font-weight: 950;
+  color: var(--accent);
+  font-weight: 400;
 }
 
 .company-directory .website-link {
@@ -235,23 +244,24 @@
 
 .company-directory .pending-value {
   color: var(--muted);
-  font-weight: 800;
+  font-weight: 400;
 }
 
 .company-directory .company-status {
   display: inline-flex;
-  min-width: 72px;
-  height: 20px;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
-  border-radius: 999px;
+  padding: 3px 6px;
+  border-radius: 5px;
   background: #efeae4;
   color: var(--muted);
-  font-size: 0.5rem;
-  font-weight: 950;
-  line-height: 1;
-  text-transform: uppercase;
+  font-size: 8px;
+  font-weight: 450;
+  line-height: 1.4;
+  text-transform: none;
 }
 
 .company-directory .company-status.is-pending {
@@ -295,8 +305,8 @@
 }
 
 .company-directory .company-status.is-usable {
-  background: var(--green-soft);
-  color: var(--green);
+  background: #edf6f0;
+  color: #55836b;
 }
 
 .company-directory .company-status.is-unusable {
@@ -337,15 +347,15 @@
 
 .company-directory {
   display: flex;
-  width: min(1660px, calc(100% - 56px));
-  height: calc(100dvh - 48px);
+  width: min(1320px, calc(100% - 80px));
+  height: min(820px, calc(100dvh - 32px));
   min-width: 0;
-  margin: 24px auto;
+  margin: 0 auto 32px;
   padding: 0;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 0.9rem;
+  font-size: 13px;
 }
 
 .company-directory__back {
@@ -353,11 +363,11 @@
   align-self: flex-start;
   flex: 0 0 auto;
   color: var(--accent-dark);
-  font-size: 0.66rem;
-  font-weight: 900;
+  font-size: 9px;
+  font-weight: 500;
   line-height: 1;
   text-decoration: none;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .company-directory__back:hover {
@@ -368,9 +378,9 @@
 .company-directory__header {
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: minmax(0, 1fr) 214px;
-  align-items: end;
-  gap: 26px;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  align-items: center;
+  gap: 24px;
 }
 
 .company-directory__heading {
@@ -378,30 +388,31 @@
 }
 
 .company-directory h1 {
-  margin: 6px 0 7px;
-  font-family: Impact, 'Arial Narrow', ui-sans-serif, system-ui, sans-serif;
-  font-size: clamp(2.2rem, 3vw, 3.25rem);
-  font-weight: 900;
-  letter-spacing: 0.005em;
-  line-height: 0.96;
+  margin: 6px 0 2px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
 .company-directory__intro {
   margin: 0;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 750;
+  color: #8a8085;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 .company-directory__total {
   min-width: 0;
-  min-height: 86px;
-  padding: 17px 19px;
-  border: 1px solid rgba(46, 115, 95, 0.78);
-  border-radius: 12px;
+  min-height: 74px;
+  padding: 12px 14px;
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
   background: var(--panel-strong);
-  box-shadow: 0 11px 28px rgba(44, 37, 31, 0.07);
+  box-shadow: var(--shadow);
 }
 
 .company-directory__total span,
@@ -411,14 +422,17 @@
 
 .company-directory__total span {
   color: var(--muted);
-  font-size: 0.62rem;
-  font-weight: 900;
-  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 450;
+  text-transform: none;
 }
 
 .company-directory__total strong {
-  margin-top: 7px;
-  font-size: 1.55rem;
+  margin-top: 5px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
@@ -428,8 +442,8 @@
   flex: 1 1 auto;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
   background: var(--panel-strong);
   box-shadow: var(--shadow);
 }
@@ -439,10 +453,11 @@
   flex: 0 0 auto;
   grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
   align-items: end;
-  gap: 24px;
-  min-height: 72px;
-  padding: 14px 18px;
+  gap: 18px;
+  min-height: 58px;
+  padding: 8px 13px;
   border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #fff, #fdfbfc);
 }
 
 .company-directory__connection {
@@ -516,9 +531,25 @@
 .company-directory__col-website { width: 16%; }
 .company-directory__col-location { width: 13%; }
 
+.company-directory th:nth-child(1) { width: 20%; }
+.company-directory th:nth-child(2) { width: 9%; }
+.company-directory th:nth-child(3) { width: 13%; }
+.company-directory th:nth-child(4) { width: 12%; }
+.company-directory th:nth-child(5) { width: 17%; }
+.company-directory th:nth-child(6) { width: 16%; }
+.company-directory th:nth-child(7) { width: 13%; }
+
+.company-directory tbody tr {
+  transition: background-color 150ms ease;
+}
+
+.company-directory tbody tr:hover {
+  background: #faf5f8;
+}
+
 @media (max-width: 1180px) {
   .company-directory {
-    width: calc(100% - 36px);
+    width: calc(100% - 80px);
   }
 
   .company-directory__toolbar {
@@ -539,12 +570,12 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 700px) {
   .company-directory {
-    width: calc(100% - 28px);
-    height: calc(100dvh - 36px);
-    gap: 12px;
-    margin: 18px auto;
+    width: calc(100% - 20px);
+    height: calc(100dvh - 20px);
+    gap: 10px;
+    margin: 10px auto;
     padding: 0;
   }
 
@@ -559,7 +590,16 @@
   }
 
   .company-directory__total {
-    min-height: 72px;
+    min-height: 0;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .company-directory__total strong {
+    margin-top: 0;
   }
 
   .company-directory__toolbar {

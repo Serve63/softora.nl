@@ -70,7 +70,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(shellSource, /id="company-directory-total"/);
   assert.match(shellSource, /id="company-directory-retry"/);
   assert.doesNotMatch(shellSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20260930-candidate-contacts/);
+  assert.match(shellSource, /assets\/kvk-database-total-found\.css\?v=20261003-overview-style/);
   assert.match(shellSource, /assets\/kvk-database-total-found\.js\?v=20261001-clean-results/);
   assert.match(shellSource, />Opnieuw laden<\/button>/);
   assert.doesNotMatch(shellSource, /assets\/kvk-database\.css/);
@@ -82,7 +82,7 @@ test('alle gevonden bedrijven heeft een eigen beschermde pagina met canonical si
   assert.match(pageSource, /id="company-directory-table-frame"/);
   assert.match(pageSource, /id="company-directory-total"/);
   assert.doesNotMatch(pageSource, /<p class="eyebrow">Softora Database<\/p>/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260930-candidate-contacts/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20261003-overview-style/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20261001-clean-results/);
 });
 
@@ -105,6 +105,23 @@ test('directory links keep their target but display only the site name and a rea
     assert.equal(list.DASHBOARD_DIRECTORY_BUTTONS[button], category);
     assert.match(list.buildCompanyApiUrl('', 0, category), new RegExp(`categorie=${category}`));
   }
+});
+
+test('every company category shares the overview typography in embedded and standalone views', () => {
+  const embedded = fs.readFileSync(path.join(repoRoot, 'premium-kvk-company-directory.html'), 'utf8');
+  const standalone = fs.readFileSync(path.join(repoRoot, 'premium-kvk-company-directory-shell.html'), 'utf8');
+  const styles = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-total-found.css'), 'utf8');
+  for (const source of [embedded, standalone]) {
+    assert.match(source, /href="\/assets\/fonts\.css"/);
+    assert.match(source, /kvk-database-total-found\.css\?v=20261003-overview-style/);
+    assert.match(source, /class="company-directory__heading">\s*<a class="company-directory__back"/);
+    assert.match(source, /class="company-directory"/);
+  }
+  assert.match(styles, /\.company-directory h1\s*\{[^}]*font-family: 'Oswald', sans-serif;[^}]*font-size: 32px;/s);
+  assert.match(styles, /\.company-directory td\s*\{[^}]*height: 31px;[^}]*font-size: 8px;[^}]*font-weight: 400;/s);
+  assert.match(styles, /\.company-directory\s*\{[^}]*text-transform: none;/s);
+  assert.doesNotMatch(styles, /font-family: Impact|clamp\(2\.2rem/);
+  assert.match(styles, /\.company-directory table\s*\{[^}]*min-width: 1050px;/s);
 });
 
 test('kvk database snapshot page contains the approved compact dashboard', () => {
@@ -175,7 +192,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /assets\/kvk-database-total-found\.js\?v=20261001-clean-results/);
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
-  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20260930-candidate-contacts/);
+  assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20261003-overview-style/);
   assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20261001-clean-results/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
