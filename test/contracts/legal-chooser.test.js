@@ -8,6 +8,20 @@ const { getIndexablePublicHtmlFileFromPath } = require('../../server/services/pu
 const root = path.resolve(__dirname, '../..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
+function assertLegalHeader(html) {
+  const header = (source) => DomUtils.findOne((node) => node.name === 'header', parseDocument(source).children);
+  const actual = header(html);
+  const reference = header(read('assets/entry/toekomst.html'));
+  const login = (node) => node.attribs?.class?.split(' ').includes('login-menu');
+  const referenceLogin = DomUtils.findOne(login, reference.children);
+  assert.ok(referenceLogin, 'The toekomst reference retains its login menu');
+  DomUtils.removeElement(referenceLogin);
+  assert.equal(DomUtils.findAll(login, actual.children).length, 0);
+  const markup = (node) => DomUtils.getOuterHTML(node).replace(/>\s+</g, '><');
+  assert.equal(markup(actual), markup(reference));
+}
+
+
 test('toekomst copyright opens the legal chooser while keeping the article and personnel links', () => {
   const doc = parseDocument(read('assets/entry/toekomst.html'));
   const links = DomUtils.findAll((node) => node.name === 'a', doc.children);
@@ -42,12 +56,11 @@ test('legal chooser links all three choices to public pages', () => {
   assert.match(read('assets/juridisch/index.html'), /legal\.css\?v=legal-details-/);
 });
 
-test('legal chooser shares the toekomst header and menu resources', () => {
+test('legal chooser shares the toekomst header and contact resources without login', () => {
   const html = read('assets/juridisch/index.html');
   const entry = read('assets/entry/toekomst.html');
   const doc = parseDocument(html);
-  const header = (source) => DomUtils.findOne((node) => node.name === 'header', parseDocument(source).children);
-  assert.equal(DomUtils.getOuterHTML(header(html)), DomUtils.getOuterHTML(header(entry)));
+  assertLegalHeader(html);
   for (const resource of ['/assets/entry/start.css', '/assets/entry/ai-medewerker.css', '/assets/entry/contact-menu.js']) {
     const pattern = new RegExp('(?:href|src)="(' + resource.replaceAll('.', '\\.') + '\\?[^" ]+)"');
     assert.equal(html.match(pattern)?.[1], entry.match(pattern)?.[1], resource);
@@ -136,11 +149,10 @@ for (const [route, file] of [['/juridisch', 'assets/juridisch/index.html'], ['/b
 }
 
 for (const file of ['assets/juridisch/bedrijfsgegevens.html', 'premium-algemene-voorwaarden.html', 'premium-privacy-policy.html']) {
-  test(file + ' shares the toekomst header and offers back before the legal label', () => {
+  test(file + ' shares the contact header without login and offers back before the legal label', () => {
     const html = read(file);
     const doc = parseDocument(html);
-    const header = (source) => DomUtils.findOne((node) => node.name === 'header', parseDocument(source).children);
-    assert.equal(DomUtils.getOuterHTML(header(html)), DomUtils.getOuterHTML(header(read('assets/entry/toekomst.html'))));
+    assertLegalHeader(html);
     for (const resource of ['/assets/entry/start.css', '/assets/entry/ai-medewerker.css', '/assets/entry/contact-menu.js']) {
       assert.ok(html.includes(resource), resource);
     }
