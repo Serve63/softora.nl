@@ -73,6 +73,71 @@ function normalizeOwnerForTest(accountEmail) {
   return String(accountEmail || '').toLowerCase().startsWith('martijn') ? 'martijn' : 'serve';
 }
 
+test('zoeken en contacttijdlijn verbergen headerloze afwezigheid met de volledige indexbody en behouden echte en verzonden berichten', async () => {
+  const automatic = { id: 'auto', accountEmail: 'serve@softora.nl', folder: 'inbox', storageFolder: 'instantly', preview: 'Beste lezer, De praktijk is gesloten.', body: '' };
+  const human = { ...automatic, id: 'human', preview: 'Bedankt, stuur de preview maar door.' };
+  const sent = { ...automatic, id: 'sent', folder: 'sent', automatedReplyEvidence: true };
+  const rows = [automatic, human, sent];
+  const hydratedBatches = [];
+  const enrichedBatches = [];
+  const service = createMailboxDiscoveryService({
+    repository: {
+      async search() { return { messages: rows, totalCount: rows.length }; },
+      async contactTimeline() { return { messages: rows, totalCount: rows.length }; },
+    },
+    mailboxIndexStore: {
+      async hydrateMessageBodies({ messages }) {
+        assert.ok(messages.every((message) => message.folder === 'instantly'));
+        hydratedBatches.push(messages.map((message) => message.id));
+        return messages.map((message) => ({ ...message, body: message.id === 'auto'
+          ? 'Beste lezer, De praktijk is gesloten tot maandag 19 oktober, berichten worden na die tijd beantwoord.'
+          : 'Bedankt, stuur de preview maar door.' }));
+      },
+    },
+    async enrichMessages(messages) { enrichedBatches.push(messages.map((message) => message.id)); return messages; },
+  });
+  const search = await service.searchMailbox({ owner: 'serve', query: 'praktijk' });
+  const timeline = await service.getContactTimeline({ owner: 'serve', contactEmail: 'practice@example.test' });
+  for (const result of [search, timeline]) {
+    assert.deepEqual(result.messages.map((message) => message.id), ['human', 'sent']);
+    assert.equal(result.messages[0].body, '', 'zoekresultaten blijven compact');
+    assert.equal(result.totalCount, 2);
+    assert.equal(result.nextCursor, null);
+  }
+  assert.deepEqual(hydratedBatches, [['auto', 'human'], ['auto', 'human']]);
+  assert.deepEqual(enrichedBatches, [['human', 'sent'], ['human', 'sent']]);
+  assert.equal(rows.length, 3);
+  assert.equal(automatic.body, '');
+});
+
+test('een zoekpagina met alleen automation heeft geen resultaat en schuift de cursor over de bronrijen', async () => {
+  const automatic = { id: 'auto', folder: 'inbox', body: 'De praktijk is gesloten, berichten worden na die tijd beantwoord.' };
+  const calls = [];
+  const service = createMailboxDiscoveryService({ repository: {
+    async search(input) {
+      calls.push(input);
+      return input.offset === 0
+        ? { messages: [automatic], totalCount: 2 }
+        : { messages: [{ id: 'human', body: 'Stuur de preview maar door.' }], totalCount: 2 };
+    },
+  } });
+  const first = await service.searchMailbox({ query: 'praktijk', limit: 1 });
+  assert.deepEqual(first.messages, []);
+  assert.ok(first.nextCursor);
+  const next = await service.searchMailbox({ query: 'praktijk', cursor: first.nextCursor, limit: 1 });
+  assert.equal(calls[1].offset, 1);
+  assert.deepEqual(next.messages.map((message) => message.id), ['human']);
+  assert.equal(next.nextCursor, null);
+
+  const allAutomatic = createMailboxDiscoveryService({ repository: {
+    async search() { return { messages: [automatic], totalCount: 1 }; },
+  } });
+  const empty = await allAutomatic.searchMailbox({ query: 'praktijk' });
+  assert.equal(empty.totalCount, 0);
+  assert.deepEqual(empty.messages, []);
+  assert.equal(empty.nextCursor, null);
+});
+
 test('mailbox discovery beperkt owner-scope server-side en valideert query en cursor', async () => {
   const calls = [];
   const service = createMailboxDiscoveryService({
