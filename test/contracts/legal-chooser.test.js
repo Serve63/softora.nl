@@ -39,7 +39,44 @@ test('legal chooser links all three choices to public pages', () => {
   assert.match(css, /prefers-reduced-motion:\s*no-preference/);
   const desktopIconWidth = Number(css.match(/\.legal-visual img \{[^}]*width:\s*min\(100%,\s*(\d+)px\)/)?.[1]);
   assert.ok(desktopIconWidth > 0 && desktopIconWidth <= 180, 'Legal icons should remain secondary to their labels');
-  assert.match(read('assets/juridisch/index.html'), /legal\.css\?v=legal-icons-compact-/);
+  assert.match(read('assets/juridisch/index.html'), /legal\.css\?v=legal-header-cleanup-/);
+});
+
+test('legal chooser shares the toekomst header and menu resources', () => {
+  const html = read('assets/juridisch/index.html');
+  const entry = read('assets/entry/toekomst.html');
+  const doc = parseDocument(html);
+  const header = (source) => DomUtils.findOne((node) => node.name === 'header', parseDocument(source).children);
+  assert.equal(DomUtils.getOuterHTML(header(html)), DomUtils.getOuterHTML(header(entry)));
+  for (const resource of ['/assets/entry/start.css', '/assets/entry/ai-medewerker.css', '/assets/entry/contact-menu.js']) {
+    const pattern = new RegExp('(?:href|src)="(' + resource.replaceAll('.', '\\.') + '\\?[^" ]+)"');
+    assert.equal(html.match(pattern)?.[1], entry.match(pattern)?.[1], resource);
+  }
+  const body = DomUtils.findOne((node) => node.name === 'body', doc.children);
+  assert.ok(body.attribs.class.split(' ').includes('toekomst-ai'));
+  const css = read('assets/juridisch/legal.css');
+  assert.match(css, /\.legal-page:not\(\.legal-chooser\) header/);
+  assert.match(css, /\.legal-chooser \.page \{ max-width: 1440px;/);
+});
+
+test('legal chooser puts back above its eyebrow and omits redundant actions and footer', () => {
+  const doc = parseDocument(read('assets/juridisch/index.html'));
+  const hasClass = (node, value) => node.attribs?.class?.split(' ').includes(value);
+  const intro = DomUtils.findOne((node) => hasClass(node, 'legal-intro'), doc.children);
+  const children = intro.children.filter((node) => node.type === 'tag');
+  assert.equal(children[0].name, 'a');
+  assert.ok(hasClass(children[0], 'back-link'));
+  assert.equal(children[0].attribs.href, '/toekomst');
+  assert.equal(DomUtils.textContent(children[0]).trim(), '← Terug');
+  assert.ok(hasClass(children[1], 'legal-eyebrow'));
+  assert.equal(DomUtils.findAll((node) => node.name === 'footer', doc.children).length, 0);
+  assert.doesNotMatch(DomUtils.textContent(doc), /Een vraag\?|Mail ons gerust|Bekijk de voorwaarden|Lees het privacybeleid|Bekijk onze gegevens|Alle oplossingen|© 2026/);
+  const choices = DomUtils.findAll((node) => hasClass(node, 'legal-card'), doc.children);
+  for (const choice of choices) {
+    assert.ok(DomUtils.findOne((node) => node.name === 'h2', choice.children));
+    assert.ok(DomUtils.findOne((node) => node.name === 'p', choice.children));
+    assert.equal(DomUtils.findAll((node) => hasClass(node, 'legal-card-action'), choice.children).length, 0);
+  }
 });
 
 test('public company identifiers match Softora bookkeeping and omit its internal tax account number', () => {
@@ -77,9 +114,14 @@ for (const [route, file] of [['/juridisch', 'assets/juridisch/index.html'], ['/b
     assert.equal((await fetch(url, { method: 'HEAD' })).status, 200);
     assert.equal((await fetch(url, { method: 'POST' })).status, 405);
     const doc = parseDocument(html);
-    const elements = DomUtils.findAll((node) => node.type === 'tag', doc.children);
+    const elements = DomUtils.findAll((node) => ['tag', 'script', 'style'].includes(node.type), doc.children);
     assert.equal(elements.filter((node) => node.name === 'h1').length, 1);
-    assert.equal(elements.filter((node) => node.name === 'script').length, 0);
+    const scripts = elements.filter((node) => node.name === 'script');
+    assert.deepEqual(scripts.map((node) => node.attribs.src), route === '/juridisch' ? ['/assets/entry/contact-menu.js?v=login-menu-20260922'] : []);
+    for (const script of scripts) {
+      assert.ok(Object.hasOwn(script.attribs, 'defer'));
+      assert.equal(DomUtils.textContent(script), '');
+    }
     assert.equal(elements.filter((node) => node.name === 'style').length, 0);
     assert.doesNotMatch(html, /localhost|127\.0\.0\.1|12345678/);
     for (const node of elements) {
