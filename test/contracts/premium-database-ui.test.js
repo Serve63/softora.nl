@@ -3063,7 +3063,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(webdesignBulkScriptSource, /BATCH_ENDPOINT \+ "\/" \+ encodeURIComponent\(id\) \+ "\/cancel"/);
   assert.match(webdesignBulkScriptSource, /cancelActiveBatch: cancelActiveBatch/);
   assert.match(webdesignBulkScriptSource, /linear-gradient\(90deg,#8B2252,#c4547a\)/);
-  assert.doesNotMatch(webdesignBulkScriptSource, /bezig/);
+  assert.doesNotMatch(webdesignBulkScriptSource, /Webdesigns bezig|Bezig met laden/);
   assert.match(webdesignActionScriptSource, /const BATCH_START_CONCURRENCY = 4;/);
   assert.match(webdesignActionScriptSource, /const BATCH_RENDER_INTERVAL = 20;/);
   assert.match(webdesignActionScriptSource, /const BATCH_POLL_STAGGER_MS = 180;/);
@@ -3086,7 +3086,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260926-counts/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20261003-resilient/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261003-subscription/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
@@ -4237,6 +4237,7 @@ test('premium database webdesign bulk restores the progress bar from the running
               done: 500,
               failed: 5,
               active: 2,
+              running: 2,
               activeJobIds: ['job_live_1', 'job_live_2'],
               createdAt: Date.now(),
             },
@@ -4261,9 +4262,9 @@ test('premium database webdesign bulk restores the progress bar from the running
   assert.equal(batch.id, 'webdesign_batch_live');
   assert.equal(statusNode.hidden, false);
   assert.match(statusNode.innerHTML, /class="webdesign-bulk-title">Webdesigns/);
-  assert.match(statusNode.innerHTML, /500 \/ 2\.562/);
-  assert.match(statusNode.innerHTML, /2\.057 resterend · 5 mislukt/);
-  assert.doesNotMatch(statusNode.innerHTML, /bezig/);
+  assert.match(statusNode.innerHTML, /505 \/ 2\.562 verwerkt/);
+  assert.match(statusNode.innerHTML, /500 gemaakt · 5 mislukt · 2\.057 resterend/);
+  assert.match(statusNode.innerHTML, /2 bezig/);
   assert.match(statusNode.innerHTML, /class="webdesign-bulk-fill" style="width:20%"/);
   assert.equal(requests[0], '/api/premium-database/webdesign-photo-batches');
   assert.ok(requests.includes('/api/premium-database/webdesign-photo-batches/run'));
@@ -4365,7 +4366,7 @@ test('premium database webdesign bulk retries restore after a temporary batch li
 
   const retryTimer = timers.find((timer) => Number(timer.delay) === 2000);
   retryTimer.callback();
-  for (let index = 0; index < 8; index += 1) await Promise.resolve();
+  await new Promise((resolve) => setImmediate(resolve));
 
   const statusNode = nodes.get('webdesignBulkStatus');
   assert.equal(batchListCalls, 2);

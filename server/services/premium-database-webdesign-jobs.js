@@ -1,4 +1,4 @@
-const { isSubscriptionJob, subscriptionReuseConflict, refreshWebdesignMailReady, startManualWebdesignBatchResponse } = require('./webdesign-subscription');
+const { isSubscriptionJob, isExpiredWebdesignJob, subscriptionReuseConflict, refreshWebdesignMailReady, startManualWebdesignBatchResponse } = require('./webdesign-subscription');
 const { deliverWebdesignImage, createWebdesignDeliveryInterruptedError } = require('./premium-database-webdesign-delivery');
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 const { randomUUID } = require('crypto');
@@ -594,8 +594,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   function isExpiredJob(job, currentTime = now()) {
-    const createdAt = Number(job && job.createdAt) || 0;
-    return !createdAt || currentTime - createdAt > JOB_TTL_MS;
+    return isExpiredWebdesignJob(job, currentTime, JOB_TTL_MS);
   }
 
   function ownerKeyFromReq(req) {
@@ -2419,7 +2418,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   async function startBatchResponse(req, res) {
-    return startManualWebdesignBatchResponse(req, res, { ownerKeyFromReq, requiresPersistentBatchStorage, createBatchStorageUnavailableResult, createBatchId, now, persistBatch, serializeBatch, manualExecutionProvider });
+    return startManualWebdesignBatchResponse(req, res, { ownerKeyFromReq, requiresPersistentBatchStorage, createBatchStorageUnavailableResult, createBatchId, loadBatch, now, persistBatch, serializeBatch, manualExecutionProvider });
   }
 
   async function appendBatchChunkResponse(req, res) {

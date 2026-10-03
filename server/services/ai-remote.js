@@ -390,7 +390,7 @@ function createAiRemoteService(deps = {}) {
       'toegang is tijdelijk geblokkeerd',
       'ip adres',
       'ip address',
-      'captcha',
+      'complete the captcha', 'solve the captcha', 'captcha verification required',
     ];
     if (hardSignals.some((signal) => text.includes(signal))) {
       return true;
