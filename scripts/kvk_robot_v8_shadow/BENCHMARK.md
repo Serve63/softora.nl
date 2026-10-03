@@ -50,10 +50,15 @@ De ontwikkelbron is `limit-holdout-160-v7`, met referentie
 Deze namen verwijzen uitsluitend naar beschermde lokale `data/shadow`-bestanden;
 de bestanden en individuele contactuitvoer zijn niet opgenomen in Git.
 
-Validatie: 20 gerichte Python-tests; 3 nieuwe Node-contracttests;
-`npm run verify:critical` groen, inclusief 5157 contracttests en 100 smoke-tests.
+Validatie: 24 gerichte Python-tests; 4 nieuwe Node-contracttests;
+`npm run verify:critical` groen, inclusief 5158 contracttests en 100 smoke-tests.
 De drie bestaande lokale PostgreSQL-integratiesuites zijn volgens hun bestaande
 contract overgeslagen omdat geen testdatabase was geconfigureerd.
+
+Na deze meting is de CLI-padkeuze verder beperkt tot bestaande shadowdirectories
+en JSON-bestandsnamen. De gemeten overlay is daarbij ongewijzigd gebleven en de
+gemeten replay-harness is lokaal onder zijn SHA256 bewaard. Traversal-, symlink-
+en buiten-de-shadow-paden worden aanvullend door gerichte tests geweigerd.
 
 De live robot bleef actief met acht gelijktijdige bedrijven; searchers en
 controleurs bleven uit. De v8-code is niet in de enginekeuze opgenomen of

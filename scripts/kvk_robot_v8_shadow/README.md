@@ -21,6 +21,10 @@ De scripts installeren niets in de worker. De live enginekeuze bevat nog
 uitsluitend v5/v7. `--candidate` zet de overlay alleen in het replayproces aan.
 Gebruik de Python-omgeving van de lokale Database-installatie, met Python 3.12.
 Die installatie bevat de oorspronkelijke v7-engine en capture-/parseermodules.
+De installatie staat op het vaste lokale pad `~/Documents/Database`. Bron en
+uitvoerdirectory worden gekozen uit bestaande directe submappen van `data/shadow`;
+CLI-waarden kunnen geen willekeurige directory toevoegen. Maak een eigen nieuwe
+uitvoerdirectory vooraf aan. JSON-symlinks en subdirectory-traversal worden geweigerd.
 
 ```sh
 export SOFTORA_ROBOT_SHADOW_ROOT="$HOME/Documents/Database"

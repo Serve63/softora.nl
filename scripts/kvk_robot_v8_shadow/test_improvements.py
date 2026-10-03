@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ROOT = Path(os.environ.get("SOFTORA_ROBOT_SHADOW_ROOT", str(Path.home() / "Documents" / "Database"))).resolve()
+ROOT = Path.home() / "Documents" / "Database"
 os.environ.update(ROBOT_AI_JUDGE="0", ROBOT_AI_ASSIST="0", ROBOT_AI_SITE_FINDER="0")
 sys.path[:0] = [str(HERE), str(ROOT / "experiments/robot-v7-limit-20260930"), str(ROOT / "scripts")]
 import bridge_verify as bridge

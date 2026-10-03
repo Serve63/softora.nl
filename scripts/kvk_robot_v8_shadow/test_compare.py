@@ -4,14 +4,18 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import compare as comparison
 from compare import compare
 
 
 class ComparisonTests(unittest.TestCase):
     def setUp(self):
         self.scratch = tempfile.TemporaryDirectory()
-        self.root = Path(self.scratch.name)
+        self.database_root = Path(self.scratch.name).resolve()
+        self.root = self.database_root / "data" / "shadow" / "fixture"
+        self.root.mkdir(parents=True)
         self.truth = [
             {"kvk_nummer": "12345678", "lead_status": "usable", "email": "info@fixture.nl", "telefoonnummer": "0649278153"},
             {"kvk_nummer": "87654321", "lead_status": "unusable"},
@@ -35,7 +39,8 @@ class ComparisonTests(unittest.TestCase):
             path = self.root / (name + ".json")
             path.write_text(json.dumps(data))
             paths.append(path)
-        return compare(*paths)
+        with patch.object(comparison, "ROOT", self.database_root):
+            return compare(*paths)
 
     def test_known_gain_and_phone_format_agreement(self):
         result = self.evaluate()

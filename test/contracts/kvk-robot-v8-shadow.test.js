@@ -31,3 +31,12 @@ test('v8 comparison refuses partial coverage, changed sources and unsafe audits'
   assert.match(result.stderr, /Ran 4 tests/);
   assert.match(result.stderr, /OK/);
 });
+
+test('v8 CLI paths reject traversal, symlinks and files outside shadow inventory', () => {
+  const result = spawnSync('python3', [path.join(folder, 'test_shadow_paths.py')], {
+    cwd: root, encoding: 'utf8', timeout: 30000,
+  });
+  assert.equal(result.status, 0, result.stderr || String(result.error));
+  assert.match(result.stderr, /Ran 4 tests/);
+  assert.match(result.stderr, /OK/);
+});

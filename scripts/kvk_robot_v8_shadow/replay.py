@@ -12,9 +12,9 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from shadow_paths import ROOT, source_directory, shadow_file
 
 HERE = Path(__file__).resolve().parent
-ROOT = Path(os.environ.get("SOFTORA_ROBOT_SHADOW_ROOT", str(Path.home() / "Documents" / "Database"))).resolve()
 V7 = ROOT / "experiments" / "robot-v7-limit-20260930"
 NETWORK_ATTEMPTS = []
 
@@ -97,13 +97,12 @@ def replay(source, candidate=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("source", type=Path)
-    parser.add_argument("output", type=Path)
+    parser.add_argument("source")
+    parser.add_argument("output")
     parser.add_argument("--candidate", action="store_true")
     args = parser.parse_args()
-    source, output = args.source.resolve(), args.output.resolve()
-    source.relative_to((ROOT / "data" / "shadow").resolve())
-    output.relative_to((ROOT / "data" / "shadow").resolve())
+    source = source_directory(args.source, ROOT)
+    output = shadow_file(args.output, ROOT)
     if output.exists() or source == output or source in output.parents:
         raise ValueError("Use a new output outside the frozen source directory")
     result, audit = replay(source, args.candidate)

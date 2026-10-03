@@ -3,7 +3,7 @@ import argparse
 import json
 import re
 from collections import Counter
-from pathlib import Path
+from shadow_paths import ROOT, shadow_file
 
 
 def keyed(rows):
@@ -44,9 +44,9 @@ def score(truth, results):
 
 
 def compare(truth_path, baseline_path, candidate_path):
-    truth = keyed(json.loads(Path(truth_path).read_text()))
-    baseline = json.loads(Path(baseline_path).read_text())
-    candidate = json.loads(Path(candidate_path).read_text())
+    truth = keyed(json.loads(shadow_file(truth_path, ROOT).read_text()))
+    baseline = json.loads(shadow_file(baseline_path, ROOT).read_text())
+    candidate = json.loads(shadow_file(candidate_path, ROOT).read_text())
     old, new = keyed(baseline["results"]), keyed(candidate["results"])
     if not (truth.keys() == old.keys() == new.keys()):
         raise ValueError("Truth, baseline and candidate must cover identical companies")
