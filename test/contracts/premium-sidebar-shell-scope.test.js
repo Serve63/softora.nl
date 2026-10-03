@@ -22,6 +22,11 @@ test('personnel dark mode preserves the shared sidebar, legacy palettes and publ
   assert.match(css, /html\[data-theme="dark"\] \.sidebar\[data-static-sidebar="1"\]/);
   assert.match(css, /data-softora-sidebar-content-frame="1"/);
   assert.match(css, /personnel-theme-toggle:focus-visible/);
+  assert.match(css, /html\[data-theme="dark"\] \.location-button:is\(\.is-selected, \.is-contact-active, \.is-worker-active\) \{ background: var\(--accent-soft\) !important; \}/);
+  assert.match(css, /html\[data-theme="dark"\] \.planning-panel \.location-button\.is-worker-active \{ box-shadow: inset 4px 0 var\(--accent-light\); \}/);
+  assert.match(css, /html\[data-theme="dark"\] \.planning-worker-label\.is-controller \{ background: var\(--yellow-soft\); color: #e6b45b; \}/);
+  assert.match(css, /html\[data-theme="dark"\] \.planning-worker-label\.is-robot \{ background: var\(--green-soft\); color: var\(--green\); \}/);
+  assert.match(css, /html\[data-theme="dark"\] \.latest-treated-panel \.website-link \{ color: var\(--accent-light\) !important; \}/);
 });
 
 test('mailbox laadt het gedeelde afwezigheidsfilter vóór de inbox zonder sidebarwijzigingen', () => {
@@ -560,7 +565,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20261004a'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20261004b'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260927-locked'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
