@@ -14,6 +14,8 @@ function normalizeWebdesignJobRetryPayload(value = {}) {
 function buildWebdesignJobPayload(job = {}) {
   const retry = normalizeWebdesignJobRetryPayload(job.retry);
   const payload = { customer: job.customer && typeof job.customer === 'object' ? job.customer : {} };
+  if (job.executionProvider === 'codex-subscription') payload.executionProvider = 'codex-subscription';
+  if (job.subscriptionClaim) payload.subscriptionClaim = job.subscriptionClaim;
   if (job.variant) payload.variant = normalizeString(job.variant).slice(0, 80);
   if (job.assignedDesignOwnerEmail) payload.assignedDesignOwnerEmail = normalizeString(job.assignedDesignOwnerEmail).toLowerCase().slice(0, 240);
   if (job.batchId) payload.batchId = normalizeString(job.batchId).slice(0, 120);
@@ -27,4 +29,31 @@ function buildWebdesignJobPayload(job = {}) {
   return payload;
 }
 
-module.exports = { normalizeWebdesignJobRetryPayload, buildWebdesignJobPayload };
+function toMsFromIso(value) { const parsed = Date.parse(value); return Number.isFinite(parsed) ? parsed : null; }
+
+function normalizeWebdesignJobRow(row = {}) {
+  const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+  return {
+    id: normalizeString(row.job_id),
+    ownerKey: normalizeString(row.owner_key),
+    customer: payload.customer && typeof payload.customer === 'object' ? payload.customer : {},
+    websiteUrl: normalizeString(row.website_url),
+    status: normalizeString(row.status || 'queued').toLowerCase(),
+    error: normalizeString(row.error || ''),
+    createdAt: toMsFromIso(row.created_at) || Date.now(),
+    startedAt: toMsFromIso(row.started_at),
+    finishedAt: toMsFromIso(row.finished_at),
+    retry: normalizeWebdesignJobRetryPayload(payload.retry),
+    cancelled: payload.cancelled === true,
+    generationAttempted: payload.generationAttempted === true, generation: payload.generation || null, assignedDesignOwnerEmail: normalizeString(payload.assignedDesignOwnerEmail).toLowerCase(),
+    executionProvider: payload.executionProvider || '', subscriptionClaim: payload.subscriptionClaim || '',
+    variant: normalizeString(payload.variant || ''),
+    batchId: normalizeString(payload.batchId || ''),
+    batchTargetIndex: Number.isFinite(Number(payload.batchTargetIndex))
+      ? Math.max(0, Math.floor(Number(payload.batchTargetIndex)))
+      : null,
+  };
+}
+
+
+module.exports = { normalizeWebdesignJobRetryPayload, buildWebdesignJobPayload, normalizeWebdesignJobRow };

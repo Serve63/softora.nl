@@ -727,6 +727,7 @@
                     await finishPendingJob({ customerId: target.id, jobId: job.id }, errorMessage, "failed");
                     return { started: false, failed: true, error: errorMessage };
                 }
+                if (!quiet && job.executionProvider === 'codex-subscription') setStatusMessage('Webdesign via je abonnement · wacht op Codex op je Mac.', 'info');
                 schedulePoll(job.id, pollDelay);
                 return { started: true, jobId: job.id };
             } catch (error) {

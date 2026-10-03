@@ -28,6 +28,7 @@ function normalizeUsage(usage) {
 function buildWebsiteImageGenerationMetadata(payload = {}) {
   const model = String(payload.model || '').trim().slice(0, 100);
   if (!model) return null;
+  if (payload.billingMode === 'subscription') return { model, billingMode: 'subscription', quality: '', size: String(payload.size || '').slice(0, 30), usage: null, cost: null };
   const usage = normalizeUsage(payload.usage);
   let cost = null;
   if (/^gpt-image-2\.5-(sunburst|flare)(-\d{4}-\d{2}-\d{2})?$/.test(model) && usage) {

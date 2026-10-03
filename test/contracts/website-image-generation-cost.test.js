@@ -49,7 +49,7 @@ test('the completed price replaces the estimate and survives the photo refresh a
   }, requestAnimationFrame: (fn) => fn(), setTimeout() {} };
   const reporter = createCostReporter({ root, costEur: null, setStatusMessage: (text) => messages.push(text) });
   reporter.show('v2-visual-dna');
-  assert.equal(labels[0].textContent, '€0,04');
+  assert.equal(labels[0].textContent, 'via je abonnement');
   reporter.report({ customerId: 'example', company: 'Example', generation: metadata(payload) });
   assert.equal(labels[1].textContent, '€0,20');
   assert.equal(messages[0], 'Example · €0,20');

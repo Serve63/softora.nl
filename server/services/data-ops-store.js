@@ -1,7 +1,7 @@
 const { readOutboundGuardKeys } = require('./outbound-guard-key-reader');
 const { createMailboxStatsMessagesRepository } = require('../repositories/mailbox-stats-messages');
 const { createHash } = require('crypto');
-const { normalizeWebdesignJobRetryPayload, buildWebdesignJobPayload } = require('./webdesign-job-payload');
+const { normalizeWebdesignJobRow, buildWebdesignJobPayload } = require('./webdesign-job-payload');
 
 const {
   buildCustomerIdentityKey,
@@ -2013,28 +2013,6 @@ function createSoftoraDataOpsStore(deps = {}) {
     };
   }
 
-  function normalizeWebdesignJobRow(row = {}) {
-    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
-    return {
-      id: normalizeString(row.job_id),
-      ownerKey: normalizeString(row.owner_key),
-      customer: payload.customer && typeof payload.customer === 'object' ? payload.customer : {},
-      websiteUrl: normalizeString(row.website_url),
-      status: normalizeString(row.status || 'queued').toLowerCase(),
-      error: normalizeString(row.error || ''),
-      createdAt: toMsFromIso(row.created_at) || Date.now(),
-      startedAt: toMsFromIso(row.started_at),
-      finishedAt: toMsFromIso(row.finished_at),
-      retry: normalizeWebdesignJobRetryPayload(payload.retry),
-      cancelled: payload.cancelled === true,
-      generationAttempted: payload.generationAttempted === true, generation: payload.generation || null, assignedDesignOwnerEmail: normalizeString(payload.assignedDesignOwnerEmail).toLowerCase(),
-      variant: normalizeString(payload.variant || ''),
-      batchId: normalizeString(payload.batchId || ''),
-      batchTargetIndex: Number.isFinite(Number(payload.batchTargetIndex))
-        ? Math.max(0, Math.floor(Number(payload.batchTargetIndex)))
-        : null,
-    };
-  }
 
   const WEBDESIGN_BATCH_KIND = 'bulk_webdesign_batch';
   const WEBDESIGN_BATCH_CHUNK_KIND = 'bulk_webdesign_chunk';
@@ -2070,7 +2048,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         kind: WEBDESIGN_BATCH_KIND,
         batch: {
           id,
-          status,
+          executionProvider: batch.executionProvider || '', status,
           total: Math.max(0, Math.floor(Number(batch.total || 0) || 0)),
           expectedChunks: Math.max(0, Math.floor(Number(batch.expectedChunks || 0) || 0)),
           uploadedTargets: Math.max(0, Math.floor(Number(batch.uploadedTargets || 0) || 0)),
@@ -2090,6 +2068,7 @@ function createSoftoraDataOpsStore(deps = {}) {
     const batch = payload.batch && typeof payload.batch === 'object' ? payload.batch : {};
     return {
       id: normalizeString(row.job_id || batch.id),
+      executionProvider: batch.executionProvider || '',
       ownerKey: normalizeString(row.owner_key),
       status: normalizeWebdesignBatchStatus(batch.status || row.status, 'queued'),
       error: normalizeString(row.error || ''),

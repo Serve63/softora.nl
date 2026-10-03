@@ -2556,8 +2556,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /nodes\.generatePhotosButton\.hidden = !showPhotoBatchControl;/);
   assert.match(pageSource, /const WEBSITE_PHOTO_COST_EUR = null;/);
   assert.match(pageSource, /nodes\.count\.textContent = displayText;/);
-  assert.match(pageSource, /Sunburst medium: /);
-  assert.match(pageSource, /SoftoraDatabasePhotoBatch\.formatOutputEstimate\(1\)/);
+  assert.match(pageSource, /AI-foto\. " \+ window\.SoftoraDatabasePhotoBatch\.pricingNote/);
+  assert.doesNotMatch(pageSource, /Sunburst medium: /);
   assert.match(pageSource, /SoftoraDatabasePhotoBatch\.pricingNote/);
   assert.doesNotMatch(pageSource, /URL-scan kost €0,00/);
   assert.match(pageSource, /id="generatePhotosButton"/);
@@ -2667,7 +2667,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260925-v2-only/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260926-mail-ready/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261003-subscription/);
   assert.doesNotMatch(webdesignVariantPickerScriptSource, /v1-prompt-only|V1_VARIANT/);
   assert.doesNotMatch(webdesignActionScriptSource, /v1-prompt-only/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
@@ -2926,9 +2926,9 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
     fs.readFileSync(path.join(__dirname, '../../assets/premium-database-webdesign-source-selection.js'), 'utf8'),
     /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/
   );
-  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20260917-source/);
+  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20261003-subscription/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260926-mail-ready/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261003-subscription/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260914-provider/);
@@ -3087,7 +3087,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20260926-counts/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260926-mail-ready/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261003-subscription/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeString\(variant\)\.toLowerCase\(\) !== "v2-visual-dna"/);
@@ -3129,7 +3129,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
   assert.match(pageSource, /assets\/premium-database-instantly-status\.js\?v=20260923-current-campaigns/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20260926-mail-ready/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261003-subscription/);
   assert.doesNotMatch(webdesignActionScriptSource, /webdesigns klaar en naar Mailklaar verplaatst|Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(webdesignActionScriptSource, /costReporter\.consume\(customerIds\)/);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \}; const databaseSortedLists = window\.SoftoraDatabaseSortedLists\.create/);

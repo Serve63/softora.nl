@@ -1,3 +1,4 @@
+const { isSubscriptionJob, subscriptionReuseConflict, refreshWebdesignMailReady, startManualWebdesignBatchResponse } = require('./webdesign-subscription');
 const { deliverWebdesignImage, createWebdesignDeliveryInterruptedError } = require('./premium-database-webdesign-delivery');
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 const { randomUUID } = require('crypto');
@@ -532,6 +533,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     photoRemovalKey = 'softora_database_photos_removed_v1',
     photoDataPrefix = 'softora_database_photo_data_v1_',
     jobProcessTimeoutMs = 10 * 60 * 1000,
+    manualExecutionProvider = 'codex-subscription',
     processJobsInline = process.env.VERCEL === '1' || process.env.VERCEL === 'true',
     webdesignJobConcurrency = process.env.PREMIUM_WEBDESIGN_JOB_CONCURRENCY,
     bulkChunkTargetLimit = process.env.PREMIUM_WEBDESIGN_BULK_CHUNK_TARGET_LIMIT,
@@ -885,7 +887,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   function isJobReadyToProcess(job) {
-    if (!job || job.status !== 'queued' || isExpiredJob(job)) return false;
+    if (!job || isSubscriptionJob(job) || job.status !== 'queued' || isExpiredJob(job)) return false;
     const retry = getRetryState(job);
     return !retry.nextAttemptAt || retry.nextAttemptAt <= now();
   }
@@ -920,6 +922,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const safetyBlocked = job.error === WEBDESIGN_SAFETY_BLOCKED_ERROR_CODE || isOpenAiSafetyBlockedError(job.error);
     return {
       id: job.id,
+      executionProvider: job.executionProvider || 'api',
       status: job.status,
       variant: normalizeWebdesignVariant(job.variant),
       customerId: job.customer.id,
@@ -1212,6 +1215,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   async function processJob(job) {
+    if (isSubscriptionJob(job)) throw new Error('Deze opdracht wordt uitsluitend via het Codex-abonnement uitgevoerd.');
     if (job && job.cancelled === true) throw createCancelledWebdesignJobError();
     if (isExpiredJob(job)) throw createExpiredWebdesignJobError();
     job.status = 'running';
@@ -1230,24 +1234,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         if (isExpiredJob(job)) throw createExpiredWebdesignJobError();
       },
     });
-    if (job.customer.webdesignMailProvider === 'instantly' && mailReadySnapshotService?.invalidate) mailReadySnapshotService.invalidate();
-    if (
-      job.customer.webdesignMailProvider !== 'instantly' &&
-      mailReadySnapshotService &&
-      typeof mailReadySnapshotService.markCustomersMailReadyAfterAssetUpsert === 'function'
-    ) {
-      try {
-        const snapshotUpdated = await mailReadySnapshotService.markCustomersMailReadyAfterAssetUpsert([job.customer.id]);
-        if (!snapshotUpdated && typeof logger.warn === 'function') {
-          logger.warn('[PremiumDatabaseWebdesignJobs][mail-ready-snapshot]', `Snapshot niet direct bijgewerkt voor ${job.customer.id}.`);
-        }
-      } catch (error) {
-        if (typeof logger.warn === 'function') {
-          logger.warn('[PremiumDatabaseWebdesignJobs][mail-ready-snapshot]', error && error.message ? error.message : error);
-        }
-        if (typeof mailReadySnapshotService.invalidate === 'function') mailReadySnapshotService.invalidate();
-      }
-    }
+    await refreshWebdesignMailReady(job, mailReadySnapshotService, logger);
   }
 
   function setMailReadySnapshotService(service) {
@@ -1347,7 +1334,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   function isStaleRunningJob(job) {
-    if (!job || job.status !== 'running' || isExpiredJob(job)) return false;
+    if (!job || isSubscriptionJob(job) || job.status !== 'running' || isExpiredJob(job)) return false;
     const startedAt = Number(job.startedAt) || 0;
     if (!startedAt) return true;
     return now() - startedAt > JOB_PROCESS_TIMEOUT_MS + 30 * 1000;
@@ -1464,6 +1451,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       return createWebdesignJobStatusUnavailableResult();
     }
     if (existing) {
+      if (subscriptionReuseConflict(input, existing)) return subscriptionReuseConflict(input, existing);
       return {
         ok: true,
         statusCode: 202,
@@ -1494,6 +1482,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
           detail: 'Deze webdesign-opdracht hoort bij een andere sessie.',
         };
       }
+      if (subscriptionReuseConflict(input, existingById)) return subscriptionReuseConflict(input, existingById);
       return {
         ok: true,
         statusCode: 202,
@@ -1506,6 +1495,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const job = {
       id: jobId,
       ownerKey, assignedDesignOwnerEmail: ownerAssignment.ownerEmail,
+      executionProvider: input.executionProvider === 'codex-subscription' ? 'codex-subscription' : 'api',
       customer,
       websiteUrl,
       variant: normalizeWebdesignVariant(input.variant),
@@ -1547,6 +1537,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const result = await startJob({
       ...body,
       ownerKey: ownerKeyFromReq(req),
+      executionProvider: manualExecutionProvider,
       customer: body.customer || body,
     });
     const statusCode = Math.max(100, Math.min(599, Number(result.statusCode) || (result.ok ? 202 : 500)));
@@ -1573,7 +1564,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
 
     let job = jobs.get(jobId);
     let persistentLoadError = null;
-    if (!job) {
+    if (!job || isSubscriptionJob(job)) {
       const loaded = await loadPersistentJobResult(jobId);
       job = loaded.job;
       persistentLoadError = loaded.error;
@@ -1901,7 +1892,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const activeJobIds = collectActiveBatchJobIds(chunks);
     const status = getEffectiveBatchStatus(batch, summary);
     return {
-      id: batch.id,
+      id: batch.id, executionProvider: batch.executionProvider || 'api',
       status,
       total: summary.total,
       uploadedTargets: summary.uploadedTargets,
@@ -1988,7 +1979,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         const status = normalizeString(target.status).toLowerCase();
         if ((status !== 'queued' && status !== 'running') || !target.jobId) continue;
         let job = jobs.get(target.jobId);
-        if (!job) {
+        if (!job || isSubscriptionJob(job)) {
           const loaded = await loadPersistentJobResult(target.jobId);
           if (loaded.error) continue;
           job = loaded.job;
@@ -2042,7 +2033,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
         if (target.nextAttemptAt && target.nextAttemptAt > now()) continue;
         attempted += 1;
         const result = await startJob({
-          ownerKey: batch.ownerKey,
+          ownerKey: batch.ownerKey, executionProvider: batch.executionProvider,
           customer: target.customer,
           websiteUrl: target.websiteUrl, variant: target.variant,
           batchId: batch.id,
@@ -2264,7 +2255,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     const jobId = normalizeJobId(target && target.jobId);
     if (!jobId) return '';
     let job = jobs.get(jobId);
-    if (!job) {
+    if (!job || isSubscriptionJob(job)) {
       const loaded = await loadPersistentJobResult(jobId);
       if (!loaded.error && loaded.job) job = loaded.job;
     }
@@ -2428,32 +2419,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   async function startBatchResponse(req, res) {
-    const ownerKey = ownerKeyFromReq(req);
-    if (!ownerKey) return res.status(401).json({ ok: false, error: 'Niet ingelogd' });
-    if (!requiresPersistentBatchStorage()) {
-      const result = createBatchStorageUnavailableResult('batch-opslag controleren');
-      return res.status(result.statusCode).json(result);
-    }
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const batch = {
-      id: createBatchId(),
-      ownerKey,
-      status: 'queued',
-      total: Math.max(0, Math.floor(Number(body.total || 0) || 0)),
-      expectedChunks: 0,
-      uploadedTargets: 0,
-      createdAt: now(),
-      startedAt: null,
-      finishedAt: null,
-      summary: {},
-      lastError: '',
-    };
-    const saved = await persistBatch(batch, 'batch starten opslaan');
-    if (!saved || saved.ok !== true) {
-      const result = createBatchStorageUnavailableResult(saved && saved.action ? saved.action : 'batch starten opslaan', saved && saved.error);
-      return res.status(result.statusCode).json(result);
-    }
-    return res.status(202).json({ ok: true, batch: serializeBatch(batch, []) });
+    return startManualWebdesignBatchResponse(req, res, { ownerKeyFromReq, requiresPersistentBatchStorage, createBatchStorageUnavailableResult, createBatchId, now, persistBatch, serializeBatch, manualExecutionProvider });
   }
 
   async function appendBatchChunkResponse(req, res) {
@@ -2604,6 +2570,11 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     setMailReadySnapshotService,
     setNightlyMailStockService: (service) => { nightlyMailStockService = service; },
     startBatchResponse,
+    saveSubscriptionPhoto: async (job, image) => {
+      await persistGeneratedPhoto(job, image);
+      await refreshWebdesignMailReady(job, mailReadySnapshotService, logger);
+      jobs.delete(job.id);
+    },
     startJob,
     startJobResponse,
     _jobs: jobs,

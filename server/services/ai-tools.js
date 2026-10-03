@@ -115,7 +115,7 @@ function createAiToolsCoordinator(deps = {}) {
     };
   }
 
-  async function runWebsitePreviewGeneratePipeline(inputUrl, options = {}) {
+  async function prepareWebsitePreviewImage(inputUrl, options = {}) {
     const body = options.body && typeof options.body === 'object' ? options.body : {};
     const referenceImageMode = normalizeString(options.referenceImageMode || '').toLowerCase();
     const usesHomepageScreenshot = referenceImageMode === HOMEPAGE_SCREENSHOT_REFERENCE_MODE;
@@ -151,6 +151,11 @@ function createAiToolsCoordinator(deps = {}) {
           }
         : {}),
     };
+    return { fetched, generationScan };
+  }
+
+  async function runWebsitePreviewGeneratePipeline(inputUrl, options = {}) {
+    const { fetched, generationScan } = await prepareWebsitePreviewImage(inputUrl, options);
     const generated = await generateWebsitePreviewImageWithAi(generationScan);
 
     appendDashboardActivity(
@@ -591,7 +596,7 @@ function createAiToolsCoordinator(deps = {}) {
     sendOrderDossierResponse,
     sendTranscriptToPromptResponse,
     sendWebsitePreviewGenerateResponse,
-    runWebsitePreviewGeneratePipeline,
+    prepareWebsitePreviewImage, runWebsitePreviewGeneratePipeline,
   };
 }
 

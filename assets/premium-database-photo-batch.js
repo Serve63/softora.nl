@@ -4,7 +4,7 @@
   // https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml (2026-09-08)
   const EUR_USD_REFERENCE_RATE = 1.1614;
   const VAT_RATE = 0.21;
-  const PRICING_NOTE = "Richtprijs vooraf; het berekende bedrag verschijnt na generatie.";
+  const PRICING_NOTE = "Via je ChatGPT/Codex-abonnement. Je Mac moet aanstaan en internet hebben. Je abonnementslimieten gelden.";
 
   function usdToEuroIncludingVat(amountUsd) {
     return amountUsd / EUR_USD_REFERENCE_RATE * (1 + VAT_RATE);
@@ -40,6 +40,7 @@
   }
 
   function formatGenerationCost(generation) {
+    if (generation && generation.billingMode === 'subscription') return 'via je abonnement';
     const cost = generation && generation.cost;
     if (!cost || cost.basis !== "reported-image-usage" || cost.currency !== "USD" || !Number.isFinite(cost.amountUsd) || cost.amountUsd < 0) return "beeldkosten niet beschikbaar";
     return formatEuroCost(usdToEuroIncludingVat(cost.amountUsd));
@@ -62,7 +63,7 @@
         label.className = "photo-generate-charge-label";
         label.setAttribute("aria-live", "polite");
         label.title = PRICING_NOTE;
-        label.textContent = generation ? formatGenerationCost(generation) : (Number.isFinite(costEur) ? formatEuroCost(costEur) : formatOutputEstimate(1));
+        label.textContent = generation ? formatGenerationCost(generation) : "via je abonnement";
         root.document.body.appendChild(label);
         updateChargeLabelPositions();
         const frame = typeof root.requestAnimationFrame === "function"
@@ -171,7 +172,7 @@
       nodes.startPhotoBatchButton.disabled = !provider || !selectedCount;
       nodes.photoBatchLimitInput.max = String(Math.max(total, 1));
       nodes.photoBatchSummary.textContent = message || (selectedCount
-        ? formatPhotoBatchCount(selectedCount) + " · " + (Number.isFinite(selectedCost) ? formatCost(selectedCost) : formatOutputEstimate(selectedCount))
+        ? formatPhotoBatchCount(selectedCount) + " · via je abonnement · Mac aan met internet"
         : "Vul minimaal 1 in.");
     }
 
