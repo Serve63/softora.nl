@@ -8,6 +8,15 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
+test('mailbox laadt het gedeelde afwezigheidsfilter vóór de inbox zonder sidebarwijzigingen', () => {
+  const page = readRepoFile('premium-mailbox.html');
+  const detector = page.indexOf('premium-mailbox-absence-notice.js?v=20261003a');
+  const inbox = page.indexOf('premium-mailbox-campaign-inbox.js?v=20261003a');
+  assert.ok(detector >= 0 && detector < inbox);
+  assert.match(page, /data-sidebar-key="mailbox"/);
+  assert.match(page, /data-sidebar-user-name/);
+});
+
 test('the shared deferred sidebar script keeps partial documents out of the first paint', () => {
   const source = readRepoFile('server/services/html-pages.js');
   const critical = source.split('const PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET = [')[1].split('].join')[0];
@@ -882,7 +891,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie/);
   assert.match(pageSource, /<textarea id="c-body"[^>]*><\/textarea><div class="compose-body-loading" id="c-body-loading" role="status"[^>]*hidden><span class="compose-body-spinner"/);
   assert.match(pageSource, /\.compose-body-spinner \{[^}]*animation: mailbox-refresh-spin/);
-  assert.match(pageSource, /assets\/premium-mailbox-campaign-inbox\.js\?v=20260924c/);
+  assert.match(pageSource, /assets\/premium-mailbox-campaign-inbox\.js\?v=20261003a/);
   const browserStorageAssetIndex = pageSource.indexOf('assets/premium-browser-storage.js?v=20260828b');
   const attachmentDigestAssetIndex = pageSource.indexOf('assets/premium-mailbox-attachment-digest.js?v=20260828c');
   const sendStateAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-send-state.js?v=20260831b');
