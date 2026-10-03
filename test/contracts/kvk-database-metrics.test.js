@@ -4,7 +4,36 @@ const assert = require('node:assert/strict');
 const {
   createController,
   getLast60Minutes,
+  renderLast60Delta,
 } = require('../../assets/kvk-database-metrics');
+
+test('individual events expire at the exact rolling hour and stale measurements show unknown', () => {
+  const at = Date.parse('2026-10-03T12:00:00Z');
+  const snapshot = { generatedAt: new Date(at).toISOString(), state: {
+    metrics_measured_at: new Date(at).toISOString(),
+    last_60_minutes: { treated: 2, declared_usable: 2, declared_unusable: 0,
+      usable: 2, with_website: 1, without_website: 1, successful_found: 2, control_room: 0,
+      control_room_activity: { added: 0, removed: 0 } },
+    last_60_minute_events: [
+      { at: at - 3_599_000, delta: { treated: 1, declared_usable: 1, with_website: 1 } },
+      { at: at - 30_000, delta: { treated: 1, declared_usable: 1, without_website: 1 } },
+    ],
+  } };
+  assert.equal(getLast60Minutes(snapshot, at).treated, 2);
+  const expired = getLast60Minutes(snapshot, at + 1_000);
+  assert.equal(expired.treated, 1);
+  assert.equal(expired.with_website, 0);
+  assert.equal(expired.without_website, 1);
+  assert.equal(expired.usable, expired.with_website + expired.without_website);
+  const stale = getLast60Minutes(snapshot, at + 120_001);
+  assert.equal(stale.treated, null);
+  assert.equal(stale.control_room_activity.added, null);
+  const element = createElement(['.stat-delta-number']);
+  renderLast60Delta(element, stale.without_website);
+  assert.equal(element.nodes['.stat-delta-number'].textContent, '—');
+  assert.equal(element.classList.contains('is-zero'), false);
+  assert.equal(snapshot.state.last_60_minutes.treated, 2);
+});
 
 function createTextNode() {
   return { textContent: '', hidden: false, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
