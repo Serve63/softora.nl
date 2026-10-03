@@ -27,7 +27,7 @@ test('toekomst copyright opens the legal chooser while keeping the article and p
   const links = DomUtils.findAll((node) => node.name === 'a', doc.children);
   const copyright = links.find((node) => node.attribs.class === 'footer-copyright');
   assert.equal(copyright.attribs.href, '/juridisch');
-  assert.equal(DomUtils.textContent(copyright), '© 2026 SOFTORA.NL Juridisch');
+  assert.equal(DomUtils.textContent(copyright), '© 2026 Softora.nl Juridisch');
   assert.ok(links.some((node) => node.attribs.href === 'https://www.softora.nl/blog'));
   assert.ok(links.some((node) => node.attribs.href === '/premium-personeel-login'));
 });
