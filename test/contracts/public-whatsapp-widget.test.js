@@ -51,7 +51,18 @@ function assertHasHeaderContact(html, pagePath) {
   assert.equal(addPublicWhatsappWidgetIfMissing(html, { pagePath }), html);
 }
 
-test('iedere publieke vaste pagina houdt meetbaar contact via widget of expliciete vaste header', () => {
+function assertHasLegalContactMenu(html, pagePath) {
+  assert.doesNotMatch(html, /data-softora-whatsapp-widget|public-whatsapp-widget\.css|<footer\b/);
+  assert.match(html, /<details class="contact-menu">/);
+  const whatsapp = [...html.matchAll(/<a\b[^>]*>/g)].map((match) => match[0]).find((anchor) => anchor.includes('href="https://wa.me/31643262792"'));
+  assert.ok(whatsapp, 'Legal pages retain WhatsApp in the shared contact menu');
+  assert.match(whatsapp, /data-softora-conversion-target="whatsapp"/);
+  assert.ok(whatsapp.includes(`data-softora-conversion-page="${pagePath}"`));
+  assert.equal((html.match(/\/assets\/public-conversion-tracking\.js\?/g) || []).length, 1);
+  assert.equal(addPublicWhatsappWidgetIfMissing(html, { pagePath }), html);
+}
+
+test('iedere publieke vaste pagina houdt meetbaar contact via widget of header', () => {
   for (const entry of INDEXABLE_PUBLIC_SEO_PAGES) {
     const source = fs.readFileSync(path.join(repoRoot, entry.fileName), 'utf8');
     const once = applyPublicSeoHeadDefaults(source, entry.fileName, {
@@ -62,7 +73,9 @@ test('iedere publieke vaste pagina houdt meetbaar contact via widget of explicie
     });
 
     const verify = ['/bedrijfssoftware-op-maat', '/chatbot-laten-maken', '/contact'].includes(entry.path)
-      ? assertHasHeaderContact : assertHasOneSitewideWidget;
+      ? assertHasHeaderContact
+      : ['/algemene-voorwaarden', '/privacybeleid'].includes(entry.path)
+        ? assertHasLegalContactMenu : assertHasOneSitewideWidget;
     verify(once, entry.path);
     verify(twice, entry.path);
   }

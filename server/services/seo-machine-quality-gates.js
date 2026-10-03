@@ -731,6 +731,20 @@ function isSharedArticleContactOption(anchor, html, pathName) {
     && extractAnchorEntries(header).some((entry) => entry.attrs === anchor.attrs);
 }
 
+function isSharedLegalWhatsappOption(anchor, html, pathName) {
+  if (!['/algemene-voorwaarden', '/privacybeleid'].includes(pathName)
+    || !/<body\b[^>]*class="legal-document toekomst-ai"/.test(html)) return false;
+  const header = html.match(/<header\b[^>]*>([\s\S]*?)<\/header>/)?.[1] || '';
+  const menu = header.match(/<details class="contact-menu">([\s\S]*?)<\/details>/)?.[1] || '';
+  return anchor.href === 'https://wa.me/31643262792'
+    && anchor.label === 'WhatsApp Stuur ons een bericht.'
+    && getAttrValue(anchor.attrs, 'class') === 'contact-option'
+    && hasSafeBlankTarget(anchor.attrs)
+    && hasCompleteConversionTracking(anchor.attrs, 'whatsapp')
+    && getAttrValue(anchor.attrs, 'data-softora-conversion-page') === pathName
+    && extractAnchorEntries(menu).some((entry) => entry.attrs === anchor.attrs);
+}
+
 function auditConversionCtas({ pages = [] } = {}) {
   const issues = [];
 
@@ -744,7 +758,7 @@ function auditConversionCtas({ pages = [] } = {}) {
     const leadCtaButtons = buttons.filter((button) => isLeadCtaLabel(button.label));
     const trackedWhatsappButtons = leadCtaButtons.filter(isTrackedWhatsappButton);
     const whatsappChannelLabels = [
-      ...conversionLinks.filter((anchor) => hasVisibleWhatsappCtaLabel(anchor.label) && !isSharedArticleContactOption(anchor, html, pathName)),
+      ...conversionLinks.filter((anchor) => hasVisibleWhatsappCtaLabel(anchor.label) && !isSharedArticleContactOption(anchor, html, pathName) && !isSharedLegalWhatsappOption(anchor, html, pathName)),
       ...leadCtaButtons.filter((button) => hasVisibleWhatsappCtaLabel(button.label)),
       ...extractCtaHelperTextEntries(html).filter((entry) => hasVisibleWhatsappCtaLabel(entry.label)),
     ];
