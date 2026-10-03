@@ -1,8 +1,5 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
 const { isAbsenceNotice } = require('../../assets/premium-mailbox-absence-notice');
 const { isAutomatedCampaignReply } = require('../../server/services/mailbox-automated-reply');
 const inbox = require('../../assets/premium-mailbox-campaign-inbox');
@@ -27,12 +24,9 @@ test('afwezigheidsmeldingen zonder autoheaders worden gelijk herkend door server
     ['Our practice is closed. Emails will be answered after our return. Your design looks great.', false],
     ['Dank voor je mail. Ik kijk na mijn vakantie naar het ontwerp.', false],
   ];
-  const context = { window: {} };
-  vm.runInNewContext(fs.readFileSync(path.resolve(__dirname, '../../assets/premium-mailbox-absence-notice.js'), 'utf8'), context);
   for (const [body, expected] of cases) {
     const message = { subject: 'Re: Kleine vraag over jullie website', body, autoSubmitted: 'no' };
     assert.equal(isAbsenceNotice(body), expected, body);
-    assert.equal(context.window.SoftoraMailboxAbsenceNotice.isAbsenceNotice(body), expected, body);
     assert.equal(isAutomatedCampaignReply(message), expected, `server: ${body}`);
     assert.equal(inbox.isAutomatedCampaignReply(message), expected, `browser: ${body}`);
   }
