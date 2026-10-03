@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { isDeepStrictEqual } = require('node:util');
 const { getLast60Minutes } = require('../../assets/kvk-database-metrics');
 
 const DEFAULT_STATE_KEY_SUFFIX = 'kvk_database_snapshot_v1';
@@ -170,6 +171,8 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     if (!Array.isArray(snapshot.locations)) {
       return 'Snapshot mist locations.';
     }
+    const metricsError = validateMetrics(snapshot);
+    if (metricsError) return metricsError;
     const serialized = JSON.stringify(snapshot);
     if (Buffer.byteLength(serialized, 'utf8') > MAX_SNAPSHOT_BYTES) {
       return `Snapshot is te groot. Maximaal ${MAX_SNAPSHOT_BYTES} bytes.`;
@@ -190,8 +193,29 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     if (progress.latestTreated.length > 10) {
       return 'Voortgangssnapshot bevat meer dan 10 behandelde bedrijven.';
     }
+    const metricsError = validateMetrics(progress);
+    if (metricsError) return metricsError;
     if (Buffer.byteLength(JSON.stringify(progress), 'utf8') > MAX_PROGRESS_BYTES) {
       return `Voortgangssnapshot is te groot. Maximaal ${MAX_PROGRESS_BYTES} bytes.`;
+    }
+    return '';
+  }
+
+  function validateMetrics(snapshot) {
+    const state = snapshot.state;
+    if (!state.metrics_measured_at) return ''; // Existing publishers remain compatible.
+    const measuredAt = Date.parse(state.metrics_measured_at);
+    const events = state.last_60_minute_events;
+    if (!Number.isFinite(measuredAt) || !Array.isArray(events)
+        || events.some((event) => !Number.isFinite(event?.at) || event.at > measuredAt
+          || event.at <= measuredAt - 3_600_000 || !event.delta
+          || Object.values(event.delta).some((value) => !Number.isInteger(value)))
+        || (snapshot.latestTreated || []).some((row) => !Number.isFinite(Date.parse(row.contact_checked_at))
+          || Date.parse(row.contact_checked_at) > measuredAt)
+        || !isDeepStrictEqual(getLast60Minutes(snapshot, measuredAt), state.last_60_minutes)
+        || state.usable !== state.with_website + state.without_website
+        || state.treated !== state.declared_usable + state.declared_unusable + state.control_room) {
+      return 'KVK tellingen en recente resultaten horen niet bij dezelfde consistente meting.';
     }
     return '';
   }

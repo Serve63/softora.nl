@@ -5,6 +5,48 @@ const {
   createKvkDatabaseSnapshotService,
 } = require('../../server/services/kvk-database-snapshot');
 
+test('consistent metrics reject mismatched hours, totals and newer recent rows before storage', async () => {
+  const { getLast60Minutes } = require('../../assets/kvk-database-metrics');
+  const at = Date.parse('2026-10-03T12:00:00Z');
+  const snapshot = createSnapshot();
+  snapshot.generatedAt = new Date(at).toISOString();
+  snapshot.state = { ...snapshot.state, metrics_measured_at: snapshot.generatedAt,
+    treated: 9, declared_usable: 6, declared_unusable: 1, control_room: 2, usable: 6,
+    last_60_minutes: { treated: 0, declared_usable: 0, declared_unusable: 0,
+      usable: 0, with_website: 0, without_website: 0, successful_found: 0, control_room: 0,
+      control_room_activity: { added: 0, removed: 0 } },
+    last_60_minute_events: [{ at: at - 1000, delta: { treated: 1, declared_usable: 1, without_website: 1 } }],
+  };
+  snapshot.state.last_60_minutes = getLast60Minutes(snapshot, at);
+  snapshot.latestTreated = [{ contact_checked_at: new Date(at - 1000).toISOString() }];
+  let writes = 0;
+  const service = createKvkDatabaseSnapshotService({ kvkDatabaseSyncToken: 'test',
+    fetchSupabaseRowByKeyViaRest: async () => ({ ok: true, body: null }),
+    upsertSupabaseRowViaRest: async () => { writes += 1; return { ok: true }; },
+  });
+  for (const corrupt of [
+    (s) => { s.state.last_60_minutes.without_website = 0; },
+    (s) => { s.latestTreated[0].contact_checked_at = new Date(at + 1).toISOString(); },
+    (s) => { s.state.with_website = 5; },
+    (s) => { s.state.control_room = 3; },
+    (s) => { s.state.last_60_minute_events[0].at = at + 1; },
+  ]) {
+    const invalid = structuredClone(snapshot);
+    corrupt(invalid);
+    for (const method of ['sendPostSnapshotResponse', 'sendPostProgressResponse']) {
+      const res = createJsonResponse();
+      await service[method]({ headers: { authorization: 'Bearer test' },
+        body: method.includes('Progress') ? { progress: invalid } : { snapshot: invalid } }, res);
+      assert.equal(res.statusCode, 400);
+    }
+  }
+  assert.equal(writes, 0);
+  const res = createJsonResponse();
+  await service.sendPostSnapshotResponse({ headers: { authorization: 'Bearer test' }, body: { snapshot } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(writes, 1);
+});
+
 function createJsonResponse() {
   return {
     statusCode: null,

@@ -36,16 +36,39 @@
   // Share this rule with the snapshot API and re-evaluate it on every render.
   function getLast60Minutes(snapshot, now = Date.now()) {
     const activity = snapshot?.state?.last_60_minutes || {};
-    const generatedAt = Date.parse(snapshot?.generatedAt || '');
+    const generatedAt = Date.parse(snapshot?.state?.metrics_measured_at || snapshot?.generatedAt || '');
     const age = Number(now) - generatedAt;
-    if (Number.isFinite(age) && age >= 0 && age < 60 * 60 * 1000) return activity;
-    function zeroCounts(counts) {
-      return Object.fromEntries(Object.entries(counts).map(([key, value]) => [
+    function mapCounts(counts, replacement = 0) {
+      return Object.fromEntries(Object.entries(counts).map(([key, child]) => [
         key,
-        value && typeof value === 'object' ? zeroCounts(value) : 0,
+        child && typeof child === 'object' ? mapCounts(child, replacement) : replacement,
       ]));
     }
-    return zeroCounts(activity);
+    const events = snapshot?.state?.last_60_minute_events;
+    if (Array.isArray(events)) {
+      // A stopped/failed publisher means unknown new work, never a proven +0.
+      if (!Number.isFinite(age) || age < 0 || age > 120_000) return mapCounts(activity, null);
+      const counts = mapCounts(activity);
+      for (const event of events) {
+        if (!Number.isFinite(event.at) || event.at <= Number(now) - 3_600_000 || event.at > Number(now)) continue;
+        for (const [path, delta] of Object.entries(event.delta || {})) {
+          const parts = path.split('.');
+          let target = counts;
+          for (const part of parts.slice(0, -1)) target = target?.[part];
+          const key = parts[parts.length - 1];
+          if (target && Number.isFinite(delta) && key in target) target[key] += delta;
+        }
+      }
+      counts.usable = (counts.with_website || 0) + (counts.without_website || 0);
+      counts.successful_found = counts.declared_usable || 0;
+      counts.control_room = (counts.control_room_activity?.added || 0) - (counts.control_room_activity?.removed || 0);
+      for (const grade of ['1', '2']) {
+        if (counts.unusable_grades) counts.unusable_grades[grade] = counts.unusable_grade_activity?.[grade]?.added || 0;
+      }
+      return counts;
+    }
+    if (Number.isFinite(age) && age >= 0 && age < 60 * 60 * 1000) return activity;
+    return mapCounts(activity);
   }
 
   function sumCounts(...values) {
@@ -115,10 +138,10 @@
   function renderLast60Delta(element, value) {
     if (!element) return;
     const rawCount = Number(value || 0);
-    const count = Number.isFinite(rawCount) ? rawCount : 0;
+    const count = value === null ? null : Number.isFinite(rawCount) ? rawCount : 0;
     const numberNode = element.querySelector('.stat-delta-number');
     const labelNode = element.querySelector('.stat-delta-label');
-    if (numberNode) numberNode.textContent = `${count >= 0 ? '+' : ''}${numberFormat.format(count)}`;
+    if (numberNode) numberNode.textContent = count === null ? '—' : `${count >= 0 ? '+' : ''}${numberFormat.format(count)}`;
     if (labelNode) labelNode.textContent = '60m';
     element.classList.toggle('is-zero', count === 0);
     element.classList.toggle('is-negative', count < 0);
@@ -259,8 +282,8 @@
           countOrFallback('controlRoom', scraperState.control_room),
         );
       }
-      renderLast60Delta(elements.successfulFoundLast60, last60.declared_usable ?? 0);
-      renderLast60Delta(elements.declaredUnusableLast60, last60.declared_unusable ?? 0);
+      renderLast60Delta(elements.successfulFoundLast60, last60.declared_usable);
+      renderLast60Delta(elements.declaredUnusableLast60, last60.declared_unusable);
       renderControlRoomLast60(elements.controlRoomLast60, last60.control_room_activity);
       renderLast60Delta(elements.treated, last60.treated);
       renderLast60Delta(elements.usable, last60.usable);
