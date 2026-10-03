@@ -8,6 +8,22 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
+test('personnel dark mode preserves the shared sidebar, legacy palettes and public scope', () => {
+  const theme = readRepoFile('assets/personnel-theme.js');
+  const css = readRepoFile('assets/personnel-appearance.css');
+  const coordinator = readRepoFile('server/services/html-pages.js');
+  assert.doesNotMatch(theme, /forceLightTheme|syncThemeButtonsToLight/);
+  assert.match(theme, /applyPersonnelTheme\(window\.SoftoraPersonnelTheme\.getMode\(\), false\)/);
+  assert.match(coordinator, /hasStaticSidebar && \/assets\\\/personnel-theme/);
+  assert.match(coordinator, /fileName === 'premium-kvk-database\.html'/);
+  for (const token of ['bg-primary', 'bg-secondary', 'text-primary', 'text-secondary', 'bg', 'card', 'text-dark']) {
+    assert.match(css, new RegExp(`--${token}: [^;]+ !important;`));
+  }
+  assert.match(css, /html\[data-theme="dark"\] \.sidebar\[data-static-sidebar="1"\]/);
+  assert.match(css, /data-softora-sidebar-content-frame="1"/);
+  assert.match(css, /personnel-theme-toggle:focus-visible/);
+});
+
 test('mailbox laadt het gedeelde afwezigheidsfilter vóór de inbox zonder sidebarwijzigingen', () => {
   const page = readRepoFile('premium-mailbox.html');
   const detector = page.indexOf('premium-mailbox-absence-notice.js?v=20261003a');
@@ -544,7 +560,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20260927-locked'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20261004a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260927-locked'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
