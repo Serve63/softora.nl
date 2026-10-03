@@ -95,7 +95,8 @@ test('public company identifiers match Softora bookkeeping and omit its internal
     assert.ok(html.includes('<strong>KvK-nummer:</strong> ' + kvk));
     assert.doesNotMatch(html, /12345678/);
   }
-  for (const link of ['mailto:info@softora.nl', 'tel:+31643262792', '/juridisch', '/contact']) assert.ok(company.includes('href="' + link + '"'));
+  for (const link of ['mailto:info@softora.nl', 'tel:+31643262792', '/juridisch', 'https://www.softora.nl/contact']) assert.ok(company.includes('href="' + link + '"'));
+  assert.doesNotMatch(company, /Liever een bericht via de website|Neem contact op|class="legal-contact"/);
 });
 
 for (const [route, file] of [['/juridisch', 'assets/juridisch/index.html'], ['/bedrijfsgegevens', 'assets/juridisch/bedrijfsgegevens.html']]) {
