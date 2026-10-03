@@ -1976,13 +1976,14 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     for (const chunk of chunks) {
       for (const target of chunk.targets || []) {
         const status = normalizeString(target.status).toLowerCase();
-        if ((status !== 'queued' && status !== 'running') || !target.jobId) continue;
+        if (!['queued', 'running', 'error'].includes(status) || !target.jobId) continue;
         let job = jobs.get(target.jobId);
         if (!job || isSubscriptionJob(job)) {
           const loaded = await loadPersistentJobResult(target.jobId);
           if (loaded.error) continue;
           job = loaded.job;
         }
+        if (status === 'error' && (!isSubscriptionJob(job) || job.status === 'error')) continue;
         if (!job) {
           markTarget(target, 'pending', { jobId: '', error: '' });
           changed.add(chunk.index);

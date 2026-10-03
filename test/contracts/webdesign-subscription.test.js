@@ -28,7 +28,7 @@ function fixture() {
       listWebdesignBatchChunks: async (_owner, id) => [...chunks.values()].filter((c) => c.batchId === id).map((c) => structuredClone(c)),
     },
   });
-  return { coordinator, rows, batches, apiCalls: () => apiCalls };
+  return { coordinator, rows, batches, chunks, apiCalls: () => apiCalls };
 }
 
 test('manual job cannot select API, stays off the API on polling and reads remote completion', async () => {
@@ -62,6 +62,30 @@ test('manual bulk carries the subscription lane into every durable target job', 
   await f.coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 1, expectedChunks: 1 } }, res());
   assert.equal(f.rows.size, 1);
   assert.equal([...f.rows.values()][0].executionProvider, 'codex-subscription');
+  assert.equal(f.apiCalls(), 0);
+});
+
+test('subscription batch reconciles a recovered result after its target was marked failed', async () => {
+  const f = fixture(), started = res();
+  await f.coordinator.startBatchResponse({ premiumAuth: auth, body: { total: 2 } }, started);
+  const batchId = started.body.batch.id;
+  await f.coordinator.appendBatchChunkResponse({ premiumAuth: auth, params: { batchId }, body: { index: 0,
+    targets: ['recovered', 'peer'].map((id) => ({ customer: { id, bedrijf: id }, websiteUrl: 'https://example.nl' })) } }, res());
+  await f.coordinator.commitBatchResponse({ premiumAuth: auth, params: { batchId }, body: { total: 2, expectedChunks: 1 } }, res());
+  const [job, peer] = [...f.rows.values()];
+  job.status = 'error'; peer.status = 'error';
+  const read = async () => {
+    const response = res();
+    await f.coordinator.getBatchResponse({ premiumAuth: auth, params: { batchId } }, response);
+    return response.body.batch;
+  };
+  assert.equal((await read()).failed, 2);
+  // The result RPC reopens the parent after a late saved result arrives.
+  job.status = 'done'; job.finishedAt = Date.now();
+  f.batches.get(batchId).status = 'running';
+  const recovered = await read();
+  assert.equal(recovered.made, 1); assert.equal(recovered.failed, 1);
+  assert.equal([...f.chunks.values()][0].targets[0].status, 'done');
   assert.equal(f.apiCalls(), 0);
 });
 
