@@ -2,6 +2,7 @@
 
 const { createMailboxDiscoveryRepository } = require('../repositories/mailbox-discovery');
 const { getCampaignMailboxAccounts } = require('./mailbox-campaign-replies');
+const { isAutomatedMailboxMessage } = require('./mailbox-delivery-failure-visibility');
 
 const SEARCH_LIMIT_DEFAULT = 20;
 const CONTACT_LIMIT_DEFAULT = 30;
@@ -95,6 +96,25 @@ function createMailboxDiscoveryService(deps = {}) {
     return email;
   }
 
+  async function visibleDiscoveryMessages(messages) {
+    const incoming = messages.filter((message) => (
+      message.folder !== 'sent' && message.direction !== 'sent' && message.localAcceptedSend !== true
+    ));
+    // Search rows omit bodies. Use the existing bounded index batch to classify
+    // authored text, while keeping the public search response lightweight.
+    const hydrated = typeof mailboxIndexStore.hydrateMessageBodies === 'function' && incoming.length
+      ? await mailboxIndexStore.hydrateMessageBodies({ messages: incoming.map((message) => ({
+        ...message, folder: message.storageFolder || message.folder,
+      })) })
+      : incoming;
+    const identity = (message) => `${message.accountEmail || ''}|${message.messageKey || message.id || ''}`;
+    const evidence = new Map(hydrated.map((message) => [identity(message), message]));
+    return messages.filter((message) => (
+      message.folder === 'sent' || message.direction === 'sent' || message.localAcceptedSend === true ||
+      !isAutomatedMailboxMessage(evidence.get(identity(message)) || message)
+    ));
+  }
+
   async function searchMailbox(input = {}) {
     const query = normalizeSearchQuery(input.query);
     const limit = normalizeLimit(input.limit, SEARCH_LIMIT_DEFAULT, 40);
@@ -108,11 +128,14 @@ function createMailboxDiscoveryService(deps = {}) {
       offset,
     });
     const nextOffset = offset + result.messages.length;
+    const messages = await visibleDiscoveryMessages(result.messages);
     return {
       ok: true,
       query,
-      messages: await (deps.enrichMessages || (async (messages) => messages))(result.messages),
-      totalCount: result.totalCount,
+      messages: await (deps.enrichMessages || (async (messages) => messages))(messages),
+      // Only replace the raw count when the entire result is known. Cursors
+      // always advance over source rows, including hidden automatic messages.
+      totalCount: offset === 0 && nextOffset >= result.totalCount ? messages.length : result.totalCount,
       nextCursor: nextOffset < result.totalCount ? encodeCursor(nextOffset) : null,
     };
   }
@@ -125,11 +148,12 @@ function createMailboxDiscoveryService(deps = {}) {
       accountEmails: getScopedAccounts(input.owner), contactEmail, limit, offset,
     });
     const nextOffset = offset + result.messages.length;
+    const messages = await visibleDiscoveryMessages(result.messages);
     return {
       ok: true,
       contactEmail,
-      messages: await (deps.enrichMessages || (async (messages) => messages))(result.messages),
-      totalCount: result.totalCount,
+      messages: await (deps.enrichMessages || (async (messages) => messages))(messages),
+      totalCount: offset === 0 && nextOffset >= result.totalCount ? messages.length : result.totalCount,
       nextCursor: nextOffset < result.totalCount ? encodeCursor(nextOffset) : null,
     };
   }
