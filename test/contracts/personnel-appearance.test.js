@@ -1,10 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
 const { createReadModelStore } = require('../../assets/premium-readmodel-store');
-const source = fs.readFileSync(path.join(__dirname, '../../assets/personnel-appearance.js'), 'utf8');
+const { initialize } = require('../../assets/personnel-appearance');
 
 function storage() {
   const values = new Map();
@@ -30,7 +27,7 @@ function openPage(localStorage, owner = 'serve', hasDate = true) {
   };
   const window = { document: doc, SoftoraReadModelStore: createReadModelStore({ localStorage }),
     addEventListener: (key, callback) => { events[key] = callback; } };
-  vm.runInNewContext(source, { window });
+  initialize(window);
   return { window, rootAttributes, events, classes, get button() { return button; } };
 }
 

@@ -1,4 +1,7 @@
-(function (global) {
+(function (global, initialize) {
+    if (typeof module !== "undefined" && module.exports) module.exports = { initialize: initialize };
+    if (global && global.document) initialize(global);
+})(typeof window !== "undefined" ? window : null, function initialize(global) {
     "use strict";
     const doc = global.document;
     const root = doc.documentElement;
@@ -59,4 +62,4 @@
         if (event.key !== null && event.key !== "softora-readmodel-sync:" + model) return;
         try { applyMode(store && owner ? store.readSync(model, owner) : "light", false); } catch (_) { /* Ignore unavailable storage. */ }
     });
-})(window);
+});
