@@ -1,11 +1,13 @@
 """Real SQLite regressions for every dashboard movement and concurrent publication."""
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
 import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
 from kvk_dashboard_consistency import capture_snapshot, connection_for, empty_counts, epoch, hourly_activity
@@ -118,12 +120,12 @@ class DashboardConsistencyTests(unittest.TestCase):
             db=Path(directory)/'test.sqlite'
             writer=sqlite3.connect(db); self.addCleanup(writer.close)
             writer.execute('PRAGMA journal_mode=WAL'); writer.executescript(SCHEMA)
+            measured = datetime.fromtimestamp(NOW, timezone.utc)
             def latest(limit):
                 if not writer.execute('SELECT 1 FROM companies').fetchone():
                     writer.execute("INSERT INTO companies(id,kvk_nummer,actief,lead_status) VALUES(1,'robot',1,'usable')")
                     writer.execute("INSERT INTO company_primary VALUES(1,'robot')")
-                    from datetime import datetime,timezone
-                    at=datetime.now(timezone.utc).isoformat()
+                    at=(measured + timedelta(milliseconds=1)).isoformat()
                     writer.execute("INSERT INTO contact_research_lane_events VALUES('robot','initial','usable','searcher_robot',?)",(at,))
                     writer.execute("INSERT INTO contact_research_bucket_events VALUES(1,'robot','initial','','without_website',?)",(at,))
                     writer.commit()
@@ -134,10 +136,15 @@ class DashboardConsistencyTests(unittest.TestCase):
                             declared_usable=c.execute('SELECT COUNT(*) FROM companies').fetchone()[0],declared_unusable=0,control_room=0)
             dashboard=SimpleNamespace(DB_PATH=db, company_where=lambda bucket,q:(["lead_status='usable'" if bucket in ('usable','without_website') else '0'],[]),
                 review_classification=SimpleNamespace(totals=totals),latest_treated_query=latest,latest_luna_errors_query=lambda limit:[])
-            first=capture_snapshot({'state':{},'companyTotals':{}},dashboard)
+            # The second read must have a later API millisecond even on fast machines.
+            with patch('kvk_dashboard_consistency.datetime', wraps=datetime) as clock:
+                clock.now.return_value = measured
+                first=capture_snapshot({'state':{},'companyTotals':{}},dashboard)
             self.assertEqual(first['latestTreated'],[])
             self.assertEqual(first['state']['last_60_minutes']['without_website'],0)
-            second=capture_snapshot({'state':{},'companyTotals':{}},dashboard)
+            with patch('kvk_dashboard_consistency.datetime', wraps=datetime) as clock:
+                clock.now.return_value = measured + timedelta(milliseconds=2)
+                second=capture_snapshot({'state':{},'companyTotals':{}},dashboard)
             self.assertEqual(len(second['latestTreated']),1)
             self.assertEqual(second['state']['last_60_minutes']['without_website'],1)
             self.assertEqual(second['generatedAt'],second['state']['metrics_measured_at'])
