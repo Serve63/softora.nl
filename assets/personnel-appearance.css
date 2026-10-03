@@ -112,11 +112,11 @@ html[data-theme="dark"] :is(.mail-roi-step-button, .mail-roi-autopilot-toggle) {
 html[data-theme="dark"] :is(.status-filter-divider, .mail-roi-step-divider) { background: var(--border) !important; }
 /* The company database is also opened as a standalone settings iframe. */
 html[data-theme="dark"] :is(.inventory, .research-details, .planning-details, .latest-treated-panel,
-    .planning-title-row, .inventory-footer, .planning-legend-popover, .panel-heading,
-    .kvk-database-shell__content, .kvk-database-shell__frame) {
+    .planning-title-row, .inventory-footer, .planning-legend-popover, .panel-heading) {
     background: var(--bg-secondary) !important;
     border-color: var(--border) !important;
 }
+html[data-theme="dark"] :is(.kvk-database-shell__content, .kvk-database-shell__frame) { background: var(--bg-primary) !important; }
 html[data-theme="dark"] :is(.planning-details, .latest-treated-panel)::after {
     background: var(--bg-secondary) !important;
     border-color: var(--border) !important;
