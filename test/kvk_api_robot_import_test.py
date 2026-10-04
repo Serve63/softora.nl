@@ -83,6 +83,26 @@ NOTHING_FOUND = {'kvk_nummer': '17218892', 'decision': 'missing_phone_and_email'
                  'proof': [{'url': 'https://drimble.nl/bedrijf/x', 'reason': 'no_contact'}]}
 
 
+class RobotContactGateTests(unittest.TestCase):
+    def test_a_website_builder_address_is_never_imported_and_goes_to_the_controleurs(self):
+        jimdo = dict(USABLE, email='datenschutz@jimdo.com', decision='usable', website='https://vaartbelyn.nl/')
+        self.assertIsNone(robot_import.robot_find(jimdo))
+        verdict = robot_import.robot_verdict(jimdo)
+        self.assertEqual(verdict['reason'], 'identity_unconfirmed')
+        self.assertIn('platform-e-mail', verdict['note'])
+
+    def test_a_theme_demo_number_abroad_on_a_dutch_site_is_rejected(self):
+        demo = dict(USABLE, phone='+19168752235', website='https://cuisinevanpien.nl/', email='info@cuisinevanpien.nl')
+        self.assertIsNone(robot_import.robot_find(demo))
+        self.assertIn('buitenlands nummer', robot_import.contact_problem(demo))
+
+    def test_a_foreign_company_with_its_own_foreign_number_still_passes(self):
+        africa = dict(USABLE, phone='+256 773 363012', website='https://www.roadtripafrica.com/', email='info@roadtripafrica.com')
+        self.assertEqual(robot_import.contact_problem(africa), '')
+        self.assertIsNotNone(robot_import.robot_find(africa))
+        self.assertIsNotNone(robot_import.robot_find(USABLE))
+
+
 class RobotVerdictTests(unittest.TestCase):
     setUp, tearDown, row = RobotImportTests.setUp, RobotImportTests.tearDown, RobotImportTests.row
 

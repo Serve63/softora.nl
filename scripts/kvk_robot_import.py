@@ -42,13 +42,39 @@ HOLDING_NAME = re.compile(r"\b(holding|beheer|vastgoed|participaties?|investment
 NO_CONTACT_DECISIONS = {"missing_phone_and_email", "technical_retry", "missing_email", "missing_phone", "no_own_contact"}
 
 
+# Last gate before the database, whatever path produced the find: a website builder's or host's
+# own address (datenschutz@jimdo.com in a site footer) is never the company's e-mail.
+PLATFORM_EMAIL_DOMAINS = frozenset({
+    "jimdo.com", "jimdosite.com", "wix.com", "wixpress.com", "squarespace.com", "webnode.com", "webnode.nl",
+    "weebly.com", "site123.com", "strato.de", "strato.nl", "one.com", "hostnet.nl", "transip.nl", "mijndomein.nl",
+    "vimexx.nl", "godaddy.com", "shopify.com", "lightspeedhq.com", "mailchimp.com", "wordpress.com",
+    "wordpress.org", "automattic.com", "webflow.com", "jouwweb.nl", "sentry.io", "example.com", "domain.com",
+    "domain.tld", "cloudflare.com", "google.com", "facebook.com",
+})
+
+
+def contact_problem(result: dict) -> str:
+    """Why a usable result's contacts cannot be right, or '' when they pass."""
+    email = str(result.get("email") or "").strip().lower()
+    domain = email.rsplit("@", 1)[-1]
+    if any(domain == item or domain.endswith("." + item) for item in PLATFORM_EMAIL_DOMAINS):
+        return f"platform-e-mail {email}"
+    phone = re.sub(r"[^\d+]", "", str(result.get("phone") or result.get("telefoonnummer") or ""))
+    website = str(result.get("website") or "").lower()
+    dutch_site = bool(re.search(r"\.nl(?:[/:?#]|$)", website)) or domain.endswith(".nl")
+    foreign = phone.startswith("+") and not phone.startswith("+31") or phone.startswith("00") and not phone.startswith("0031")
+    if foreign and dutch_site:
+        return f"buitenlands nummer {phone} bij een Nederlandse site (demonummer van een websitethema)"
+    return ""
+
+
 def robot_find(result: dict) -> dict | None:
     """The contact set to import, or None when the Robot did not find a usable lead."""
     if result.get("lead_status") != "usable":
         return None
     phone = str(result.get("phone") or result.get("telefoonnummer") or "").strip()
     email = str(result.get("email") or "").strip()
-    if not phone or not email:
+    if not phone or not email or contact_problem(result):
         return None
     return {
         "kvk": str(result.get("kvk_nummer") or result.get("kvk") or ""),
@@ -63,7 +89,9 @@ def robot_verdict(result: dict) -> dict | None:
     if robot_find(result) is not None:
         return None
     decision = str(result.get("decision") or "")
-    reason = UNUSABLE_REASONS.get(decision)
+    problem = contact_problem(result) if result.get("lead_status") == "usable" else ""
+    # A find that fails the contact gate goes to the Controleurs as unconfirmed, never in silently.
+    reason = "identity_unconfirmed" if problem else UNUSABLE_REASONS.get(decision)
     if not reason:
         return None
     if decision in NO_CONTACT_DECISIONS and HOLDING_NAME.search(str(result.get("bedrijfsnaam") or "")):
@@ -72,6 +100,7 @@ def robot_verdict(result: dict) -> dict | None:
     proof = [str(item.get("url") or "") for item in result.get("proof") or [] if isinstance(item, dict)]
     note = "; ".join(part for part in (
         f"Robot v7 + AI-hulp: {result.get('decision')}",
+        f"contactcontrole afgekeurd: {problem}" if problem else "",
         f"AI-controle: {assist.get('reason')}" if assist.get("reason") else "",
         f"conflict: {result.get('conflict_kind')}" if result.get("conflict_kind") else "",
         ("bewijs: " + ", ".join(url for url in proof if url)[:500]) if any(proof) else "",
