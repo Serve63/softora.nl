@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Phone: Safari's top and bottom bars take the white of "Recent onderzocht". -->
+  <meta name="theme-color" content="#ffffff" media="(max-width: 700px)">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>Softora Database | Bedrijven Scraper</title>
   <link rel="icon" type="image/png" href="/assets/softora-search-favicon.png" sizes="512x512">
@@ -54,6 +56,7 @@
     @media (max-width: 700px) {
       /* Servé only reads "Recent onderzocht" here on his phone: no navigation bar above it. */
       .dashboard-layout.kvk-database-shell[data-sidebar-shell="canonical"] > .sidebar { display: none !important; }
+      html, body, .kvk-database-shell__content, .kvk-database-shell__frame { background: #fff !important; }
     }
   </style>
 </head>
