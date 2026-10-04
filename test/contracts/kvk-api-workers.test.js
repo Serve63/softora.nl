@@ -121,6 +121,8 @@ test('robot writes its finds and, only when switched on, its unusable verdicts f
   assert.match(page, /<strong>Robot<\/strong>/);
   assert.doesNotMatch(page, /Zonder AI · resultaten ter controle|Sol 6 Max via API|<strong>Robot v5/);
   assert.match(runner, /planning-next/);
+  // Waiting-bound work: the Robot may run up to 32 companies side by side.
+  assert.match(runner, /MAX_WORKERS = 32\nWORKERS = max\(1, min\(MAX_WORKERS, int\(os\.environ\.get\('SOFTORA_ROBOT_WORKERS'\) or 4\)\)\)/);
   assert.match(runner, /completed\.json/);
   assert.match(runner, /mode=ro/);
   assert.match(runner, /os\.killpg/);

@@ -37,8 +37,10 @@ if not ENGINE.exists():
     ENGINE = ENGINE_V5
 PYTHON = ROOT / '.venv-robot-zero' / 'bin' / 'python'
 FIELDS = ('id', 'kvk_nummer', 'bedrijfsnaam', 'plaats', 'straatnaam', 'huisnummer', 'postcode', 'vestigingsnummer')
-# Each company is its own engine process; a handful run side by side.
-WORKERS = max(1, min(8, int(os.environ.get('SOFTORA_ROBOT_WORKERS') or 4)))
+# Each company is its own engine process. Most of its time is spent waiting on websites and the
+# model, not on this machine, so up to MAX_WORKERS run side by side (SOFTORA_ROBOT_WORKERS).
+MAX_WORKERS = 32
+WORKERS = max(1, min(MAX_WORKERS, int(os.environ.get('SOFTORA_ROBOT_WORKERS') or 4)))
 # The planning is read once per window instead of once per company; a window
 # older than this is read afresh so a changed planning location is followed.
 PLANNING_REFRESH_SECONDS = 60
