@@ -83,4 +83,8 @@ def control_location(connection, queue, measured):
         "WHERE c.plaats=? AND c.lead_status='unusable' AND COALESCE(c.unusable_review_grade, 1)=1", (place,))}
     total = len(waiting | checked)
     percent = int(100 * len(checked) / total) if total else 100
-    return {'place': place, 'percent': percent, 'checked': len(checked), 'total': total, 'recovered': len(recovered)}
+    province = connection.execute(
+        'SELECT c.provincie FROM company_primary p JOIN companies c ON c.id=p.company_id WHERE p.kvk_nummer=?',
+        (checks[0][1],)).fetchone()
+    return {'place': place, 'provincie': str(province[0] or '') if province else '', 'percent': percent,
+            'checked': len(checked), 'total': total, 'recovered': len(recovered)}

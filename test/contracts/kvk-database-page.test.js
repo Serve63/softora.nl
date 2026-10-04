@@ -193,7 +193,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20261003-overview-style/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20261004-robot-controls/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20261004-robot-names/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -433,8 +433,10 @@ test('kvk database shows every Robot result and only material Controller correct
   assert.match(html, /Voorbeeld &amp; Zoon/);
   assert.match(html, /Geen mail/);
   assert.match(html, /0612345678/);
-  assert.match(html, /Robot/);
+  assert.match(html, /Robot Searcher/);
   assert.doesNotMatch(html, /Luna 5\.6 Max/);
+  const control = lunaErrors.activityRowHtml({ found_by_role_label: 'Robot Controleur', found_by_model_label: '' });
+  assert.match(control, /<strong>Robot Controleur<\/strong><\/span>/);
   assert.match(html, /href="https:\/\/voorbeeld\.nl"[^>]*>voorbeeld\.nl<\/a>/);
   assert.doesNotMatch(html, />https?:\/\//i);
   assert.match(styleSource, /\.latest-treated-panel\{[^}]*margin-top:0;[^}]*margin-bottom:18px/);
@@ -775,7 +777,7 @@ test('Robot activities show one role label without a model subtitle', () => {
  const { activityRowHtml } = require('../../assets/kvk-database-luna-errors');
  for (const model of ['Sol 5.6 Xhigh', 'Robot']) {
  const html = activityRowHtml({ found_by_role_label: 'Robot', found_by_model_label: model });
- assert.match(html, /<strong>Robot<\/strong><\/span>/);
+ assert.match(html, /<strong>Robot Searcher<\/strong><\/span>/);
  assert.doesNotMatch(html, /<span>(Sol 5.6 Xhigh|Robot)<\/span>/);
  }
  assert.match(activityRowHtml({found_by_role_label:'Searcher', found_by_model_label:'Sol 6 Max'}), /Sol 6 Max/);

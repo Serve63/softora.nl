@@ -3,11 +3,12 @@
   const opener = document.getElementById('kvk-api-workers-open');
   if (!dialog || !opener) return;
   const message = document.getElementById('kvk-api-workers-message');
+  // Only the two robots have a switch (Servé, 2026-10-04): the Robot Searcher (role robot) and the Robot
+  // Controleur (role controller). The old AI Searchers have none; how many run at once is set on the Mac.
   const controls = {
-    searcher: { count: document.getElementById('kvk-api-searcher-count'), button: document.getElementById('kvk-api-searcher-toggle'), status: document.getElementById('kvk-api-searcher-status') },
-    controller: { count: document.getElementById('kvk-api-controller-count'), button: document.getElementById('kvk-api-controller-toggle'), status: document.getElementById('kvk-api-controller-status') },
+    robot: { button: document.getElementById('kvk-api-robot-toggle'), status: document.getElementById('kvk-api-robot-status') },
+    controller: { button: document.getElementById('kvk-api-controller-toggle'), status: document.getElementById('kvk-api-controller-status') },
   };
-  controls.robot = { button: document.getElementById('kvk-api-robot-toggle'), status: document.getElementById('kvk-api-robot-status') };
   let state = null;
   let busy = false;
   let revision = 0;

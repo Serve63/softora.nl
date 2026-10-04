@@ -100,7 +100,10 @@
   function activityRowHtml(activity) {
     const uncertain = activity.unusable_reason === 'identity_unconfirmed';
     const unconfirmedField = '<span class="pending-value" aria-label="Niet bevestigd">—</span>';
-    const isRobot = String(activity.found_by_role_label || '').trim().toLowerCase() === 'robot';
+    // The robots are named in full and carry no model line (Servé, 2026-10-04).
+    const role = String(activity.found_by_role_label || '').trim();
+    const isRobot = ['robot', 'robot controleur'].includes(role.toLowerCase());
+    const roleLabel = role.toLowerCase() === 'robot' ? 'Robot Searcher' : (role || '-');
     const modelHtml = isRobot ? '' : `<span>${escapeHtml(activity.found_by_model_label || '-')}</span>`;
     const location = [activity.woonplaats, activity.provincie].filter(Boolean).join(', ');
     const statusExplanation = activity.unusable_reason === 'operational_unclear'
@@ -116,7 +119,7 @@
         <td>${escapeHtml(relativeTimeLabel(activity.contact_checked_at))}</td>
         <td><span class="cell-stack"><strong>${escapeHtml(activity.bedrijfsnaam)}</strong><span>KVK ${escapeHtml(activity.kvk_nummer || '-')}</span></span></td>
         <td><span class="company-status${statusClass}"${statusExplanation ? ` title="${escapeHtml(statusExplanation)}"` : ''}>${escapeHtml(activityStatus(activity))}</span></td>
-        <td><span class="cell-stack"><strong>${escapeHtml(activity.found_by_role_label || '-')}</strong>${modelHtml}</span></td>
+        <td><span class="cell-stack"><strong>${escapeHtml(roleLabel)}</strong>${modelHtml}</span></td>
         <td>${uncertain ? unconfirmedField : escapeHtml(fieldValue(activity.telefoonnummer))}</td>
         <td>${uncertain ? unconfirmedField : escapeHtml(fieldValue(activity.email))}</td>
         <td class="link-like">${uncertain ? unconfirmedField : websiteHtml(activity.website)}</td>

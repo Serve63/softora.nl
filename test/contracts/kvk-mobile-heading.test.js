@@ -74,7 +74,7 @@ function fakeBody(producers) {
 }
 
 test('the picker shows only the chosen robot and says so when it has no work yet', () => {
-  const body = fakeBody(['Robot', 'Controleur', 'Robot']);
+  const body = fakeBody(['Robot Searcher', 'Controleur', 'Robot Searcher']);
   assert.equal(filterRows(body, 'searcher'), 2);
   assert.deepEqual(body.rows.map(row => row.hidden), [false, true, false]);
   assert.equal(filterRows(body, 'controller'), 0);

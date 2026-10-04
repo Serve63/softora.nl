@@ -24,7 +24,7 @@ test('personnel dark mode preserves the shared sidebar, legacy palettes and publ
   assert.match(css, /personnel-theme-toggle:focus-visible/);
   assert.match(css, /html\[data-theme="dark"\] \.location-button:is\(\.is-selected, \.is-contact-active, \.is-worker-active\) \{ background: var\(--accent-soft\) !important; \}/);
   assert.match(css, /html\[data-theme="dark"\] \.planning-panel \.location-button\.is-worker-active \{ box-shadow: inset 4px 0 var\(--accent-light\); \}/);
-  assert.match(css, /html\[data-theme="dark"\] \.planning-worker-label\.is-controller \{ background: var\(--yellow-soft\); color: #e6b45b; \}/);
+  assert.match(css, /html\[data-theme="dark"\] \.planning-worker-label\.is-controller-robot \{ background: var\(--yellow-soft\); color: #e6b45b; \}/);
   assert.match(css, /html\[data-theme="dark"\] \.planning-worker-label\.is-robot \{ background: var\(--green-soft\); color: var\(--green\); \}/);
   assert.match(css, /html\[data-theme="dark"\] \.latest-treated-panel \.website-link \{ color: var\(--accent-light\) !important; \}/);
 });
