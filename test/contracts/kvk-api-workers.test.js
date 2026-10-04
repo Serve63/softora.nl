@@ -148,6 +148,8 @@ test('robot writes its finds and, only when switched on, its unusable verdicts f
   assert.match(controller, /'review-next', '--review-unusable', '--review-grade', '1'/);
   assert.match(controller, /ROBOT_AI_MODE='control'/);
   assert.doesNotMatch(controller, /api\.openai|contact_validate_apply/);
+  // A company whose research keeps failing goes to the Controleurs after three attempts.
+  assert.match(runner, /GIVE_UP_AFTER = 3/);
   // No place limit: the Robot works on until every imported place in the planning is done.
   assert.match(runner, /LOCATIONS_AHEAD = None/);
   assert.match(importer, /"jimdo\.com"/);
