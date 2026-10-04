@@ -125,6 +125,36 @@ class RobotControllerModelTests(unittest.TestCase):
         importlib.reload(kvk_robot_controller)
 
 
+class RobotControllerOrderTests(unittest.TestCase):
+    def test_the_queue_follows_the_location_planning_and_recover_only_checks_are_redone(self):
+        import json, kvk_robot_controller as controller
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            db = root / 'db.sqlite'
+            with sqlite3.connect(db) as connection:
+                connection.executescript('CREATE TABLE companies(id INTEGER PRIMARY KEY, kvk_nummer TEXT, actief INTEGER, '
+                                         'lead_status TEXT, unusable_review_grade INTEGER, woonplaatscode TEXT);'
+                                         'CREATE TABLE company_primary(company_id INTEGER, kvk_nummer TEXT);')
+                for company_id, kvk, place in ((1, '11111111', 'WP_HELVOIRT'), (2, '22222222', 'WP_ESCH'),
+                                               (3, '33333333', 'WP_HELVOIRT'), (4, '44444444', 'WP_ESCH')):
+                    connection.execute("INSERT INTO companies VALUES(?,?,1,'unusable',1,?)", (company_id, kvk, place))
+                    connection.execute('INSERT INTO company_primary VALUES(?,?)', (company_id, kvk))
+            locations = root / 'locations.json'
+            locations.write_text(json.dumps([{'woonplaatscode': 'WP_ESCH'}, {'woonplaatscode': 'WP_HELVOIRT'}]))
+            queue = root / 'queue'
+            (queue / '22222222').mkdir(parents=True)
+            (queue / '22222222' / 'completed.json').write_text(json.dumps({'outcome': 'confirmed', 'written': False}))
+            with patch.object(controller, 'DB', db), patch.object(controller, 'LOCATIONS', locations), \
+                    patch.object(controller, 'QUEUE', queue):
+                self.assertEqual(controller.review_head(3), ['22222222', '44444444', '11111111'])
+                with patch.object(controller, 'FINALIZE', False):
+                    self.assertTrue(controller.checked('22222222'))
+                with patch.object(controller, 'FINALIZE', True):
+                    self.assertFalse(controller.checked('22222222'))
+                    self.assertFalse(controller.checked('44444444'))
+
+
 class RobotControllerLoopTests(unittest.TestCase):
     def test_the_main_loop_starts_companies_and_reports_them(self):
         import kvk_robot_controller as controller
