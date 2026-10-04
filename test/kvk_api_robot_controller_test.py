@@ -94,6 +94,21 @@ class RobotControllerOutcomeTests(unittest.TestCase):
         self.assertIn('platform-e-mail', note)
 
 
+class RobotControllerRecoverOnlyTests(unittest.TestCase):
+    def test_recover_only_is_the_default_and_never_finalizes(self):
+        import importlib, os
+        from unittest.mock import patch
+        import kvk_robot_controller
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('SOFTORA_ROBOT_CONTROL_FINALIZE', None)
+            self.assertFalse(importlib.reload(kvk_robot_controller).FINALIZE)
+        with patch.dict(os.environ, {'SOFTORA_ROBOT_CONTROL_FINALIZE': '1'}):
+            self.assertTrue(importlib.reload(kvk_robot_controller).FINALIZE)
+        importlib.reload(kvk_robot_controller)
+        source = (Path(__file__).parents[1] / 'scripts' / 'kvk_robot_controller.py').read_text()
+        self.assertIn("written = import_control_confirmation(DB, kvk, detail) if FINALIZE else False", source)
+
+
 class RobotControllerLabelTests(unittest.TestCase):
     def test_the_dashboard_names_the_robot_controller(self):
         self.assertEqual(activity_labels(True, 'controller_robot', ''), ('Robot Controleur', ''))
