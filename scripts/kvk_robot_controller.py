@@ -172,7 +172,7 @@ def main():
                         window = []
                         time.sleep(IDLE_SECONDS)
                         continue
-                    names = ', '.join(identity['bedrijfsnaam'][:40] for identity in running.values())
+                    names = ', '.join(identity['bedrijfsnaam'][:40] for _future, identity in running.values())
                     report('controller', f'Robot Controleur · {len(running)} tegelijk: {names}'[:1200], next(iter(running)))
                     wait([future for future, _ in running.values()], timeout=POLL_SECONDS, return_when=FIRST_COMPLETED)
                 except Exception as error:

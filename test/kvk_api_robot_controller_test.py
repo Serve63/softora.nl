@@ -1,6 +1,7 @@
 import sqlite3
 import sys
 import tempfile
+import time
 import types
 import unittest
 from pathlib import Path
@@ -107,6 +108,30 @@ class RobotControllerRecoverOnlyTests(unittest.TestCase):
         importlib.reload(kvk_robot_controller)
         source = (Path(__file__).parents[1] / 'scripts' / 'kvk_robot_controller.py').read_text()
         self.assertIn("written = import_control_confirmation(DB, kvk, detail) if FINALIZE else False", source)
+
+
+class RobotControllerLoopTests(unittest.TestCase):
+    def test_the_main_loop_starts_companies_and_reports_them(self):
+        import kvk_robot_controller as controller
+        from unittest.mock import patch
+        messages = []
+
+        def report(role, message, kvk='', halt=False):
+            messages.append(message)
+            if len(messages) >= 3:
+                raise KeyboardInterrupt  # ends the endless loop for this test
+
+        identity = {key: '' for key in controller.searcher.FIELDS}
+        identity.update(kvk_nummer='11111111', bedrijfsnaam='Zonneveld')
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(controller, 'QUEUE', Path(directory)), patch.object(controller, 'enabled', return_value=True), \
+                patch.object(controller, 'review_head', return_value=['11111111']), \
+                patch.object(controller, 'identity_for', return_value=identity), \
+                patch.object(controller, 'research', side_effect=lambda *_: time.sleep(0.2) or True), \
+                patch.object(controller, 'report', side_effect=report):
+            with self.assertRaises(KeyboardInterrupt):
+                controller.main()
+        self.assertTrue(any('Robot Controleur · 1 tegelijk: Zonneveld' in message for message in messages), messages)
 
 
 class RobotControllerLabelTests(unittest.TestCase):
