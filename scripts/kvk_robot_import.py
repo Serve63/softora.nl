@@ -227,6 +227,96 @@ def import_find(db_path: Path, find: dict, timestamp: str | None = None) -> bool
         connection.close()
 
 
+CONTROL_NOTE = "Robot Controleur: teruggevonden bij controle van een eerder onbruikbaar-oordeel"
+
+
+def _control_events(cursor, kvk: str, outcome: str, to_grade: int, timestamp: str, digest: str,
+                    to_bucket: str = "") -> None:
+    cursor.execute(
+        """INSERT INTO contact_research_lane_events(kvk_nummer,lane,model_role,outcome,created_at)
+           VALUES(?,'unusable_review','controller_robot',?,?)
+           ON CONFLICT(kvk_nummer,lane) DO UPDATE SET model_role=excluded.model_role,
+             outcome=excluded.outcome, created_at=excluded.created_at""",
+        (kvk, outcome, timestamp),
+    )
+    if to_bucket:
+        cursor.execute(
+            """INSERT INTO contact_research_bucket_events(kvk_nummer,lane,model_role,from_bucket,to_bucket,created_at)
+               VALUES(?,'unusable_review','controller_robot','unusable',?,?)""",
+            (kvk, to_bucket, timestamp),
+        )
+    cursor.execute(
+        """INSERT INTO unusable_review_grade_events(kvk_nummer,from_grade,to_grade,model_role,created_at)
+           VALUES(?,1,?,'review_grade_1',?)""",
+        (kvk, to_grade, timestamp),
+    )
+    cursor.execute(
+        """INSERT OR IGNORE INTO research_execution_attributions(kvk_nummer,lane,created_at,producer_thread_id,model,reasoning_effort,display_label,input_sha256)
+           VALUES(?,'unusable_review',?,'robot-controller','robot','deterministic','Robot Controleur',?)""",
+        (kvk, timestamp, digest),
+    )
+
+
+def import_control_recovery(db_path: Path, find: dict, timestamp: str | None = None) -> bool:
+    """The Robot Controleur found a usable contact set for a grade-1 unusable company: it becomes usable."""
+    timestamp = timestamp or datetime.now(timezone(timedelta(hours=2))).isoformat()
+    kvk, website = find["kvk"], find["website"]
+    digest = hashlib.sha256(json.dumps(find, sort_keys=True).encode()).hexdigest()
+    connection = sqlite3.connect(db_path, timeout=60)
+    try:
+        cursor = connection.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            """UPDATE companies SET website=?, website_status=?, email=?, telefoonnummer=?,
+               lead_status='usable', contact_status='checked', contact_checked_at=?,
+               operational_status='operational', source_quality='official', entity_role='specific',
+               contact_research_note=?, unusable_reason='', unusable_review_grade=0, unusable_reviewed_at=?,
+               usable_review_state='verified', usable_reviewed_at=?, usable_review_outcome='recovered_by_control',
+               updated_at=?
+               WHERE kvk_nummer=? AND lead_status='unusable' AND COALESCE(unusable_review_grade,1)=1""",
+            (website, "found" if website else "no_website", find["email"], find["phone"], timestamp,
+             CONTROL_NOTE, timestamp, timestamp, timestamp, kvk),
+        )
+        if cursor.rowcount < 1:
+            connection.rollback()
+            return False
+        _control_events(cursor, kvk, "usable", 0, timestamp, digest, "with_website" if website else "without_website")
+        connection.commit()
+        return True
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def import_control_confirmation(db_path: Path, kvk: str, note: str = "", timestamp: str | None = None) -> bool:
+    """The Robot Controleur searched again and found nothing usable: the unusable verdict becomes final (grade 2)."""
+    timestamp = timestamp or datetime.now(timezone(timedelta(hours=2))).isoformat()
+    digest = hashlib.sha256(f"{kvk}:{note}".encode()).hexdigest()
+    connection = sqlite3.connect(db_path, timeout=60)
+    try:
+        cursor = connection.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            """UPDATE companies SET unusable_review_grade=2, unusable_reviewed_at=?, updated_at=?,
+               contact_research_note=TRIM(COALESCE(contact_research_note,'') || ' | Robot Controleur: ' || ?)
+               WHERE kvk_nummer=? AND lead_status='unusable' AND COALESCE(unusable_review_grade,1)=1""",
+            (timestamp, timestamp, note[:400] or "opnieuw gezocht, niets bruikbaars", kvk),
+        )
+        if cursor.rowcount < 1:
+            connection.rollback()
+            return False
+        _control_events(cursor, kvk, "unusable", 2, timestamp, digest)
+        connection.commit()
+        return True
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
 def publish_live(root: Path) -> None:
     """Hand the change to the live dashboard publisher, like a Searcher apply does."""
     try:

@@ -140,6 +140,14 @@ test('robot writes its finds and, only when switched on, its unusable verdicts f
   assert.match(importer, /if cursor\.rowcount < 1:/);
   assert.doesNotMatch(importer, /rowcount != 1/);
   assert.match(runner, /STALE_CLAIM_SECONDS = 12 \* 3600/);
+  // The Controleurs switch drives the Robot Controleur only when SOFTORA_CONTROLLER_ENGINE=robot.
+  const controller = fs.readFileSync(path.join(root, 'scripts/kvk_robot_controller.py'), 'utf8');
+  const workerSource = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
+  assert.match(workerSource, /robot_controller = os\.environ\.get\("SOFTORA_CONTROLLER_ENGINE", ""\)\.strip\(\)\.lower\(\) == "robot"/);
+  assert.match(workerSource, /roles = \("searcher",\) if robot_controller else \("searcher", "controller"\)/);
+  assert.match(controller, /'review-next', '--review-unusable', '--review-grade', '1'/);
+  assert.match(controller, /ROBOT_AI_MODE='control'/);
+  assert.doesNotMatch(controller, /api\.openai|contact_validate_apply/);
   // No place limit: the Robot works on until every imported place in the planning is done.
   assert.match(runner, /LOCATIONS_AHEAD = None/);
   assert.match(importer, /"jimdo\.com"/);

@@ -755,10 +755,15 @@ def main() -> int:
         moved = quarantine_stale(PENDING, ROOT / "data/kvk_stale_results", expected)
         print(f"Oude resultaatgroepen veilig apart gezet: {len(moved)}", flush=True)
         apply_lock = threading.Lock()
-        threads = [threading.Thread(target=work, args=(role, apply_lock), daemon=True)
-                   for role in ("searcher", "controller")]
+        # SOFTORA_CONTROLLER_ENGINE=robot: the Controleurs switch drives the Robot Controleur instead of Codex.
+        robot_controller = os.environ.get("SOFTORA_CONTROLLER_ENGINE", "").strip().lower() == "robot"
+        roles = ("searcher",) if robot_controller else ("searcher", "controller")
+        threads = [threading.Thread(target=work, args=(role, apply_lock), daemon=True) for role in roles]
         from kvk_robot_v5 import main as robot_main
         threads.append(threading.Thread(target=robot_main, daemon=True))
+        if robot_controller:
+            from kvk_robot_controller import main as controller_main
+            threads.append(threading.Thread(target=controller_main, daemon=True))
         for thread in threads:
             thread.start()
         for thread in threads:

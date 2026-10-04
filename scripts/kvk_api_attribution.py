@@ -86,6 +86,8 @@ def activity_labels(is_controller, model_role, researcher):
     role = str(model_role or '').lower()
     model = str(researcher or '').strip()
     if is_controller:
+        if role == 'controller_robot':
+            return 'Robot Controleur', ''
         return 'Controleur', model
     if role == 'searcher_robot' or model.lower() == 'robot':
         return 'Robot', ''
@@ -95,7 +97,7 @@ def activity_labels(is_controller, model_role, researcher):
 
 
 def patched_dashboard_source(source):
-    """Include actual Codex producer roles in the existing recent-activity query."""
+    """Include actual Codex producer roles and the Robot Controleur in the existing recent-activity query."""
     start = source.index('def latest_treated_query(')
     end = source.index('\ndef ', start + 4)
     query = source[start:end]
@@ -103,9 +105,11 @@ def patched_dashboard_source(source):
         old = "'" + role + "_luna_max'"
         if old not in query:
             raise ValueError('Recent-activity query changed; inspect before installing')
-        missing = ["'" + role + '_codex_' + family + '_' + effort + "'"
-                   for family in ('luna', 'sol') for effort in ('max', 'xhigh')
-                   if "'" + role + '_codex_' + family + '_' + effort + "'" not in query]
+        roles = ["'" + role + '_codex_' + family + '_' + effort + "'"
+                 for family in ('luna', 'sol') for effort in ('max', 'xhigh')]
+        if role == 'controller':
+            roles.append("'controller_robot'")  # the Robot Controleur's reviews count like any Controleur's
+        missing = [item for item in roles if item not in query]
         if missing:
             query = query.replace(old, old + ', ' + ', '.join(missing))
     result = source[:start] + query + source[end:]
