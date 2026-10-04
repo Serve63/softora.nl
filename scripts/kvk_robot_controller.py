@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Robot Controleur: re-checks unusable verdicts of review grade 1 with the Robot engine plus AI.
 
-It takes the grade-1 unusable companies in the order of the Locatieplanning (first place first). Each company is researched again in control mode: the model gets the earlier verdict and
+It takes the grade-1 unusable companies, and the usable finds that were never confirmed, in the order of
+the Locatieplanning (first place first). Each company is researched again in control mode: the model gets the earlier verdict and
 searches the whole Searcher route (directories, trade names by address, social profiles), and the
 Robot verifies every answer literally, as for the Searcher Robot. A usable result passes the same
 contact gate as the Searcher Robot and is written as recovered by control; otherwise the company stays
@@ -21,7 +22,8 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 from kvk_api_workers import ROOT, call, report, save_result, transient_control_failure
 import kvk_robot_v5 as searcher
-from kvk_robot_import import contact_problem, import_control_confirmation, import_control_recovery, robot_find
+from kvk_robot_import import (contact_problem, import_approval_confirmed, import_approval_rejected,
+                              import_control_confirmation, import_control_recovery, robot_find)
 
 QUEUE = ROOT / 'data' / 'shadow' / 'robot-controller'
 DB = ROOT / 'data' / 'nederland_bedrijven.sqlite'
@@ -63,9 +65,13 @@ def review_head(limit):
     2026-10-05: the Controleur follows the list after Haaren), within a place by company id."""
     order = planning_order()
     with sqlite3.connect(DB.as_uri() + '?mode=ro', uri=True, timeout=30) as db:
+        # Both kinds of unfinished control in a place: grade-1 unusable verdicts and usable finds that were
+        # never confirmed (review state pending), so a place reaches 100% before the next one starts.
         rows = db.execute("SELECT p.kvk_nummer, c.woonplaatscode, c.id FROM company_primary p "
-                          "JOIN companies c ON c.id=p.company_id WHERE c.actief=1 AND c.lead_status='unusable' "
-                          "AND COALESCE(c.unusable_review_grade, 1)=1").fetchall()
+                          "JOIN companies c ON c.id=p.company_id WHERE c.actief=1 AND ("
+                          "(c.lead_status='unusable' AND COALESCE(c.unusable_review_grade, 1)=1) OR "
+                          "(c.lead_status='usable' AND c.usable_review_state='pending' "
+                          "AND TRIM(COALESCE(c.premium_database_transferred_at, ''))=''))").fetchall()
     rows.sort(key=lambda row: (order.get(str(row[1] or ''), len(order)), row[2]))
     return [str(row[0]) for row in rows[:limit]]
 
@@ -85,10 +91,15 @@ def identity_for(kvk):
         db.row_factory = sqlite3.Row
         row = db.execute('SELECT c.* FROM company_primary p JOIN companies c ON c.id=p.company_id WHERE p.kvk_nummer=?',
                          (kvk,)).fetchone()
-    if not row or row['lead_status'] != 'unusable' or int(row['unusable_review_grade'] or 1) != 1:
+    if not row:
+        return None
+    approval = (row['lead_status'] == 'usable' and row['usable_review_state'] == 'pending'
+                and not str(row['premium_database_transferred_at'] or '').strip())
+    if not approval and (row['lead_status'] != 'unusable' or int(row['unusable_review_grade'] or 1) != 1):
         return None
     identity = {key: row[key] for key in searcher.FIELDS}
-    identity['earlier_reason'] = row['unusable_reason'] or ''
+    identity['earlier_reason'] = 'bruikbaar, niet bevestigd' if approval else (row['unusable_reason'] or '')
+    identity['approval'] = approval
     return identity
 
 
@@ -143,7 +154,13 @@ def research(identity, stop):
         finally:
             searcher.terminate(child)
     outcome, detail = control_outcome(searcher.result_for(attempt, kvk))
-    if outcome == 'recovered':
+    if identity.get('approval'):
+        # An unconfirmed usable find: verified with the proven contacts, or (finalizing) definitively unusable.
+        if outcome == 'recovered':
+            written = import_approval_confirmed(DB, detail)
+        else:
+            written = import_approval_rejected(DB, kvk, detail) if FINALIZE else False
+    elif outcome == 'recovered':
         written = import_control_recovery(DB, detail)
     else:
         written = import_control_confirmation(DB, kvk, detail) if FINALIZE else False
