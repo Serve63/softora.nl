@@ -1,8 +1,7 @@
-/* Bedrijvendatabase on a phone: one readable column that scrolls as a page.
-   Loaded last; only applies up to 700px so the desktop layout is untouched. */
+/* Bedrijvendatabase on a phone: only "Recent onderzocht", full screen (Servé, 2026-10-04).
+   Loaded last; only applies up to 700px so the desktop layout is untouched. The rules for
+   the other sections stay so they read well if they are ever shown again on a phone. */
 @media (max-width: 700px) {
-  /* The desktop keeps the page on one screen (overflow hidden); a phone scrolls it. */
-  html, body { height: auto !important; min-height: 100%; overflow-x: hidden !important; overflow-y: auto !important; }
 
   /* The desktop "fit everything on one screen" grid becomes a normal scrolling column. */
   body .app-shell {
@@ -199,4 +198,17 @@
   body .latest-treated-panel tbody td:nth-child(8) strong { font-weight: 700; }
   body .latest-treated-panel tbody tr.empty-row { display: block; }
   body .latest-treated-panel tbody tr.empty-row td { white-space: normal; text-align: center; }
+
+  /* Phone shows only the recent research, filling the screen below the navigation. */
+  body .page-header, body .inventory, body .research-details, body .planning-details { display: none !important; }
+  html, body { height: 100% !important; overflow: hidden !important; }
+  body .app-shell { width: 100% !important; height: 100% !important; padding: 0 !important; gap: 0 !important; }
+  body .latest-treated-panel {
+    flex: 1 1 auto;
+    height: 100% !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  body .latest-treated-panel .table-frame { flex: 1 1 auto; max-height: none !important; min-height: 0; overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
 }
