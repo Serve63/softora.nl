@@ -20,7 +20,8 @@ import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 from kvk_api_workers import PENDING, ROOT, call, report, run_cli, save_result, transient_control_failure
-from kvk_robot_import import import_find, publish_live, robot_find
+import kvk_robot_import
+from kvk_robot_import import import_find, import_verdict, publish_live, robot_find, robot_verdict
 
 QUEUE = ROOT / 'data' / 'shadow' / 'robot-v5-dashboard'
 DB = ROOT / 'data' / 'nederland_bedrijven.sqlite'
@@ -331,17 +332,22 @@ def totals():
 
 
 def import_completed(checkpoint):
-    """Write a finished company's usable find to the database once."""
+    """Write a finished company's usable find (or, with final verdicts on, its unusable verdict) once."""
     totals()
     with IMPORT_LOCK:
         state = json.loads(checkpoint.read_text())
         if 'imported' in state:
             return
-        find = robot_find(result_for(state['run_dir'], str(state['kvk_nummer'])))
+        result = result_for(state['run_dir'], str(state['kvk_nummer']))
+        find = robot_find(result)
         state['imported'] = bool(find) and import_find(DB, find)
+        verdict = robot_verdict(result) if kvk_robot_import.FINAL_VERDICTS and not find else None
+        if verdict:
+            # No find: the Robot's unusable verdict goes to the Controleurs instead of waiting for a Searcher.
+            state['verdict_imported'] = import_verdict(DB, verdict)
         save_result(checkpoint, state)
         TOTALS['found'] += bool(state['imported'])
-    if state['imported']:
+    if state['imported'] or state.get('verdict_imported'):
         PUBLISHER.request()
 
 
