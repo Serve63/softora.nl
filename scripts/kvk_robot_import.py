@@ -125,7 +125,9 @@ def import_verdict(db_path: Path, verdict: dict, timestamp: str | None = None) -
                WHERE kvk_nummer=? AND lead_status='unresearched'""",
             (verdict["reason"], timestamp, verdict["note"], timestamp, kvk),
         )
-        if cursor.rowcount != 1:
+        # One KVK number can have several establishment rows (hoofd- and nevenvestiging); like a
+        # Searcher apply, the result is written to all of them. None updated means already researched.
+        if cursor.rowcount < 1:
             connection.rollback()
             return False
         cursor.execute(
@@ -187,7 +189,9 @@ def import_find(db_path: Path, find: dict, timestamp: str | None = None) -> bool
             (website, "found" if website else "no_website", find["email"], find["phone"],
              timestamp, NOTE, timestamp, timestamp, kvk),
         )
-        if cursor.rowcount != 1:
+        # One KVK number can have several establishment rows (hoofd- and nevenvestiging); like a
+        # Searcher apply, the result is written to all of them. None updated means already researched.
+        if cursor.rowcount < 1:
             connection.rollback()
             return False
         cursor.execute(

@@ -1,6 +1,7 @@
 import sqlite3
 import sys
 import tempfile
+import time
 import types
 import unittest
 from pathlib import Path
@@ -81,6 +82,26 @@ class RobotImportTests(unittest.TestCase):
 NOTHING_FOUND = {'kvk_nummer': '17218892', 'decision': 'missing_phone_and_email', 'lead_status': 'unusable',
                  'ai_assist': {'reason': 'ai_incomplete'},
                  'proof': [{'url': 'https://drimble.nl/bedrijf/x', 'reason': 'no_contact'}]}
+
+
+class RobotWritesEveryEstablishmentTests(unittest.TestCase):
+    setUp, tearDown = RobotImportTests.setUp, RobotImportTests.tearDown
+
+    def test_a_kvk_with_a_hoofd_and_nevenvestiging_is_written_to_both_rows(self):
+        with sqlite3.connect(self.db) as connection:
+            connection.execute("DROP TABLE companies")
+            connection.execute("""CREATE TABLE companies (kvk_nummer TEXT, website TEXT, website_status TEXT, email TEXT,
+              telefoonnummer TEXT, lead_status TEXT, contact_status TEXT, contact_checked_at TEXT, operational_status TEXT,
+              source_quality TEXT, entity_role TEXT, contact_research_note TEXT, unusable_reason TEXT,
+              unusable_review_grade INTEGER, unusable_reviewed_at TEXT, usable_review_state TEXT, usable_reviewed_at TEXT,
+              usable_review_outcome TEXT, updated_at TEXT)""")
+            connection.executemany("INSERT INTO companies(kvk_nummer, lead_status) VALUES(?, 'unresearched')",
+                                   [('17218892',), ('17218892',), ('22222222',), ('22222222',)])
+        self.assertTrue(robot_import.import_find(self.db, robot_import.robot_find(USABLE)))
+        self.assertTrue(robot_import.import_verdict(self.db, robot_import.robot_verdict(dict(NOTHING_FOUND, kvk_nummer='22222222'))))
+        with sqlite3.connect(self.db) as connection:
+            rows = connection.execute("SELECT kvk_nummer, lead_status FROM companies ORDER BY kvk_nummer").fetchall()
+        self.assertEqual(rows, [('17218892', 'usable')] * 2 + [('22222222', 'unusable')] * 2)
 
 
 class RobotContactGateTests(unittest.TestCase):
@@ -189,6 +210,8 @@ class RobotLeavesSearcherWorkAloneTests(unittest.TestCase):
                 (pending / name).write_text('{}')
             with patch.object(robot, 'PENDING', pending):
                 self.assertEqual(robot.searcher_claims(), {'00000001', '00000002'})
+                # Two days later the Searchers are off: their abandoned claims no longer block the Robot.
+                self.assertEqual(robot.searcher_claims(now=time.time() + 2 * 24 * 3600), set())
 
 
 class RobotKeepsRunningTests(unittest.TestCase):
