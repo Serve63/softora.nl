@@ -32,6 +32,12 @@ test('the phone heading names the place the Robot works in with its progress', (
   assert.equal(robotLocationText(list(rows)), 'Drunen · 45%');
 });
 
+test('the heading adds the usable companies found in that place', () => {
+  const rows = [row({ place: 'Drunen', progress: 'Onderzoek: 45%', robot: true })];
+  const counts = new Map([['nederland | noord-brabant | heusden | drunen', 1234]]);
+  assert.equal(robotLocationText(list(rows), counts), 'Drunen · 45% · 1.234 bruikbaar');
+});
+
 test('without a Robot label the active planning row is used, and nothing when there is none', () => {
   assert.equal(robotLocationText(list([row({ place: 'Vught', progress: 'Controle: 16%', active: true })])), 'Vught · 16%');
   assert.equal(robotLocationText(list([row({ place: 'Vught', progress: '' })])), '');
