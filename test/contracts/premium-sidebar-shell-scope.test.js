@@ -635,6 +635,8 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(pageSource, /@media \(max-width: 900px\) \{[\s\S]*?\.kvk-database-shell \{ display: flex; flex-direction: column; height: 100dvh; \}/);
   assert.match(pageSource, /\.kvk-database-shell__content \{\s*flex: 1 1 auto;/);
   assert.match(pageSource, /\.dashboard-layout\.kvk-database-shell\[data-sidebar-shell="canonical"\] > main\.kvk-database-shell__content \{ padding: 0 !important; \}/);
+  // Only this route hides the navigation bar on a phone; the canonical sidebar itself is untouched.
+  assert.match(pageSource, /@media \(max-width: 700px\) \{[\s\S]*?\.dashboard-layout\.kvk-database-shell\[data-sidebar-shell="canonical"\] > \.sidebar \{ display: none !important; \}/);
   // The phone layout of the dashboard itself lives in one stylesheet that is loaded last.
   assert.match(dashboardSource, /kvk-database-planning-workers\.css\?v=[^"]+">\s*<link rel="stylesheet" href="\/assets\/kvk-database-mobile\.css\?v=/);
   assert.doesNotMatch(pageSource, /settings-module-route-header|data-settings-module-back-host/);
