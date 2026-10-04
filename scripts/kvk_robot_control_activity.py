@@ -51,3 +51,36 @@ def latest_controlled(connection, queue, measured, limit=LIMIT):
                    found_by_role_label='Robot Controleur', found_by_model_label='')
         rows.append(row)
     return rows
+
+
+def _places(connection, kvks):
+    places = {}
+    kvks = list(kvks)
+    for start in range(0, len(kvks), 500):
+        chunk = kvks[start:start + 500]
+        rows = connection.execute(
+            'SELECT p.kvk_nummer, c.plaats FROM company_primary p JOIN companies c ON c.id=p.company_id '
+            f"WHERE p.kvk_nummer IN ({','.join('?' * len(chunk))})", chunk).fetchall()
+        places.update({str(row[0]): str(row[1] or '') for row in rows})
+    return places
+
+
+def control_location(connection, queue, measured):
+    """Where the Robot Controleur checks now: the place of its latest check, the share of that place's
+    review queue (grade-1 unusable companies plus those it already checked there) it has checked, and how
+    many it recovered there. None before its first check."""
+    checks = _checkpoints(Path(queue), measured)
+    if not checks:
+        return None
+    places = _places(connection, {kvk for _at, kvk, _recovered in checks})
+    place = places.get(checks[0][1], '')
+    if not place:
+        return None
+    checked = {kvk for _at, kvk, _recovered in checks if places.get(kvk) == place}
+    recovered = {kvk for _at, kvk, was_recovered in checks if was_recovered and places.get(kvk) == place}
+    waiting = {str(row[0]) for row in connection.execute(
+        "SELECT p.kvk_nummer FROM company_primary p JOIN companies c ON c.id=p.company_id "
+        "WHERE c.plaats=? AND c.lead_status='unusable' AND COALESCE(c.unusable_review_grade, 1)=1", (place,))}
+    total = len(waiting | checked)
+    percent = int(100 * len(checked) / total) if total else 100
+    return {'place': place, 'percent': percent, 'checked': len(checked), 'total': total, 'recovered': len(recovered)}

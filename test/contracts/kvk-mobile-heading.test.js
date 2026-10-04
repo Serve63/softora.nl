@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { robotLocationText, filterRows } = require('../../assets/kvk-database-mobile-heading');
+const { robotLocationText, controlLocationText, filterRows } = require('../../assets/kvk-database-mobile-heading');
 
 const root = path.join(__dirname, '../..');
 
@@ -81,6 +81,12 @@ test('the picker shows only the chosen robot and says so when it has no work yet
   assert.equal(body.appended[0].cells[0].textContent, 'Nog geen controles van de Robot Controleur.');
   const withControl = fakeBody(['Robot Controleur']);
   assert.equal(filterRows(withControl, 'controller'), 1);
+});
+
+test('the Robot Controleur view names its place, progress and recoveries', () => {
+  assert.equal(controlLocationText({ place: 'Helvoirt', percent: 10, recovered: 2 }), 'Helvoirt · 10% · 2 teruggevonden');
+  assert.equal(controlLocationText(null), '');
+  assert.equal(controlLocationText({ place: '' }), '');
 });
 
 test('the location and the white Safari bars are phone-only', () => {
