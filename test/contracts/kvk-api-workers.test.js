@@ -140,6 +140,8 @@ test('robot writes its finds and, only when switched on, its unusable verdicts f
   assert.match(importer, /if cursor\.rowcount < 1:/);
   assert.doesNotMatch(importer, /rowcount != 1/);
   assert.match(runner, /STALE_CLAIM_SECONDS = 12 \* 3600/);
+  // No place limit: the Robot works on until every imported place in the planning is done.
+  assert.match(runner, /LOCATIONS_AHEAD = None/);
   assert.match(importer, /"jimdo\.com"/);
   const workers = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
   assert.match(workers, /variants = \["searcher"\] if role == "searcher" else \["controller-unusable"\]/);

@@ -44,11 +44,11 @@ WORKERS = max(1, min(MAX_WORKERS, int(os.environ.get('SOFTORA_ROBOT_WORKERS') or
 # The planning is read once per window instead of once per company; a window
 # older than this is read afresh so a changed planning location is followed.
 PLANNING_REFRESH_SECONDS = 60
-# When the active planning location has no open company left, the Robot works
-# ahead on the next locations of the same planning order (already imported and
-# not yet completed), so their easy companies are done before the Searchers
-# arrive. It never jumps over the planning order.
-LOCATIONS_AHEAD = 10
+# When the active planning location has no open company left, the Robot works on
+# through the next locations of the same planning order (already imported and not
+# yet completed), with no limit: it stops only when every imported place is done.
+# It never jumps over the planning order. None means no limit.
+LOCATIONS_AHEAD = None
 IDLE_SECONDS = 60
 POLL_SECONDS = 5
 IMPORT_LOCK = threading.Lock()
@@ -160,7 +160,7 @@ def read_locations_ahead(limit, locations_ahead=LOCATIONS_AHEAD):
     kvks, used = [], 0
     with research.connect() as connection:
         for code in following:
-            if used >= locations_ahead or len(kvks) >= limit:
+            if (locations_ahead is not None and used >= locations_ahead) or len(kvks) >= limit:
                 break
             if code not in imported or code in completed or code not in locations:
                 continue
