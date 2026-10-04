@@ -34,6 +34,15 @@
     return place ? [place, percent, found].filter(Boolean).join(' · ') : '';
   }
 
+  // "Helvoirt · 10% · 2 teruggevonden": the place the Robot Controleur checks, from the snapshot's controlLocation.
+  function controlLocationText(location) {
+    const place = String(location?.place || '').trim();
+    if (!place) return '';
+    const percent = Number.isFinite(Number(location.percent)) ? `${Math.floor(Number(location.percent))}%` : '';
+    const recovered = Number.isSafeInteger(location.recovered) ? `${numberFormat.format(location.recovered)} teruggevonden` : '';
+    return [place, percent, recovered].filter(Boolean).join(' · ');
+  }
+
   // Which robot's work the phone list shows; the "Gevonden door" cell names the producer.
   const ROLE_LABELS = { searcher: 'robot', controller: 'robot controleur' };
   const EMPTY_TEXT = { searcher: 'Nog geen werk van de Robot Searcher.', controller: 'Nog geen controles van de Robot Controleur.' };
@@ -78,7 +87,17 @@
     }));
   }
 
-  function start(doc = document) {
+  function currentSnapshot() {
+    try {
+      // kvk-database.js keeps the live snapshot in this page-level binding.
+      // eslint-disable-next-line no-undef
+      return typeof activeSnapshot === 'undefined' ? null : activeSnapshot;
+    } catch {
+      return null;
+    }
+  }
+
+  function start(doc = document, getSnapshot = currentSnapshot) {
     const list = doc.getElementById('location-list');
     const target = doc.getElementById('latest-robot-location');
     const select = doc.getElementById('latest-role-select');
@@ -88,10 +107,12 @@
     const phone = () => Boolean(doc.defaultView?.matchMedia?.('(max-width: 700px)').matches);
     const role = () => (select?.value === 'controller' ? 'controller' : 'searcher');
     const update = () => {
-      // The Robot's place belongs to the Searcher view; the Controleur has no planning place yet.
+      // The Searcher's place comes from the planning; the Controleur's from its latest check.
       const latest = [...(body?.rows || [])].find(item => !item.hidden && rowRole(item) === ROLE_LABELS.searcher);
       const latestPlace = String(latest?.cells?.[7]?.textContent || '').split(',')[0].trim();
-      const text = role() === 'searcher' ? robotLocationText(list, usableByPath, latestPlace) : '';
+      const text = role() === 'searcher'
+        ? robotLocationText(list, usableByPath, latestPlace)
+        : controlLocationText(getSnapshot()?.controlLocation);
       if (target.textContent !== text) target.textContent = text;
       target.hidden = !text;
     };
@@ -132,5 +153,5 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => start());
     else start();
   }
-  return { robotLocationText, filterRows, start };
+  return { robotLocationText, controlLocationText, filterRows, start };
 });

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
-from kvk_robot_control_activity import latest_controlled, queue_for
+from kvk_robot_control_activity import control_location, latest_controlled, queue_for
 
 
 class LatestControlledTests(unittest.TestCase):
@@ -52,6 +52,17 @@ class LatestControlledTests(unittest.TestCase):
             kvk = '1' if index == 0 else f'x{index}'
             self.checkpoint(kvk, float(index))
         self.assertEqual(len(latest_controlled(self.db, self.queue, 500.0, limit=10)), 1)  # unknown KVKs skipped
+
+
+    def test_the_controllers_place_progress_and_recoveries(self):
+        self.assertIsNone(control_location(self.db, self.queue, 500.0))
+        self.db.execute("INSERT INTO companies(kvk_nummer,bedrijfsnaam,lead_status,unusable_review_grade,plaats) "
+                        "VALUES('4','Wacht BV','unusable',1,'Helvoirt')")
+        self.db.execute('INSERT INTO company_primary VALUES(last_insert_rowid(),?)', ('4',))
+        self.checkpoint('1', 100.0, 'recovered', True)
+        self.checkpoint('2', 200.0)
+        self.assertEqual(control_location(self.db, self.queue, 500.0),
+                         {'place': 'Helvoirt', 'percent': 50, 'checked': 2, 'total': 4, 'recovered': 1})
 
 
 if __name__ == '__main__':
