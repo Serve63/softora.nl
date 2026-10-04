@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="/assets/kvk-api-workers.css?v=20260926-subscription">
   <link rel="stylesheet" href="/assets/kvk-database-upload.css?v=20260924-recovery">
   <link rel="stylesheet" href="/assets/kvk-database-planning-workers.css?v=20260927a">
-  <link rel="stylesheet" href="/assets/kvk-database-mobile.css?v=20261004c">
+  <link rel="stylesheet" href="/assets/kvk-database-mobile.css?v=20261004d">
 </head>
 <body>
   <main class="app-shell">
@@ -167,6 +167,10 @@
         <div>
 
           <h2>Recent onderzocht</h2>
+          <label class="latest-role-picker"><span class="kvk-visually-hidden">Toon werk van</span><select id="latest-role-select" aria-label="Toon werk van">
+            <option value="searcher">Robot Searcher</option>
+            <option value="controller">Robot Controleur</option>
+          </select></label>
           <span id="latest-robot-location" class="latest-robot-location" aria-label="Robot is bezig in" hidden></span>
         </div>
         <div class="heading-actions">
@@ -221,6 +225,6 @@
   <script src="/assets/kvk-database-control.js?v=20260923-location-count"></script>
   <script src="/assets/kvk-api-workers.js?v=20260927-status"></script>
   <script src="/assets/kvk-database-upload.js?v=20260924-recovery"></script>
-  <script src="/assets/kvk-database-mobile-heading.js?v=20261004b"></script>
+  <script src="/assets/kvk-database-mobile-heading.js?v=20261004c"></script>
 </body>
 </html>

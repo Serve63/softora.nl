@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { robotLocationText } = require('../../assets/kvk-database-mobile-heading');
+const { robotLocationText, filterRows } = require('../../assets/kvk-database-mobile-heading');
 
 const root = path.join(__dirname, '../..');
 
@@ -44,13 +44,46 @@ test('without a Robot label the active planning row is used, and nothing when th
   assert.equal(robotLocationText(null), '');
 });
 
+function fakeBody(producers) {
+  const rows = producers.map(name => ({
+    hidden: false,
+    classList: { contains: () => false },
+    cells: [{}, {}, {}, { querySelector: () => ({ textContent: name }), textContent: name }],
+  }));
+  const body = {
+    rows,
+    appended: [],
+    querySelector: () => body.appended[0] || null,
+    ownerDocument: {
+      createElement: () => {
+        const cell = { textContent: '' };
+        const row = { className: '', set innerHTML(_v) {}, cells: [cell], remove: () => { body.appended = []; } };
+        return row;
+      },
+    },
+    appendChild: row => { body.appended.push(row); },
+  };
+  return body;
+}
+
+test('the picker shows only the chosen robot and says so when it has no work yet', () => {
+  const body = fakeBody(['Robot', 'Controleur', 'Robot']);
+  assert.equal(filterRows(body, 'searcher'), 2);
+  assert.deepEqual(body.rows.map(row => row.hidden), [false, true, false]);
+  assert.equal(filterRows(body, 'controller'), 0);
+  assert.equal(body.appended[0].cells[0].textContent, 'Nog geen controles van de Robot Controleur.');
+  const withControl = fakeBody(['Robot Controleur']);
+  assert.equal(filterRows(withControl, 'controller'), 1);
+});
+
 test('the location and the white Safari bars are phone-only', () => {
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
   const shell = fs.readFileSync(path.join(root, 'premium-kvk-database-shell.html'), 'utf8');
   const css = fs.readFileSync(path.join(root, 'assets/kvk-database-mobile.css'), 'utf8');
-  assert.match(page, /<h2>Recent onderzocht<\/h2>\s*<span id="latest-robot-location"[^>]*hidden><\/span>/);
+  assert.match(page, /<option value="searcher">Robot Searcher<\/option>\s*<option value="controller">Robot Controleur<\/option>/);
+  assert.match(page, /<span id="latest-robot-location"[^>]*hidden><\/span>/);
   assert.match(page, /kvk-database-mobile-heading\.js\?v=/);
   assert.match(page, /<meta name="theme-color" content="#ffffff" media="\(max-width: 700px\)">/);
   assert.match(shell, /<meta name="theme-color" content="#ffffff" media="\(max-width: 700px\)">/);
-  assert.match(css, /^\/\* Only the phone heading shows where the Robot works\. \*\/\n\.latest-robot-location \{ display: none; \}/);
+  assert.match(css, /^\/\* Only the phone heading shows the robot picker and where the Robot works\. \*\/\n\.latest-robot-location, \.latest-role-picker \{ display: none; \}/);
 });

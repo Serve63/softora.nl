@@ -1,5 +1,5 @@
-/* Only the phone heading shows where the Robot works. */
-.latest-robot-location { display: none; }
+/* Only the phone heading shows the robot picker and where the Robot works. */
+.latest-robot-location, .latest-role-picker { display: none; }
 
 /* Bedrijvendatabase on a phone: only "Recent onderzocht", full screen (Servé, 2026-10-04).
    Loaded last; only applies up to 700px so the desktop layout is untouched. The rules for
@@ -245,4 +245,37 @@
   }
   body .latest-treated-panel .heading-actions:empty { display: none; }
   body .latest-treated-panel .table-frame { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+  /* "Robot Searcher" / "Robot Controleur" replaces the title: a native picker styled as the heading. */
+  body .latest-treated-panel .data-heading h2 { display: none !important; }
+  body .latest-role-picker { position: relative; display: inline-flex; align-items: center; min-width: 0; }
+  body .latest-role-picker select {
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+    padding: 2px 18px 2px 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink, #252229);
+    font-family: Oswald, Impact, "Arial Narrow", sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  body .latest-role-picker::after {
+    content: "";
+    position: absolute;
+    right: 3px;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: translateY(-70%) rotate(45deg);
+    pointer-events: none;
+  }
+  body .latest-role-picker select:focus-visible { outline: 2px solid var(--accent, #8e2f5f); outline-offset: 3px; border-radius: 4px; }
+  body .latest-treated-panel tbody tr[hidden] { display: none !important; }
 }
