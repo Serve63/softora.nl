@@ -94,6 +94,11 @@ test('the heading shows what is left of the Codex subscription', () => {
   assert.equal(codexUsageText(null), '');
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
   assert.match(page, /id="latest-codex-usage"/);
+  // A new stylesheet version, so phones load the line's own row instead of a cached sheet.
+  assert.match(page, /kvk-database-mobile\.css\?v=20261004g/);
+  const css = fs.readFileSync(path.join(root, 'assets/kvk-database-mobile.css'), 'utf8');
+  assert.match(css, /\.latest-codex-usage:not\(\[hidden\]\) \{[^}]*flex: 0 0 100%;[^}]*order: -1;/);
+  assert.match(css, /\.latest-role-picker \{[^}]*flex: 0 0 auto;/);
 });
 
 test('the location and the white Safari bars are phone-only', () => {
