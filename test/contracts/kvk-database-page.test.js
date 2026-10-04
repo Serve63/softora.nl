@@ -193,7 +193,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20261003-overview-style/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20261001-clean-results/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20261004-robot-controls/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -441,6 +441,34 @@ test('kvk database shows every Robot result and only material Controller correct
 
   assert.equal(lunaErrors.activityStatus({ review_finding: 'missed_usable' }), 'Onterecht afgekeurd');
   assert.equal(lunaErrors.activityStatus({ review_finding: 'incorrect_approval' }), 'Onterecht goedgekeurd');
+});
+
+test('Robot Controleur checks are listed as phone-only rows with their own outcome', () => {
+  const lunaErrors = require('../../assets/kvk-database-luna-errors.js');
+  const checked = lunaErrors.activityRowHtml({ bedrijfsnaam: 'Popa', control_outcome: 'checked', lead_status: 'unusable',
+    found_by_role_label: 'Robot Controleur', contact_checked_at: new Date().toISOString() });
+  assert.match(checked, /<tr class="robot-control-row">/);
+  assert.match(checked, /Niets gevonden/);
+  assert.equal(lunaErrors.activityStatus({ control_outcome: 'recovered', lead_status: 'usable' }), 'Teruggevonden');
+  assert.doesNotMatch(lunaErrors.activityRowHtml({ bedrijfsnaam: 'X', lead_status: 'usable' }), /robot-control-row/);
+
+  const head = { innerHTML: '' };
+  const body = { innerHTML: '' };
+  const controller = lunaErrors.createController({
+    document: { getElementById: id => (id.endsWith('head') ? head : body) },
+    getSnapshot: () => ({
+      latestTreated: [{ kvk_nummer: '1', bedrijfsnaam: 'Searcher BV', found_by_role_label: 'Robot' }],
+      latestControlled: [
+        { kvk_nummer: '1', bedrijfsnaam: 'Searcher BV', control_outcome: 'recovered' },
+        { kvk_nummer: '2', bedrijfsnaam: 'Controle BV', control_outcome: 'checked', found_by_role_label: 'Robot Controleur' },
+      ],
+    }),
+  });
+  controller.render();
+  assert.equal((body.innerHTML.match(/<tr/g) || []).length, 2);
+  assert.match(body.innerHTML, /Controle BV/);
+  const mobile = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-mobile-heading.js'), 'utf8');
+  assert.match(mobile, /row\.classList\.contains\('robot-control-row'\)/);
 });
 
 test('scraper website labels omit protocol, www and final slash while preserving link destinations', () => {

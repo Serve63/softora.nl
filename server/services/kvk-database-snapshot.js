@@ -193,6 +193,10 @@ function createKvkDatabaseSnapshotService(deps = {}) {
     if (progress.latestTreated.length > 10) {
       return 'Voortgangssnapshot bevat meer dan 10 behandelde bedrijven.';
     }
+    if (progress.latestControlled !== undefined
+        && (!Array.isArray(progress.latestControlled) || progress.latestControlled.length > 10)) {
+      return 'Voortgangssnapshot bevat een ongeldige Robot Controleur-lijst.';
+    }
     const metricsError = validateMetrics(progress);
     if (metricsError) return metricsError;
     if (Buffer.byteLength(JSON.stringify(progress), 'utf8') > MAX_PROGRESS_BYTES) {
