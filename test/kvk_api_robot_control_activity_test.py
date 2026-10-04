@@ -56,13 +56,14 @@ class LatestControlledTests(unittest.TestCase):
 
     def test_the_controllers_place_progress_and_recoveries(self):
         self.assertIsNone(control_location(self.db, self.queue, 500.0))
-        self.db.execute("INSERT INTO companies(kvk_nummer,bedrijfsnaam,lead_status,unusable_review_grade,plaats) "
-                        "VALUES('4','Wacht BV','unusable',1,'Helvoirt')")
+        self.db.execute("INSERT INTO companies(kvk_nummer,bedrijfsnaam,lead_status,unusable_review_grade,plaats,provincie) "
+                        "VALUES('4','Wacht BV','unusable',1,'Helvoirt','Noord-Brabant')")
         self.db.execute('INSERT INTO company_primary VALUES(last_insert_rowid(),?)', ('4',))
         self.checkpoint('1', 100.0, 'recovered', True)
         self.checkpoint('2', 200.0)
         self.assertEqual(control_location(self.db, self.queue, 500.0),
-                         {'place': 'Helvoirt', 'percent': 50, 'checked': 2, 'total': 4, 'recovered': 1})
+                         {'place': 'Helvoirt', 'provincie': 'Noord-Brabant', 'percent': 50, 'checked': 2, 'total': 4,
+                          'recovered': 1})
 
 
 if __name__ == '__main__':

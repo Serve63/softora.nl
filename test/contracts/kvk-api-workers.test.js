@@ -45,13 +45,11 @@ function response() {
 test('KVK dashboard exposes one control for each API worker', () => {
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
   assert.match(page, /id="kvk-api-workers-open"/);
-  assert.match(page, /id="kvk-api-searcher-toggle"/);
-  assert.match(page, /id="kvk-api-controller-toggle"/);
+  // Only the two robots have a switch; the old AI Searchers and the per-worker count are gone.
+  assert.match(page, /<strong>Robot Searcher<\/strong><small id="kvk-api-robot-status">/);
+  assert.match(page, /<strong>Robot Controleur<\/strong><small id="kvk-api-controller-status">/);
   assert.match(page, /assets\/kvk-api-workers\.js/);
-  for (const role of ['searcher', 'controller']) {
-    assert.match(page, new RegExp(`<input id="kvk-api-${role}-count"[^>]+type="text"[^>]+inputmode="numeric"`));
-  }
-  assert.doesNotMatch(page, /<select id="kvk-api-(searcher|controller)-count"/);
+  assert.doesNotMatch(page, /kvk-api-searcher-toggle|kvk-api-(searcher|controller)-count|<strong>Searchers<\/strong>/);
 });
 
 test('KVK API budget starts at exactly 100 EUR with both workers off', () => {
@@ -122,7 +120,7 @@ test('robot writes its finds and, only when switched on, its unusable verdicts f
   const runner = fs.readFileSync(path.join(root, 'scripts/kvk_robot_v5.py'), 'utf8');
   assert.match(page, /id="kvk-api-robot-toggle"/);
   assert.match(page, /id="kvk-api-workers-title">Database vullen<\/h2>/);
-  assert.match(page, /<strong>Robot<\/strong>/);
+  assert.match(page, /<strong>Robot Searcher<\/strong>/);
   assert.doesNotMatch(page, /Zonder AI · resultaten ter controle|Sol 6 Max via API|<strong>Robot v5/);
   assert.match(runner, /planning-next/);
   // Waiting-bound work: the Robot may run up to 32 companies side by side.
@@ -381,7 +379,7 @@ test('dialog renders a single error prefix and distinguishes stale workers from 
   };
   const workers = {
     searcher: { enabled: true, blocked: true, message: 'Herstel nodig: Bewijs ontbreekt' },
-    controller: { enabled: true, active: false, message: '' },
+    controller: { enabled: true, blocked: true, message: 'Herstel nodig: Bewijs ontbreekt' },
     robot: { enabled: true, active: true, message: 'Onderzoekt bedrijf' },
   };
   const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
@@ -396,8 +394,7 @@ test('dialog renders a single error prefix and distinguishes stale workers from 
   require('../../assets/kvk-api-workers.js');
   element('kvk-api-workers-open').events.click();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(element('kvk-api-searcher-status').textContent, 'Herstel nodig · Bewijs ontbreekt');
-  assert.equal(element('kvk-api-controller-status').textContent, 'Wacht op lokale werker');
+  assert.equal(element('kvk-api-controller-status').textContent, 'Herstel nodig · Bewijs ontbreekt');
   assert.equal(element('kvk-api-robot-status').textContent, 'Aan · Onderzoekt bedrijf');
 });
 

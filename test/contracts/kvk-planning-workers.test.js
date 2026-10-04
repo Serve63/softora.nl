@@ -1,32 +1,27 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { rolesFor, render } = require('../../assets/kvk-database-planning-workers');
-const locations = [
-  { woonplaatscode: 'a', stage_progress: { researched: 10, reviewed: 10 } },
-  { woonplaatscode: 'b', stage_progress: { researched: 10, reviewed: 3 } },
-  { woonplaatscode: 'c', woonplaats: 'Plaats', provincie: 'Brabant', stage_progress: { researched: 2, reviewed: 1 } },
-];
-const scraper = { contact_active_location_code: 'c' };
-const workers = { searcher: { enabled: true }, controller: { enabled: true }, robot: { active: true } };
-test('marks each role at its planning location, including shared locations', () => {
-  assert.deepEqual(rolesFor(locations[0], locations, scraper, workers), []);
-  assert.deepEqual(rolesFor(locations[1], locations, scraper, workers), ['controller']);
-  assert.deepEqual(rolesFor(locations[2], locations, scraper, workers, { woonplaatscode: 'c' }), ['searcher', 'robot']);
-  assert.match(render(['searcher', 'controller', 'robot']), /Searcher.*Controleur.*Robot/);
-});
-test('explicit control route overrides the next unfinished stage', () => {
-  const state = { ...scraper, contact_parallel_routes: [{ queue_kind: 'global_review', active_location_code: 'c' }] };
-  assert.deepEqual(rolesFor(locations[1], locations, state, workers), []);
-  assert.deepEqual(rolesFor(locations[2], locations, state, workers), ['searcher', 'controller', 'robot']);
-});
-test('roles stay visible when workers are off; robot uses its known location or the research head', () => {
-  assert.deepEqual(rolesFor(locations[2], locations, scraper, {}), ['searcher', 'robot']);
-  assert.deepEqual(rolesFor(locations[2], locations, scraper, workers, { plaats: 'Plaats', provincie: 'Anders' }), ['searcher']);
-  assert.deepEqual(rolesFor(locations[2], locations, scraper, workers, { plaats: 'Plaats', provincie: 'Brabant' }), ['searcher', 'robot']);
+
+const oirschot = { woonplaatscode: 'a', woonplaats: 'Oirschot', provincie: 'Noord-Brabant' };
+const helvoirt = { woonplaatscode: 'b', woonplaats: 'Helvoirt', provincie: 'Noord-Brabant' };
+const biezenmortel = { woonplaatscode: 'c', woonplaats: 'Biezenmortel', provincie: 'Noord-Brabant' };
+const snapshot = {
+  latestTreated: [
+    { found_by_role_label: 'Robot Controleur', woonplaats: 'Helvoirt', provincie: 'Noord-Brabant' },
+    { found_by_role_label: 'Robot', woonplaats: 'Oirschot', provincie: 'Noord-Brabant' },
+  ],
+  controlLocation: { place: 'Helvoirt', provincie: 'Noord-Brabant', percent: 10 },
+};
+
+test('each robot is marked where it works now, from the snapshot', () => {
+  assert.deepEqual(rolesFor(oirschot, [], {}, snapshot), ['robot']);
+  assert.deepEqual(rolesFor(helvoirt, [], {}, snapshot), ['controller-robot']);
+  assert.deepEqual(rolesFor(biezenmortel, [], {}, snapshot), []);
+  assert.deepEqual(rolesFor({ ...oirschot, provincie: 'Limburg' }, [], {}, snapshot), []);
+  assert.match(render(['robot', 'controller-robot']), /Robot Searcher.*Robot Controleur/);
 });
 
-test('stopping all three workers keeps all planning markers', () => {
-  const stopped = { searcher: { enabled: false }, controller: { enabled: false }, robot: { active: false } };
-  assert.deepEqual(rolesFor(locations[1], locations, scraper, stopped), ['controller']);
-  assert.deepEqual(rolesFor(locations[2], locations, scraper, stopped, { woonplaatscode: 'c' }), ['searcher', 'robot']);
+test('the old AI Searcher and Controleur markers are gone', () => {
+  assert.deepEqual(rolesFor(biezenmortel, [biezenmortel], { contact_active_location_code: 'c' }, {}), []);
+  assert.doesNotMatch(render(['robot', 'controller-robot']), />Searcher<|>Controleur</);
 });

@@ -14,5 +14,5 @@
   line-height: 1.2;
   vertical-align: middle;
 }
-.planning-worker-label.is-controller { background: #fff0db; color: #975b19; }
+.planning-worker-label.is-controller-robot { background: #fff0db; color: #975b19; }
 .planning-worker-label.is-robot { background: #e0edef; color: #326872; }

@@ -50,7 +50,7 @@
   }
 
   // Which robot's work the phone list shows; the "Gevonden door" cell names the producer.
-  const ROLE_LABELS = { searcher: 'robot', controller: 'robot controleur' };
+  const ROLE_LABELS = { searcher: 'robot searcher', controller: 'robot controleur' };
   const EMPTY_TEXT = { searcher: 'Nog geen werk van de Robot Searcher.', controller: 'Nog geen controles van de Robot Controleur.' };
 
   function rowRole(row) {
