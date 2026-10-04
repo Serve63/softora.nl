@@ -32,6 +32,10 @@ WORKERS = max(1, min(MAX_WORKERS, int(os.environ.get('SOFTORA_ROBOT_CONTROL_WORK
 # company stays in the review queue (grade 1) instead of becoming final, so no lead is ever lost.
 # SOFTORA_ROBOT_CONTROL_FINALIZE=1 also writes the final grade 2.
 FINALIZE = os.environ.get('SOFTORA_ROBOT_CONTROL_FINALIZE', '0') == '1'
+# The Controleur can run its own AI model (Servé, 2026-10-04: Luna 6 Max) apart from the Searcher Robot's.
+AI_OVERRIDES = {name: os.environ[source] for name, source in (
+    ('ROBOT_AI_MODEL', 'SOFTORA_ROBOT_CONTROL_AI_MODEL'), ('ROBOT_AI_EFFORT', 'SOFTORA_ROBOT_CONTROL_AI_EFFORT'),
+    ('ROBOT_AI_EFFORT_AGAIN', 'SOFTORA_ROBOT_CONTROL_AI_EFFORT')) if os.environ.get(source)}
 POLL_SECONDS = 5
 IDLE_SECONDS = 60
 REFRESH_SECONDS = 60
@@ -96,7 +100,7 @@ def research(identity, stop):
         break
     if stop.is_set():
         return False
-    environment = dict(os.environ, ROBOT_AI_JUDGE='0', ROBOT_AI_ASSIST='1', ROBOT_AI_MODE='control')
+    environment = dict(os.environ, **AI_OVERRIDES, ROBOT_AI_JUDGE='0', ROBOT_AI_ASSIST='1', ROBOT_AI_MODE='control')
     with (folder / 'runner.log').open('a') as log:
         child = subprocess.Popen(command, cwd=ROOT, stdout=log, stderr=log, start_new_session=True, env=environment)
         deadline = time.monotonic() + searcher.COMPANY_TIMEOUT_SECONDS
