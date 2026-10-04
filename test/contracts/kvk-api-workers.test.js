@@ -136,6 +136,10 @@ test('robot writes its finds and, only when switched on, its unusable verdicts f
   assert.match(runner, /robot_verdict\(result\) if kvk_robot_import\.FINAL_VERDICTS and not find else None/);
   // Last contact gate before the database: platform addresses and theme demo numbers never get in.
   assert.match(importer, /if not phone or not email or contact_problem\(result\):/);
+  // Every establishment row of a KVK number is written, and abandoned Searcher claims expire.
+  assert.match(importer, /if cursor\.rowcount < 1:/);
+  assert.doesNotMatch(importer, /rowcount != 1/);
+  assert.match(runner, /STALE_CLAIM_SECONDS = 12 \* 3600/);
   assert.match(importer, /"jimdo\.com"/);
   const workers = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
   assert.match(workers, /variants = \["searcher"\] if role == "searcher" else \["controller-unusable"\]/);

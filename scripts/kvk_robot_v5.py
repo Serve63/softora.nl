@@ -48,7 +48,7 @@ PLANNING_REFRESH_SECONDS = 60
 # ahead on the next locations of the same planning order (already imported and
 # not yet completed), so their easy companies are done before the Searchers
 # arrive. It never jumps over the planning order.
-LOCATIONS_AHEAD = 3
+LOCATIONS_AHEAD = 10
 IDLE_SECONDS = 60
 POLL_SECONDS = 5
 IMPORT_LOCK = threading.Lock()
@@ -108,11 +108,25 @@ def enabled():
 SEARCHER_WORK = re.compile(r'^contact_agent_results_api_searcher_initial_(\d{8})\.(?:busy|luna\.json|json|recovery\.json)$')
 
 
-def searcher_claims():
+# A Searcher claim older than this was abandoned (the Searchers were switched off); the Robot takes it.
+STALE_CLAIM_SECONDS = 12 * 3600
+
+
+def searcher_claims(now=None):
     """Companies a Searcher is researching or has an answer waiting for; the Robot leaves those alone."""
     if not PENDING.is_dir():
         return set()
-    return {match.group(1) for match in (SEARCHER_WORK.match(path.name) for path in PENDING.iterdir()) if match}
+    now = time.time() if now is None else now
+    claims = set()
+    for path in PENDING.iterdir():
+        match = SEARCHER_WORK.match(path.name)
+        try:
+            fresh = now - path.stat().st_mtime < STALE_CLAIM_SECONDS
+        except OSError:
+            continue
+        if match and fresh:
+            claims.add(match.group(1))
+    return claims
 
 
 def completed_kvks():
