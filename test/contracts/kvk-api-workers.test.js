@@ -132,6 +132,9 @@ test('robot writes its finds and, only when switched on, its unusable verdicts f
   assert.match(importer, /FINAL_VERDICTS = os\.environ\.get\("SOFTORA_ROBOT_FINAL_VERDICTS", "0"\) == "1"/);
   assert.match(importer, /lead_status='unusable', unusable_reason=\?[\s\S]*unusable_review_grade=1/);
   assert.match(runner, /robot_verdict\(result\) if kvk_robot_import\.FINAL_VERDICTS and not find else None/);
+  // Last contact gate before the database: platform addresses and theme demo numbers never get in.
+  assert.match(importer, /if not phone or not email or contact_problem\(result\):/);
+  assert.match(importer, /"jimdo\.com"/);
   const workers = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
   assert.match(workers, /variants = \["searcher"\] if role == "searcher" else \["controller-unusable"\]/);
 });
