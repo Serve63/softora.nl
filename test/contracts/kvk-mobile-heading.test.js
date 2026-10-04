@@ -90,6 +90,8 @@ test('the location and the white Safari bars are phone-only', () => {
   assert.match(page, /<option value="searcher">Robot Searcher<\/option>\s*<option value="controller">Robot Controleur<\/option>/);
   assert.match(page, /<span id="latest-robot-location"[^>]*hidden><\/span>/);
   assert.match(page, /kvk-database-mobile-heading\.js\?v=/);
+  // The picker is as small as the place text next to it.
+  assert.match(css, /\.latest-role-picker select \{[^}]*font-size: 12px;/);
   assert.match(page, /<meta name="theme-color" content="#ffffff" media="\(max-width: 700px\)">/);
   assert.match(shell, /<meta name="theme-color" content="#ffffff" media="\(max-width: 700px\)">/);
   assert.match(css, /^\/\* Only the phone heading shows the robot picker and where the Robot works\. \*\/\n\.latest-robot-location, \.latest-role-picker \{ display: none; \}/);

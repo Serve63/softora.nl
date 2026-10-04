@@ -254,24 +254,24 @@
     -webkit-appearance: none;
     field-sizing: content;
     margin: 0;
-    padding: 2px 18px 2px 0;
+    padding: 2px 16px 2px 0;
     border: 0;
     background: transparent;
     color: var(--ink, #252229);
-    font-family: Oswald, Impact, "Arial Narrow", sans-serif;
-    font-size: 15px;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: none;
     cursor: pointer;
   }
   body .latest-role-picker::after {
     content: "";
     position: absolute;
-    right: 3px;
+    right: 4px;
     top: 50%;
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-right: 2px solid currentColor;
     border-bottom: 2px solid currentColor;
     transform: translateY(-70%) rotate(45deg);
