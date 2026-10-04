@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { robotLocationText, controlLocationText, filterRows } = require('../../assets/kvk-database-mobile-heading');
+const { robotLocationText, controlLocationText, codexUsageText, filterRows } = require('../../assets/kvk-database-mobile-heading');
 
 const root = path.join(__dirname, '../..');
 
@@ -89,6 +89,13 @@ test('the Robot Controleur view names its place, progress and recoveries', () =>
   assert.equal(controlLocationText({ place: '' }), '');
 });
 
+test('the heading shows what is left of the Codex subscription', () => {
+  assert.equal(codexUsageText({ remainingPercent: 97.4 }), 'Codex: 97% over');
+  assert.equal(codexUsageText(null), '');
+  const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
+  assert.match(page, /id="latest-codex-usage"/);
+});
+
 test('the location and the white Safari bars are phone-only', () => {
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
   const shell = fs.readFileSync(path.join(root, 'premium-kvk-database-shell.html'), 'utf8');
@@ -100,5 +107,5 @@ test('the location and the white Safari bars are phone-only', () => {
   assert.match(css, /\.latest-role-picker select \{[^}]*font-size: 12px;/);
   assert.match(page, /<meta name="theme-color" content="#ffffff" media="\(max-width: 700px\)">/);
   assert.match(shell, /<meta name="theme-color" content="#ffffff" media="\(max-width: 700px\)">/);
-  assert.match(css, /^\/\* Only the phone heading shows the robot picker and where the Robot works\. \*\/\n\.latest-robot-location, \.latest-role-picker \{ display: none; \}/);
+  assert.match(css, /^\/\* Only the phone heading shows the robot picker and where the Robot works\. \*\/\n\.latest-robot-location, \.latest-role-picker, \.latest-codex-usage \{ display: none; \}/);
 });

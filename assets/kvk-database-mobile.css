@@ -1,5 +1,5 @@
 /* Only the phone heading shows the robot picker and where the Robot works. */
-.latest-robot-location, .latest-role-picker { display: none; }
+.latest-robot-location, .latest-role-picker, .latest-codex-usage { display: none; }
 
 /* Bedrijvendatabase on a phone: only "Recent onderzocht", full screen (Servé, 2026-10-04).
    Loaded last; only applies up to 700px so the desktop layout is untouched. The rules for
@@ -242,6 +242,16 @@
     text-overflow: ellipsis;
     text-transform: none;
     white-space: nowrap;
+  }
+  /* "Codex: 97% over" on its own line above the picker. */
+  body .latest-treated-panel .data-heading > div:first-child { flex-wrap: wrap; row-gap: 4px; }
+  body .latest-codex-usage:not([hidden]) {
+    display: block;
+    flex: 0 0 100%;
+    order: -1;
+    color: var(--muted, #7f7a84);
+    font-size: 11px;
+    font-weight: 600;
   }
   body .latest-treated-panel .heading-actions:empty { display: none; }
   body .latest-treated-panel .table-frame { padding-bottom: env(safe-area-inset-bottom, 0px); }

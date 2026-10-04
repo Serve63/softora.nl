@@ -28,7 +28,8 @@ test('API worker, evidence and recovery queue regressions pass without paid requ
     'test_engine_cannot_enable_the_paid_identity_judge_from_an_inherited_setting',
     'test_newest_checks_first_with_their_outcome_and_only_recovered_contacts',
     'test_the_controllers_place_progress_and_recoveries',
-    'test_the_controller_can_run_its_own_ai_model']) {
+    'test_the_controller_can_run_its_own_ai_model',
+    'test_the_weekly_share_left_is_read_and_cached_for_a_minute']) {
     assert.match(result.stderr, new RegExp(`${regression}[^\\n]+ \\.\\.\\. ok`));
   }
 });

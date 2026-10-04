@@ -43,6 +43,12 @@
     return [place, percent, recovered].filter(Boolean).join(' · ');
   }
 
+  // "Codex: 97% over": what is left of the subscription's weekly limit, from the snapshot's codexUsage.
+  function codexUsageText(usage) {
+    const left = Number(usage?.remainingPercent);
+    return Number.isFinite(left) ? `Codex: ${Math.floor(left)}% over` : '';
+  }
+
   // Which robot's work the phone list shows; the "Gevonden door" cell names the producer.
   const ROLE_LABELS = { searcher: 'robot', controller: 'robot controleur' };
   const EMPTY_TEXT = { searcher: 'Nog geen werk van de Robot Searcher.', controller: 'Nog geen controles van de Robot Controleur.' };
@@ -115,6 +121,12 @@
         : controlLocationText(getSnapshot()?.controlLocation);
       if (target.textContent !== text) target.textContent = text;
       target.hidden = !text;
+      const usage = doc.getElementById('latest-codex-usage');
+      if (usage) {
+        const usageText = codexUsageText(getSnapshot()?.codexUsage);
+        if (usage.textContent !== usageText) usage.textContent = usageText;
+        usage.hidden = !usageText;
+      }
     };
     let filtering = false;
     const applyRole = () => {
@@ -146,6 +158,9 @@
     update();
     refreshCounts();
     doc.defaultView?.setInterval?.(refreshCounts, 60000);
+    // Every new snapshot (and a slow tick) refreshes the heading, so the Codex share is always current.
+    doc.defaultView?.addEventListener?.('softora:kvk-progress', update);
+    doc.defaultView?.setInterval?.(update, 15000);
     doc.addEventListener('visibilitychange', refreshCounts);
   }
 
@@ -153,5 +168,5 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => start());
     else start();
   }
-  return { robotLocationText, controlLocationText, filterRows, start };
+  return { robotLocationText, controlLocationText, codexUsageText, filterRows, start };
 });
