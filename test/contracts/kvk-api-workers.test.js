@@ -29,7 +29,8 @@ test('API worker, evidence and recovery queue regressions pass without paid requ
     'test_newest_checks_first_with_their_outcome_and_only_recovered_contacts',
     'test_the_controllers_place_progress_and_recoveries',
     'test_the_controller_can_run_its_own_ai_model',
-    'test_the_weekly_share_left_is_read_and_cached_for_a_minute']) {
+    'test_the_weekly_share_left_is_read_and_cached_for_a_minute',
+    'test_the_queue_follows_the_location_planning_and_recover_only_checks_are_redone']) {
     assert.match(result.stderr, new RegExp(`${regression}[^\\n]+ \\.\\.\\. ok`));
   }
 });
@@ -147,7 +148,7 @@ test('robot writes its finds and, only when switched on, its unusable verdicts f
   const workerSource = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
   assert.match(workerSource, /robot_controller = os\.environ\.get\("SOFTORA_CONTROLLER_ENGINE", ""\)\.strip\(\)\.lower\(\) == "robot"/);
   assert.match(workerSource, /roles = \("searcher",\) if robot_controller else \("searcher", "controller"\)/);
-  assert.match(controller, /'review-next', '--review-unusable', '--review-grade', '1'/);
+  assert.match(controller, /rows\.sort\(key=lambda row: \(order\.get/);
   assert.match(controller, /ROBOT_AI_MODE='control'/);
   assert.match(controller, /for _future, identity in running\.values\(\)/);
   assert.match(controller, /FINALIZE = os\.environ\.get\('SOFTORA_ROBOT_CONTROL_FINALIZE', '0'\) == '1'/);

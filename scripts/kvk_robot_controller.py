@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Robot Controleur: re-checks unusable verdicts of review grade 1 with the Robot engine plus Sol 6.1.
+"""Robot Controleur: re-checks unusable verdicts of review grade 1 with the Robot engine plus AI.
 
-It takes companies from the same review queue the Controleurs use (review-next, grade 1), in that
-order. Each company is researched again in control mode: the model gets the earlier verdict and
+It takes the grade-1 unusable companies in the order of the Locatieplanning (first place first). Each company is researched again in control mode: the model gets the earlier verdict and
 searches the whole Searcher route (directories, trade names by address, social profiles), and the
 Robot verifies every answer literally, as for the Searcher Robot. A usable result passes the same
 contact gate as the Searcher Robot and is written as recovered by control; otherwise the company stays
@@ -20,7 +19,7 @@ import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
-from kvk_api_workers import ROOT, call, report, run_cli, save_result, transient_control_failure
+from kvk_api_workers import ROOT, call, report, save_result, transient_control_failure
 import kvk_robot_v5 as searcher
 from kvk_robot_import import contact_problem, import_control_confirmation, import_control_recovery, robot_find
 
@@ -46,11 +45,39 @@ def enabled():
     return bool(state.get('workers', {}).get('controller', {}).get('enabled'))
 
 
+LOCATIONS = ROOT / 'data' / 'locations_nl_2026_near_haaren.json'
+
+
+def planning_order():
+    """woonplaatscode -> rank in the location planning (the dashboard's Locatieplanning order)."""
+    try:
+        locations = json.loads(LOCATIONS.read_text())
+    except (OSError, ValueError):
+        return {}
+    codes = [str(item.get('woonplaatscode') or '').strip() for item in locations if isinstance(item, dict)]
+    return {code: rank for rank, code in enumerate(code for code in codes if code)}
+
+
 def review_head(limit):
-    """Grade-1 unusable companies in the Controleurs' review order."""
-    packet = json.loads(run_cli('contact_research.py', 'review-next', '--review-unusable', '--review-grade', '1',
-                                '--limit', str(limit), '--json'))
-    return [str(company['kvk_nummer']) for company in packet.get('bedrijven', [])]
+    """Grade-1 unusable companies in planning order: the first place in the Locatieplanning first (Servé,
+    2026-10-05: the Controleur follows the list after Haaren), within a place by company id."""
+    order = planning_order()
+    with sqlite3.connect(DB.as_uri() + '?mode=ro', uri=True, timeout=30) as db:
+        rows = db.execute("SELECT p.kvk_nummer, c.woonplaatscode, c.id FROM company_primary p "
+                          "JOIN companies c ON c.id=p.company_id WHERE c.actief=1 AND c.lead_status='unusable' "
+                          "AND COALESCE(c.unusable_review_grade, 1)=1").fetchall()
+    rows.sort(key=lambda row: (order.get(str(row[1] or ''), len(order)), row[2]))
+    return [str(row[0]) for row in rows[:limit]]
+
+
+def checked(kvk):
+    """Whether this company needs no new check: a check that recovered it, or any check while not finalizing.
+    A check from the recover-only days that wrote nothing is done again once finalizing is on."""
+    try:
+        checkpoint = json.loads((QUEUE / kvk / 'completed.json').read_text())
+    except (OSError, ValueError):
+        return False
+    return bool(checkpoint.get('written')) or not FINALIZE
 
 
 def identity_for(kvk):
@@ -82,7 +109,7 @@ def research(identity, stop):
     folder = QUEUE / kvk
     folder.mkdir(parents=True, exist_ok=True)
     checkpoint = folder / 'completed.json'
-    if checkpoint.exists():
+    if checked(kvk):
         return True
     source = folder / 'input.json'
     save_result(source, [{key: identity[key] for key in searcher.FIELDS}])
@@ -157,13 +184,13 @@ def main():
                     free = WORKERS - len(running)
                     if free and (not window or time.monotonic() - read_at > REFRESH_SECONDS):
                         # Checked companies stay in the queue in recover-only mode, so read past them.
-                        checked = sum(1 for _ in QUEUE.glob('*/completed.json'))
-                        window, read_at = review_head(checked + WORKERS * 3), time.monotonic()
+                        done = sum(1 for path in QUEUE.glob('*/completed.json') if checked(path.parent.name))
+                        window, read_at = review_head(done + WORKERS * 3), time.monotonic()
                     now = time.time()
                     for kvk in list(window):
                         if free <= 0:
                             break
-                        if kvk in running or failures.get(kvk, 0) > now or (QUEUE / kvk / 'completed.json').exists():
+                        if kvk in running or failures.get(kvk, 0) > now or checked(kvk):
                             continue
                         identity = identity_for(kvk)
                         window.remove(kvk)
