@@ -101,7 +101,9 @@
       filtering = true;
       try {
         if (phone()) filterRows(body, role());
-        else [...body.rows].forEach((row) => { row.hidden = row.classList.contains('robot-role-empty'); });
+        else [...body.rows].forEach((row) => {
+          row.hidden = row.classList.contains('robot-role-empty') || row.classList.contains('robot-control-row');
+        });
       } finally { filtering = false; }
       update();
     };

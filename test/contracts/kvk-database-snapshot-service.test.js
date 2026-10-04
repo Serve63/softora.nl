@@ -170,6 +170,7 @@ test('kvk database snapshot service stores and reads a compact live progress row
     state: { companies_found: 100, successful_found: 7, with_website: 4, without_website: 3, unusable: 2 },
     companyTotals: { all: 100, usable: 7, with_website: 4, without_website: 3, unusable: 2 },
     latestTreated: [{ kvk_nummer: '12345678', bedrijfsnaam: 'Voorbeeld B.V.' }],
+    latestControlled: [{ kvk_nummer: '87654321', bedrijfsnaam: 'Controle B.V.', control_outcome: 'checked' }],
   };
   let storedRow = null;
   const service = createKvkDatabaseSnapshotService({
@@ -237,7 +238,8 @@ test('kvk database progress endpoint serializes writes and rejects stale retries
 
 test('kvk database compact progress rejects oversized or structurally incomplete payloads', async () => {
   const service = createKvkDatabaseSnapshotService({ kvkDatabaseSyncToken: 'secret-token' });
-  for (const progress of [{ state: {}, latestTreated: new Array(11).fill({}) }, { state: {} }]) {
+  for (const progress of [{ state: {}, latestTreated: new Array(11).fill({}) }, { state: {} },
+    { state: {}, latestTreated: [], latestControlled: new Array(11).fill({}) }]) {
     const response = createJsonResponse();
     await service.sendPostSnapshotResponse(
       { headers: { authorization: 'Bearer secret-token' }, body: { progress } },

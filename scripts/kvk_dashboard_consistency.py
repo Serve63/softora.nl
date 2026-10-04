@@ -5,6 +5,8 @@ from functools import wraps
 import sqlite3
 import re
 
+from kvk_robot_control_activity import latest_controlled, queue_for
+
 _capture = ContextVar('kvk_dashboard_capture', default=None)
 USABLE = {'with_website', 'without_website'}
 
@@ -205,6 +207,7 @@ def capture_snapshot(snapshot, dashboard):
         snapshot['companyTotals'].update({key: state[key] for key in ('usable', 'with_website', 'without_website', 'unusable')})
         snapshot['latestTreated'] = dashboard.latest_treated_query(10)
         snapshot['latestLunaErrors'] = dashboard.latest_luna_errors_query(10)
+        snapshot['latestControlled'] = latest_controlled(connection, queue_for(dashboard.DB_PATH), measured.timestamp())
         snapshot['generatedAt'] = state['served_at'] = state['metrics_measured_at']
         if state['usable'] != state['with_website'] + state['without_website']:
             raise ValueError('Dashboard available inventory does not balance')

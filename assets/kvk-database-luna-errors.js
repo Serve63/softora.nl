@@ -56,6 +56,9 @@
   }
 
   function activityStatus(activity) {
+    // A Robot Controleur check from latestControlled: recovered, or nothing found (stays in the review queue).
+    if (activity.control_outcome === 'recovered') return 'Teruggevonden';
+    if (activity.control_outcome === 'checked') return 'Niets gevonden';
     if (activity.unusable_reason === 'identity_unconfirmed') {
       return Number(activity.unusable_review_grade || 0) >= 2 ? 'Afgekeurd' : 'Ter controle';
     }
@@ -106,8 +109,10 @@
     const statusClass = !uncertain && activity.lead_status === 'usable' && !activity.review_finding
       ? ' is-usable'
       : ' is-unusable';
+    // Robot Controleur checks are only listed in the phone's "Robot Controleur" view.
+    const rowClass = activity.control_outcome ? ' class="robot-control-row"' : '';
     return `
-      <tr>
+      <tr${rowClass}>
         <td>${escapeHtml(relativeTimeLabel(activity.contact_checked_at))}</td>
         <td><span class="cell-stack"><strong>${escapeHtml(activity.bedrijfsnaam)}</strong><span>KVK ${escapeHtml(activity.kvk_nummer || '-')}</span></span></td>
         <td><span class="company-status${statusClass}"${statusExplanation ? ` title="${escapeHtml(statusExplanation)}"` : ''}>${escapeHtml(activityStatus(activity))}</span></td>
@@ -134,9 +139,12 @@
       const activities = Array.isArray(snapshot?.latestTreated)
         ? snapshot.latestTreated.slice(0, 10)
         : [];
+      const shown = new Set(activities.map(activity => String(activity.kvk_nummer || '')));
+      const controlled = (Array.isArray(snapshot?.latestControlled) ? snapshot.latestControlled.slice(0, 10) : [])
+        .filter(activity => activity.control_outcome && !shown.has(String(activity.kvk_nummer || '')));
       const headHtml = tableHeaderHtml();
-      const bodyHtml = activities.length
-        ? activities.map(activityRowHtml).join('')
+      const bodyHtml = activities.length || controlled.length
+        ? [...activities, ...controlled].map(activityRowHtml).join('')
         : '<tr class="empty-row"><td colspan="8">Nog geen nieuwe onderzoeksresultaten of Controleur-correcties.</td></tr>';
       // Rewriting unchanged rows every second would clear any text the user is selecting.
       if (headHtml !== renderedHead) head.innerHTML = renderedHead = headHtml;
