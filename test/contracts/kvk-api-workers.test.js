@@ -147,6 +147,7 @@ test('robot writes its finds and, only when switched on, its unusable verdicts f
   assert.match(workerSource, /roles = \("searcher",\) if robot_controller else \("searcher", "controller"\)/);
   assert.match(controller, /'review-next', '--review-unusable', '--review-grade', '1'/);
   assert.match(controller, /ROBOT_AI_MODE='control'/);
+  assert.match(controller, /for _future, identity in running\.values\(\)/);
   assert.match(controller, /FINALIZE = os\.environ\.get\('SOFTORA_ROBOT_CONTROL_FINALIZE', '0'\) == '1'/);
   assert.doesNotMatch(controller, /api\.openai|contact_validate_apply/);
   // A company whose research keeps failing goes to the Controleurs after three attempts.
