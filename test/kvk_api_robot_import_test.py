@@ -14,12 +14,14 @@ SCHEMA = '''
 CREATE TABLE companies (kvk_nummer TEXT PRIMARY KEY, website TEXT, website_status TEXT, email TEXT,
   telefoonnummer TEXT, lead_status TEXT, contact_status TEXT, contact_checked_at TEXT, operational_status TEXT,
   source_quality TEXT, entity_role TEXT, contact_research_note TEXT, unusable_reason TEXT,
-  unusable_review_grade INTEGER, usable_review_state TEXT, usable_reviewed_at TEXT,
+  unusable_review_grade INTEGER, unusable_reviewed_at TEXT, usable_review_state TEXT, usable_reviewed_at TEXT,
   usable_review_outcome TEXT, updated_at TEXT);
 CREATE TABLE contact_research_lane_events (kvk_nummer TEXT, lane TEXT, model_role TEXT, outcome TEXT,
   created_at TEXT, PRIMARY KEY(kvk_nummer, lane));
 CREATE TABLE contact_research_bucket_events (kvk_nummer TEXT, lane TEXT, model_role TEXT, from_bucket TEXT,
   to_bucket TEXT, created_at TEXT);
+CREATE TABLE unusable_review_grade_events (id INTEGER PRIMARY KEY AUTOINCREMENT, kvk_nummer TEXT,
+  from_grade INTEGER, to_grade INTEGER, model_role TEXT, created_at TEXT);
 CREATE TABLE research_attribution (kvk_nummer TEXT PRIMARY KEY, researcher TEXT, created_at TEXT);
 CREATE TABLE research_execution_attributions (kvk_nummer TEXT, lane TEXT, created_at TEXT,
   producer_thread_id TEXT, model TEXT, reasoning_effort TEXT, display_label TEXT, input_sha256 TEXT,
@@ -74,6 +76,84 @@ class RobotImportTests(unittest.TestCase):
         find = robot_import.robot_find(USABLE)
         self.assertTrue(robot_import.import_find(self.db, find))
         self.assertFalse(robot_import.import_find(self.db, find))
+
+
+NOTHING_FOUND = {'kvk_nummer': '17218892', 'decision': 'missing_phone_and_email', 'lead_status': 'unusable',
+                 'ai_assist': {'reason': 'ai_incomplete'},
+                 'proof': [{'url': 'https://drimble.nl/bedrijf/x', 'reason': 'no_contact'}]}
+
+
+class RobotVerdictTests(unittest.TestCase):
+    setUp, tearDown, row = RobotImportTests.setUp, RobotImportTests.tearDown, RobotImportTests.row
+
+    def test_every_robot_decision_maps_to_a_searcher_reason_and_a_find_is_no_verdict(self):
+        expected = {'missing_phone_and_email': 'missing_phone_and_email', 'holding': 'non_specific_entity',
+                    'chain': 'chain_branch', 'stopped': 'stopped', 'conflict': 'identity_unconfirmed',
+                    'technical_retry': 'missing_phone_and_email', 'no_own_contact': 'no_own_contact'}
+        for decision, reason in expected.items():
+            self.assertEqual(robot_import.robot_verdict(dict(NOTHING_FOUND, decision=decision))['reason'], reason)
+        self.assertIsNone(robot_import.robot_verdict(USABLE))
+        holding = dict(NOTHING_FOUND, bedrijfsnaam='Van Gils Beheer B.V.')
+        self.assertEqual(robot_import.robot_verdict(holding)['reason'], 'non_specific_entity')
+        self.assertIsNone(robot_import.robot_verdict(dict(NOTHING_FOUND, decision='something_new')))
+
+    def test_a_verdict_is_written_as_unusable_for_the_controleurs(self):
+        verdict = robot_import.robot_verdict(NOTHING_FOUND)
+        self.assertTrue(robot_import.import_verdict(self.db, verdict, '2026-10-04T10:00:00+02:00'))
+        row = self.row('17218892')
+        self.assertEqual((row['lead_status'], row['unusable_reason'], row['unusable_review_grade']),
+                         ('unusable', 'missing_phone_and_email', 1))
+        self.assertIn('ai_incomplete', row['contact_research_note'])
+        self.assertIn('drimble.nl', row['contact_research_note'])
+        with sqlite3.connect(self.db) as connection:
+            self.assertEqual(connection.execute('SELECT outcome FROM contact_research_lane_events').fetchone()[0], 'unusable')
+            self.assertEqual(connection.execute('SELECT from_grade, to_grade, model_role FROM unusable_review_grade_events').fetchone(),
+                             (0, 1, 'initial_research'))
+
+    def test_a_verdict_never_overwrites_research_and_is_written_once(self):
+        self.assertFalse(robot_import.import_verdict(self.db, robot_import.robot_verdict(dict(NOTHING_FOUND, kvk_nummer='11111111'))))
+        verdict = robot_import.robot_verdict(NOTHING_FOUND)
+        self.assertTrue(robot_import.import_verdict(self.db, verdict))
+        self.assertFalse(robot_import.import_verdict(self.db, verdict))
+
+    def test_final_verdicts_are_off_unless_switched_on(self):
+        import importlib, os
+        from unittest.mock import patch
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('SOFTORA_ROBOT_FINAL_VERDICTS', None)
+            self.assertFalse(importlib.reload(robot_import).FINAL_VERDICTS)
+        with patch.dict(os.environ, {'SOFTORA_ROBOT_FINAL_VERDICTS': '1'}):
+            self.assertTrue(importlib.reload(robot_import).FINAL_VERDICTS)
+        importlib.reload(robot_import)
+
+
+class RobotWritesItsVerdictWhenFinishedTests(unittest.TestCase):
+    setUp, tearDown, row = RobotImportTests.setUp, RobotImportTests.tearDown, RobotImportTests.row
+
+    def finish(self, result, final_verdicts):
+        import json
+        import kvk_robot_v5 as robot
+        from unittest.mock import patch
+        run = Path(self.directory.name) / 'run'
+        run.mkdir()
+        (run / 'terminal-results.json').write_text(json.dumps({'results': [result]}))
+        checkpoint = Path(self.directory.name) / 'completed.json'
+        checkpoint.write_text(json.dumps({'kvk_nummer': '17218892', 'run_dir': str(run)}))
+        with patch.object(robot, 'DB', self.db), patch.object(robot, 'totals'), patch.object(robot, 'PUBLISHER'), \
+                patch.dict(robot.TOTALS, {'done': 0, 'found': 0}), \
+                patch.object(robot.kvk_robot_import, 'FINAL_VERDICTS', final_verdicts):
+            robot.import_completed(checkpoint)
+        return json.loads(checkpoint.read_text())
+
+    def test_without_final_verdicts_a_company_without_find_stays_for_the_searchers(self):
+        state = self.finish(NOTHING_FOUND, False)
+        self.assertEqual(self.row('17218892')['lead_status'], 'unresearched')
+        self.assertNotIn('verdict_imported', state)
+
+    def test_with_final_verdicts_the_robot_finishes_the_company_for_the_controleurs(self):
+        state = self.finish(NOTHING_FOUND, True)
+        self.assertTrue(state['verdict_imported'])
+        self.assertEqual((self.row('17218892')['lead_status'], self.row('17218892')['unusable_review_grade']), ('unusable', 1))
 
 
 class RobotLeavesSearcherWorkAloneTests(unittest.TestCase):

@@ -113,7 +113,7 @@ test('Robot v5 can be enabled without an API key or paid budget reservation', as
   assert.equal(res.body.state.workers.robot.enabled, true);
 });
 
-test('robot writes only its own usable finds, via the guarded import, never via a paid route', () => {
+test('robot writes its finds and, only when switched on, its unusable verdicts for the Controleurs', () => {
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
   const runner = fs.readFileSync(path.join(root, 'scripts/kvk_robot_v5.py'), 'utf8');
   assert.match(page, /id="kvk-api-robot-toggle"/);
@@ -128,6 +128,10 @@ test('robot writes only its own usable finds, via the guarded import, never via 
   assert.match(runner, /import_find\(DB, find\)/);
   const importer = fs.readFileSync(path.join(root, 'scripts/kvk_robot_import.py'), 'utf8');
   assert.match(importer, /WHERE kvk_nummer=\? AND lead_status='unresearched'/);
+  // Unusable verdicts are off by default and always land as review grade 1 for the Controleurs.
+  assert.match(importer, /FINAL_VERDICTS = os\.environ\.get\("SOFTORA_ROBOT_FINAL_VERDICTS", "0"\) == "1"/);
+  assert.match(importer, /lead_status='unusable', unusable_reason=\?[\s\S]*unusable_review_grade=1/);
+  assert.match(runner, /robot_verdict\(result\) if kvk_robot_import\.FINAL_VERDICTS and not find else None/);
   const workers = fs.readFileSync(path.join(root, 'scripts/kvk_api_workers.py'), 'utf8');
   assert.match(workers, /variants = \["searcher"\] if role == "searcher" else \["controller-unusable"\]/);
 });
