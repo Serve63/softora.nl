@@ -5,8 +5,8 @@ It takes companies from the same review queue the Controleurs use (review-next, 
 order. Each company is researched again in control mode: the model gets the earlier verdict and
 searches the whole Searcher route (directories, trade names by address, social profiles), and the
 Robot verifies every answer literally, as for the Searcher Robot. A usable result passes the same
-contact gate as the Searcher Robot and is written as recovered by control; otherwise the unusable
-verdict becomes final (grade 2). It runs instead of the Codex Controleurs when
+contact gate as the Searcher Robot and is written as recovered by control; otherwise the company stays
+in the review queue (recover-only) or, with SOFTORA_ROBOT_CONTROL_FINALIZE=1, becomes final (grade 2). It runs instead of the Codex Controleurs when
 SOFTORA_CONTROLLER_ENGINE=robot and follows the dashboard's Controleurs switch.
 """
 from __future__ import annotations
@@ -28,6 +28,10 @@ QUEUE = ROOT / 'data' / 'shadow' / 'robot-controller'
 DB = ROOT / 'data' / 'nederland_bedrijven.sqlite'
 MAX_WORKERS = 32
 WORKERS = max(1, min(MAX_WORKERS, int(os.environ.get('SOFTORA_ROBOT_CONTROL_WORKERS') or 8)))
+# Recover-only (Servé, 2026-10-04): a usable result is written as recovered, but when nothing is found the
+# company stays in the review queue (grade 1) instead of becoming final, so no lead is ever lost.
+# SOFTORA_ROBOT_CONTROL_FINALIZE=1 also writes the final grade 2.
+FINALIZE = os.environ.get('SOFTORA_ROBOT_CONTROL_FINALIZE', '0') == '1'
 POLL_SECONDS = 5
 IDLE_SECONDS = 60
 REFRESH_SECONDS = 60
@@ -108,8 +112,10 @@ def research(identity, stop):
         finally:
             searcher.terminate(child)
     outcome, detail = control_outcome(searcher.result_for(attempt, kvk))
-    written = (import_control_recovery(DB, detail) if outcome == 'recovered'
-               else import_control_confirmation(DB, kvk, detail))
+    if outcome == 'recovered':
+        written = import_control_recovery(DB, detail)
+    else:
+        written = import_control_confirmation(DB, kvk, detail) if FINALIZE else False
     save_result(checkpoint, {'kvk_nummer': kvk, 'run_dir': str(attempt), 'outcome': outcome,
                              'written': bool(written), 'completed_at': time.time()})
     if written:
@@ -146,7 +152,9 @@ def main():
                                 print(f'Robot Controleur herprobeert {kvk}: {error}', flush=True)
                     free = WORKERS - len(running)
                     if free and (not window or time.monotonic() - read_at > REFRESH_SECONDS):
-                        window, read_at = review_head(WORKERS * 3), time.monotonic()
+                        # Checked companies stay in the queue in recover-only mode, so read past them.
+                        checked = sum(1 for _ in QUEUE.glob('*/completed.json'))
+                        window, read_at = review_head(checked + WORKERS * 3), time.monotonic()
                     now = time.time()
                     for kvk in list(window):
                         if free <= 0:
