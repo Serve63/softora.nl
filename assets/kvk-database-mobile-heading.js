@@ -10,9 +10,20 @@
 
   // "Drunen · 45% · 120 bruikbaar": the place the Robot works in, read from the rendered planning
   // rows, with the usable companies found there (from location-stats, keyed by planning path).
-  function robotLocationText(list, usableByPath = new Map()) {
+  function planningRowFor(list, place) {
+    const wanted = normalizedPath(place);
+    if (!wanted || !list.querySelectorAll) return null;
+    return [...list.querySelectorAll('.location-item')].find((item) => {
+      const path = item.querySelector('.location-path')?.firstChild?.textContent || '';
+      return normalizedPath(path.split('|').pop()) === wanted;
+    }) || null;
+  }
+
+  // latestPlace: where the Robot's most recent company is; it works ahead of the planning head.
+  function robotLocationText(list, usableByPath = new Map(), latestPlace = '') {
     if (!list) return '';
-    const row = list.querySelector('.planning-worker-label.is-robot')?.closest('.location-item')
+    const row = planningRowFor(list, latestPlace)
+      || list.querySelector('.planning-worker-label.is-robot')?.closest('.location-item')
       || list.querySelector('.location-button.is-contact-active')?.closest('.location-item');
     if (!row) return '';
     const path = row.querySelector('.location-path')?.firstChild?.textContent || row.querySelector('.location-path')?.textContent || '';
@@ -78,7 +89,9 @@
     const role = () => (select?.value === 'controller' ? 'controller' : 'searcher');
     const update = () => {
       // The Robot's place belongs to the Searcher view; the Controleur has no planning place yet.
-      const text = role() === 'searcher' ? robotLocationText(list, usableByPath) : '';
+      const latest = [...(body?.rows || [])].find(item => !item.hidden && rowRole(item) === ROLE_LABELS.searcher);
+      const latestPlace = String(latest?.cells?.[7]?.textContent || '').split(',')[0].trim();
+      const text = role() === 'searcher' ? robotLocationText(list, usableByPath, latestPlace) : '';
       if (target.textContent !== text) target.textContent = text;
       target.hidden = !text;
     };
@@ -90,6 +103,7 @@
         if (phone()) filterRows(body, role());
         else [...body.rows].forEach((row) => { row.hidden = row.classList.contains('robot-role-empty'); });
       } finally { filtering = false; }
+      update();
     };
     select?.addEventListener('change', () => { update(); applyRole(); });
     if (body) new MutationObserver(applyRole).observe(body, { childList: true });

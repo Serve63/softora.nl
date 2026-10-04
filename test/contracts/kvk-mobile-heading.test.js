@@ -20,6 +20,7 @@ function row({ place, progress, robot = false, active = false }) {
 
 function list(rows) {
   return {
+    querySelectorAll: () => rows.map(r => r.item),
     querySelector(selector) {
       const match = rows.find(r => (selector.includes('is-robot') && r.robot) || (selector.includes('is-contact-active') && r.active));
       return match ? { closest: () => match.item } : null;
@@ -36,6 +37,12 @@ test('the heading adds the usable companies found in that place', () => {
   const rows = [row({ place: 'Drunen', progress: 'Onderzoek: 45%', robot: true })];
   const counts = new Map([['nederland | noord-brabant | heusden | drunen', 1234]]);
   assert.equal(robotLocationText(list(rows), counts), 'Drunen · 45% · 1.234 bruikbaar');
+});
+
+test('the place of the Robot\'s latest company wins over the planning head it works ahead of', () => {
+  const rows = [row({ place: 'Drunen', progress: 'Onderzoek: 50%', robot: true }), row({ place: 'Vlijmen', progress: 'Onderzoek: 12%' })];
+  assert.equal(robotLocationText(list(rows), new Map(), 'Vlijmen'), 'Vlijmen · 12%');
+  assert.equal(robotLocationText(list(rows), new Map(), 'Onbekend'), 'Drunen · 50%');
 });
 
 test('without a Robot label the active planning row is used, and nothing when there is none', () => {
