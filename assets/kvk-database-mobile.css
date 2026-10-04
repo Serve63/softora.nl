@@ -1,0 +1,202 @@
+/* Bedrijvendatabase on a phone: one readable column that scrolls as a page.
+   Loaded last; only applies up to 700px so the desktop layout is untouched. */
+@media (max-width: 700px) {
+  /* The desktop keeps the page on one screen (overflow hidden); a phone scrolls it. */
+  html, body { height: auto !important; min-height: 100%; overflow-x: hidden !important; overflow-y: auto !important; }
+
+  /* The desktop "fit everything on one screen" grid becomes a normal scrolling column. */
+  body .app-shell {
+    display: flex !important;
+    flex-direction: column;
+    gap: 14px !important;
+    width: calc(100% - 28px) !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 auto !important;
+    padding: 18px 0 32px !important;
+    grid-template-rows: none !important;
+  }
+
+  /* Title with both actions side by side underneath, equally wide. */
+  body .page-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    margin: 0 !important;
+    height: auto !important;
+  }
+  body .page-header h1 { margin: 0 !important; font-size: 28px !important; line-height: 1 !important; }
+  body .page-intro { display: block !important; margin: 6px 0 0 !important; font-size: 12px !important; }
+  body .header-controls {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px !important;
+    width: 100%;
+    height: auto !important;
+    margin: 0 !important;
+  }
+  body .header-controls > button {
+    justify-content: center !important;
+    width: 100% !important;
+    min-height: 42px !important;
+    margin: 0 !important;
+    padding: 0 12px !important;
+    font-size: 12px !important;
+  }
+
+  /* Stock: the main number on its own row, the two website splits below it. */
+  body .inventory, body .research-details { margin: 0 !important; height: auto !important; }
+  body .inventory-grid, body .research-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+  }
+  body .inventory-grid .stat-card, body .research-grid .stat-card {
+    position: relative;
+    display: flex !important;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px;
+    min-width: 0;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 14px 40px 14px 16px !important;
+    border: 0 !important;
+    border-top: 1px solid var(--line, #e6e0da) !important;
+  }
+  body .inventory-grid .stat-card:nth-child(1),
+  body .research-grid .stat-card:nth-child(1) { grid-column: 1 / -1; border-top: 0 !important; }
+  body .inventory-grid .stat-card:nth-child(3),
+  body .research-grid .stat-card:nth-child(3),
+  body .research-grid .stat-card:nth-child(5) { border-left: 1px solid var(--line, #e6e0da) !important; }
+  body .inventory-grid .stat-main, body .research-grid .stat-main {
+    display: flex !important;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    gap: 4px !important;
+    min-height: 0 !important;
+  }
+  body .inventory-grid .stat-main > span, body .research-grid .stat-main > span {
+    display: block !important;
+    max-width: 100%;
+    min-height: 0 !important;
+    overflow: hidden;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  body .inventory-grid .stat-main strong { font-size: 28px !important; line-height: 1 !important; letter-spacing: -0.5px !important; }
+  body .inventory-grid .stat-card:nth-child(1) .stat-main strong { font-size: 40px !important; }
+  body .research-grid .stat-main strong { font-size: 22px !important; line-height: 1 !important; }
+  body .inventory-grid .stat-delta, body .research-grid .stat-delta { gap: 4px !important; font-size: 11px !important; }
+  body .stat-card .stat-card-directory__open {
+    position: absolute !important;
+    top: 12px !important;
+    right: 12px !important;
+    display: grid !important;
+    width: 22px !important;
+    height: 22px !important;
+    margin: 0 !important;
+  }
+
+  /* Location planning: the full place name on one line, its checks, progress and count on the next. */
+  body .planning-details, body .workspace-grid { height: auto !important; min-height: 0 !important; }
+  body .planning-panel { height: auto !important; min-height: 0 !important; max-height: none !important; }
+  body .planning-panel .location-list {
+    grid-auto-rows: auto !important;
+    max-height: 380px;
+    padding: 0 !important;
+    overflow: auto !important;
+  }
+  body .planning-panel .location-item { height: auto !important; min-height: 0 !important; }
+  body .planning-panel .location-list .location-button {
+    grid-template-columns: 22px auto auto minmax(0, 1fr) !important;
+    grid-auto-columns: 0;
+    align-items: center !important;
+    gap: 6px 8px !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 11px 14px !important;
+  }
+  body .planning-panel .location-list .location-button > .rank { grid-row: 1; grid-column: 1; place-self: start; margin: 1px 0 0 !important; }
+  body .planning-panel .location-list .location-path {
+    grid-row: 1;
+    grid-column: 2 / -1 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left !important;
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+    white-space: normal !important;
+  }
+  body .planning-panel .location-list .location-statuses { grid-row: 2; grid-column: 2 !important; }
+  body .planning-panel .location-list .location-stage-progress {
+    grid-row: 2;
+    grid-column: 3 !important;
+    font-size: 11px !important;
+    text-align: left !important;
+    white-space: nowrap;
+  }
+  body .planning-panel .location-list .location-button > .badge {
+    grid-row: 2;
+    grid-column: 4 !important;
+    justify-self: end;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 22px !important;
+    font-size: 11px !important;
+  }
+
+  /* Recently researched: each company as a small card instead of an eight-column table. */
+  body .latest-treated-panel { height: auto !important; min-height: 0 !important; margin: 0 !important; }
+  body .latest-treated-panel .data-heading { min-height: 0 !important; padding: 14px 16px !important; }
+  body .latest-treated-panel .table-frame { max-height: 70vh !important; overflow: auto !important; }
+  body .latest-treated-panel table { display: block; min-width: 0 !important; table-layout: auto; }
+  body .latest-treated-panel thead { display: none; }
+  body .latest-treated-panel tbody { display: block; }
+  body .latest-treated-panel tbody tr,
+  body .latest-treated-panel tbody tr:not(.empty-row) {
+    display: grid;
+    height: auto !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 5px 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line, #e6e0da);
+  }
+  body .latest-treated-panel tbody td {
+    display: block;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    line-height: 1.35 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  body .latest-treated-panel tbody td:nth-child(2) { grid-row: 1; grid-column: 1; }
+  body .latest-treated-panel tbody td:nth-child(2) strong { font-size: 13px; }
+  body .latest-treated-panel tbody td:nth-child(2) .cell-stack span { font-size: 11px; }
+  body .latest-treated-panel tbody td:nth-child(1) { grid-row: 1; grid-column: 2; color: var(--muted, #7f7a84); font-size: 11px; text-align: right; }
+  body .latest-treated-panel tbody td:nth-child(3) { grid-row: 2; grid-column: 1; }
+  body .latest-treated-panel tbody td:nth-child(3) .company-status { height: 22px; padding: 0 10px; font-size: 11px; }
+  body .latest-treated-panel tbody td:nth-child(4) { grid-row: 2; grid-column: 2; align-self: center; font-size: 11px; text-align: right; }
+  body .latest-treated-panel tbody td:nth-child(n+5) { grid-column: 1 / -1; color: #46404a; }
+  body .latest-treated-panel tbody td:nth-child(5)::before { content: "Tel  "; color: var(--muted, #7f7a84); font-weight: 700; }
+  body .latest-treated-panel tbody td:nth-child(6)::before { content: "Mail  "; color: var(--muted, #7f7a84); font-weight: 700; }
+  body .latest-treated-panel tbody td:nth-child(7)::before { content: "Web  "; color: var(--muted, #7f7a84); font-weight: 700; }
+  body .latest-treated-panel tbody td:nth-child(8) { color: var(--muted, #7f7a84); font-size: 11px; }
+  body .latest-treated-panel tbody td:nth-child(8) strong { font-weight: 700; }
+  body .latest-treated-panel tbody tr.empty-row { display: block; }
+  body .latest-treated-panel tbody tr.empty-row td { white-space: normal; text-align: center; }
+}

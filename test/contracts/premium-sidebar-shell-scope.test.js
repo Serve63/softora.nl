@@ -631,6 +631,11 @@ test('kvk database route keeps the canonical sidebar outside its scraper frame',
   assert.match(pageSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(pageSource, /class="main-content kvk-database-shell__content"/);
   assert.match(pageSource, /src="\/premium-kvk-database\?softora_sidebar_content=1"/);
+  // On a phone the top navigation and the frame share one screen: nothing falls below the fold.
+  assert.match(pageSource, /@media \(max-width: 900px\) \{[\s\S]*?\.kvk-database-shell \{ display: flex; flex-direction: column; height: 100dvh; \}/);
+  assert.match(pageSource, /\.kvk-database-shell__content \{\s*flex: 1 1 auto;[\s\S]*?padding: 0 !important;/);
+  // The phone layout of the dashboard itself lives in one stylesheet that is loaded last.
+  assert.match(dashboardSource, /kvk-database-planning-workers\.css\?v=[^"]+">\s*<link rel="stylesheet" href="\/assets\/kvk-database-mobile\.css\?v=/);
   assert.doesNotMatch(pageSource, /settings-module-route-header|data-settings-module-back-host/);
   assert.match(dashboardSource, /<main class="app-shell">\s*<header class="page-header">/);
   assert.equal((pageSource.match(/background:\s*#f4f1ed/g) || []).length, 3);

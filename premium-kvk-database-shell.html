@@ -38,8 +38,17 @@
       background: #f4f1ed;
     }
     @media (max-width: 900px) {
-      .kvk-database-shell { display: block; }
-      .kvk-database-shell__content { width: 100%; height: 100dvh; margin-left: 0; }
+      /* Phone: the top navigation and the scraper frame share one screen, so the
+         frame's bottom never falls below the visible area; the frame scrolls itself. */
+      .kvk-database-shell { display: flex; flex-direction: column; height: 100dvh; }
+      .kvk-database-shell__content {
+        flex: 1 1 auto;
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        margin-left: 0;
+        padding: 0 !important;
+      }
     }
   </style>
 </head>
