@@ -258,7 +258,7 @@
 
   /* "Robot Searcher" / "Robot Controleur" replaces the title: a native picker styled as the heading. */
   body .latest-treated-panel .data-heading h2 { display: none !important; }
-  body .latest-role-picker { position: relative; display: inline-flex; align-items: center; min-width: 0; }
+  body .latest-role-picker { position: relative; display: inline-flex; align-items: center; min-width: 0; flex: 0 0 auto; }
   body .latest-role-picker select {
     appearance: none;
     -webkit-appearance: none;
