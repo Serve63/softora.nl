@@ -110,6 +110,21 @@ class RobotControllerRecoverOnlyTests(unittest.TestCase):
         self.assertIn("written = import_control_confirmation(DB, kvk, detail) if FINALIZE else False", source)
 
 
+class RobotControllerModelTests(unittest.TestCase):
+    def test_the_controller_can_run_its_own_ai_model(self):
+        import importlib, os
+        from unittest.mock import patch
+        import kvk_robot_controller
+        with patch.dict(os.environ, {'SOFTORA_ROBOT_CONTROL_AI_MODEL': 'gpt-6-luna', 'SOFTORA_ROBOT_CONTROL_AI_EFFORT': 'max'}):
+            overrides = importlib.reload(kvk_robot_controller).AI_OVERRIDES
+        self.assertEqual(overrides, {'ROBOT_AI_MODEL': 'gpt-6-luna', 'ROBOT_AI_EFFORT': 'max', 'ROBOT_AI_EFFORT_AGAIN': 'max'})
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('SOFTORA_ROBOT_CONTROL_AI_MODEL', None)
+            os.environ.pop('SOFTORA_ROBOT_CONTROL_AI_EFFORT', None)
+            self.assertEqual(importlib.reload(kvk_robot_controller).AI_OVERRIDES, {})
+        importlib.reload(kvk_robot_controller)
+
+
 class RobotControllerLoopTests(unittest.TestCase):
     def test_the_main_loop_starts_companies_and_reports_them(self):
         import kvk_robot_controller as controller
