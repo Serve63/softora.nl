@@ -1,3 +1,6 @@
+/* Only the phone heading shows where the Robot works. */
+.latest-robot-location { display: none; }
+
 /* Bedrijvendatabase on a phone: only "Recent onderzocht", full screen (Servé, 2026-10-04).
    Loaded last; only applies up to 700px so the desktop layout is untouched. The rules for
    the other sections stay so they read well if they are ever shown again on a phone. */
@@ -211,4 +214,35 @@
     box-shadow: none !important;
   }
   body .latest-treated-panel .table-frame { flex: 1 1 auto; max-height: none !important; min-height: 0; overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
+
+  /* One white surface edge to edge, so Safari's top and bottom bars match it. */
+  html, body, body .app-shell, body .latest-treated-panel, body .latest-treated-panel .panel-heading,
+  body .latest-treated-panel .data-heading { background: #fff !important; }
+  body .latest-treated-panel .data-heading {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 14px !important;
+  }
+  body .latest-treated-panel .data-heading > div:first-child {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+  }
+  body .latest-treated-panel .data-heading h2 { margin: 0 !important; white-space: nowrap; }
+  body .latest-robot-location:not([hidden]) {
+    display: inline-block;
+    overflow: hidden;
+    color: var(--accent, #8e2f5f);
+    font-size: 12px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    text-transform: none;
+    white-space: nowrap;
+  }
+  body .latest-treated-panel .heading-actions:empty { display: none; }
+  body .latest-treated-panel .table-frame { padding-bottom: env(safe-area-inset-bottom, 0px); }
 }
