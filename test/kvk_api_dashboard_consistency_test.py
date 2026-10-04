@@ -88,6 +88,16 @@ class DashboardConsistencyTests(unittest.TestCase):
         self.assertEqual(counts['unusable_grade_activity']['2'], {'added':1,'removed':1})
         self.assertEqual((counts['usable'],counts['with_website'],counts['without_website']), (1,1,0))
 
+    def test_robot_controleur_rejecting_an_unconfirmed_find_moves_it_from_usable_to_definitive(self):
+        self.company('unconfirmed', 'unusable', 2)
+        self.lane('unconfirmed', 'unusable', lane='approved_review', role='controller_robot')
+        self.bucket('unconfirmed', 'without_website', 'unusable', lane='approved_review')
+        self.grade('unconfirmed', 0, 2)
+        counts, _ = hourly_activity(self.c, NOW)
+        self.assertEqual([counts[k] for k in ('treated', 'declared_usable', 'declared_unusable', 'control_room')],
+                         [0, -1, 1, 0])
+        self.assertEqual(counts['without_website'], -1)
+
     def test_offsets_dst_fractional_seconds_hour_boundary_future_and_canonical_scope(self):
         now = epoch('2026-10-25T02:30:00+01:00')
         for kvk, timestamp, expected in [('inside','2026-10-25T02:30:00.001+0200',1),

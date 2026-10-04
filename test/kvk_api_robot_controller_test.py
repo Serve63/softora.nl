@@ -75,6 +75,44 @@ class RobotControllerWritesTests(unittest.TestCase):
         self.assertFalse(robot_import.import_control_confirmation(self.db, '22222222'))
 
 
+class RobotControllerApprovalTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.db = Path(self.directory.name) / 'bedrijven.sqlite'
+        with sqlite3.connect(self.db) as connection:
+            connection.executescript(SCHEMA.replace('updated_at TEXT);', 'updated_at TEXT, id INTEGER PRIMARY KEY, '
+                                                    'actief INTEGER DEFAULT 1, premium_database_transferred_at TEXT DEFAULT \'\');'))
+            connection.executemany("INSERT INTO companies(kvk_nummer, lead_status, usable_review_state, website, website_status, "
+                                   "unusable_review_grade) VALUES(?, 'usable', 'pending', ?, ?, 0)",
+                                   [('11111111', 'https://oud.nl/', 'found'), ('11111111', 'https://oud.nl/', 'found'),
+                                    ('22222222', '', 'no_website')])
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def query(self, sql):
+        with sqlite3.connect(self.db) as connection:
+            return connection.execute(sql).fetchall()
+
+    def test_a_confirmed_find_is_verified_on_every_row_without_changing_the_classification(self):
+        self.assertTrue(robot_import.import_approval_confirmed(self.db, FIND, '2026-10-05T01:00:00+02:00'))
+        self.assertEqual(self.query("SELECT lead_status, usable_review_state, email FROM companies WHERE kvk_nummer='11111111'"),
+                         [('usable', 'verified', 'info@zonneveld.nl')] * 2)
+        self.assertEqual(self.query("SELECT lane, outcome FROM contact_research_lane_events"), [('approved_review', 'usable')])
+        self.assertEqual(self.query("SELECT * FROM contact_research_bucket_events"), [])
+        self.assertEqual(self.query("SELECT * FROM unusable_review_grade_events"), [])
+        self.assertFalse(robot_import.import_approval_confirmed(self.db, FIND))
+
+    def test_an_unconfirmed_find_becomes_definitively_unusable_with_balancing_events(self):
+        self.assertTrue(robot_import.import_approval_rejected(self.db, '22222222', 'niets te bevestigen'))
+        self.assertEqual(self.query("SELECT lead_status, unusable_reason, unusable_review_grade FROM companies "
+                                    "WHERE kvk_nummer='22222222'"), [('unusable', 'identity_unconfirmed', 2)])
+        self.assertEqual(self.query("SELECT lane, from_bucket, to_bucket FROM contact_research_bucket_events"),
+                         [('approved_review', 'without_website', 'unusable')])
+        self.assertEqual(self.query("SELECT from_grade, to_grade FROM unusable_review_grade_events"), [(0, 2)])
+        self.assertFalse(robot_import.import_approval_rejected(self.db, '22222222'))
+
+
 class RobotControllerOutcomeTests(unittest.TestCase):
     def setUp(self):
         import kvk_robot_controller
@@ -134,12 +172,17 @@ class RobotControllerOrderTests(unittest.TestCase):
             db = root / 'db.sqlite'
             with sqlite3.connect(db) as connection:
                 connection.executescript('CREATE TABLE companies(id INTEGER PRIMARY KEY, kvk_nummer TEXT, actief INTEGER, '
-                                         'lead_status TEXT, unusable_review_grade INTEGER, woonplaatscode TEXT);'
+                                         'lead_status TEXT, unusable_review_grade INTEGER, woonplaatscode TEXT, '
+                                         'usable_review_state TEXT, premium_database_transferred_at TEXT);'
                                          'CREATE TABLE company_primary(company_id INTEGER, kvk_nummer TEXT);')
                 for company_id, kvk, place in ((1, '11111111', 'WP_HELVOIRT'), (2, '22222222', 'WP_ESCH'),
                                                (3, '33333333', 'WP_HELVOIRT'), (4, '44444444', 'WP_ESCH')):
-                    connection.execute("INSERT INTO companies VALUES(?,?,1,'unusable',1,?)", (company_id, kvk, place))
+                    connection.execute("INSERT INTO companies VALUES(?,?,1,'unusable',1,?,'','')", (company_id, kvk, place))
                     connection.execute('INSERT INTO company_primary VALUES(?,?)', (company_id, kvk))
+                # An unconfirmed usable find in Esch is part of Esch's control; a verified one is not.
+                connection.execute("INSERT INTO companies VALUES(5,'55555555',1,'usable',0,'WP_ESCH','pending','')")
+                connection.execute("INSERT INTO companies VALUES(6,'66666666',1,'usable',0,'WP_ESCH','verified','')")
+                connection.executemany('INSERT INTO company_primary VALUES(?,?)', [(5, '55555555'), (6, '66666666')])
             locations = root / 'locations.json'
             locations.write_text(json.dumps([{'woonplaatscode': 'WP_ESCH'}, {'woonplaatscode': 'WP_HELVOIRT'}]))
             queue = root / 'queue'
@@ -147,7 +190,7 @@ class RobotControllerOrderTests(unittest.TestCase):
             (queue / '22222222' / 'completed.json').write_text(json.dumps({'outcome': 'confirmed', 'written': False}))
             with patch.object(controller, 'DB', db), patch.object(controller, 'LOCATIONS', locations), \
                     patch.object(controller, 'QUEUE', queue):
-                self.assertEqual(controller.review_head(3), ['22222222', '44444444', '11111111'])
+                self.assertEqual(controller.review_head(4), ['22222222', '44444444', '55555555', '11111111'])
                 with patch.object(controller, 'FINALIZE', False):
                     self.assertTrue(controller.checked('22222222'))
                 with patch.object(controller, 'FINALIZE', True):

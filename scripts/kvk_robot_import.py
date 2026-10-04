@@ -317,6 +317,111 @@ def import_control_confirmation(db_path: Path, kvk: str, note: str = "", timesta
         connection.close()
 
 
+def _usable_bucket(website: str, website_status: str) -> str:
+    working = str(website or "").strip() and website_status not in ("no_website", "not_working")
+    return "with_website" if working else "without_website"
+
+
+def _approval_rows(cursor, kvk: str):
+    return cursor.execute(
+        """SELECT id, website, website_status FROM companies
+           WHERE kvk_nummer=? AND actief=1 AND lead_status='usable' AND usable_review_state='pending'
+             AND TRIM(COALESCE(premium_database_transferred_at,''))=''""", (kvk,)).fetchall()
+
+
+def _approval_events(cursor, kvk: str, outcome: str, timestamp: str, digest: str, old_bucket: str,
+                     new_bucket: str, to_grade: int | None) -> None:
+    """Lane, bucket and grade events in the shape of an approved review, so the dashboard's hour balances."""
+    cursor.execute(
+        """INSERT INTO contact_research_lane_events(kvk_nummer,lane,model_role,outcome,created_at)
+           VALUES(?,'approved_review','controller_robot',?,?)
+           ON CONFLICT(kvk_nummer,lane) DO UPDATE SET model_role=excluded.model_role,
+             outcome=excluded.outcome, created_at=excluded.created_at""",
+        (kvk, outcome, timestamp),
+    )
+    if old_bucket != new_bucket:
+        cursor.execute(
+            """INSERT INTO contact_research_bucket_events(kvk_nummer,lane,model_role,from_bucket,to_bucket,created_at)
+               VALUES(?,'approved_review','controller_robot',?,?,?)""",
+            (kvk, old_bucket, new_bucket, timestamp),
+        )
+    if to_grade is not None:
+        cursor.execute(
+            """INSERT INTO unusable_review_grade_events(kvk_nummer,from_grade,to_grade,model_role,created_at)
+               VALUES(?,0,?,'review_grade_1',?)""",
+            (kvk, to_grade, timestamp),
+        )
+    cursor.execute(
+        """INSERT OR IGNORE INTO research_execution_attributions(kvk_nummer,lane,created_at,producer_thread_id,model,reasoning_effort,display_label,input_sha256)
+           VALUES(?,'approved_review',?,'robot-controller','robot','deterministic','Robot Controleur',?)""",
+        (kvk, timestamp, digest),
+    )
+
+
+def import_approval_confirmed(db_path: Path, find: dict, timestamp: str | None = None) -> bool:
+    """The Robot Controleur confirmed an unconfirmed usable find (review state pending): it is verified, with
+    the contact set the check proved."""
+    timestamp = timestamp or datetime.now(timezone(timedelta(hours=2))).isoformat()
+    kvk, website = find["kvk"], find["website"]
+    digest = hashlib.sha256(json.dumps(find, sort_keys=True).encode()).hexdigest()
+    connection = sqlite3.connect(db_path, timeout=60)
+    try:
+        cursor = connection.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        rows = _approval_rows(cursor, kvk)
+        if not rows:
+            connection.rollback()
+            return False
+        old_bucket = _usable_bucket(rows[0][1], rows[0][2])
+        new_status = "found" if website else "no_website"
+        cursor.execute(
+            f"""UPDATE companies SET website=?, website_status=?, email=?, telefoonnummer=?,
+                usable_review_state='verified', usable_reviewed_at=?, usable_review_outcome='confirmed_by_control',
+                updated_at=? WHERE id IN ({','.join('?' * len(rows))})""",
+            (website, new_status, find["email"], find["phone"], timestamp, timestamp, *[row[0] for row in rows]),
+        )
+        _approval_events(cursor, kvk, "usable", timestamp, digest, old_bucket, _usable_bucket(website, new_status), None)
+        connection.commit()
+        return True
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def import_approval_rejected(db_path: Path, kvk: str, note: str = "", timestamp: str | None = None) -> bool:
+    """The Robot Controleur could not confirm an unconfirmed usable find: it becomes definitively unusable."""
+    timestamp = timestamp or datetime.now(timezone(timedelta(hours=2))).isoformat()
+    digest = hashlib.sha256(f"{kvk}:approval:{note}".encode()).hexdigest()
+    connection = sqlite3.connect(db_path, timeout=60)
+    try:
+        cursor = connection.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        rows = _approval_rows(cursor, kvk)
+        if not rows:
+            connection.rollback()
+            return False
+        old_bucket = _usable_bucket(rows[0][1], rows[0][2])
+        cursor.execute(
+            f"""UPDATE companies SET lead_status='unusable', unusable_reason='identity_unconfirmed',
+                unusable_review_grade=2, unusable_reviewed_at=?, usable_review_state='rejected',
+                usable_reviewed_at=?, usable_review_outcome='rejected_by_control', updated_at=?,
+                contact_research_note=TRIM(COALESCE(contact_research_note,'') || ' | Robot Controleur: ' || ?)
+                WHERE id IN ({','.join('?' * len(rows))})""",
+            (timestamp, timestamp, timestamp, note[:400] or "contactgegevens niet te bevestigen",
+             *[row[0] for row in rows]),
+        )
+        _approval_events(cursor, kvk, "unusable", timestamp, digest, old_bucket, "unusable", 2)
+        connection.commit()
+        return True
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
 def publish_live(root: Path) -> None:
     """Hand the change to the live dashboard publisher, like a Searcher apply does."""
     try:
