@@ -23,6 +23,39 @@
     return place ? [place, percent, found].filter(Boolean).join(' · ') : '';
   }
 
+  // Which robot's work the phone list shows; the "Gevonden door" cell names the producer.
+  const ROLE_LABELS = { searcher: 'robot', controller: 'robot controleur' };
+  const EMPTY_TEXT = { searcher: 'Nog geen werk van de Robot Searcher.', controller: 'Nog geen controles van de Robot Controleur.' };
+
+  function rowRole(row) {
+    return String(row.cells?.[3]?.querySelector('strong')?.textContent || row.cells?.[3]?.textContent || '')
+      .trim().toLocaleLowerCase('nl-NL');
+  }
+
+  function filterRows(body, role) {
+    if (!body) return 0;
+    let shown = 0;
+    [...body.rows].forEach((row) => {
+      if (row.classList.contains('robot-role-empty') || row.classList.contains('empty-row')) return;
+      const match = rowRole(row) === ROLE_LABELS[role];
+      row.hidden = !match;
+      shown += match ? 1 : 0;
+    });
+    let empty = body.querySelector('.robot-role-empty');
+    if (!shown) {
+      if (!empty) {
+        empty = body.ownerDocument.createElement('tr');
+        empty.className = 'robot-role-empty empty-row';
+        empty.innerHTML = '<td colspan="8"></td>';
+        body.appendChild(empty);
+      }
+      empty.cells[0].textContent = EMPTY_TEXT[role];
+    } else if (empty) {
+      empty.remove();
+    }
+    return shown;
+  }
+
   async function loadUsableByPath() {
     const response = await fetch(`/api/kvk-database/location-stats?t=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' });
     const payload = await response.json().catch(() => ({}));
@@ -37,16 +70,34 @@
   function start(doc = document) {
     const list = doc.getElementById('location-list');
     const target = doc.getElementById('latest-robot-location');
+    const select = doc.getElementById('latest-role-select');
+    const body = doc.getElementById('latest-luna-errors-table-body');
     if (!list || !target) return;
     let usableByPath = new Map();
+    const phone = () => Boolean(doc.defaultView?.matchMedia?.('(max-width: 700px)').matches);
+    const role = () => (select?.value === 'controller' ? 'controller' : 'searcher');
     const update = () => {
-      const text = robotLocationText(list, usableByPath);
+      // The Robot's place belongs to the Searcher view; the Controleur has no planning place yet.
+      const text = role() === 'searcher' ? robotLocationText(list, usableByPath) : '';
       if (target.textContent !== text) target.textContent = text;
       target.hidden = !text;
     };
+    let filtering = false;
+    const applyRole = () => {
+      if (filtering || !body) return;
+      filtering = true;
+      try {
+        if (phone()) filterRows(body, role());
+        else [...body.rows].forEach((row) => { row.hidden = row.classList.contains('robot-role-empty'); });
+      } finally { filtering = false; }
+    };
+    select?.addEventListener('change', () => { update(); applyRole(); });
+    if (body) new MutationObserver(applyRole).observe(body, { childList: true });
+    doc.defaultView?.matchMedia?.('(max-width: 700px)').addEventListener?.('change', applyRole);
+    applyRole();
     const refreshCounts = async () => {
       // Only the phone shows this heading; the desktop never loads the counts for it.
-      if (doc.hidden || !doc.defaultView?.matchMedia?.('(max-width: 700px)').matches) return;
+      if (doc.hidden || !phone()) return;
       try {
         const counts = await loadUsableByPath();
         if (counts) { usableByPath = counts; update(); }
@@ -58,11 +109,12 @@
     update();
     refreshCounts();
     doc.defaultView?.setInterval?.(refreshCounts, 60000);
+    doc.addEventListener('visibilitychange', refreshCounts);
   }
 
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => start());
     else start();
   }
-  return { robotLocationText, start };
+  return { robotLocationText, filterRows, start };
 });
