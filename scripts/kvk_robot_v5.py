@@ -86,6 +86,22 @@ class CompanyRetries:
         return {kvk for kvk, state in self.pending.items() if state['retry_at'] > self.clock()}
 
 
+# After this many technical failures (a website that keeps hanging) the Robot stops retrying and hands the
+# company to the Controleurs, so it never occupies a slot forever and its place can reach 100%.
+GIVE_UP_AFTER = 3
+
+
+def give_up(kvk, error):
+    """Write the company as unconfirmed for the Controleurs and mark it finished; True when written."""
+    note = f'Robot kon het onderzoek na {GIVE_UP_AFTER} pogingen niet afronden ({str(error)[:160]}); ter controle'
+    written = kvk_robot_import.FINAL_VERDICTS and import_verdict(DB, {'kvk': kvk, 'reason': 'identity_unconfirmed',
+                                                                        'note': note})
+    if written:
+        save_result(QUEUE / kvk / 'completed.json', {'kvk_nummer': kvk, 'gave_up': True, 'note': note, 'imported': False,
+                                                     'verdict_imported': True, 'completed_at': time.time()})
+    return bool(written)
+
+
 def collect_finished(running, retries):
     """An engine failure only retries its company; data/validation failures still stop safely."""
     for kvk, (future, _identity) in list(running.items()):
@@ -97,6 +113,10 @@ def collect_finished(running, retries):
                 retries.succeeded(kvk)
         except CompanyResearchError as error:
             retries.failed(kvk, error)
+            if retries.pending[kvk]['attempts'] >= GIVE_UP_AFTER and give_up(kvk, error):
+                retries.succeeded(kvk)
+                print(f'Robot geeft {kvk} door aan de controle: {error}', flush=True)
+                continue
             print(f'Robot herprobeert {kvk}: {error}', flush=True)
 
 

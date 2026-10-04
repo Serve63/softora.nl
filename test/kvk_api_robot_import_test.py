@@ -197,6 +197,37 @@ class RobotWritesItsVerdictWhenFinishedTests(unittest.TestCase):
         self.assertEqual((self.row('17218892')['lead_status'], self.row('17218892')['unusable_review_grade']), ('unusable', 1))
 
 
+class RobotGivesUpToTheControleursTests(unittest.TestCase):
+    setUp, tearDown, row = RobotImportTests.setUp, RobotImportTests.tearDown, RobotImportTests.row
+
+    def test_after_three_technical_failures_the_company_goes_to_the_controleurs(self):
+        import concurrent.futures
+        import kvk_robot_v5 as robot
+        from unittest.mock import patch
+        queue = Path(self.directory.name) / 'queue'
+        queue.mkdir()
+
+        def failed_future():
+            future = concurrent.futures.Future()
+            future.set_exception(robot.CompanyResearchError('Tijdlimiet bereikt bij 17218892'))
+            return future
+
+        with patch.object(robot, 'QUEUE', queue), patch.object(robot, 'DB', self.db), \
+                patch.object(robot.kvk_robot_import, 'FINAL_VERDICTS', True):
+            retries = robot.CompanyRetries()
+            for attempt in range(3):
+                running = {'17218892': (failed_future(), {})}
+                robot.collect_finished(running, retries)
+                if attempt < 2:
+                    self.assertEqual(self.row('17218892')['lead_status'], 'unresearched')
+            row = self.row('17218892')
+            self.assertEqual((row['lead_status'], row['unusable_reason'], row['unusable_review_grade']),
+                             ('unusable', 'identity_unconfirmed', 1))
+            self.assertIn('niet afronden', row['contact_research_note'])
+            self.assertTrue((queue / '17218892' / 'completed.json').exists())
+            self.assertNotIn('17218892', retries.pending)
+
+
 class RobotLeavesSearcherWorkAloneTests(unittest.TestCase):
     def test_robot_skips_companies_a_searcher_is_busy_with_or_has_an_answer_for(self):
         import kvk_robot_v5 as robot
