@@ -252,6 +252,7 @@
   body .latest-role-picker select {
     appearance: none;
     -webkit-appearance: none;
+    field-sizing: content;
     margin: 0;
     padding: 2px 18px 2px 0;
     border: 0;
