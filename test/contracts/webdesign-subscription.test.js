@@ -302,3 +302,86 @@ print('parallel checkpoints, PNG recovery, quota and watchdog OK')
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /parallel checkpoints, PNG recovery, quota and watchdog OK/);
 });
+
+async function brandImage(fill) {
+  const sharp = require('sharp');
+  const block = await sharp({ create: { width: 200, height: 120, channels: 3, background: fill } }).png().toBuffer();
+  const png = await sharp({ create: { width: 400, height: 600, channels: 3, background: '#ffffff' } })
+    .composite([{ input: block, left: 100, top: 200 }]).jpeg().toBuffer();
+  return 'data:image/jpeg;base64,' + png.toString('base64');
+}
+
+test('subscription designs get the API house-colour lock in the prompt and on delivery', async () => {
+  const orange = await brandImage('#e05a1a'), stored = [], finished = [];
+  let saves = 0;
+  const repository = {
+    claim: async () => ({ ok: true, job: { id: 'job-1234567890123456', subscriptionClaim: claim,
+      websiteUrl: 'https://example.nl/contact/', customer: { bedrijf: 'Example', dom: 'example.nl' } } }),
+    storeBrandGuard: async (id, token, guard) => { stored.push({ id, token, guard }); return { ok: true }; },
+    begin: async () => ({ ok: true, job: { id: 'job-1234567890123456', customer: { id: 'c' }, subscriptionBrandGuard: stored[0].guard } }),
+    finish: async (_id, _claim, error = '') => { finished.push(error); return { ok: true }; },
+  };
+  const aiToolsCoordinator = {
+    prepareWebsitePreviewImage: async () => ({ generationScan: { host: 'example.nl', title: 'Example',
+      referenceImageMode: 'homepage-screenshot', referenceImageUrls: ['https://image.thum.io/get/https://example.nl/'],
+      brandColorEvidence: [{ color: '#e05a1a' }] } }),
+    fetchWebsitePreviewReferenceImages: async () => [{ dataUrl: orange }],
+  };
+  const service = createWebdesignSubscriptionService({ repository, aiToolsCoordinator, logger: { warn() {} },
+    coordinator: { saveSubscriptionPhoto: async () => { saves++; } } });
+  const polled = res();
+  await service.poll({ body: { claim } }, polled);
+  assert.equal(stored.length, 1);
+  assert.equal(stored[0].guard.palette.length, 1);
+  assert.match(polled.body.job.prompt, new RegExp(stored[0].guard.palette[0].hex, 'i'));
+  const rejected = res();
+  await service.complete({ body: { jobId: 'job-1234567890123456', claim, dataUrl: await brandImage('#1a4fe0') } }, rejected);
+  assert.equal(saves, 0);
+  assert.match(finished[0], /huiskleuren ontbreken/);
+  await service.complete({ body: { jobId: 'job-1234567890123456', claim, dataUrl: orange } }, res());
+  assert.equal(saves, 1);
+  assert.equal(finished[1], '');
+});
+
+test('a failing colour preparation never blocks the subscription design itself', async () => {
+  const service = createWebdesignSubscriptionService({ logger: { warn() {} },
+    repository: { claim: async () => ({ ok: true, job: { id: 'job-1234567890123456', subscriptionClaim: claim,
+      websiteUrl: 'https://example.nl/', customer: {} } }), storeBrandGuard: () => assert.fail('No guard expected') },
+    aiToolsCoordinator: { prepareWebsitePreviewImage: async () => ({ generationScan: { referenceImageMode: 'homepage-screenshot', referenceImageUrls: [] } }),
+      fetchWebsitePreviewReferenceImages: async () => { throw new Error('screenshot offline'); } } });
+  const polled = res();
+  await service.poll({ body: { claim } }, polled);
+  assert.equal(polled.body.ok, true);
+  assert.ok(polled.body.job.prompt);
+});
+
+test('webdesigns always use the company homepage, also when a subpage was stored', async () => {
+  const { createAiToolsCoordinator } = require('../../server/services/ai-tools');
+  const fetched = [];
+  const tools = createAiToolsCoordinator({ logger: { warn() {}, error() {} },
+    fetchWebsitePreviewScanFromUrl: async (url) => { fetched.push(url); return { normalizedUrl: url, finalUrl: url, scan: { host: 'example.nl' } }; } });
+  const { buildWebdesignPipelineOptions } = require('../../server/services/design-photo-generation-policy');
+  for (const stored of ['https://woodunlimited.nl/terms-of-service/', 'woodunlimited.nl/contact?x=1']) {
+    const { generationScan } = await tools.prepareWebsitePreviewImage(stored, buildWebdesignPipelineOptions({ source: 'premium-database' }));
+    assert.equal(fetched.at(-1), 'https://woodunlimited.nl/');
+    assert.ok(generationScan.referenceImageUrls.every((url) => !/terms-of-service|contact/.test(url)));
+  }
+  await tools.prepareWebsitePreviewImage('https://bedrijf.wixsite.com/bedrijf', buildWebdesignPipelineOptions({ source: 'premium-database' }));
+  assert.equal(fetched.at(-1), 'https://bedrijf.wixsite.com/bedrijf');
+  await assert.rejects(tools.prepareWebsitePreviewImage('https://www.google.com/maps/place/Bedrijf',
+    buildWebdesignPipelineOptions({ source: 'premium-database' })), { code: 'WEBDESIGN_PLATFORM_WEBSITE' });
+  await tools.prepareWebsitePreviewImage('https://example.nl/contact/', {});
+  assert.equal(fetched.at(-1), 'https://example.nl/contact/');
+});
+
+test('the colour lock survives storage and only the claimed running subscription job can receive it', () => {
+  const guard = { version: 'brand-color-families-v1', palette: [{ hex: '#e05a1a', hue: 20 }] };
+  const restored = normalizeWebdesignJobRow({ job_id: 'a', payload: buildWebdesignJobPayload({ customer: { id: 'a' }, subscriptionBrandGuard: guard }) });
+  assert.deepEqual(restored.subscriptionBrandGuard, guard);
+  assert.equal(normalizeWebdesignJobRow({ job_id: 'b', payload: {} }).subscriptionBrandGuard, null);
+  const sql = fs.readFileSync(path.join(__dirname, '../../supabase/migrations/20261005091500_webdesign_subscription_brand_guard.sql'), 'utf8');
+  assert.match(sql, /status = 'running'/);
+  assert.match(sql, /subscriptionClaim' = p_claim/);
+  assert.match(sql, /security invoker set search_path = ''/i);
+  assert.match(sql, /from public, anon, authenticated/i);
+});

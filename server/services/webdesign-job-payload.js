@@ -16,6 +16,7 @@ function buildWebdesignJobPayload(job = {}) {
   const payload = { customer: job.customer && typeof job.customer === 'object' ? job.customer : {} };
   if (job.executionProvider === 'codex-subscription') payload.executionProvider = 'codex-subscription';
   if (job.subscriptionClaim) payload.subscriptionClaim = job.subscriptionClaim;
+  if (job.subscriptionBrandGuard) payload.subscriptionBrandGuard = job.subscriptionBrandGuard;
   if (job.variant) payload.variant = normalizeString(job.variant).slice(0, 80);
   if (job.assignedDesignOwnerEmail) payload.assignedDesignOwnerEmail = normalizeString(job.assignedDesignOwnerEmail).toLowerCase().slice(0, 240);
   if (job.batchId) payload.batchId = normalizeString(job.batchId).slice(0, 120);
@@ -47,6 +48,7 @@ function normalizeWebdesignJobRow(row = {}) {
     cancelled: payload.cancelled === true,
     generationAttempted: payload.generationAttempted === true, generation: payload.generation || null, assignedDesignOwnerEmail: normalizeString(payload.assignedDesignOwnerEmail).toLowerCase(),
     executionProvider: payload.executionProvider || '', subscriptionClaim: payload.subscriptionClaim || '',
+    subscriptionBrandGuard: Array.isArray(payload.subscriptionBrandGuard?.palette) ? payload.subscriptionBrandGuard : null,
     variant: normalizeString(payload.variant || ''),
     batchId: normalizeString(payload.batchId || ''),
     batchTargetIndex: Number.isFinite(Number(payload.batchTargetIndex))

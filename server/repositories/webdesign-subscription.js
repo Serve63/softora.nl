@@ -14,6 +14,7 @@ function createWebdesignSubscriptionRepository({ getSupabaseClient = () => null 
     claim: (claim) => rpc('claim', { p_claim: claim }),
     heartbeat: (jobId, claim) => rpc('result', { p_job_id: jobId, p_claim: claim, p_action: 'heartbeat', p_error: '' }),
     begin: (jobId, claim) => rpc('result', { p_job_id: jobId, p_claim: claim, p_action: 'begin', p_error: '' }),
+    storeBrandGuard: (jobId, claim, guard) => rpc('guard', { p_job_id: jobId, p_claim: claim, p_guard: guard }),
     finish: (jobId, claim, error = '') => rpc('result', { p_job_id: jobId, p_claim: claim, p_action: error ? 'error' : 'done', p_error: error }),
   };
 }
