@@ -114,6 +114,30 @@ def control_outcome(result):
     return 'confirmed', note
 
 
+GIVE_UP_AFTER = 3
+
+
+def failed_attempts(folder):
+    """Earlier runs of this company that ended without a result (a technical failure), across restarts."""
+    return sum(1 for run in folder.glob('run-*') if run.is_dir() and not (run / 'terminal-results.json').exists())
+
+
+def give_up(identity, folder):
+    """After three technical failures the company gets its final verdict instead of being retried forever
+    (J. Pijnenburg Holding hung Helvoirt at 99% for a night): it could not be confirmed. True when written."""
+    kvk = str(identity['kvk_nummer'])
+    note = f'controle {GIVE_UP_AFTER}x technisch mislukt; niet te bevestigen'
+    if not FINALIZE:
+        return False
+    if identity.get('approval'):
+        written = import_approval_rejected(DB, kvk, note)
+    else:
+        written = import_control_confirmation(DB, kvk, note)
+    save_result(folder / 'completed.json', {'kvk_nummer': kvk, 'outcome': 'gave_up', 'written': bool(written),
+                                            'note': note, 'completed_at': time.time()})
+    return bool(written)
+
+
 def research(identity, stop):
     """Re-check one company; False when the dashboard stopped it first."""
     kvk = str(identity['kvk_nummer'])
@@ -121,6 +145,9 @@ def research(identity, stop):
     folder.mkdir(parents=True, exist_ok=True)
     checkpoint = folder / 'completed.json'
     if checked(kvk):
+        return True
+    if failed_attempts(folder) >= GIVE_UP_AFTER and give_up(identity, folder):
+        searcher.PUBLISHER.request()
         return True
     source = folder / 'input.json'
     save_result(source, [{key: identity[key] for key in searcher.FIELDS}])
