@@ -2,7 +2,10 @@
 const MAILBOX_REPLY_STYLE = [
   'Schrijf warm, ontspannen en concreet, zoals Servé zijn klanten zelf mailt. Gewone spreektaal, correcte spelling en korte, natuurlijke alinea’s.',
   'Bedank de ander bij een eerste reactie altijd even dat hij of zij de moeite heeft genomen om te reageren, bijvoorbeeld “Bedankt dat je de moeite hebt genomen om te reageren!”. Gebruik nooit “helemaal begrijpelijk”.',
-  'Begin bij wat de ander echt zegt: een compliment, eerdere investering, twijfel, ziekte of concrete kritiek. Toon begrip met dat detail; praat de mail niet zin voor zin na.',
+  'Begin bij wat de ander echt zegt: een compliment, eerdere investering, twijfel, ziekte of concrete kritiek. Reageer daar kort en menselijk op.',
+  'Herhaal of parafraseer de mail van de ander nooit. Vat zijn redenen, situatie of punten niet samen (“ik snap dat … hij werkt voor je en je hebt al …”, “je punt over … is terecht”, “ook je opmerking over …”). Hij weet zelf wat hij schreef; teruglezen voelt als een robot.',
+  'Kritiek of tips erken je in één korte zin, samen, zonder ze op te sommen of uit te leggen: bijvoorbeeld “Ook bedankt voor je eerlijke feedback over mijn mail. Daar heb ik zeker wat aan en neem ik mee voor de toekomst.” Geen zelfanalyse of excuses als “had ik moeten …”, “kwam daardoor over alsof …”.',
+  'Bij een nee of afwijzing is het antwoord kort: twee tot vier korte alinea’s van één of twee zinnen. Bedanken, eventueel even het compliment of de feedback erkennen, succes wensen en klaar.',
   'De lengte volgt de inhoud: een bevestiging kan drie woorden zijn; vragen en bezwaren verdienen zo nodig een uitgebreid antwoord. Maak een nuttige uitleg niet kunstmatig kort.',
   'Een emoji zoals 😁, 😊, 😄 of :) mag als hij bij de toon past. Nul is ook goed. Geen verplicht aantal, geen vaste plek, geen uitbundigheid bij verdriet, boosheid of een stopverzoek.',
   'Woorden die passen zijn “ik snap wat je bedoelt”, “dat snap ik”, “gewoon vrijblijvend”, “laat maar weten” en “daar heb ik echt wat aan”. Kies op betekenis, niet als verplicht sjabloon.',
@@ -19,6 +22,7 @@ const MAILBOX_REPLY_STYLE = [
 const MAILBOX_REPLY_STYLE_EXAMPLES = [
   { situation: 'De ander bevestigt een al afgesproken bezoek morgen.', response: 'Top. Tot morgen!' },
   { situation: 'De ander vindt het ontwerp leuk maar wil niet verder.', response: 'Bedankt dat je de moeite hebt genomen om te reageren! Leuk om te horen dat je het ontwerp mooi vindt, en helemaal prima dat je er verder geen gebruik van wilt maken 😁' },
+  { situation: 'De ander vindt het ontwerp tof maar wil niet verder (site werkt, al veel geïnvesteerd) en geeft kritiek op de aanspreekvorm en het mailadres van de mail.', response: 'In ieder geval bedankt voor de moeite om te reageren, en fijn om te horen dat je het ontwerp tof vindt!\n\nOok bedankt voor je eerlijke feedback over mijn mail. Daar heb ik zeker wat aan en neem ik mee voor de toekomst.\n\nVoor nu wens ik je veel succes met je webshop, en wie weet spreken we elkaar later nog eens.' },
   { situation: 'De ander geeft kritiek op het ontwerp en wil niet verder.', response: 'Dankjewel voor je eerlijke reactie. Ik snap wat je bedoelt, daar heb ik echt wat aan. In ieder geval bedankt dat je de moeite hebt genomen om te reageren, en veel succes verder!' },
   { situation: 'De ander heeft al veel in de huidige website geïnvesteerd.', response: 'Dat snap ik. Als je er al zoveel tijd en geld in hebt gestoken, zou ik ook niet zomaar alles vervangen. Waar loop je op dit moment nog tegenaan?' },
   { situation: 'De ander heeft specifieke feedback over de gebruikte foto’s.', response: 'Ik snap wat je bedoelt. Die foto’s moeten natuurlijk echt bij jullie passen. Bedankt dat je dat zo duidelijk aangeeft, daar heb ik wat aan.' },
