@@ -196,6 +196,7 @@ function buildServerAppFeatureWiringRuntimeContext({
       websiteGenerationStrictHtml: envConfig.WEBSITE_GENERATION_STRICT_HTML,
       fetchWebsitePreviewScanFromUrl: aiContentRuntime.fetchWebsitePreviewScanFromUrl,
       generateWebsitePreviewImageWithAi: aiContentRuntime.generateWebsitePreviewImageWithAi,
+      fetchWebsitePreviewReferenceImages: aiContentRuntime.fetchWebsitePreviewReferenceImages,
       openAiImageModel: envConfig.OPENAI_IMAGE_MODEL,
       buildOrderDossierInput: aiContentRuntime.buildOrderDossierInput,
       generateDynamicOrderDossierWithAnthropic:

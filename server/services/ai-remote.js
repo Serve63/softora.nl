@@ -1982,7 +1982,7 @@ function createAiRemoteService(deps = {}) {
     generateWebsiteHtmlWithAi,
     generateWebsiteHtmlWithAnthropic,
     generateWebsiteHtmlWithOpenAi,
-    generateWebsitePreviewImageWithAi,
+    generateWebsitePreviewImageWithAi, fetchWebsitePreviewReferenceImages,
     generateWebsitePromptFromTranscriptWithAi,
     sendAnthropicMessage,
     summarizeMeetingTranscriptWithAi,

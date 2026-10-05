@@ -19,6 +19,7 @@ function createAiToolsCoordinator(deps = {}) {
       revisedPrompt: '',
       usage: null,
     }),
+    fetchWebsitePreviewReferenceImages = async () => [],
     appendDashboardActivity = () => {},
     getOpenAiApiKey = () => '',
     openAiImageModel = '',
@@ -74,6 +75,19 @@ function createAiToolsCoordinator(deps = {}) {
     ];
   }
 
+  // Webdesigns are homepage redesigns; a stored contact/privacy URL must not become the brand source.
+  function toWebsiteHomepageUrl(value) {
+    const raw = normalizeString(value || '');
+    try {
+      const parsed = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+      // Site builders that host a whole company site under a path keep that path.
+      const pathHosted = /(^|\.)wixsite\.com$|^sites\.google\.com$/i.test(parsed.hostname);
+      return /^https?:$/.test(parsed.protocol) && parsed.hostname && !pathHosted ? `${parsed.origin}/` : raw;
+    } catch (_) {
+      return raw;
+    }
+  }
+
   function shouldUseDatabasePreviewFallback(body = {}) {
     return normalizeString(body.source).toLowerCase() === 'premium-database'
       && normalizeString(body.action).toLowerCase() === 'webdesign';
@@ -121,6 +135,7 @@ function createAiToolsCoordinator(deps = {}) {
     const usesHomepageScreenshot = referenceImageMode === HOMEPAGE_SCREENSHOT_REFERENCE_MODE;
     const platform = detectPlatformWebsiteUrl(inputUrl);
     if (platform) throw buildPlatformWebsiteError(platform);
+    if (usesHomepageScreenshot) inputUrl = toWebsiteHomepageUrl(inputUrl);
     let fetched;
     try {
       fetched = await fetchWebsitePreviewScanFromUrl(inputUrl);
@@ -596,7 +611,7 @@ function createAiToolsCoordinator(deps = {}) {
     sendOrderDossierResponse,
     sendTranscriptToPromptResponse,
     sendWebsitePreviewGenerateResponse,
-    prepareWebsitePreviewImage, runWebsitePreviewGeneratePipeline,
+    prepareWebsitePreviewImage, runWebsitePreviewGeneratePipeline, fetchWebsitePreviewReferenceImages,
   };
 }
 
