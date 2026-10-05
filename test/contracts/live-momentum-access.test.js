@@ -135,7 +135,7 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.match(html, /<h1 id="momentum-access-title">Toegangscode<\/h1>/);
   assert.match(html, /data-momentum-access-dots/);
   assert.equal((html.match(/data-momentum-access-digit=/g) || []).length, 10);
-  assert.match(html, /live-momentum-access\.css\?v=20261005a/);
+  assert.match(html, /live-momentum-access\.css\?v=20261005b/);
   assert.match(html, /settings-module-routes\.js\?v=20260818b/);
   assert.match(html, /settings-module-back\.js\?v=20260909a/);
   assert.equal((html.match(/data-settings-module-back-host/g) || []).length, 1);
@@ -168,6 +168,14 @@ test('Winnen vereenvoudigt de toegangskop alleen op mobiel en behoudt de desktop
   const mobileEnd = css.indexOf('@media (max-height:', mobileStart);
   const desktopCss = css.slice(0, mobileStart);
   const mobileCss = css.slice(mobileStart, mobileEnd);
+
+  const themeColor = html.match(/<meta name="theme-color" content="(#[a-f0-9]+)" media="\(max-width: 900px\)">/)?.[1];
+  const canvasColor = css.match(/--access-bg:\s*(#[a-f0-9]+);/)?.[1];
+  assert.ok(themeColor);
+  assert.equal(themeColor, canvasColor);
+  assert.match(mobileCss, /html\s*\{\s*background-color:\s*var\(--access-bg\);/);
+  assert.match(mobileCss, /\.momentum-access-page::before\s*\{\s*background:\s*var\(--access-bg\);/);
+  assert.doesNotMatch(desktopCss, /\.momentum-access-page::before\s*\{\s*background:\s*var\(--access-bg\);/);
 
   assert.match(html, /class="momentum-access-brand-desktop">SOFTORA MOMENTUM<\/span>/);
   assert.match(html, /class="momentum-access-brand-mobile">SOFTORA WINNEN<\/span>/);
