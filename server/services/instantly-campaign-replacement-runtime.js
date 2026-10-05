@@ -25,6 +25,7 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     removeMailReadyCustomer,
     campaignApi,
     normalizeString,
+    dataOpsStore = null,
   } = deps;
   const configuredCampaigns = config.autoApprovedCampaigns || config.replacementCampaigns;
 
@@ -38,8 +39,25 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
         bypassReadCache: true,
       });
       const values = state && typeof state.values === 'object' ? state.values : {};
-      return { state, values, rows: parseRows(values, customerDbKey, normalizeString) };
+      const rows = parseRows(values, customerDbKey, normalizeString);
+      return { state, values, rows: rows.concat(await loadMissingInstantlyDesignRows(rows)) };
     };
+  // The customer read holds only the most recently updated rows, so older
+  // customers with an Instantly design would never be offered for upload.
+  const loadMissingInstantlyDesignRows = async (rows) => {
+    if (!dataOpsStore || typeof dataOpsStore.listDesignPhotoAssetFlags !== 'function' ||
+      typeof dataOpsStore.listCustomersByIds !== 'function') return [];
+    const readOptions = { bypassReadCache: true, bypassReadFailureCooldown: true, suppressTransientReadFailureLog: true };
+    const flags = await dataOpsStore.listDesignPhotoAssetFlags(readOptions);
+    const known = new Set((Array.isArray(rows) ? rows : []).map((row) => normalizeString(row && row.id)));
+    const customerIds = Array.from(new Set((Array.isArray(flags) ? flags : [])
+      .filter((flag) => flag && flag.webdesignMailProvider === 'instantly')
+      .map((flag) => normalizeString(flag.customerId))
+      .filter((id) => id && !known.has(id))));
+    if (!customerIds.length) return [];
+    const extra = await dataOpsStore.listCustomersByIds({ ...readOptions, customerIds });
+    return Array.isArray(extra) ? extra.filter((row) => row && !known.has(normalizeString(row.id))) : [];
+  };
   const loadRows = async () => {
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {

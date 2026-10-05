@@ -2854,6 +2854,46 @@ test('automatic upload uses targeted design-photo reads instead of the heavy pho
   assert.equal(harness.uiStateReads.some((read) => read.scope === 'premium_database_photos'), false);
 });
 
+test('automatic upload also offers older customers with an Instantly design outside the recent customer read', async () => {
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
+  const byIdReads = [];
+  const oldCustomer = { id: 'old-design', bedrijf: 'Oud Design BV', email: 'info@oud-design.test', website: 'https://oud-design.test', status: 'prospect', mail: true, verantwoordelijk: 'Servé' };
+  const harness = createService({
+    now: '2026-10-05T09:00:00.000Z',
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    rows: [{ id: 'recent-plain', bedrijf: 'Recent BV', email: 'info@recent.test', website: 'https://recent.test', status: 'prospect', mail: true }],
+    dataOpsStore: {
+      listDesignPhotoAssetFlags: async () => [{ customerId: 'old-design', hasPhoto: true, hasMockup: true, webdesignMailProvider: 'instantly' }],
+      listCustomersByIds: async (options) => {
+        byIdReads.push(options.customerIds);
+        return options.customerIds.includes('old-design') ? [oldCustomer] : [];
+      },
+      listDesignPhotosWithSignedUrls: async () => [{
+        customerId: 'old-design',
+        websitePhotoUrl: 'https://cdn.softora.test/old-design.jpg',
+        websiteMockupUrl: 'https://cdn.softora.test/old-design-mockup.jpg',
+        fileName: 'Oud design',
+        legacyMeta: { webdesignMailProvider: 'instantly', senderEmail: 'serve@softora.nl' },
+      }],
+    },
+    fetchJsonWithTimeout: async (url, options) => {
+      if (url.includes('/campaigns/')) return { response: { ok: true, status: 200 }, data: { name: 'Servé Creusen Softora.nl - frisse start', status: 1 } };
+      if (url.endsWith('/leads/add')) {
+        const lead = JSON.parse(options.body).leads[0];
+        assert.equal(lead.email, 'info@oud-design.test');
+        return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'old-lead', email: lead.email, index: 0 }] } };
+      }
+      return { response: { ok: true, status: 200 }, data: { status: 1 } };
+    },
+  });
+
+  const result = await harness.service.autoUploadMailReady();
+
+  assert.equal(result.uploaded, 1);
+  assert.deepEqual(byIdReads[0], ['old-design']);
+});
+
 test('automatic upload routes the design owner to Martijn even when daily rotation would choose Servé', async () => {
   const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const harness = createService({
