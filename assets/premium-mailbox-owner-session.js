@@ -43,6 +43,10 @@
     'contactTimelineNextCursor', 'contactTimelineError', 'contactTimelineNeedsRefresh',
     'externalContactEmail',
   ];
+  // A loaded contact dossier is only re-read after a list refresh when the
+  // list shows a change for that contact, or as a safety net after this age.
+  const CONTACT_TIMELINE_MAX_AGE_MS = 10 * 60 * 1000;
+  const EMAIL_PATTERN = /[^\s<>"',;:()[\]]+@[^\s<>"',;:()[\]]+\.[^\s<>"',;:()[\]]+/g;
 
   function getMessageKey(message) {
     const source = message && typeof message === 'object' ? message : {};
@@ -70,6 +74,44 @@
     return fallback ? `ui:${fallback}` : '';
   }
 
+  function extractAddresses(message) {
+    const source = message && typeof message === 'object' ? message : {};
+    return String([source.email, source.replyTo, source.to, source.toDisplay, source.cc, source.bcc, source.deliveredTo]
+      .filter(Boolean).join(' ')).toLowerCase().match(EMAIL_PATTERN) || [];
+  }
+
+  function getContactKey(message) {
+    const source = message && typeof message === 'object' ? message : {};
+    return normalize(source.externalContactEmail) || extractAddresses({ replyTo: source.replyTo })[0] ||
+      extractAddresses({ email: source.email })[0] || '';
+  }
+
+  function getListEntryMessages(message) {
+    return [message, ...(Array.isArray(message?.threadMessages) ? message.threadMessages : [])]
+      .filter((entry) => entry && typeof entry === 'object');
+  }
+
+  // Per contact: every list entry (with its thread) that mentions the contact.
+  // New, changed or removed messages for that contact change the signature.
+  function createContactListContext(incomingMessages) {
+    const byAddress = new Map();
+    (Array.isArray(incomingMessages) ? incomingMessages : []).forEach((entry) => {
+      const messages = getListEntryMessages(entry);
+      if (!messages.length) return;
+      const signature = messages.map((message) => `${getStableThreadMessageKey(message)}@${String(message.date || '')}`).sort().join(',');
+      new Set(messages.flatMap(extractAddresses)).forEach((address) => {
+        if (!byAddress.has(address)) byAddress.set(address, []);
+        byAddress.get(address).push(signature);
+      });
+    });
+    return {
+      signatureFor(message) {
+        const contact = getContactKey(message);
+        return contact ? `${contact}|${(byAddress.get(contact) || []).slice().sort().join('|')}` : '';
+      },
+    };
+  }
+
   function getBodyCompleteness(message) {
     const source = message && typeof message === 'object' ? message : {};
     const body = String(source.body || '').trim();
@@ -80,9 +122,11 @@
     return source.hasBody ? 1 : 0;
   }
 
-  function reconcileMessage(current, incoming) {
+  function reconcileMessage(current, incoming, listContext = null) {
     if (!current || typeof current !== 'object') return incoming;
     if (!incoming || typeof incoming !== 'object') return current;
+    const previousListSignature = current.contactTimelineListSignature;
+    const contactTimelineCheckedAt = Number(current.contactTimelineCheckedAt) || 0;
     const currentBody = Object.fromEntries(HYDRATED_MESSAGE_FIELDS.map((field) => [field, current[field]]));
     const currentThread = Array.isArray(current.threadMessages) ? current.threadMessages : [];
     const preserveContactTimeline = current.contactTimelineLoaded === true && incoming.contactTimelineLoaded !== true;
@@ -140,12 +184,19 @@
     if (retryAt) current.providerMessageIdHydrationRetryAt = retryAt;
     if (preserveContactTimeline) {
       CONTACT_TIMELINE_FIELDS.forEach((field) => { current[field] = currentContactTimeline[field]; });
-      current.contactTimelineNeedsRefresh = true;
+      const nowMs = Date.now();
+      const checkedAt = contactTimelineCheckedAt || (current.contactTimelineNeedsRefresh === true ? 0 : nowMs);
+      const signature = listContext ? listContext.signatureFor(current) : '';
+      const unchanged = Boolean(signature) && signature === previousListSignature &&
+        checkedAt > 0 && nowMs - checkedAt >= 0 && nowMs - checkedAt < CONTACT_TIMELINE_MAX_AGE_MS;
+      current.contactTimelineNeedsRefresh = current.contactTimelineNeedsRefresh === true || !unchanged;
+      if (current.contactTimelineNeedsRefresh) delete current.contactTimelineCheckedAt;
+      else current.contactTimelineCheckedAt = checkedAt;
     }
     if (Array.isArray(incoming.threadMessages)) {
       current.threadMessages = preserveContactTimeline
         ? mergeMessagesPreservingCurrent(currentThread, incoming.threadMessages)
-        : reconcileMessages(currentThread, incoming.threadMessages);
+        : reconcileMessageList(currentThread, incoming.threadMessages, null);
     }
     return current;
   }
@@ -163,7 +214,7 @@
     });
   }
 
-  function reconcileMessages(currentMessages, incomingMessages) {
+  function reconcileMessageList(currentMessages, incomingMessages, listContext) {
     const currentByKey = new Map(
       (Array.isArray(currentMessages) ? currentMessages : [])
         .map((message) => [getMessageKey(message), message])
@@ -172,9 +223,20 @@
     return (Array.isArray(incomingMessages) ? incomingMessages : []).map((message) => {
       const key = getMessageKey(message);
       return key && currentByKey.has(key)
-        ? reconcileMessage(currentByKey.get(key), message)
+        ? reconcileMessage(currentByKey.get(key), message, listContext)
         : message;
     });
+  }
+
+  // A list refresh: remembers per conversation what the list showed for its
+  // contact, so the next refresh can tell whether the dossier needs a re-read.
+  function reconcileMessages(currentMessages, incomingMessages) {
+    const listContext = createContactListContext(incomingMessages);
+    const messages = reconcileMessageList(currentMessages, incomingMessages, listContext);
+    messages.forEach((message) => {
+      if (message && typeof message === 'object') message.contactTimelineListSignature = listContext.signatureFor(message);
+    });
+    return messages;
   }
 
   function create(options = {}) {
