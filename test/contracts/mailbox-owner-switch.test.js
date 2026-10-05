@@ -160,6 +160,41 @@ test('achtergrondrefresh behoudt een geladen contactdossier buiten de smalle RFC
   assert.equal(reconciled[0].threadMessages[2].bodyLoaded, true);
 });
 
+test('ongewijzigde lijstrefresh laat een geladen contactdossier staan; wijziging of ouderdom ververst wel', () => {
+  const list = () => [
+    { id: 'jan-1', email: 'jan@klant.test', date: '2026-10-01T10:00:00Z', threadMessages: [] },
+    { id: 'piet-1', email: 'piet@klant.test', date: '2026-10-01T11:00:00Z', threadMessages: [] },
+  ];
+  let messages = ownerSession.reconcileMessages([], list());
+  messages.forEach((mail) => {
+    Object.assign(mail, { contactTimelineLoaded: true, contactTimelineTotal: 3, externalContactEmail: mail.email, contactTimelineNeedsRefresh: false });
+  });
+
+  messages = ownerSession.reconcileMessages(messages, list());
+  assert.deepEqual(messages.map((mail) => mail.contactTimelineNeedsRefresh), [false, false]);
+  messages = ownerSession.reconcileMessages(messages, list());
+  assert.deepEqual(messages.map((mail) => mail.contactTimelineNeedsRefresh), [false, false]);
+
+  const withNewJanMail = [...list(), { id: 'jan-2', email: 'jan@klant.test', date: '2026-10-02T09:00:00Z', threadMessages: [] }];
+  messages = ownerSession.reconcileMessages(messages, withNewJanMail);
+  assert.equal(messages.find((mail) => mail.id === 'jan-1').contactTimelineNeedsRefresh, true);
+  assert.equal(messages.find((mail) => mail.id === 'piet-1').contactTimelineNeedsRefresh, false);
+
+  const piet = messages.find((mail) => mail.id === 'piet-1');
+  piet.contactTimelineCheckedAt = Date.now() - 11 * 60 * 1000;
+  messages = ownerSession.reconcileMessages(messages, withNewJanMail);
+  assert.equal(messages.find((mail) => mail.id === 'piet-1').contactTimelineNeedsRefresh, true);
+
+  const withoutJanReply = list();
+  const jan = messages.find((mail) => mail.id === 'jan-1');
+  Object.assign(jan, { contactTimelineNeedsRefresh: false });
+  delete jan.contactTimelineCheckedAt;
+  messages = ownerSession.reconcileMessages(messages, withNewJanMail);
+  assert.equal(messages.find((mail) => mail.id === 'jan-1').contactTimelineNeedsRefresh, false);
+  messages = ownerSession.reconcileMessages(messages, withoutJanReply);
+  assert.equal(messages.find((mail) => mail.id === 'jan-1').contactTimelineNeedsRefresh, true);
+});
+
 test('gekozen campagne-eigenaar schrijft de servervoorkeur met keepalive', async () => {
   const writes = [];
   const client = {
