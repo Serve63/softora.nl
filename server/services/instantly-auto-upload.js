@@ -1,6 +1,7 @@
 const { createHash } = require('node:crypto');
 const { resolveInstantlyDesignOwner } = require('./instantly-design-owner');
 const { isRemoteLeadConfirmedSent } = require('./instantly-campaign-replacement');
+const { buildCampaignSignatureSequences } = require('./instantly-campaign-signature');
 
 const MAX_AUTO_UPLOAD_BATCH = 500;
 // Leave time for the canonical POST to respond before the cron's HTTP timeout.
@@ -76,6 +77,8 @@ function createInstantlyAutoUpload(deps = {}) {
     listCampaignLeads,
     addCampaignLeads,
     activateCampaign,
+    updateCampaign = null,
+    logger = console,
     removeMailReadyCustomer = async () => {},
     createError = (message, code, status = 400, details = {}) => Object.assign(new Error(message), { code, status, ...details }),
   } = deps;
@@ -102,12 +105,28 @@ function createInstantlyAutoUpload(deps = {}) {
     }
   }
 
+  // Instantly's editor is read-only for these campaigns; keep the sign-off in
+  // line with Softora's own coldmail before new leads are added.
+  async function ensureCampaignSignature(campaignId, campaign) {
+    if (typeof updateCampaign !== 'function') return;
+    const { changed, sequences } = buildCampaignSignatureSequences(campaign);
+    if (!changed) return;
+    try {
+      await updateCampaign(campaignId, { sequences });
+    } catch (error) {
+      if (logger && typeof logger.warn === 'function') {
+        logger.warn('[instantly-auto-upload] Handtekening in Instantly-campagne niet bijgewerkt:', error && error.message);
+      }
+    }
+  }
+
   async function readApprovedCampaign(owner) {
     const approved = assertApprovedCampaign(owner);
     const campaign = await getCampaign(approved.id);
     if (text(campaign && campaign.name) !== approved.name) {
       throw createError('Instantly-campagne heeft niet meer de goedgekeurde naam.', 'INSTANTLY_AUTO_CAMPAIGN_IDENTITY_MISMATCH', 503);
     }
+    await ensureCampaignSignature(approved.id, campaign);
     const status = Number(campaign.status);
     // Draft and paused campaigns may receive leads but cannot send until the
     // owner deliberately launches or resumes them. Never activate either here.

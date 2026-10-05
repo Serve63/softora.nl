@@ -2636,6 +2636,55 @@ test('automatic upload accepts a paused approved campaign without activating it'
   assert.equal(harness.fetchCalls.some((call) => call.url.includes('/activate')), false);
 });
 
+test('automatic upload adds the Softora.nl | Webdesign line to the Instantly sign-off before adding leads', async () => {
+  const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
+  const oldBody = '<div>Met vriendelijke groet,<br>{{softora_sender_name}}</div><div>📍 {{softora_city}}</div>';
+  const order = [];
+  let patchedBody = '';
+  const harness = createService({
+    now: '2026-10-05T09:00:00.000Z',
+    syncEnabled: false,
+    autoUploadEnabled: true,
+    replacementCampaigns: campaigns,
+    rows: [{ id: 'sig-next', bedrijf: 'Handtekening BV', naam: 'Nina', email: 'info@handtekening.test', website: 'https://handtekening.test', status: 'prospect', mail: true, verantwoordelijk: 'Servé Creusen' }],
+    photoMap: { 'sig-next': { id: 'sig-next', websitePhoto: TINY_PNG_DATA_URL, websiteMockup: TINY_PNG_DATA_URL, webdesignMailProvider: 'instantly' } },
+    fetchJsonWithTimeout: async (url, options = {}) => {
+      if (url.includes('/campaigns/') && options.method === 'PATCH') {
+        order.push('patch');
+        patchedBody = JSON.parse(options.body).sequences[0].steps[0].variants[0].body;
+        return { response: { ok: true, status: 200 }, data: {} };
+      }
+      if (url.endsWith('/leads/add')) {
+        order.push('add');
+        return { response: { ok: true, status: 200 }, data: { leads_uploaded: 1, created_leads: [{ id: 'sig-lead', email: 'info@handtekening.test', index: 0 }] } };
+      }
+      if (url.includes('/campaigns/')) {
+        return { response: { ok: true, status: 200 }, data: {
+          name: 'Servé Creusen Softora.nl - frisse start', status: 1,
+          sequences: [{ steps: [{ type: 'email', delay: 0, variants: [{ subject: '{{softora_subject}}', body: patchedBody || oldBody }] }] }],
+        } };
+      }
+      return { response: { ok: true, status: 200 }, data: {} };
+    },
+  });
+  const result = await harness.service.autoUploadMailReady({ actor: 'cron' });
+  assert.equal(result.uploaded, 1);
+  assert.equal(patchedBody, '<div>Met vriendelijke groet,<br>{{softora_sender_name}}<br>Softora.nl | Webdesign</div><div>📍 {{softora_city}}</div>');
+  assert.deepEqual(order.slice(0, 2), ['patch', 'add']);
+  assert.equal(order.filter((step) => step === 'patch').length, 1, 'signature is written once');
+});
+
+test('Instantly sign-off helper leaves present or ambiguous signatures untouched', () => {
+  const { addSignatureLineToBody } = require('../../server/services/instantly-campaign-signature');
+  const plain = addSignatureLineToBody('Met vriendelijke groet,\n{{softora_sender_name}}\n\n📍 {{softora_city}}');
+  assert.equal(plain.body, 'Met vriendelijke groet,\n{{softora_sender_name}}\nSoftora.nl | Webdesign\n\n📍 {{softora_city}}');
+  const present = '{{softora_sender_name}}<br>Softora.nl | Webdesign</div><div>📍 {{softora_city}}';
+  assert.equal(addSignatureLineToBody(present).changed, false);
+  const twice = '{{softora_sender_name}}<br>📍 {{softora_city}} {{softora_sender_name}}<br>📍 {{softora_city}}';
+  assert.equal(addSignatureLineToBody(twice).changed, false);
+  assert.equal(addSignatureLineToBody('Groet, {{softora_sender_name}}').changed, false);
+});
+
 test('automatic upload drains both owners in one run beyond the old daily upload cap without starting drafts', async () => {
   const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const sentLeads = [];
