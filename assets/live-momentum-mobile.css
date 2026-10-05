@@ -9,6 +9,7 @@ body[data-live-momentum-page] { background: var(--page-bg); }
 html body[data-live-momentum-page] .dashboard-layout.momentum-layout > .sidebar, html body[data-live-momentum-page] .dashboard-layout.momentum-layout > .sidebar[data-static-sidebar="1"] { display: none !important; }
 html body[data-live-momentum-page] .dashboard-layout.momentum-layout > .sidebar[data-static-sidebar="1"] .sidebar-nav { display: none !important; }
 .momentum-layout .momentum-page { --momentum-safe-start: max(16px, env(safe-area-inset-left)); --momentum-safe-end: max(16px, env(safe-area-inset-right)); width: 100% !important; min-height: 100dvh !important; padding: max(12px, env(safe-area-inset-top)) var(--momentum-safe-end) calc(28px + env(safe-area-inset-bottom)) var(--momentum-safe-start) !important; overflow: clip; }
+.dashboard-layout.momentum-layout[data-live-momentum-shell] > .momentum-page { padding-top: max(12px, env(safe-area-inset-top)) !important; }
 .momentum-art-quotes { display: none; }
 .momentum-mobile-nav { display: none; }
 .momentum-mobile-logo { display: flex; min-height: 44px; align-items: center; color: #a52055; font-family: var(--font-display); font-size: 1.28rem; font-weight: 700; line-height: 1; text-decoration: none; text-transform: uppercase; }
@@ -40,7 +41,7 @@ body[data-momentum-persistence="error"] .momentum-persistence-status { color: #b
 .momentum-mobile-summary-copy p { margin: 8px 0 0; color: rgba(255, 255, 255, .68); font-size: 12px; line-height: 1.45; }
 .momentum-mobile-summary-footer { margin-top: 17px; padding-top: 13px; border-top: 1px solid rgba(255, 255, 255, .09); color: rgba(255, 255, 255, .56); font-size: 10px; font-weight: 650; }
 .momentum-mobile-summary-footer strong { margin-right: 3px; color: #fff; font-size: 12px; }
-.momentum-mobile-list-heading { display: flex; margin: 24px 2px 11px; align-items: end; justify-content: space-between; gap: 14px; }
+.momentum-mobile-list-heading { display: flex; margin: 0 2px 11px; align-items: end; justify-content: space-between; gap: 14px; }
 .momentum-mobile-list-heading span, .momentum-mobile-month-heading > span { color: #a52055; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .momentum-mobile-list-heading h2, .momentum-mobile-month-heading h2 { margin: 2px 0 0; font-family: var(--font-display); font-size: 1.35rem; line-height: 1; text-transform: uppercase; }
 .momentum-mobile-month-heading p { margin: 0; color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.4; text-align: right; }
@@ -76,6 +77,8 @@ body[data-live-momentum-page] .habit-name:has(.add-goal) { padding-left: 46px; }
 body[data-live-momentum-page] .status.is-today { position: relative; z-index: 1; align-items: center; justify-content: center; border-right: 1px solid rgba(26, 26, 46, .075) !important; border-bottom: 1px solid rgba(26, 26, 46, .075) !important; border-left: 0 !important; border-radius: 0 17px 17px 0; }
 body[data-live-momentum-page] .status.is-today::after { position: absolute; right: 100%; width: 1px; height: 34px; background: rgba(26, 26, 46, .07); content: ""; }
 body[data-live-momentum-page] .status::before { width: 30px; height: 30px; }
+body[data-live-momentum-page] .habit-name[data-momentum-today-state="done"], body[data-live-momentum-page] .status.is-today.is-done:not(.is-on-hold) { border-color: rgba(35, 159, 88, .3) !important; background: #e5f6eb; color: #176d3b; }
+body[data-live-momentum-page] .habit-name[data-momentum-today-state="missed"], body[data-live-momentum-page] .status.is-today.is-missed:not(.is-on-hold) { border-color: rgba(187, 51, 47, .3) !important; background: #fde9e7; color: #922e28; }
 .goal-icon-button, .goal-drag-handle, .add-goal { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .goal-icon-button, .goal-drag-handle { width: 44px; min-width: 44px; height: 44px; }
 .goal-drag-handle { padding: 8px; }
