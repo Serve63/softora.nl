@@ -27,6 +27,10 @@ body {
   font-family: var(--access-sans);
 }
 
+.momentum-access-brand-mobile {
+  display: none;
+}
+
 .momentum-access-layout {
   min-height: 100dvh;
 }
@@ -237,6 +241,21 @@ input {
     min-height: 100dvh !important;
     margin-left: 0 !important;
   }
+
+  .momentum-access-header {
+    padding: 8px 0 0;
+    text-align: center;
+  }
+
+  .momentum-access-header [data-settings-module-back-host],
+  .momentum-access-header #momentum-access-description,
+  .momentum-access-brand-desktop {
+    display: none;
+  }
+
+  .momentum-access-brand-mobile {
+    display: inline;
+  }
 }
 
 @media (max-width: 520px) {
@@ -249,10 +268,6 @@ input {
     width: 100%;
     padding: 30px 22px 22px;
     border-radius: 20px;
-  }
-
-  .momentum-access-header {
-    padding-right: 38px;
   }
 
   .momentum-access-header h1 {

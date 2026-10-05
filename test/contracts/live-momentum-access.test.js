@@ -135,7 +135,7 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.match(html, /<h1 id="momentum-access-title">Toegangscode<\/h1>/);
   assert.match(html, /data-momentum-access-dots/);
   assert.equal((html.match(/data-momentum-access-digit=/g) || []).length, 10);
-  assert.match(html, /live-momentum-access\.css\?v=20260828a/);
+  assert.match(html, /live-momentum-access\.css\?v=20261005a/);
   assert.match(html, /settings-module-routes\.js\?v=20260818b/);
   assert.match(html, /settings-module-back\.js\?v=20260909a/);
   assert.equal((html.match(/data-settings-module-back-host/g) || []).length, 1);
@@ -159,6 +159,25 @@ test('Winnen toont een compacte toegangspagina zonder de dashboardinhoud vooraf 
   assert.match(js, /attempt < MAX_ADMIN_CONFIRMATION_RETRIES/);
   assert.match(js, /window\.location\.replace\('\/winnen'\)/);
   assert.doesNotMatch(js, /808080/);
+});
+
+test('Winnen vereenvoudigt de toegangskop alleen op mobiel en behoudt de desktoptekst', () => {
+  const html = fs.readFileSync(path.join(repoRoot, 'live-momentum-access.html'), 'utf8');
+  const css = fs.readFileSync(path.join(repoRoot, 'assets/live-momentum-access.css'), 'utf8');
+  const mobileStart = css.indexOf('@media (max-width: 900px)');
+  const mobileEnd = css.indexOf('@media (max-height:', mobileStart);
+  const desktopCss = css.slice(0, mobileStart);
+  const mobileCss = css.slice(mobileStart, mobileEnd);
+
+  assert.match(html, /class="momentum-access-brand-desktop">SOFTORA MOMENTUM<\/span>/);
+  assert.match(html, /class="momentum-access-brand-mobile">SOFTORA WINNEN<\/span>/);
+  assert.match(html, /id="momentum-access-description">Vul je zescijferige code in om Winnen te openen\.<\/p>/);
+  assert.match(desktopCss, /\.momentum-access-brand-mobile\s*\{\s*display:\s*none;/);
+  assert.doesNotMatch(desktopCss, /\.momentum-access-header[^}]*text-align:\s*center/);
+  assert.doesNotMatch(desktopCss, /(?:data-settings-module-back-host|momentum-access-description|momentum-access-brand-desktop)[^}]*display:\s*none/);
+  assert.match(mobileCss, /\.momentum-access-header\s*\{\s*padding:\s*8px 0 0;\s*text-align:\s*center;/);
+  assert.match(mobileCss, /\.momentum-access-header \[data-settings-module-back-host\],\s*\.momentum-access-header #momentum-access-description,\s*\.momentum-access-brand-desktop\s*\{\s*display:\s*none;/);
+  assert.match(mobileCss, /\.momentum-access-brand-mobile\s*\{\s*display:\s*inline;/);
 });
 
 test('alleen de vergrendelde Winnen-weergave verbergt slogans; unlocked behoudt ze', () => {
