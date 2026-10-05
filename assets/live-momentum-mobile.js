@@ -33,6 +33,14 @@
 
   function syncSummary() {
     const todayCells = Array.from(grid.querySelectorAll('.status.is-today'));
+    const cellsByTask = new Map(todayCells.map((cell) => [Number(cell.dataset.task), cell]));
+    Array.from(grid.querySelectorAll('.habit-name')).forEach((row, index) => {
+      const cell = cellsByTask.get(index);
+      const state = !cell || cell.classList.contains('is-on-hold') ? 'neutral'
+        : cell.classList.contains('is-done') ? 'done'
+        : cell.classList.contains('is-missed') ? 'missed' : 'neutral';
+      row.dataset.momentumTodayState = state;
+    });
     const noData = todayCells.some((cell) => cell.classList.contains('is-on-hold'));
     const completed = todayCells.filter((cell) => cell.classList.contains('is-done')).length;
     const total = noData ? 0 : todayCells.length;
