@@ -39,7 +39,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260901a"/);
   assert.match(html, /href="\/assets\/live-momentum-day-hold\.css\?v=20260825a"/);
-  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20261006a"/);
+  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20261006b"/);
   assert.match(html, /src="\/assets\/live-momentum-mobile\.js\?v=20261006a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-mission-copy\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260818a"/);
@@ -319,7 +319,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.doesNotMatch(mobileCss, /#efe3e3/);
   assert.match(mobileCss, /--momentum-safe-start:\s*max\(16px, env\(safe-area-inset-left\)\);/);
   assert.match(mobileCss, /padding:\s*max\(12px, env\(safe-area-inset-top\)\) var\(--momentum-safe-end\) calc\(28px \+ env\(safe-area-inset-bottom\)\) var\(--momentum-safe-start\) !important;/);
-  assert.match(mobileCss, /\.momentum-mobile-list-heading\s*\{[^}]*margin:\s*0 2px 11px;/);
+  assert.match(mobileCss, /\.momentum-mobile-list-heading\s*\{[^}]*margin:\s*0 2px 20px;/);
   assert.match(mobileCss, /\.dashboard-layout\.momentum-layout\[data-live-momentum-shell\] > \.momentum-page\s*\{\s*padding-top:\s*max\(12px, env\(safe-area-inset-top\)\) !important;/);
   assert.match(mobileCss, /\.habit-name\[data-momentum-today-state="done"\], body\[data-live-momentum-page\] \.status\.is-today\.is-done:not\(\.is-on-hold\)\s*\{[^}]*background:\s*#e5f6eb;/);
   assert.match(mobileCss, /\.habit-name\[data-momentum-today-state="missed"\], body\[data-live-momentum-page\] \.status\.is-today\.is-missed:not\(\.is-on-hold\)\s*\{[^}]*background:\s*#fde9e7;/);
