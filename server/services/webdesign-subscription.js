@@ -2,6 +2,7 @@
 const { createHash } = require('node:crypto');
 const { buildWebdesignPipelineOptions } = require('./design-photo-generation-policy');
 const { createWebsiteGenerationHelpers } = require('./website-generation');
+const { prepareWebsitePreviewBrandGuard, assertWebsitePreviewBrandColors } = require('./website-brand-color-guard');
 const { buildWebsitePreviewPromptFromScan } = createWebsiteGenerationHelpers();
 const isSubscriptionJob = (job) => job?.executionProvider === 'codex-subscription';
 function isExpiredWebdesignJob(job, currentTime, ttlMs) {
@@ -57,8 +58,24 @@ async function startManualWebdesignBatchResponse(req, res, deps) {
   return res.status(202).json({ ok: true, batch: serializeBatch(batch, []) });
 }
 
+// Same house-colour lock as the API path: palette in the prompt, checked again on delivery.
+async function prepareSubscriptionBrandGuard(job, generationScan, { repository, aiToolsCoordinator, logger }) {
+  try {
+    const references = await aiToolsCoordinator.fetchWebsitePreviewReferenceImages(generationScan);
+    const guard = await prepareWebsitePreviewBrandGuard(generationScan, references);
+    if (!guard?.palette.length) return null;
+    const stored = await repository.storeBrandGuard(job.id, job.subscriptionClaim, guard);
+    if (stored.ok !== true) throw new Error('Huiskleurcontrole niet opgeslagen.');
+    return guard;
+  } catch (error) {
+    // The Mac still requires its own screenshot; only the extra colour lock is skipped.
+    logger.warn?.('[WebdesignSubscription][brand-guard]', job.id, error.message);
+    return null;
+  }
+}
+
 // Called only after the existing KVK worker bearer-token gate.
-function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, coordinator }) {
+function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, coordinator, logger = console }) {
   return {
     async poll(req, res) {
       const claim = String(req.body?.claim || '');
@@ -75,8 +92,10 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
       try {
         const { generationScan } = await aiToolsCoordinator.prepareWebsitePreviewImage(job.websiteUrl,
           buildWebdesignPipelineOptions({ source: 'premium-database', company: job.customer.bedrijf, domain: job.customer.dom }));
+        const brandGuard = await prepareSubscriptionBrandGuard(job, generationScan, { repository, aiToolsCoordinator, logger });
         return res.json({ ok: true, job: { id: job.id, claim: job.subscriptionClaim,
-          prompt: buildWebsitePreviewPromptFromScan({ ...generationScan, referenceImageCount: 1 }),
+          prompt: buildWebsitePreviewPromptFromScan({ ...generationScan, referenceImageCount: 1,
+            verifiedBrandPalette: brandGuard?.palette.map((color) => color.hex) }),
           referenceUrls: generationScan.referenceImageUrls, company: job.customer.bedrijf } });
       } catch (error) {
         await repository.finish(job.id, job.subscriptionClaim, 'Websiteanalyse mislukt: ' + String(error.message || 'Website niet bereikbaar.').slice(0, 500));
@@ -103,6 +122,13 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
         return res.json({ ok: true, done: true, error: 'Ongeldige afbeelding.' });
       }
       const job = begun.job;
+      try {
+        await assertWebsitePreviewBrandColors(job.subscriptionBrandGuard, dataUrl);
+      } catch (error) {
+        if (error.code !== 'WEBDESIGN_BRAND_COLORS') throw error;
+        await repository.finish(body.jobId, body.claim, error.message);
+        return res.json({ ok: true, done: true, error: 'Huiskleuren ontbreken.' });
+      }
       job.generation = { model: 'gpt-image-2', billingMode: 'subscription', size: '1024x1536', usage: null, cost: null };
       await coordinator.saveSubscriptionPhoto(job, { dataUrl, fileName: job.id + '-webdesign.jpg' });
       const finished = await repository.finish(body.jobId, body.claim);
