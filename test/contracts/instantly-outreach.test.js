@@ -2894,6 +2894,23 @@ test('automatic upload also offers older customers with an Instantly design outs
   assert.deepEqual(byIdReads[0], ['old-design']);
 });
 
+test('Instantly photo reader gives leads still to upload a signed URL before already-uploaded leads', async () => {
+  const { createInstantlyTargetedPhotoReader } = require('../../server/services/instantly-targeted-photo-reader');
+  const sent = Array.from({ length: 520 }, (_, i) => ({ id: `sent-${i}`, instantlyLeadId: `lead-${i}`, instantlySyncedAt: '2026-10-01T09:00:00.000Z' }));
+  const rows = [...sent, { id: 'new-design' }];
+  let requestedIds = [];
+  const reader = createInstantlyTargetedPhotoReader({
+    getExplicitRowId: (row) => String(row && row.id || ''),
+    dataOpsStore: {
+      listDesignPhotoAssetFlags: async () => rows.map((row) => ({ customerId: row.id, hasPhoto: true, hasMockup: true, webdesignMailProvider: 'instantly' })),
+      listDesignPhotosWithSignedUrls: async (options) => { requestedIds = options.customerIds; return []; },
+    },
+  });
+  await reader.read(rows, { instantlyAutoUpload: true });
+  assert.equal(requestedIds.length, 500);
+  assert.equal(requestedIds[0], 'new-design');
+});
+
 test('automatic upload routes the design owner to Martijn even when daily rotation would choose Servé', async () => {
   const campaigns = { serve: '7a94c361-d83c-4857-9395-e9c5ba603f90', martijn: 'e4f7df3a-6c53-4c03-911c-beb758d9231c' };
   const harness = createService({
