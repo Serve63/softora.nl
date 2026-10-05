@@ -31,7 +31,8 @@ test('API worker, evidence and recovery queue regressions pass without paid requ
     'test_the_controller_can_run_its_own_ai_model',
     'test_the_weekly_share_left_is_read_and_cached_for_a_minute',
     'test_the_queue_follows_the_location_planning_and_recover_only_checks_are_redone',
-    'test_an_unconfirmed_find_becomes_definitively_unusable_with_balancing_events']) {
+    'test_an_unconfirmed_find_becomes_definitively_unusable_with_balancing_events',
+    'test_after_three_technical_failures_the_company_gets_its_final_verdict']) {
     assert.match(result.stderr, new RegExp(`${regression}[^\\n]+ \\.\\.\\. ok`));
   }
 });

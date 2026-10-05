@@ -1,5 +1,7 @@
+import json
 import sqlite3
 import sys
+import threading
 import tempfile
 import time
 import types
@@ -196,6 +198,29 @@ class RobotControllerOrderTests(unittest.TestCase):
                 with patch.object(controller, 'FINALIZE', True):
                     self.assertFalse(controller.checked('22222222'))
                     self.assertFalse(controller.checked('44444444'))
+
+
+class RobotControllerGiveUpTests(unittest.TestCase):
+    def test_after_three_technical_failures_the_company_gets_its_final_verdict(self):
+        import kvk_robot_controller as controller
+        from unittest.mock import patch
+        identity = {key: '' for key in controller.searcher.FIELDS}
+        identity.update(kvk_nummer='95098747', bedrijfsnaam='J. Pijnenburg Holding B.V.')
+        with tempfile.TemporaryDirectory() as directory:
+            queue = Path(directory)
+            for attempt in range(3):
+                (queue / '95098747' / f'run-{attempt}').mkdir(parents=True)
+            (queue / '95098747' / 'run-9').mkdir()
+            (queue / '95098747' / 'run-9' / 'terminal-results.json').write_text('{}')  # a finished run is no failure
+            with patch.object(controller, 'QUEUE', queue), patch.object(controller, 'FINALIZE', True), \
+                    patch.object(controller, 'import_control_confirmation', return_value=True) as confirm, \
+                    patch.object(controller.searcher, 'PUBLISHER'), \
+                    patch.object(controller.subprocess, 'Popen', side_effect=AssertionError('no new run')):
+                self.assertEqual(controller.failed_attempts(queue / '95098747'), 3)
+                self.assertTrue(controller.research(identity, threading.Event()))
+            confirm.assert_called_once()
+            self.assertIn('3x technisch mislukt', confirm.call_args.args[2])
+            self.assertTrue(json.loads((queue / '95098747' / 'completed.json').read_text())['written'])
 
 
 class RobotControllerLoopTests(unittest.TestCase):
