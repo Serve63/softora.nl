@@ -384,3 +384,22 @@ test('prijs en planning kunnen samen worden beantwoord zonder de planning tot pr
   assert.equal(analyzeMailboxReplyContext(input).ctaAllowed, false);
   rejectsReply('Kan het voor 900?', 'Dat kan voor 900.');
 });
+
+test('voorgestelde reactie praat de mail van de klant niet na', () => {
+  const prompt = buildMailboxReplySystemPrompt({ senderName: 'Servé Creusen' });
+  assert.match(prompt, /Herhaal of parafraseer de mail van de ander nooit/);
+  assert.match(prompt, /in één korte zin, samen, zonder ze op te sommen/);
+  assert.match(prompt, /Ook bedankt voor je eerlijke feedback over mijn mail/);
+  assert.doesNotMatch(prompt, /Erken de werkelijk genoemde tegenstelling/);
+});
+
+test('aanhef gebruikt nooit de naam van onze eigen afzender uit een geciteerde mail', () => {
+  const name = inferMailboxReplyFirstName({
+    from: 'verbaesther@gmail.com',
+    email: 'verbaesther@gmail.com',
+    body: 'Nee dank je, geen preview nodig.\n\nMet vriendelijke groet,\nServé Creusen\nSoftora',
+  });
+  assert.equal(name, '');
+  const reply = respond('We zijn tevreden met onze huidige website en hebben geen behoefte aan een nieuw ontwerp.', ['Geen probleem, veel succes verder!'], { firstName: 'Servé' });
+  assert.doesNotMatch(reply.split('\n')[0], /Servé/);
+});

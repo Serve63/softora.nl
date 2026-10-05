@@ -158,6 +158,11 @@ function isBusinessIdentity(identity, keys) {
   return compact.length >= 4 && (keys || []).some((key) => key.includes(compact) || compact.includes(key));
 }
 
+// Our own name sits in quoted mails and signatures; it is never the addressee.
+function isOwnSenderName(name) {
+  return Boolean(name) && (Boolean(resolveReplySenderCandidate(name)) || /^(?:serv[eé]|martijn)$/i.test(name));
+}
+
 function inferMailboxReplyFirstName(context, options = {}) {
   const raw = context && typeof context === 'object' ? context : {};
   const businessKeys = businessIdentityKeys({ email: raw.email, originalSentMail: options.originalSentMail });
@@ -170,7 +175,7 @@ function inferMailboxReplyFirstName(context, options = {}) {
       continue;
     }
     const name = normalizeFirstName(signatureIdentity);
-    if (name) return name;
+    if (name && !isOwnSenderName(name)) return name;
   }
   for (let index = lines.length - 2; index >= 0; index -= 1) {
     if (!REPLY_SIGNOFF_PATTERN.test(lines[index])) continue;
@@ -179,16 +184,13 @@ function inferMailboxReplyFirstName(context, options = {}) {
       continue;
     }
     const name = normalizeFirstName(signatureIdentity);
-    if (name) return name;
+    if (name && !isOwnSenderName(name)) return name;
   }
 
   const from = cleanLine(raw.from).replace(/\s*<[^>]+>\s*$/, '').replace(/^"|"$/g, '');
   if (BUSINESS_NAME_PATTERN.test(from) || BUSINESS_IDENTITY_TOKEN_PATTERN.test(from) || isBusinessIdentity(from, businessKeys)) return '';
-  if (/^[\p{L}'’-]+(?:\s+[\p{L}'’-]+)+$/u.test(from)) {
-    return normalizeFirstName(from);
-  }
-  if (/^[\p{L}'’-]+$/u.test(from)) return normalizeFirstName(from);
-  return '';
+  const fromName = /^[\p{L}'’-]+(?:\s+[\p{L}'’-]+)*$/u.test(from) ? normalizeFirstName(from) : '';
+  return isOwnSenderName(fromName) ? '' : fromName;
 }
 
 function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '', hasExamples = false, hasPreviousSuggestion = false } = {}) {
@@ -207,13 +209,13 @@ function buildMailboxReplySystemPrompt({ hasDraft = false, senderName = '', hasE
     'Schrijf alleen de inhoudelijke alinea’s; de server voegt de bewezen aanhef en de juiste afzenderondertekening toe. Bij antwoordBeleid.shortConfirmation true mag replyForm short zijn voor een korte vervolgbevestiging zonder aanhef of afsluiting.',
     'Iedere alinea en iedere zin moet rechtstreeks volgen uit deze mailwisseling, het medewerkersconcept of een expliciete feitregel. Vermeld per alinea bewijslabels uit antwoordBeleid.allowedEvidence.',
     'Beantwoord elk item in antwoordBeleid.questions en vermeld de bijbehorende q-id in answers bij de alinea die het inhoudelijk afhandelt. Bedanken voor een vraag is geen antwoord. Is informatie onbekend, benoem precies wat nog ontbreekt of stel een gerichte vraag; verzin geen antwoord.',
-    'Behandel ook verzoeken zonder vraagteken en meerdere onderwerpen tegelijk. Een afwijzing mag concrete feedback nooit wissen. Erken de werkelijk genoemde tegenstelling en betekenis; importeer geen stijlkenmerken uit een ander gesprek.',
+    'Behandel ook verzoeken zonder vraagteken en meerdere onderwerpen tegelijk. Een afwijzing mag concrete feedback nooit wissen: erken die kort, zonder de punten van de ander na te vertellen; importeer geen stijlkenmerken uit een ander gesprek.',
     'Een commerciële CTA mag alleen als antwoordBeleid.ctaAllowed exact true is, maximaal één logische vervolgstap. Respecteer het genoemde kanaal, budget en tijdstip. Stel geen bezoek voor als iemand alleen een technische vraag stelt, geen budget heeft of nu geen tijd heeft.',
     'Een toekomstzin mag uitsluitend als futureDoorOpenAllowed true is en is altijd optioneel. Bij noFurtherContact geen nieuwe uitnodiging, emoji of verkoopvraag.',
     'Bij een prijsvraag hangt de prijs af van de concrete scope. Gebruik alleen bedragen die in ditzelfde gesprek door onze afzender zijn genoemd of in het medewerkersconcept staan. Een voorgestelde prijs van de ontvanger is geen geaccepteerde offerte.',
     'De Softora-ontwerpen worden op maat met code gebouwd. De bestaande website van de klant kan een ander platform gebruiken. Erken die investering; beweer nooit daarom dat wij Webflow gebruiken. Beloftes over beheer, migratie en integraties vragen bewijs voor deze klant.',
     'Verzin geen feiten, bedragen, beschikbaarheid, namen, afspraken, URLs, voorwaarden of beloftes. Een oude afspraak is geen nieuwe beschikbaarheid. Zeg niet dat iets is aangepast, verzonden of afgemeld zonder bevestiging in het medewerkersconcept. Gebruik geen placeholders zoals [dag] of [link].',
-    'Controleer vóór je antwoord: kloppen persoon en perspectief; zijn alle vragen werkelijk behandeld; zijn details, prijzen en planning gegrond; klinkt het warm en natuurlijk; is elke zin nuttig; kloppen spelling en interpunctie? Verbeter het antwoord binnen deze ene aanvraag.',
+    'Controleer vóór je antwoord: kloppen persoon en perspectief; zijn alle vragen werkelijk behandeld; zijn details, prijzen en planning gegrond; klinkt het warm en natuurlijk, als een mens en niet als een samenvatting van zijn mail; is elke zin nuttig; kloppen spelling en interpunctie? Verbeter het antwoord binnen deze ene aanvraag.',
     'Zet in aanhefNaam alleen de voornaam waarmee de klant zelf ondertekende en alleen als je het zeker weet; bij twijfel leeg. Tekst als "Sent from my iPhone" of een bedrijfsnaam is geen naam. Noem die naam niet nog eens in de eerste zin.',
     'Geef uitsluitend geldige JSON terug: {"intent":"<antwoordBeleid.intent>","ctaAllowed":<antwoordBeleid.ctaAllowed>,"replyForm":"standard|short","aanhefNaam":"<voornaam of leeg>","paragraphs":[{"text":"<alinea>","evidence":["<bewijslabels>"],"answers":["<beantwoorde q-ids, anders leeg>"]}]}.',
     'Geen markdown, aanhef, ondertekening, onderwerpregel of uitleg buiten deze JSON. Maximaal acht alinea’s van elk 1200 tekens; de inhoud bepaalt de passende lengte.',
@@ -359,7 +361,7 @@ function classifyMailboxReplyIntent(inboundText) {
 function groundedModelFirstName(value, options) {
   const structured = parseStructuredDraft(value);
   const name = normalizeFirstName(structured && structured.aanhefNaam);
-  if (!name || resolveReplySenderCandidate(name) || /^(?:serv[eé]|martijn)$/i.test(name)) return '';
+  if (!name || isOwnSenderName(name)) return '';
   // Only a real signature counts: a short line that starts with the name, or
   // the name right after a sign-off. "Sent from my iPhone" is no signature.
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -374,7 +376,8 @@ function groundedModelFirstName(value, options) {
 }
 
 function enforceMailboxReplyProfile(value, options = {}) {
-  const firstName = normalizeFirstName(options.firstName) || groundedModelFirstName(value, options);
+  const givenFirstName = normalizeFirstName(options.firstName);
+  const firstName = (isOwnSenderName(givenFirstName) ? '' : givenFirstName) || groundedModelFirstName(value, options);
   const originalOpening = cleanLine(
     String(options.originalSentMail?.body || options.originalSentMail?.preview || '')
       .replace(/\r\n?/g, '\n')
