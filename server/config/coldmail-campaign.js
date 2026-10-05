@@ -127,7 +127,7 @@ const DEFAULT_COLDMAIL_WEBDESIGN_BODY = [
   '',
   'Met vriendelijke groet,',
   '{{afzender}}',
-  '',
+  'Softora.nl | Webdesign',
   '📍 {{stad}}',
 ].join('\n');
 const COLDMAIL_IMAGE_VISIBILITY_PS =
