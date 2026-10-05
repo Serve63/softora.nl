@@ -89,6 +89,7 @@ function createInstantlyTargetedPhotoReader(deps = {}) {
         });
       });
       const candidateIds = [];
+      const sentCandidateIds = [];
       const seenIds = new Set();
       (Array.isArray(rows) ? rows : []).forEach((row) => {
         const rowId = getExplicitRowId(row, normalizeString);
@@ -102,8 +103,12 @@ function createInstantlyTargetedPhotoReader(deps = {}) {
         if (!flag || provider !== 'instantly' || flag.hasPhoto !== true || flag.hasMockup !== true) return;
         if (!rowId || seenIds.has(rowId.toLowerCase())) return;
         seenIds.add(rowId.toLowerCase());
-        candidateIds.push(rowId);
+        // Already-uploaded leads only need a photo for recovery; never let
+        // them use up the signed-URL budget before leads still to upload.
+        const alreadyUploaded = Boolean(row && (row.instantlyLeadId || row.instantlySyncedAt));
+        (alreadyUploaded ? sentCandidateIds : candidateIds).push(rowId);
       });
+      candidateIds.push(...sentCandidateIds);
       if (!candidateIds.length) return { handled: true, photoMap: {} };
       const signedEntries = await dataOpsStore.listDesignPhotosWithSignedUrls({
         customerIds: candidateIds.slice(0, 500),
