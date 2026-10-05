@@ -2462,6 +2462,48 @@ test('instantly email_sent webhook marks the Softora row as mailed', async () =>
   assert.equal(row.lastColdmailSenderEmail, 'martijnven@websoftora.com');
 });
 
+test('instantly webhook persists only its customer and acknowledges a duplicate without another write', async () => {
+  const unrelatedRows = Array.from({ length: 1000 }, (_, index) => ({
+    id: `unrelated-${index}`, email: `unrelated-${index}@example.test`, status: 'interesse',
+  }));
+  const { service, getRows, writes } = createService({
+    rows: [...unrelatedRows, {
+      id: 'webhook-customer', email: 'webhook@example.test', status: 'prospect',
+      instantlyLeadId: 'webhook-lead', instantlyStatus: 'synced',
+    }],
+  });
+  const request = createRequest({ body: {
+    event_type: 'email_sent', event_id: 'single-customer-event',
+    data: { lead: { id: 'webhook-lead', email: 'webhook@example.test' } },
+  } });
+
+  assert.equal((await service.handleInstantlyWebhook(request)).processed, true);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].meta.upsertOnly, true);
+  const savedRows = JSON.parse(readChunkedStateValue(writes[0].values, 'softora_customers_premium_v1'));
+  assert.equal(savedRows.length, 1);
+  assert.equal(savedRows[0].id, 'webhook-customer');
+  assert.equal(savedRows[0].instantlyStatus, 'sent');
+  assert.deepEqual(getRows().slice(0, unrelatedRows.length), unrelatedRows);
+
+  assert.equal((await service.handleInstantlyWebhook(request)).duplicate, true);
+  assert.equal(writes.length, 1);
+});
+
+test('instantly webhook rejects an unconfirmed customer write so the provider can retry', async () => {
+  const { service, getRows } = createService({ failCustomerWrites: true });
+  const request = createRequest({ body: {
+    event_type: 'email_sent', event_id: 'failed-write-event',
+    data: { lead: { email: 'ruben@example.test' } },
+  } });
+
+  await assert.rejects(() => service.handleInstantlyWebhook(request), {
+    code: 'INSTANTLY_WEBHOOK_PERSIST_FAILED', status: 502,
+  });
+  assert.equal(getRows()[0].status, 'prospect');
+  assert.equal(getRows()[0].instantlyEmailSentAt, undefined);
+});
+
 test('instantly reply aliases keep the row actionable without overwriting interest', async () => {
   const { service, getRows } = createService({
     rows: [

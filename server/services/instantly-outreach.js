@@ -2080,7 +2080,7 @@ function createInstantlyOutreachService(deps = {}) {
   const configuredCampaigns = config.autoApprovedCampaigns || config.replacementCampaigns;
   const loadCustomerPhotoMap = createInstantlyTargetedPhotoReader({ dataOpsStore: deps.dataOpsStore, normalizeString, getExplicitRowId, buildRowIdentityKeys, buildRowIdentityKey, normalizeStoredIdentityKeys, getUiStateValues, customerPhotoScope, customerPhotoKey, parseCustomerPhotoMap, logger }).load;
   const replacementCampaignApi = createInstantlyCampaignReplacementApi({ config, fetchJsonWithTimeout, createError: createInstantlyError, normalizeString });
-  const webhookState = createInstantlyWebhookState({ now, defaultCampaignId: config.defaultCampaignId, normalizeString, chooseStatus: chooseInstantlyStatus, buildSenderFields: buildInstantlySenderRowFields, mergeHistory, buildHistoryEntry, truncateText, normalizeContactStatus, canAdvanceContactStatus });
+  const webhookState = createInstantlyWebhookState({ now, defaultCampaignId: config.defaultCampaignId, normalizeString, chooseStatus: chooseInstantlyStatus, buildSenderFields: buildInstantlySenderRowFields, mergeHistory, buildHistoryEntry, truncateText, normalizeContactStatus, canAdvanceContactStatus, setUiStateValues, buildRowsStateValues: buildCustomerRowsStateValues, customerDbScope, customerDbKey, createError: createInstantlyError });
   let syncPromise = null;
   let operationPromise = null;
   let syncTimer = null;
@@ -4357,28 +4357,20 @@ function createInstantlyOutreachService(deps = {}) {
       };
     }
 
-    const nextRows = rows.slice();
-    nextRows[index] = webhookState.updateRow(
+    const updatedRow = webhookState.updateRow(
       rows[index],
       event,
       normalizeString(body.actor) || 'Instantly webhook'
     );
-    await setUiStateValues(
-      customerDbScope,
-      buildCustomerRowsStateValues(values, nextRows, customerDbKey),
-      {
-        source: 'instantly-webhook',
-        actor: 'Instantly webhook',
-      }
-    );
+    await webhookState.persistRow(updatedRow);
 
     return {
       ok: true,
       processed: true,
       eventType: event.eventType,
-      status: nextRows[index].instantlyStatus,
-      customerId: getRowId(nextRows[index], index, normalizeString),
-      email: getRowEmail(nextRows[index], normalizeString),
+      status: updatedRow.instantlyStatus,
+      customerId: getRowId(updatedRow, index, normalizeString),
+      email: getRowEmail(updatedRow, normalizeString),
     };
   }
 

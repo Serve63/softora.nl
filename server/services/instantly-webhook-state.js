@@ -10,7 +10,24 @@ function createInstantlyWebhookState(deps = {}) {
     truncateText,
     normalizeContactStatus,
     canAdvanceContactStatus,
+    setUiStateValues,
+    buildRowsStateValues,
+    customerDbScope,
+    customerDbKey,
+    createError,
   } = deps;
+
+  async function persistRow(row) {
+    const saved = await setUiStateValues(
+      customerDbScope,
+      buildRowsStateValues({}, [row], customerDbKey),
+      { source: 'instantly-webhook', actor: 'Instantly webhook', upsertOnly: true },
+    );
+    if (!saved || saved.ok === false) {
+      throw createError('Instantly webhook kon niet duurzaam worden opgeslagen.',
+        'INSTANTLY_WEBHOOK_PERSIST_FAILED', 502);
+    }
+  }
 
   function buildMessageKey(event) {
     return [
@@ -146,7 +163,7 @@ function createInstantlyWebhookState(deps = {}) {
     return { ...row, ...baseFields, hist: history('instantly_event', 'Instantly event ontvangen', `Event verwerkt: ${event.eventType}.`) };
   }
 
-  return { buildMessageKey, hasEvent, updateRow };
+  return { buildMessageKey, hasEvent, updateRow, persistRow };
 }
 
 module.exports = { createInstantlyWebhookState };
