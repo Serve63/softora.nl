@@ -759,7 +759,7 @@ test('safe Instantly upload stores the explicit sender persona in CSV, guards an
   assert.match(result.csv, /"martijn"/);
   assert.match(result.csv, /"Martijn van de Ven"/);
   assert.match(result.csv, /"martijn@websoftora\.com"/);
-  assert.match(result.csv, /Met vriendelijke groet,\nMartijn van de Ven\n\n📍 Boxtel/);
+  assert.match(result.csv, /Met vriendelijke groet,\nMartijn van de Ven\nSoftora\.nl \| Webdesign\n📍 Boxtel/);
   assert.doesNotMatch(result.csv, /Servé Creusen/);
 
   assert.equal(outboundGuardCalls.length, 1);
@@ -1614,7 +1614,7 @@ test('instantly sync removes Martijn LinkedIn CTA before syncing', async () => {
   assert.equal(fetchCalls.length, 1);
   const body = JSON.parse(fetchCalls[0].options.body);
   const variables = body.leads[0].custom_variables;
-  assert.match(variables.softora_mail_body, /Met vriendelijke groet,\nMartijn van de Ven\n\n📍 Boxtel/);
+  assert.match(variables.softora_mail_body, /Met vriendelijke groet,\nMartijn van de Ven\nSoftora\.nl \| Webdesign\n📍 Boxtel/);
   assert.match(variables.softora_mail_body, /Je vindt het ontwerp in de bijlage bij deze e-mail\./);
   assert.equal(variables.softora_webdesign_public_path, '/webdesign/bakkerij-zon?cid=prospect-1&sender=martijn');
   assert.equal(variables.softora_webdesign_public_url, 'https://www.softora.nl/webdesign/bakkerij-zon?cid=prospect-1&sender=martijn');

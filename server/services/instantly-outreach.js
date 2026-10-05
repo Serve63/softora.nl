@@ -127,7 +127,7 @@ const DEFAULT_INSTANTLY_WEBDESIGN_BODY = [
   '',
   'Met vriendelijke groet,',
   '{{afzender}}',
-  '',
+  'Softora.nl | Webdesign',
   '📍 {{stad}}',
 ].join('\n');
 const DEFAULT_INSTANTLY_SENDER_EMAIL = 'serve@softora.nl';
