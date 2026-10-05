@@ -315,6 +315,11 @@ function registerInstantlyRoutes(app, deps = {}) {
         mailbox: mailboxResult,
       });
     } catch (error) {
+      logger.warn('[InstantlyWebhook][Rejected]', {
+        status: Number(error && error.status) || 400,
+        code: /^[A-Z0-9_]{1,100}$/.test(error && error.code) ? error.code : 'INSTANTLY_WEBHOOK_FAILED',
+        ...(Number(error && error.providerStatus) ? { providerStatus: Number(error.providerStatus) } : {}),
+      });
       res.status(error && error.status ? error.status : 400).json({
         ok: false,
         code: normalizeString(error && error.code) || 'INSTANTLY_WEBHOOK_FAILED',

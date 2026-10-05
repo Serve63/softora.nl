@@ -18,6 +18,31 @@ function createResponseRecorder() {
   };
 }
 
+test('instantly webhook logs provider failures without request data or secret-bearing messages', async () => {
+  const routes = [];
+  const warnings = [];
+  const error = Object.assign(new Error('private provider detail and webhook-secret'), {
+    code: 'INSTANTLY_API_FAILED', status: 502, providerStatus: 404,
+  });
+  registerInstantlyRoutes({
+    get() {},
+    post(path, ...handlers) { routes.push([path, handlers]); },
+  }, {
+    logger: { warn: (...args) => warnings.push(args) },
+    instantlyOutreachService: { handleInstantlyWebhook: async () => ({ ok: true, processed: true }) },
+    instantlyMailboxService: { ingestWebhook: async () => { throw error; } },
+  });
+  const webhook = routes.find(([path]) => path === '/api/instantly/webhook');
+  const res = createResponseRecorder();
+  await webhook[1][0]({ body: { email: 'private@example.test' }, query: { secret: 'webhook-secret' } }, res);
+
+  assert.equal(res.statusCode, 502);
+  assert.equal(res.body.code, 'INSTANTLY_API_FAILED');
+  assert.deepEqual(warnings, [[
+    '[InstantlyWebhook][Rejected]', { status: 502, code: 'INSTANTLY_API_FAILED', providerStatus: 404 },
+  ]]);
+});
+
 test('instantly routes expose adblock-safe admin aliases for database actions', async () => {
   const routes = [];
   let adminChecks = 0;
