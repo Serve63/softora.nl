@@ -107,6 +107,7 @@ function createInstantlyCampaignReplacementRuntime(deps = {}) {
     persistSingleRow,
     releaseReservation,
     listCampaignLeads: campaignApi.listCampaignLeads,
+    updateCampaign: campaignApi.updateCampaign,
     removeMailReadyCustomer,
     reserveRows: (items, options) => reserveRecipients(items, { ...options, source: 'instantly-auto-upload' }),
   });

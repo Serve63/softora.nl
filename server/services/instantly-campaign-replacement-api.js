@@ -23,11 +23,22 @@ function createInstantlyCampaignReplacementApi(deps = {}) {
     return data;
   }
 
+  async function updateCampaign(campaignId, patch) {
+    const cleanCampaignId = normalizeString(campaignId);
+    if (!cleanCampaignId) throw createError('Instantly campaign ID ontbreekt.', 'INSTANTLY_CAMPAIGN_ID_REQUIRED', 400);
+    const { response, data } = await fetchJsonWithTimeout(`${config.apiBaseUrl}/campaigns/${encodeURIComponent(cleanCampaignId)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` }, body: JSON.stringify(patch || {}) }, 30_000);
+    if (!response || !response.ok) {
+      throw createError(`Instantly-campagne kon niet worden bijgewerkt (${response ? response.status : 'geen response'}).`, 'INSTANTLY_CAMPAIGN_UPDATE_FAILED', response && response.status ? response.status : 502, { data, campaignId: cleanCampaignId });
+    }
+    return data;
+  }
+
   return {
     activateCampaign: (campaignId) => request(campaignId, 'activate'),
     assertConfigured,
     getCampaign: (campaignId) => request(campaignId),
     pauseCampaign: (campaignId) => request(campaignId, 'pause'),
+    updateCampaign,
   };
 }
 
