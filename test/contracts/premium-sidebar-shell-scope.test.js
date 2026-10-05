@@ -185,6 +185,8 @@ test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmod
   const accessSource = readRepoFile('live-momentum-access.html');
   const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
   const focusSource = readRepoFile('assets/live-momentum-focus-mode.js');
+  const mobileSource = readRepoFile('assets/live-momentum-mobile.css');
+  const mobileStart = mobileSource.indexOf('@media (max-width: 900px)');
 
   assert.match(pageSource, /data-sidebar-shell="canonical"/);
   assert.match(pageSource, /<aside class="sidebar" data-live-momentum-sidebar-host/);
@@ -206,6 +208,9 @@ test('Winnen gebruikt standaard de canonical premium-shell en page-only focusmod
   assert.match(accessSource, /premium-sidebar-links\.js\?v=20260818a/);
   assert.match(accessSource, /assets\/personnel-theme\.(?:css|js)\?v=/);
   assert.doesNotMatch(accessSource, /ATTACK, ATTACK, ATTACK\.|THE END GAME IS TO WIN|momentum-access-art/i);
+  assert.doesNotMatch(mobileSource.slice(0, mobileStart), /\.sidebar\[data-static-sidebar="1"\]/);
+  assert.match(mobileSource.slice(mobileStart), /html body\[data-live-momentum-page\] \.dashboard-layout\.momentum-layout > \.sidebar,\s*html body\[data-live-momentum-page\]/);
+  assert.match(mobileSource.slice(mobileStart), /html body\[data-live-momentum-page\] \.dashboard-layout\.momentum-layout > \.sidebar\[data-static-sidebar="1"\]\s*\{\s*display:\s*none !important;/);
 });
 
 test('Winnen blijft deep-link-only en wordt door geen premium-sidebarvariant zichtbaar gemaakt', () => {

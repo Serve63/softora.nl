@@ -6,7 +6,7 @@
 @media (max-width: 900px) { html { background-color: #efe3e3; }
 body[data-live-momentum-page] { background: radial-gradient(circle at 92% 4%, rgba(165, 32, 85, .08), transparent 30%), #f5f3ef; }
 @supports (-webkit-touch-callout: none) { .momentum-ios-statusbar-surface { display: block; position: fixed; z-index: 0; top: 0; left: 0; width: 100%; height: 32px; background-color: #efe3e3; pointer-events: none; } }
-html body[data-live-momentum-page] .dashboard-layout.momentum-layout > .sidebar[data-static-sidebar="1"] { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "logo profile"; gap: 0; padding-bottom: 12px !important; }
+html body[data-live-momentum-page] .dashboard-layout.momentum-layout > .sidebar, html body[data-live-momentum-page] .dashboard-layout.momentum-layout > .sidebar[data-static-sidebar="1"] { display: none !important; }
 html body[data-live-momentum-page] .dashboard-layout.momentum-layout > .sidebar[data-static-sidebar="1"] .sidebar-nav { display: none !important; }
 .momentum-layout .momentum-page { --momentum-safe-start: max(16px, env(safe-area-inset-left)); --momentum-safe-end: max(16px, env(safe-area-inset-right)); width: 100% !important; min-height: 100dvh !important; padding: max(12px, env(safe-area-inset-top)) var(--momentum-safe-end) calc(28px + env(safe-area-inset-bottom)) var(--momentum-safe-start) !important; overflow: clip; }
 .momentum-art-quotes { display: none; }
@@ -65,7 +65,7 @@ body[data-momentum-mobile-view="today"] .habit-name:has(.add-goal) { padding-lef
 body[data-momentum-mobile-view="today"] .status.is-today { position: relative; z-index: 1; align-items: center; justify-content: center; border-right: 1px solid rgba(26, 26, 46, .075) !important; border-bottom: 1px solid rgba(26, 26, 46, .075) !important; border-left: 0 !important; border-radius: 0 17px 17px 0; }
 body[data-momentum-mobile-view="today"] .status.is-today::after { position: absolute; right: 100%; width: 1px; height: 34px; background: rgba(26, 26, 46, .07); content: ""; }
 body[data-momentum-mobile-view="today"] .status::before { width: 30px; height: 30px; }
-body[data-live-momentum-page] .momentum-hero { display: block; }
+body[data-live-momentum-page] .momentum-hero { display: none !important; }
 body[data-live-momentum-page] .momentum-mobile-list-heading { display: flex; }
 body[data-live-momentum-page] .habit-board { display: block; margin-top: 0; overflow: visible; }
 body[data-live-momentum-page] .habit-grid { width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr) 68px; column-gap: 0; row-gap: 10px; border: 0; }
