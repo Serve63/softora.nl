@@ -224,6 +224,14 @@ input {
 }
 
 @media (max-width: 900px) {
+  html {
+    background-color: var(--access-bg);
+  }
+
+  .momentum-access-page::before {
+    background: var(--access-bg);
+  }
+
   html body[data-live-momentum-access-page] .momentum-access-layout .sidebar,
   html body[data-live-momentum-access-page] .momentum-access-layout .sidebar[data-static-sidebar="1"] {
     display: none !important;
