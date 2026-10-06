@@ -41,17 +41,18 @@ test('sportschool logboek page is available as installable pretty page', () => {
   assert.deepEqual(
     manifest.icons.map((icon) => `${icon.src}:${icon.sizes}:${icon.purpose}`),
     [
-      '/assets/sportschool-logboek-icon-192.png?v=20260629b:192x192:any',
-      '/assets/sportschool-logboek-logo.png?v=20260629b:512x512:any maskable',
+      '/assets/bulk-season-app-icon-192.png?v=20261006a:192x192:any',
+      '/assets/bulk-season-app-icon-512.png?v=20261006a:512x512:any',
+      '/assets/bulk-season-app-icon-maskable-512.png?v=20261006a:512x512:maskable',
     ]
   );
   assert.match(pageSource, /<title>Servé's Logboek<\/title>/);
   assert.match(pageSource, /apple-mobile-web-app-capable/);
-  assert.match(pageSource, /apple-mobile-web-app-title" content="Servé's logboek"/);
+  assert.match(pageSource, /apple-mobile-web-app-title" content="Bulk Season"/);
   assert.match(pageSource, /noindex,nofollow/);
-  assert.match(pageSource, /<link rel="manifest" href="\/assets\/sportschool-logboek\.webmanifest\?v=20260629b">/);
+  assert.match(pageSource, /<link rel="manifest" href="\/assets\/sportschool-logboek\.webmanifest\?v=20261006a">/);
   assert.match(pageSource, /<link rel="icon" type="image\/png" href="\/assets\/sportschool-logboek-icon-192\.png\?v=20260629b" sizes="192x192">/);
-  assert.match(pageSource, /<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/sportschool-logboek-touch-icon\.png\?v=20260629b">/);
+  assert.match(pageSource, /<link rel="apple-touch-icon" sizes="180x180" href="\/assets\/bulk-season-app-icon-180\.png\?v=20261006a">/);
   assert.doesNotMatch(pageSource, /<img class="gym-logo"/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css/);
   assert.match(pageSource, /assets\/sportschool-logboek\.css\?v=20260826a/);

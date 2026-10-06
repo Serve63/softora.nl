@@ -11,6 +11,12 @@ const SEARCH_FAVICON_HREF = '/assets/softora-search-favicon.png';
 const GOOGLE_SEARCH_FAVICON_HREF = '/assets/softora-search-favicon.png?v=20260821b';
 const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260616a';
 const HOME_SCREEN_ICON_HREF = '/assets/softora-touch-icon.png?v=20260615a';
+const PAGE_HOME_SCREEN_ICONS = Object.freeze({
+  'live-momentum.html': '/assets/winnen-app-icon-180.png?v=20261006a',
+  'live-momentum-access.html': '/assets/winnen-app-icon-180.png?v=20261006a',
+  'sportschool.html': '/assets/bulk-season-app-icon-180.png?v=20261006a',
+  'logboek-cut.html': '/assets/cut-season-app-icon-180.png?v=20261006a',
+});
 const STRUCTURED_DATA_LOGO_URL = 'https://www.softora.nl/assets/softora-touch-icon.png';
 const BROKEN_STRUCTURED_DATA_LOGO_PATTERN = /https:\/\/www\.softora\.nl\/assets\/61C2BCF5-70E9-4789-AFDE-FA18C862D58A\.PNG/;
 
@@ -91,10 +97,13 @@ test('html pages use the size-corrected square search favicon, browser favicon, 
       source.indexOf(searchFaviconTag) < source.indexOf(roundFaviconTag),
       `${fileName} should expose the search favicon before the filled browser favicon`
     );
+    const appHomeScreenIcon = PAGE_HOME_SCREEN_ICONS[fileName];
+    const expectedHomeScreenIcon = appHomeScreenIcon || HOME_SCREEN_ICON_HREF;
+    const homeScreenIconTag = `<link rel="apple-touch-icon"${appHomeScreenIcon ? ' sizes="180x180"' : ''} href="${expectedHomeScreenIcon}">`;
     assert.match(
       source,
-      new RegExp(`<link rel="apple-touch-icon" href="${HOME_SCREEN_ICON_HREF.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}">`),
-      `${fileName} should load the filled home-screen icon`
+      new RegExp(homeScreenIconTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      `${fileName} should load its intended home-screen icon`
     );
   });
 
