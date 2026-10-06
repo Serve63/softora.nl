@@ -222,6 +222,68 @@ test('new message remains deliberately unthreaded', async () => {
   assert.equal(result.references, '');
 });
 
+for (const folder of ['sent', 'coldmail']) {
+  test(`new message proves a Gmail-alias follow-up stored in ${folder}`, async () => {
+    const stored = {
+      id: `${folder}:427`, folder, accountEmail: 'servecreusen7@gmail.com',
+      email: 'serve.creusen7@gmail.com', to: 'info@autospeciaalmandemakers.nl',
+      messageId: '<softora-follow-up@gmail.com>', originalCampaignOutbound: false,
+      inReplyTo: '<incoming@example.nl>',
+    };
+    const result = await createResolver(stored).resolve({
+      accountEmail: stored.accountEmail, recipientEmail: stored.to,
+      body: { owner: 'serve', mode: 'new-message', idempotencyKey: `alias-${folder}`,
+        context: { id: stored.id, folder, messageId: stored.messageId } },
+    });
+    assert.equal(result.correspondenceSourceMessageId, stored.messageId);
+    assert.equal(result.replyTargetMessageId, '');
+    assert.equal(result.references, '');
+    assert.equal(result.accountEmail, stored.accountEmail);
+  });
+}
+
+for (const folder of ['sent', 'coldmail']) {
+  test(`initial campaign copied into ${folder} never proves follow-up correspondence`, async () => {
+    const stored = {
+      id: `${folder}:425`, folder, accountEmail: 'servecreusen7@gmail.com',
+      email: 'serve.creusen7@gmail.com', to: 'info@autospeciaalmandemakers.nl',
+      messageId: '<first-campaign@gmail.com>', originalCampaignOutbound: false,
+      subject: 'Kleine vraag over jullie website',
+      body: 'Afgelopen week kwam ik jullie website tegen. Ik heb een fris webdesign voor jullie gemaakt.',
+    };
+    const result = await createResolver(stored).resolve({
+      accountEmail: stored.accountEmail, recipientEmail: stored.to,
+      body: { owner: 'serve', mode: 'new-message', idempotencyKey: `campaign-${folder}`,
+        context: { id: stored.id, folder, messageId: stored.messageId } },
+    });
+    assert.equal(result.correspondenceSourceMessageId, '');
+  });
+}
+
+for (const mismatch of [
+  { name: 'different sender', stored: { email: 'someoneelse@gmail.com' } },
+  { name: 'different stored account', stored: { accountEmail: 'martijn@gmail.com' } },
+  { name: 'different recipient', recipient: 'other@example.nl' },
+  { name: 'different Message-ID', context: { messageId: '<other@gmail.com>' } },
+  { name: 'different storage folder', stored: { folder: 'inbox' } },
+  { name: 'dots in a non-Gmail sender', account: 'servecreusen@softora.nl',
+    stored: { accountEmail: 'servecreusen@softora.nl', email: 'serve.creusen@softora.nl' } },
+]) {
+  test(`Gmail correspondence repair still rejects ${mismatch.name}`, async () => {
+    const stored = { id: 'coldmail:392', folder: 'coldmail', accountEmail: 'servecreusen7@gmail.com',
+      email: 'serve.creusen7@gmail.com', to: 'info@autospeciaalmandemakers.nl',
+      messageId: '<softora-follow-up@gmail.com>', originalCampaignOutbound: false,
+      ...mismatch.stored };
+    await assert.rejects(() => createResolver(stored).resolve({
+      accountEmail: mismatch.account || 'servecreusen7@gmail.com',
+      recipientEmail: mismatch.recipient || 'info@autospeciaalmandemakers.nl',
+      body: { owner: 'serve', mode: 'new-message', idempotencyKey: 'mismatch-proof',
+        context: { id: 'coldmail:392', folder: 'coldmail', messageId: '<softora-follow-up@gmail.com>',
+          ...mismatch.context } },
+    }), (error) => error.code === 'MAILBOX_CORRESPONDENCE_SOURCE_MISMATCH');
+  });
+}
+
 test('aggregate mailbox selection is canonicalized to the exact sender account owner', async () => {
   const resolver = createResolver(null);
   const result = await resolver.resolve({

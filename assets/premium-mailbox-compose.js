@@ -725,35 +725,42 @@
     const latest = options.latestMessage && typeof options.latestMessage === 'object'
       ? options.latestMessage
       : mail;
-    const copyContext = mail.copyContext && mail.copyContext.evidenceKnown === true
-      ? mail.copyContext
+    // Never combine the root's stored ID with another message's account/recipient.
+    const source = latest.mailboxId || latest.id ? latest : mail;
+    const mailboxId = String(source.mailboxId || source.id || '').trim();
+    const storedIdentity = mailboxId.match(/(?:^|\|)(inbox|coldmail|sent):(\d+)$/);
+    const copyContext = source.copyContext && source.copyContext.evidenceKnown === true
+      ? source.copyContext
       : null;
     const accountEmail = extractEmail(
       copyContext && copyContext.sourceAccountEmail ||
-      latest.accountEmail ||
-      mail.accountEmail ||
+      source.accountEmail ||
       options.fallbackAccount
     );
     const to = extractEmail(
       copyContext && copyContext.recipientEmail ||
-      latest.to ||
+      source.to ||
       mail.email
     );
     if (!accountEmail || !to) return null;
     return {
-      id: mail.id,
-      mailboxId: String(mail.mailboxId || mail.id || '').trim(),
-      conversationId: String(mail.conversationId || '').trim(),
+      id: source.id,
+      mailboxId,
+      folder: String(source.storageFolder || storedIdentity?.[1] || source.folder || '').trim().toLowerCase(),
+      uid: Number(source.storageUid || storedIdentity?.[2] || source.uid || 0) || 0,
+      messageId: String(source.messageId || '').trim(),
+      references: String(source.references || '').trim(),
+      conversationId: String(source.conversationId || mail.conversationId || '').trim(),
       accountEmail,
       to,
-      subject: String(latest.subject || mail.subject || '').trim(),
-      ...(String(latest.provider || mail.provider || '').trim()
+      subject: String(source.subject || mail.subject || '').trim(),
+      ...(String(source.provider || '').trim()
         ? {
-            provider: String(latest.provider || mail.provider || '').trim().toLowerCase(),
-            providerAccountEmail: String(latest.providerAccountEmail || mail.providerAccountEmail || '').trim().toLowerCase(),
-            providerMessageId: String(latest.providerMessageId || mail.providerMessageId || '').trim(),
-            providerThreadId: String(latest.providerThreadId || mail.providerThreadId || '').trim(),
-            providerOwner: String(latest.providerOwner || mail.providerOwner || '').trim().toLowerCase(),
+            provider: String(source.provider || '').trim().toLowerCase(),
+            providerAccountEmail: String(source.providerAccountEmail || '').trim().toLowerCase(),
+            providerMessageId: String(source.providerMessageId || '').trim(),
+            providerThreadId: String(source.providerThreadId || '').trim(),
+            providerOwner: String(source.providerOwner || '').trim().toLowerCase(),
           }
         : {}),
       mode: 'new-message',

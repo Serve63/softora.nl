@@ -21,6 +21,7 @@ function responseRecorder() {
 }
 
 function createHarness(options = {}) {
+  const accountEmail = options.accountEmail || 'serve@softora.nl';
   const calls = [], sent = [], intents = new Map();
   const preview = createMailboxSendProvenanceStore().preview;
   const stored = {
@@ -112,6 +113,22 @@ function createHarness(options = {}) {
   return { body, calls, preflight, send, sent, stored };
 }
 
+for (const folder of ['sent', 'coldmail']) {
+  test(`Gmail-alias ${folder} follow-up passes preflight and duplicate retries dispatch once`, async () => {
+    const h = createHarness({ accountEmail: 'servecreusen7@gmail.com',
+      stored: { id: `${folder}:427`, folder, email: 'serve.creusen7@gmail.com' } });
+    const checked = await h.preflight();
+    assert.equal(checked.statusCode, 200, checked.body?.detail);
+    assert.equal(checked.body.result.externalEffect, false);
+    assert.equal(checked.body.result.correspondenceSourceMessageId, h.stored.messageId);
+    assert.equal(h.sent.length, 0);
+    const result = await h.send(checked.body.result.reconcileProof);
+    assert.equal(result.statusCode, 200, result.body?.detail);
+    await h.send(checked.body.result.reconcileProof);
+    assert.equal(h.sent.length, 1);
+  });
+}
+
 for (const mode of ['reply', 'new-message']) {
   test(`webdesign wording in a proven ${mode} keeps the authored message and only sends once`, async () => {
     const isReply = mode === 'reply';
@@ -174,8 +191,11 @@ for (const options of [
   { body: { context: { conversationId: 'conversation:claimed' }, correspondenceSourceMessageId: '<forged@example.test>',
     threadProvenance: { correspondenceSourceMessageId: '<forged@example.test>' } } },
   { stored: { originalCampaignOutbound: true, softoraSendMode: '', inReplyTo: '' } },
+  { stored: { id: 'coldmail:20', folder: 'coldmail', originalCampaignOutbound: false,
+    softoraSendMode: '', inReplyTo: '', subject: 'Kleine vraag over jullie website',
+    body: 'Afgelopen week kwam ik jullie website tegen. Ik heb een fris webdesign voor jullie gemaakt.' } },
 ]) {
-  test(`initial coldmail history remains blocked with ${options.body ? 'client claims and RE subject' : 'an original campaign source'}`, async () => {
+  test(`initial coldmail history remains blocked with ${options.body ? 'client claims and RE subject' : options.stored.folder === 'coldmail' ? 'a misclassified coldmail copy' : 'an original campaign source'}`, async () => {
     const h = createHarness(options);
     const checked = await h.preflight();
     assert.equal(checked.statusCode, 200, checked.body?.detail);
