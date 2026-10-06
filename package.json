@@ -80,6 +80,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.4",
+    "alawmulaw": "6.0.0",
     "pg": "8.23.0",
     "pgsql-parser": "18.2.6"
   }
