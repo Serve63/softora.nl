@@ -3,10 +3,12 @@ require('dotenv').config();
 const crypto = require('crypto');
 const http = require('http');
 const express = require('express');
+const { rateLimit } = require('express-rate-limit');
 const WebSocket = require('ws');
 const { mulaw } = require('alawmulaw');
 const { createSpeechTurnState } = require('./audio-turn-state');
 const { MATHIJS_PROFILE, resolveAssistantConversation } = require('./assistant-profile');
+const { createMathijsVoiceTestGate, runMathijsVoiceTest } = require('./mathijs-voice-test');
 const { createGeminiSessionSetupSender, resolveGeminiSessionModel } = require('./gemini-session');
 const {
   OUTPUT_FRAME_DURATION_MS,
@@ -318,7 +320,7 @@ function summarizeGeminiMessage(msg) {
 }
 
 function isDebugRequestAuthorized(req) {
-  if (!BRIDGE_DEBUG_TOKEN) return !IS_PRODUCTION;
+  if (!BRIDGE_DEBUG_TOKEN) return !IS_PRODUCTION && !GEMINI_API_KEY;
   const queryToken = String(req.query?.token || '').trim();
   const headerToken = String(req.get('x-bridge-debug-token') || '').trim();
   return queryToken === BRIDGE_DEBUG_TOKEN || headerToken === BRIDGE_DEBUG_TOKEN;
@@ -420,6 +422,34 @@ app.get('/debug/gemini-setup', async (req, res) => {
     ...result,
     timestamp: new Date().toISOString(),
   });
+});
+
+const mathijsVoiceTestGate = createMathijsVoiceTestGate({
+  enabled: process.env.MATHIJS_VOICE_TEST_ENABLED,
+  expiresAt: process.env.MATHIJS_VOICE_TEST_EXPIRES_AT,
+});
+const mathijsVoiceTestLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 1,
+  keyGenerator: (req) => BRIDGE_DEBUG_TOKEN && isDebugRequestAuthorized(req)
+    ? 'mathijs-single-test' : 'mathijs-denied-test',
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'De eenmalige stemtest is al aangevraagd.' },
+});
+app.post('/debug/mathijs-voice-test', mathijsVoiceTestLimiter, async (req, res) => {
+  if (!BRIDGE_DEBUG_TOKEN || !isDebugRequestAuthorized(req)) return res.status(403).json({ ok: false, error: 'Forbidden' });
+  if (!GEMINI_API_KEY) return res.status(503).json({ ok: false, error: 'Google key ontbreekt.' });
+  if (!mathijsVoiceTestGate.claim()) return res.status(409).json({ ok: false, error: 'Eenmalige stemtest is uitgeschakeld, verlopen of al gebruikt.' });
+  try {
+    const result = await runMathijsVoiceTest({
+      createSocket: () => new WebSocket(buildGeminiWsUrl(), { handshakeTimeout: GEMINI_WS_HANDSHAKE_TIMEOUT_MS }),
+      voiceName: GEMINI_VOICE,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(502).json({ ok: false, error: error.message });
+  }
 });
 
 app.get('/debug/recent-sessions', (req, res) => {
