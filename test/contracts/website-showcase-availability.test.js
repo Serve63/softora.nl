@@ -2,9 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
+const { startAvailability } = require('../../assets/website-showcase/availability.js');
 const root = path.resolve(__dirname, '../..');
-const source = fs.readFileSync(path.join(root, 'assets/website-showcase/availability.js'), 'utf8');
 
 function loadAvailability(instant) {
   const label = { textContent: '' };
@@ -18,14 +17,11 @@ function loadAvailability(instant) {
       if (event === 'visibilitychange') onVisibilityChange = handler;
     }
   };
-  vm.runInNewContext(source, {
+  startAvailability(
     document,
-    Intl,
-    Date: class extends Date {
-      constructor() { super(currentInstant); }
-    },
-    window: { setInterval: handler => { refresh = handler; } }
-  });
+    { setInterval: handler => { refresh = handler; } },
+    () => new Date(currentInstant)
+  );
   return {
     label,
     refreshAt: instant => { currentInstant = instant; refresh(); },
