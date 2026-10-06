@@ -71,7 +71,8 @@ test('WAV headers describe the exact payload length', () => {
   assert.equal(wav.readUInt16LE(34), 16);
 });
 
-test('the voice-test endpoint preserves debug authentication and a single-use gate', () => {
+test('the voice-test endpoint preserves debug authentication, rate limiting and a single-use gate', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../twilio-media-bridge/server.js'), 'utf8');
-  assert.match(source, /app\.post\('\/debug\/mathijs-voice-test'[\s\S]*?!BRIDGE_DEBUG_TOKEN \|\| !isDebugRequestAuthorized\(req\)[\s\S]*?mathijsVoiceTestGate\.claim\(\)/);
+  assert.match(source, /const mathijsVoiceTestLimiter = rateLimit\(\{[\s\S]*?limit: 1,[\s\S]*?keyGenerator: \(\) => 'mathijs-single-test'/);
+  assert.match(source, /app\.post\('\/debug\/mathijs-voice-test'[\s\S]*?!BRIDGE_DEBUG_TOKEN \|\| !isDebugRequestAuthorized\(req\)[\s\S]*?mathijsVoiceTestLimiter[\s\S]*?mathijsVoiceTestGate\.claim\(\)/);
 });

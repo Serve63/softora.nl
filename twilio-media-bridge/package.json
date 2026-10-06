@@ -14,6 +14,7 @@
     "alawmulaw": "^6.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-rate-limit": "^7.5.1",
     "ws": "^8.18.0"
   }
 }

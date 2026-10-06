@@ -3,6 +3,7 @@ require('dotenv').config();
 const crypto = require('crypto');
 const http = require('http');
 const express = require('express');
+const { rateLimit } = require('express-rate-limit');
 const WebSocket = require('ws');
 const { mulaw } = require('alawmulaw');
 const { createSpeechTurnState } = require('./audio-turn-state');
@@ -427,8 +428,18 @@ const mathijsVoiceTestGate = createMathijsVoiceTestGate({
   enabled: process.env.MATHIJS_VOICE_TEST_ENABLED,
   expiresAt: process.env.MATHIJS_VOICE_TEST_EXPIRES_AT,
 });
-app.post('/debug/mathijs-voice-test', async (req, res) => {
+const mathijsVoiceTestLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 1,
+  keyGenerator: () => 'mathijs-single-test',
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'De eenmalige stemtest is al aangevraagd.' },
+});
+app.post('/debug/mathijs-voice-test', (req, res, next) => {
   if (!BRIDGE_DEBUG_TOKEN || !isDebugRequestAuthorized(req)) return res.status(403).json({ ok: false, error: 'Forbidden' });
+  return next();
+}, mathijsVoiceTestLimiter, async (req, res) => {
   if (!GEMINI_API_KEY) return res.status(503).json({ ok: false, error: 'Google key ontbreekt.' });
   if (!mathijsVoiceTestGate.claim()) return res.status(409).json({ ok: false, error: 'Eenmalige stemtest is uitgeschakeld, verlopen of al gebruikt.' });
   try {
