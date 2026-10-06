@@ -147,7 +147,7 @@ test('the contact timeline is prefetched without touching the open conversation'
 test('the Mailbox wires the prefetch after its detail controller and warms after each complete render', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
   const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260927b');
-  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20261006d'));
+  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20261006e'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /afterCommit: \(mail, \{ changed \}\) => \{ mailboxPrefetch\?\.schedule\?\.\(\);/);
   // The outreach list holds grouped copies; the detail opens the stored message, so that one is warmed.
@@ -309,4 +309,12 @@ test('de mailbox laadt het contactdossier van een leesbaar gesprek op de achterg
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
   assert.match(page, /<div class="detail-empty" data-mailbox-boot-placeholder>/);
   assert.match(page, /\.detail-empty\[data-mailbox-boot-placeholder\] \{ visibility: hidden; \}/);
+});
+
+test('bij het opstarten flitst de "selecteer een e-mail"-tekst niet voordat het nieuwste gesprek opent', () => {
+  const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
+  assert.match(source, /<div class="detail-empty"\$\{resetOptions\.boot === true \? ' data-mailbox-boot-placeholder' : ''\}>/);
+  assert.match(source, /resetDetailEmpty\(\{ boot: true \}\);\n\s+await loadMailboxMessages\(\{ openLatest:/);
+  // Every other reset (empty list, deleted conversation, owner switch) still shows the visible prompt.
+  assert.equal((source.match(/resetDetailEmpty\(\{ boot: true \}\)/g) || []).length, 1);
 });

@@ -734,11 +734,12 @@ mailboxOwnerView = window.SoftoraMailboxOwnerSession.createView({
   resetDetail: resetDetailEmpty, toast, escapeHtml, shouldApplyMessages: () => !mailboxDiscoveryController?.isSearchActive?.(),
 });
 function isMailboxViewCurrent(token) { return mailboxOwnerView.isCurrent(token); }
-function resetDetailEmpty() {
+// At boot the newest conversation opens by itself, so the "select" prompt stays invisible until a real empty state.
+function resetDetailEmpty(resetOptions = {}) {
   mailboxDetailController?.invalidate?.(); mailboxPrefetch?.stop?.();
   const detail = document.getElementById('mail-detail');
   if (detail) {
-    detail.innerHTML = `<div class="detail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
+    detail.innerHTML = `<div class="detail-empty"${resetOptions.boot === true ? ' data-mailbox-boot-placeholder' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg><p>Selecteer een e-mail om te lezen</p></div>`;
     if (detail.dataset) delete detail.dataset.mailboxCommittedId;
     if (detail.dataset) delete detail.dataset.mailboxDomDirty;
   }
@@ -1173,7 +1174,7 @@ window.addEventListener('keydown', (event) => {
     const initialFolder = String(intent.folder || 'outreach').trim().toLowerCase() || 'outreach';
     if (initialFolder === 'outreach') {
       activeFolder = 'outreach'; applyMailboxFolderUi(activeFolder); const accountLoad = mailboxAccountsLoad = loadMailboxAccounts().finally(() => { mailboxAccountsLoad = null; });
-      setMailboxAccountUi(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT); resetDetailEmpty();
+      setMailboxAccountUi(activeMailboxAccount || MAILBOX_ACCOUNT_DEFAULT); resetDetailEmpty({ boot: true });
       await loadMailboxMessages({ openLatest: !(intent.message || intent.email || intent.query) });
       await accountLoad;
       return;
