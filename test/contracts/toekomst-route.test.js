@@ -187,3 +187,10 @@ test('chooser marks the four upcoming services while keeping the website availab
   }
  }
 });
+
+test('meeting banner also displays its upcoming availability', () => {
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ const banner=html.match(/<section class="meet-softora"[^]*?<\/section>/)?.[0] || '';
+ assert.match(banner,/<span class="choice-coming-soon">Coming soon<\/span>/);
+ assert.match(banner,/class="meet-link" href="https:\/\/www.softora.nl\/contact"/);
+});
