@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { PGlite } = require('@electric-sql/pglite');
+require('../../assets/premium-mailbox-message-provenance');
 
 const discoveryUi = require('../../assets/premium-mailbox-discovery');
 const campaignInbox = require('../../assets/premium-mailbox-campaign-inbox');
@@ -55,6 +56,45 @@ const campaignProvenanceMigrationPath = path.resolve(
   __dirname,
   '../../supabase/migrations/20260824122203_mailbox_discovery_campaign_provenance.sql'
 );
+const ownAliasesMigrationPath = path.resolve(__dirname,
+  '../../supabase/migrations/20261006102318_mailbox_discovery_own_gmail_aliases.sql');
+
+test('eigen Gmail-aliassen blijven buiten contactdossiers en verzonden coldmail kiest de ontvanger', async () => {
+  const accounts = ['servecreusen7@gmail.com'];
+  const reply = {
+    id: 'coldmail:reply', accountEmail: accounts[0], folder: 'coldmail',
+    email: 'marijn@example.nl', from: 'Marijn', to: accounts[0],
+    messageId: '<reply@test>', date: '2026-09-14T14:56:00Z',
+  };
+  for (const alias of ['serve.creusen7@gmail.com', 'Serve.Creusen7+werk@googlemail.com']) {
+    const sent = {
+      id: 'coldmail:sent', accountEmail: accounts[0], folder: 'coldmail',
+      email: alias, from: 'Servé Creusen', to: reply.email, replyTo: alias,
+      messageId: '<sent@test>', date: '2026-09-15T14:22:00Z',
+      externalContactEmail: alias, threadMessages: [reply],
+      contactTimelineLoaded: true, contactTimelineTotal: 1,
+    };
+    assert.equal(discoveryUi.resolveExternalContact(sent, accounts), reply.email);
+    const dossier = discoveryUi.getContactDossier(sent, { accountEmails: accounts, activeFolder: 'outreach', campaignInbox });
+    assert.equal(dossier.contactEmail, reply.email);
+    assert.equal(dossier.title, 'Marijn');
+    assert.equal(dossier.newMessageAction.kind, 'new-message');
+    assert.equal(dossier.newMessageAction.message.messageId, sent.messageId);
+    let request = '';
+    const controller = discoveryUi.create({
+      document: { getElementById: () => null, querySelector: () => null },
+      getActiveMail: () => sent.id, getAccountEmails: () => accounts, getMessageOwner: () => 'serve',
+      fetch: async (url) => { request = url; return { ok: true, json: async () => ({ ok: true, totalCount: 2, messages: [sent, reply] }) }; },
+    });
+    assert.equal(await controller.loadContactTimeline(sent), true);
+    assert.equal(new URL(request, 'https://example.test').searchParams.get('contact'), reply.email);
+    assert.equal(sent.externalContactEmail, reply.email);
+    assert.deepEqual(sent.threadMessages.map((m) => m.messageId), [reply.messageId]);
+  }
+  // External contacts keep their exact address; Gmail normalization is only for own identities.
+  assert.equal(discoveryUi.resolveExternalContact({ email: 'other.person+work@gmail.com', to: accounts[0] }, accounts), 'other.person+work@gmail.com');
+  assert.equal(discoveryUi.resolveExternalContact({ email: 'serve.creusen7@outlook.com', to: accounts[0] }, accounts), 'serve.creusen7@outlook.com');
+});
 
 function createElement() {
   const listeners = {};
@@ -1364,6 +1404,72 @@ test('databasefuncties vinden volledige historie, scheiden RFC-threads en sluite
   await database.exec(fs.readFileSync(campaignProvenanceMigrationPath, 'utf8'));
   await database.exec(fs.readFileSync(path.resolve(__dirname,
     '../../supabase/migrations/20260905023656_mailbox_campaign_message_gate.sql'), 'utf8'));
+
+  await database.exec(`
+    insert into public.softora_mailbox_messages (
+      message_key,account_email,folder,uid,provider_id,message_id,in_reply_to,references_text,
+      sender_name,sender_email,recipients_text,subject,preview,body_text,date,internal_date,
+      has_body,payload
+    ) values
+      ('alias-root','testaliases@gmail.com','coldmail',701,'coldmail:701','<alias-root@test>','','',
+        'Test sender','test.aliases@gmail.com','client.alias+work@gmail.com',
+        'Kleine vraag over jullie website','aliasregressie','aliasregressie',
+        '2026-09-14T10:00:00Z','2026-09-14T10:00:00Z',true,'{"originalCampaignOutbound":true}'),
+      ('alias-reply','testaliases@gmail.com','coldmail',702,'coldmail:702','<alias-reply@test>',
+        '<alias-root@test>','<alias-root@test>','Client','client.alias+work@gmail.com','testaliases@gmail.com',
+        'Re: Kleine vraag over jullie website','aliasregressie','aliasregressie',
+        '2026-09-14T11:00:00Z','2026-09-14T11:00:00Z',true,'{}'),
+      ('alias-sent','testaliases@gmail.com','sent',703,'sent:703','<alias-sent@test>',
+        '<alias-reply@test>','<alias-root@test> <alias-reply@test>','Test sender','test.aliases@gmail.com','client.alias+work@gmail.com',
+        'Re: Kleine vraag over jullie website','aliasregressie','aliasregressie',
+        '2026-09-15T10:00:00Z','2026-09-15T10:00:00Z',true,'{}');
+    insert into public.softora_mailbox_campaign_lineage_roots values ('alias-root','testaliases@gmail.com');
+    insert into public.softora_mailbox_campaign_lineage_members values
+      ('alias-reply','testaliases@gmail.com',false),('alias-sent','testaliases@gmail.com',false);
+    insert into public.softora_outbound_recipient_guards
+      (guard_key,key_type,key_value,permanent,channel,provider,sender_email)
+      values ('alias-self-guard','email','test.aliases+guard@googlemail.com',true,'coldmail','softora','testaliases@gmail.com');
+    insert into public.softora_mailbox_send_provenance
+      (intent_id,idempotency_key,owner,account_email,recipient_email,status,provider,sent_message_id,accepted_at)
+      values ('alias-self-provenance','alias-self-provenance','serve','testaliases@gmail.com',
+        'test.aliases+provenance@gmail.com','accepted','smtp','<alias-self@test>','2026-09-15T12:00:00Z');
+  `);
+  const aliasSearch = () => database.query(`
+    select external_contact_email, message_key from public.softora_search_mailbox_contact_dossiers(
+      '{"serve":["testaliases@gmail.com"]}'::jsonb, 'aliasregressie', 20, 0
+    )
+  `);
+  assert.equal((await aliasSearch()).rows.length, 2, 'reproduce the spurious own-address dossier before migration');
+  await database.exec(fs.readFileSync(ownAliasesMigrationPath, 'utf8'));
+  assert.deepEqual((await aliasSearch()).rows, [{ external_contact_email: 'client.alias+work@gmail.com', message_key: 'alias-sent' }]);
+  assert.deepEqual((await database.query(`
+    select contact_email from public.softora_mailbox_outreach_contacts(array['testaliases@gmail.com'])
+  `)).rows, [{ contact_email: 'client.alias+work@gmail.com' }]);
+  assert.equal((await database.query(`
+    select public.softora_mailbox_is_outreach_contact(array['testaliases@gmail.com'], 'test.aliases@gmail.com') as allowed
+  `)).rows[0].allowed, false);
+  assert.deepEqual((await database.query(`
+    select message_key from public.softora_mailbox_contact_timeline(
+      array['testaliases@gmail.com'], 'client.alias+work@gmail.com', 50, 0
+    )
+  `)).rows.map((row) => row.message_key), ['alias-sent', 'alias-reply', 'alias-root']);
+  assert.equal((await database.query(`
+    select * from public.softora_search_mailbox_contact_dossiers(
+      '{"martijn":["martijn@softora.nl"]}'::jsonb, 'aliasregressie', 20, 0
+    )
+  `)).rows.length, 0);
+  assert.equal((await database.query(`
+    select public.softora_mailbox_own_identity(' Test.Aliases+werk@Googlemail.com ') as own,
+      public.softora_mailbox_own_identity('Test.Aliases+werk@outlook.com') as other,
+      has_function_privilege('anon', 'public.softora_mailbox_own_identity(text)', 'execute') as anon_access,
+      has_function_privilege('authenticated', 'public.softora_mailbox_outreach_contacts(text[])', 'execute') as authenticated_access
+  `)).rows[0].own, 'testaliases@gmail.com');
+  const aliasAccess = (await database.query(`
+    select has_function_privilege('anon', 'public.softora_mailbox_own_identity(text)', 'execute') as anon_access,
+      has_function_privilege('authenticated', 'public.softora_mailbox_outreach_contacts(text[])', 'execute') as authenticated_access,
+      public.softora_mailbox_own_identity('Test.Aliases+werk@outlook.com') as other
+  `)).rows[0];
+  assert.deepEqual(aliasAccess, { anon_access: false, authenticated_access: false, other: 'test.aliases+werk@outlook.com' });
 
   const preMigrationDeleteState = await database.query(`
     select message_key, deleted_at

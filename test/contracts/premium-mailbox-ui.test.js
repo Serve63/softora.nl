@@ -202,7 +202,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20261006a/);
-  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20260924b/);
+  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20261006a/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260826a/);
   assert.match(page, /assets\/premium-mailbox-read\.js\?v=20260826a/);
@@ -2450,6 +2450,35 @@ test('Salon TOF contactdossier toont contacttitel en één nieuwe-berichtactie b
     fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-mobile.css'), 'utf8'),
     /\.detail-contact-action \.detail-reply \{ width: 100%; justify-content: center; \}/
   );
+});
+
+test('Gmail-alias in verzonden coldmail toont de externe contacttitel, historie en nieuwe-berichtactie', async () => {
+  const mailbox = loadMailboxHelpersForTest();
+  await mailbox.ready;
+  const account = 'servecreusen7@gmail.com';
+  const contact = 'client@example.nl';
+  const base = { accountEmail: account, hasBody: true, bodyLoaded: true, bodyTruncated: false, technicalThreadKey: 'gmail-alias-thread' };
+  const original = { ...base, id: 'sent:alias-original', mailboxId: 'sent:alias-original', folder: 'sent',
+    messageId: '<alias-original@test>', email: 'serve.creusen7@gmail.com', from: 'Servé Creusen', to: 'office@example.nl',
+    date: '2026-09-10T10:00:00Z', body: 'Oorspronkelijke campagnevraag.' };
+  const reply = { ...base, id: 'coldmail:alias-reply', mailboxId: 'coldmail:alias-reply', folder: 'coldmail',
+    messageId: '<alias-reply@test>', email: contact, from: 'Contactpersoon', to: account,
+    inReplyTo: original.messageId, references: original.messageId,
+    date: '2026-09-14T10:00:00Z', body: 'Eerder ontvangen antwoord.' };
+  const root = mailbox.normalizeMailboxApiMessage({ ...base, id: 'coldmail:alias-latest', mailboxId: 'coldmail:alias-latest',
+    folder: 'coldmail', messageId: '<alias-latest@test>', email: 'serve.creusen7@gmail.com', from: 'Servé Creusen', to: contact,
+    inReplyTo: reply.messageId, references: `${original.messageId} ${reply.messageId}`,
+    date: '2026-09-15T10:00:00Z', body: 'Mijn recente antwoord.' });
+  Object.assign(root, { externalContactEmail: 'serve.creusen7@gmail.com', contactTimelineLoaded: true,
+    contactTimelineTotal: 3, contactTimelineThreadCount: 1, threadMessages: [original, reply] });
+  mailbox.setMails([root]);
+  await mailbox.openMail(root.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipContactTimeline: true });
+  const html = mailbox.getElement('mail-detail').innerHTML;
+  assert.match(html, /<div class="detail-subject">Contactpersoon<\/div>/);
+  assert.match(html, /3 berichten · 1 onderwerp · client@example.nl/);
+  assert.equal((html.match(/Nieuw bericht sturen/g) || []).length, 1);
+  for (const body of [original.body, reply.body, 'Mijn recente antwoord.']) assert.ok(html.includes(body));
+  assert.equal((html.match(/<span>Van:<\/span>/g) || []).length, 3);
 });
 
 test('mailbox hydrateert een oorspronkelijke webdesignlink uit exact MIME-bewijs', async () => {
@@ -10114,7 +10143,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
     'de vervolgknop hoort na de resultatenlijst te staan'
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
-  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20260924b/);
+  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20261006a/);
   assert.match(pageSource, /premium-mailbox\.js\?v=20261006a/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
