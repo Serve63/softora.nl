@@ -13,7 +13,7 @@ const pageSmokeTargets = Object.freeze([
   { path: '/diensten', status: 410, marker: 'Deze pagina is verwijderd' },
   { path: '/ai-automatisering', status: 410, marker: 'Deze pagina is verwijderd' },
   { path: '/bedrijfssoftware-op-maat', marker: 'Bedrijfssoftware op maat' },
-  { path: '/bedrijfssoftware', marker: 'Grip op je werk.' },
+  { path: '/bedrijfssoftware', marker: 'één helder geheel.' },
   { path: '/website', marker: 'Een website die laat zien wat jouw bedrijf' },
   { path: '/crm-systeem-op-maat', status: 410, marker: 'Deze pagina is verwijderd' },
   { path: '/ai-telefonist', status: 410, marker: 'Deze pagina is verwijderd' },
