@@ -39,8 +39,8 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /href="\/assets\/live-momentum-focus-mode\.css\?v=20260813a"/);
   assert.match(html, /href="\/assets\/live-momentum\.css\?v=20260901a"/);
   assert.match(html, /href="\/assets\/live-momentum-day-hold\.css\?v=20260825a"/);
-  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20261006b"/);
-  assert.match(html, /src="\/assets\/live-momentum-mobile\.js\?v=20261006a"/);
+  assert.match(html, /href="\/assets\/live-momentum-mobile\.css\?v=20261007a"/);
+  assert.match(html, /src="\/assets\/live-momentum-mobile\.js\?v=20261007a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-mission-copy\.css\?v=20260815a"/);
   assert.match(html, /href="\/assets\/settings-module-back\.css\?v=20260818a"/);
   assert.match(html, /href="\/assets\/live-momentum-endgame-progress\.css\?v=20260722a"/);
@@ -60,7 +60,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<script src="\/assets\/live-momentum-history-state\.js\?v=20260825a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-day-hold\.js\?v=20260825a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum\.js\?v=20260901a" defer><\/script>/);
-  assert.match(html, /<script src="\/assets\/live-momentum-mobile\.js\?v=20261006a" defer><\/script>/);
+  assert.match(html, /<script src="\/assets\/live-momentum-mobile\.js\?v=20261007a" defer><\/script>/);
   assert.match(html, /<script src="\/assets\/live-momentum-focus-mode\.js\?v=20260813a" defer><\/script>/);
   assert.ok(html.indexOf('live-momentum-mobile.css') > html.indexOf('live-momentum-video.css'));
   assert.ok(html.indexOf('live-momentum-day-hold.css') > html.indexOf('live-momentum-mobile.css'));
@@ -79,7 +79,7 @@ test('live momentum page renders the requested dashboard surface', () => {
   assert.match(html, /<nav class="momentum-mobile-tabs" aria-label="Winnen overzicht">[\s\S]*data-momentum-mobile-view-target="today"[\s\S]*data-momentum-mobile-view-target="month"[\s\S]*data-momentum-mobile-view-target="endgame"/);
   assert.match(html, /class="momentum-mobile-score-ring" role="progressbar" aria-label="Momentumscore vandaag"[\s\S]*data-momentum-mobile-score>0%/);
   assert.match(html, /data-momentum-mobile-completed>0 \/ 0<\/strong> doelen voltooid/);
-  assert.match(html, /<header class="momentum-mobile-list-heading">[\s\S]*<h2>Doelen voor vandaag:<\/h2>/);
+  assert.match(html, /<header class="momentum-mobile-list-heading">[\s\S]*<h2>Doelen voor[\s\S]*data-momentum-mobile-day-label>vandaag<\/span>/);
   assert.doesNotMatch(html, /momentum-mobile-links|Tik rechts om af te vinken|data-momentum-mobile-open-month|Bekijk maandritme/);
   assert.match(html, /<h2 class="end-game-title">HET EINDSPEL<\/h2>/);
   assert.match(html, /class="end-game-progress" role="progressbar" aria-label="Voortgang van Het Eindspel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-end-game-progress/);
@@ -321,8 +321,8 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(mobileCss, /padding:\s*max\(12px, env\(safe-area-inset-top\)\) var\(--momentum-safe-end\) calc\(28px \+ env\(safe-area-inset-bottom\)\) var\(--momentum-safe-start\) !important;/);
   assert.match(mobileCss, /\.momentum-mobile-list-heading\s*\{[^}]*margin:\s*0 2px 20px;/);
   assert.match(mobileCss, /\.dashboard-layout\.momentum-layout\[data-live-momentum-shell\] > \.momentum-page\s*\{\s*padding-top:\s*max\(12px, env\(safe-area-inset-top\)\) !important;/);
-  assert.match(mobileCss, /\.habit-name\[data-momentum-today-state="done"\], body\[data-live-momentum-page\] \.status\.is-today\.is-done:not\(\.is-on-hold\)\s*\{[^}]*background:\s*#e5f6eb;/);
-  assert.match(mobileCss, /\.habit-name\[data-momentum-today-state="missed"\], body\[data-live-momentum-page\] \.status\.is-today\.is-missed:not\(\.is-on-hold\)\s*\{[^}]*background:\s*#fde9e7;/);
+  assert.match(mobileCss, /\.habit-name\[data-momentum-today-state="done"\], body\[data-live-momentum-page\] \.status\.is-mobile-day\.is-done:not\(\.is-on-hold\)\s*\{[^}]*background:\s*#e5f6eb;/);
+  assert.match(mobileCss, /\.habit-name\[data-momentum-today-state="missed"\], body\[data-live-momentum-page\] \.status\.is-mobile-day\.is-missed:not\(\.is-on-hold\)\s*\{[^}]*background:\s*#fde9e7;/);
   assert.match(mobileCss, /html body\[data-live-momentum-page\] \.dashboard-layout\.momentum-layout > \.sidebar\[data-static-sidebar="1"\]\s*\{\s*display:\s*none !important;/);
   assert.match(mobileCss, /html body\[data-live-momentum-page\] \.dashboard-layout\.momentum-layout > \.sidebar\[data-static-sidebar="1"\] \.sidebar-nav\s*\{\s*display:\s*none !important;\s*\}/);
   assert.match(mobileCss, /\.momentum-mobile-nav\s*\{\s*display:\s*none;/);
@@ -333,7 +333,7 @@ test('live momentum stylesheet keeps the visual replica self-contained', () => {
   assert.match(mobileCss, /\.momentum-mobile-score-ring\s*\{[\s\S]*background:\s*conic-gradient\(#42d981 var\(--momentum-mobile-score, 0deg\)/);
   assert.match(mobileCss, /body\[data-momentum-mobile-view="today"\] \.habit-grid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 68px;/);
   assert.match(mobileCss, /body\[data-momentum-mobile-view="today"\] \.habit-grid > \*\s*\{[\s\S]*display:\s*none;/);
-  assert.match(mobileCss, /body\[data-momentum-mobile-view="today"\] \.habit-grid > \.habit-name,\s*body\[data-momentum-mobile-view="today"\] \.habit-grid > \.status\.is-today\s*\{[\s\S]*display:\s*flex;[\s\S]*min-height:\s*66px;/);
+  assert.match(mobileCss, /body\[data-momentum-mobile-view="today"\] \.habit-grid > \.habit-name,\s*body\[data-momentum-mobile-view="today"\] \.habit-grid > \.status\.is-mobile-day\s*\{[\s\S]*display:\s*flex;[\s\S]*min-height:\s*66px;/);
   assert.match(mobileCss, /body\[data-momentum-mobile-view="month"\] \.habit-spacer,\s*body\[data-momentum-mobile-view="month"\] \.habit-name\s*\{[\s\S]*position:\s*sticky;[\s\S]*left:\s*0;/);
   assert.match(mobileCss, /\.habit-label\s*\{[\s\S]*font-size:\s*15px;/);
   assert.match(mobileCss, /\.goal-icon-button,\s*\.goal-drag-handle\s*\{[\s\S]*width:\s*44px;[\s\S]*min-width:\s*44px;[\s\S]*height:\s*44px;/);
@@ -395,9 +395,9 @@ test('live momentum script wires habit toggles to chart and persisted state', ()
   assert.match(mobileJs, /window\.matchMedia\('\(max-width: 900px\)'\)/);
   assert.match(mobileJs, /function setView\(view\)[\s\S]*const nextView = mobileQuery\.matches \? 'endgame' : requestedView;[\s\S]*page\.dataset\.momentumMobileView = nextView;/);
   assert.match(mobileJs, /querySelectorAll\('\.status\.is-today'\)/);
-  assert.match(mobileJs, /new Map\(todayCells\.map\(\(cell\) => \[Number\(cell\.dataset\.task\), cell\]\)\)/);
+  assert.match(mobileJs, /new Map\(todayCells\.filter\([\s\S]*?\)\.map\(\(cell\) => \[Number\(cell\.dataset\.task\), cell\]\)\)/);
   assert.match(mobileJs, /row\.dataset\.momentumTodayState = state;/);
-  assert.match(mobileJs, /const noData = todayCells\.some\(\(cell\) => cell\.classList\.contains\('is-on-hold'\)\)/);
+  assert.match(mobileJs, /const noData = selectedDay\?\.noData \|\| todayCells\.some\(\(cell\) => cell\.classList\.contains\('is-on-hold'\)\)/);
   assert.match(mobileJs, /scoreValue\.textContent = noData \? '—' : `\$\{score\}%`/);
   assert.match(mobileJs, /completedValue\.textContent = noData \? 'Geen data'/);
   assert.match(mobileJs, /scoreRing\?\.style\.setProperty\('--momentum-mobile-score', `\$\{score \* 3\.6\}deg`\);/);
