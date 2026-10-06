@@ -12,6 +12,10 @@ const content = DomUtils.textContent(document);
 test('the introduction starts with Martijn and Servé and follows the requested section order', () => {
   const sections = elements.filter((node) => node.name === 'section' && node.attribs.id);
   assert.deepEqual(sections.map((node) => node.attribs.id), ['mensen', 'bedrijf', 'oplossingen', 'portfolio']);
+  const header = elements.find((node) => node.name === 'header');
+  assert.equal(DomUtils.findAll((node) => node.name === 'nav', header.children).length, 0, 'The header must omit the section navigation');
+  const headerLinks = DomUtils.findAll((node) => node.name === 'a', header.children);
+  assert.deepEqual(headerLinks.map((node) => node.attribs.href), ['/toekomst', 'https://www.softora.nl/contact']);
   const portraits = elements.filter((node) => node.name === 'img');
   assert.equal(portraits.length, 2);
   assert.match(portraits[0].attribs.alt, /Martijn van de Ven, medeoprichter/);
