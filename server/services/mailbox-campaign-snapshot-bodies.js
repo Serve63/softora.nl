@@ -9,12 +9,15 @@ function normalizeText(value) {
   return String(value || '').trim();
 }
 
+// A message needs the bodies service when its text is missing or cut off, or
+// when its AI presentation is unknown (Instantly rows arrive with a body but
+// without one). The service reads the stored presentation; nothing new is
+// classified for a message the browser would have fetched on open anyway.
 function needsBody(message) {
-  return Boolean(
-    message && typeof message === 'object' &&
-    (message.hasBody === true || normalizeText(message.body)) &&
-    (!normalizeText(message.body) || message.bodyTruncated === true)
-  );
+  if (!message || typeof message !== 'object') return false;
+  const body = normalizeText(message.body);
+  if (!(message.hasBody === true || body)) return false;
+  return !body || message.bodyTruncated === true || !message.aiPresentation;
 }
 
 function buildReference(message, fallbackAccountEmail, defaultFolder) {
