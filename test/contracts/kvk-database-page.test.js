@@ -193,7 +193,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20261003-overview-style/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20261004-robot-names/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20261006-no-empty-flash/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -598,7 +598,7 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
   assert.match(pageSource, /assets\/kvk-database\.js\?v=20260927-worker-labels/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260927-copyable/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20261006-remembered/);
   assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260917-control-orange/);
   assert.match(pageSource, /id="companies-control-room-last60"><span class="stat-delta-added"[^>]*>\+—<\/span><span class="stat-delta-removed"[^>]*>−—<\/span>/);
   assert.match(metricsSource, /companies-successful-found/);

@@ -139,6 +139,8 @@
     function render() {
       if (!head || !body) return;
       const snapshot = getSnapshot();
+      // Before the first snapshot nothing is known; never flash "no results" over the shown rows.
+      if (!snapshot || (!snapshot.state && !Array.isArray(snapshot.latestTreated))) return;
       const activities = Array.isArray(snapshot?.latestTreated)
         ? snapshot.latestTreated.slice(0, 10)
         : [];

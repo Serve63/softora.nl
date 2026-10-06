@@ -4,7 +4,7 @@
     module.exports = api;
     return;
   }
-  api.start({
+  globalScope.SoftoraKvkMetrics = api.start({
     document: globalScope.document,
     window: globalScope.window || globalScope,
     getSnapshot() {
@@ -22,6 +22,10 @@
   const numberFormat = new Intl.NumberFormat('nl-NL');
   const DIRECTORY_API_URL = '/api/kvk-database/company-directory';
   const CANONICAL_REFRESH_INTERVAL_MS = 30_000;
+  // Last verified directory counts (docs/platform-performance.md): a reopened page
+  // shows them at once instead of a snapshot estimate that jumps a second later.
+  const REMEMBERED_COUNTS_KEY = 'kvk-database:canonical-counts';
+  const REMEMBERED_COUNTS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
   const CANONICAL_CATEGORIES = Object.freeze({
     treated: 'behandeld',
     successfulFound: 'bruikbaar-verklaard',
@@ -124,6 +128,19 @@
     return Object.fromEntries(entries);
   }
 
+  function readRememberedCounts(store) {
+    let remembered = null;
+    try { remembered = store?.readLastKnown?.(REMEMBERED_COUNTS_KEY, REMEMBERED_COUNTS_MAX_AGE_MS); } catch { return null; }
+    if (!remembered || typeof remembered !== 'object') return null;
+    const counts = {};
+    for (const key of Object.keys(CANONICAL_CATEGORIES)) {
+      const count = nonNegativeCount(remembered[key]);
+      if (count === null) return null;
+      counts[key] = count;
+    }
+    return counts;
+  }
+
   function mergeGradeActivity(...activities) {
     const available = activities.filter((activity) => activity && typeof activity === 'object');
     if (!available.length) return undefined;
@@ -191,7 +208,9 @@
       : typeof windowRef.fetch === 'function'
         ? windowRef.fetch.bind(windowRef)
         : null;
-    let canonicalCounts = null;
+    const store = deps.store || windowRef.SoftoraReadModelStore || null;
+    let canonicalCounts = readRememberedCounts(store);
+    let canonicalCountsLive = false;
     let canonicalRefreshPromise = null;
     const elements = {
       treatedTotal: documentRef.getElementById('companies-treated'),
@@ -233,6 +252,8 @@
     function renderMetrics() {
       const snapshot = getSnapshot();
       if (!snapshot?.state && !canonicalCounts) return;
+      // Without a snapshot only the directory totals are known; activity stays as shown.
+      const hasSnapshot = Boolean(snapshot?.state);
       const scraperState = snapshot?.state || {};
       const last60 = getLast60Minutes(snapshot, now());
       const unusableGrades = scraperState.unusable_grades || {};
@@ -282,6 +303,7 @@
           countOrFallback('controlRoom', scraperState.control_room),
         );
       }
+      if (!hasSnapshot) return;
       renderLast60Delta(elements.successfulFoundLast60, last60.declared_usable);
       renderLast60Delta(elements.declaredUnusableLast60, last60.declared_unusable);
       renderControlRoomLast60(elements.controlRoomLast60, last60.control_room_activity);
@@ -313,6 +335,8 @@
       canonicalRefreshPromise = fetchCanonicalDirectoryCounts(fetchImpl)
         .then((counts) => {
           canonicalCounts = counts;
+          canonicalCountsLive = true;
+          try { store?.rememberLastKnown?.(REMEMBERED_COUNTS_KEY, counts); } catch { /* only costs the next instant open */ }
           renderMetrics();
           return true;
         })
@@ -327,6 +351,7 @@
       renderMetrics,
       refreshCanonicalCounts,
       getCanonicalCounts: () => canonicalCounts && { ...canonicalCounts },
+      hasLiveCanonicalCounts: () => canonicalCountsLive,
     };
   }
 
