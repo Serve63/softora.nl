@@ -147,7 +147,7 @@ test('the contact timeline is prefetched without touching the open conversation'
 test('the Mailbox wires the prefetch after its detail controller and warms after each complete render', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
   const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260927b');
-  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20261006c'));
+  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20261006d'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /afterCommit: \(mail, \{ changed \}\) => \{ mailboxPrefetch\?\.schedule\?\.\(\);/);
   // The outreach list holds grouped copies; the detail opens the stored message, so that one is warmed.
@@ -184,7 +184,7 @@ test('a dossier that a list refresh marked stale is warmed again, at most once a
 
 test('a click shows a complete but stale dossier at once and refreshes it in the background', () => {
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
-  assert.match(source, /const stale = mail\.contactTimelineLoaded === true && mail\.contactTimelineNeedsRefresh === true && Number\(mail\.contactTimelineTotal\) > 0; const load = \(\) => mailboxDiscoveryController\?\.loadContactTimeline\?\.\(mail, \{ deferRender: !stale, signal \}\); if \(stale\) \{ void load\(\); return true; \}/);
+  assert.match(source, /const stale = mail\.contactTimelineLoaded === true && mail\.contactTimelineNeedsRefresh === true && Number\(mail\.contactTimelineTotal\) > 0; const ready = [^;]+; const load = \(\) => mailboxDiscoveryController\?\.loadContactTimeline\?\.\(mail, \{ deferRender: !\(stale \|\| ready\), signal \}\); if \(stale\) \{ void load\(\); return true; \}/);
 });
 
 test('preparation drains past the first six conversations with at most three concurrent timelines', async () => {
@@ -283,4 +283,30 @@ test('opening an existing row updates only selection without rebuilding hydrated
   assert.deepEqual([...selected], [['a', false], ['b', true]]);
   assert.equal(selectItem(documentRef, 'missing'), false);
   assert.equal(selected.get('b'), true, 'unknown rows leave selection intact for the full render fallback');
+});
+
+test('een gesprek met alle teksten uit de pagina is direct leesbaar, zonder te wachten op het contactdossier', () => {
+  const index = loadIndex();
+  const complete = {
+    bodyLoaded: true, body: 'Hoi', hasBody: true, aiPresentation: { status: 'ready' },
+    threadMessages: [{ hasBody: true, body: 'Eerdere mail' }, { hasBody: false, body: '' }],
+  };
+  assert.equal(index.isConversationReadable(complete), true);
+  assert.equal(index.isConversationReadable({ ...complete, bodyLoaded: false }), false);
+  assert.equal(index.isConversationReadable({ ...complete, aiPresentation: undefined, aiPresentationUnknown: true }), false);
+  assert.equal(index.isConversationReadable({ ...complete, threadMessages: [{ hasBody: true, body: '' }] }), false);
+  assert.equal(index.isConversationReadable({ ...complete, threadMessages: [{ hasBody: true, body: 'x', bodyTruncated: true }] }), false);
+  // A failed earlier message shows its own retry, so it does not hold the conversation back.
+  assert.equal(index.isConversationReadable({ ...complete, threadMessages: [{ hasBody: true, body: '', bodyLoadError: 'Mislukt' }] }), true);
+});
+
+test('de mailbox laadt het contactdossier van een leesbaar gesprek op de achtergrond', () => {
+  const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
+  const hydrateTimeline = source.match(/hydrateTimeline: \(\{ mail, signal \}\) => \{[^\n]+/)?.[0] || '';
+  assert.match(hydrateTimeline, /const ready = !mail\.contactTimelineLoaded && window\.SoftoraMailboxIndex\?\.isConversationReadable\?\.\(mail\) === true;/);
+  assert.match(hydrateTimeline, /deferRender: !\(stale \|\| ready\)/);
+  assert.match(hydrateTimeline, /if \(ready\) \{ void loaded; return true; \}/);
+  const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
+  assert.match(page, /<div class="detail-empty" data-mailbox-boot-placeholder>/);
+  assert.match(page, /\.detail-empty\[data-mailbox-boot-placeholder\] \{ visibility: hidden; \}/);
 });
