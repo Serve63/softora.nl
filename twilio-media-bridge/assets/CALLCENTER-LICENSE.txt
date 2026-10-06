@@ -1,0 +1,28 @@
+Callcenter ambience attribution
+
+"Ambience - Busy office-call center.wav" by dnlburnett (8 February 2016).
+Source: https://freesound.org/people/dnlburnett/sounds/335711/
+Public MP3 preview: https://cdn.freesound.org/previews/335/335711_5658680-lq.mp3
+Licence: Creative Commons Attribution 4.0 International (CC BY 4.0).
+Licence text: https://creativecommons.org/licenses/by/4.0/
+
+The licence permits commercial use, redistribution and adaptation with attribution.
+The original author does not endorse Softora or this adaptation.
+
+Softora adaptation, 6 October 2026:
+- Converted the public preview to mono, signed 16-bit little-endian PCM at 8 kHz.
+- Applied a 120 Hz high-pass and 1800 Hz low-pass for restrained phone ambience.
+- Overlapped the tail and head by 1.5 seconds to form a continuous 95-second loop.
+- Normalised the level and limited peaks to keep keyboard transients in the background.
+- No speech, music or generated voices have been added to the source recording.
+
+Generated file: callcenter-dnlburnett-335711-8k.raw (1,520,000 bytes).
+Source MP3 SHA-256: 34ad0780c1f954aab835b5781bf70dd791c5a9b5efdccc35505ac79ff71948f3
+Generated PCM SHA-256: d7136ee34e1784ca8d6154c014df47e52694135f014b1850e33b774858c978f3
+
+Reproduce the processing using the public preview above:
+  afconvert -f WAVE -d LEI16@8000 -c 1 --mix source.mp3 source-8k.wav
+  node twilio-media-bridge/scripts/prepare-callcenter-ambience.js source-8k.wav output.raw
+
+Keep this attribution with distributed copies of the adapted recording.
+This file is also published in Softora's public source repository.
