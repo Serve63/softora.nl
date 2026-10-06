@@ -80,6 +80,7 @@ test('local blog serves real article content and local assets without conversion
   assert.match(html, /<details class="login-menu">/);
   assert.match(html, /<details class="contact-menu">/);
   assert.doesNotMatch(html, /content-menu|whatsapp-widget|seo-content\.css/);
+  assert.doesNotMatch(html, /data-ebook|ebook\.js|ebook\.css/, 'The read-only preview must not offer an unsupported submission form');
   assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map((match) => match[1]), [
     '/assets/entry/contact-menu.js', '/assets/articles/article.js?v=articles-20261002',
   ]);

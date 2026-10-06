@@ -7,6 +7,8 @@
   <script src="/assets/public-conversion-tracking.js?v=20260601a" defer></script>
   <script src="/assets/entry/contact-menu.js" defer></script>
   <script src="/assets/articles/article.js?v=articles-20261002" defer></script>
+  <link rel="stylesheet" href="/assets/articles/ebook.css?v=20261006a">
+  <script src="/assets/articles/ebook.js?v=20261006a" defer></script>
 </head>
 <body data-softora-articles-layout="v1">
   <a class="skip-link" href="#hoofdinhoud">Naar de inhoud</a>
@@ -45,5 +47,39 @@
       </aside>
     </div>
   </main>
+  <!-- ebook-offer:start -->
+  <aside class="ebook-teaser" data-ebook-teaser aria-labelledby="ebook-teaser-title" hidden>
+    <button class="ebook-close" data-ebook-dismiss type="button" aria-label="E-bookaanbod sluiten">×</button>
+    <div class="ebook-teaser-heading"><span>Gratis e-book voor ondernemers</span><h2 id="ebook-teaser-title">Meer groei.<br>Minder handwerk.</h2></div>
+    <div class="ebook-teaser-body">
+      <p>Ontdek hoe bedrijfssoftware jouw bedrijf helpt groeien.</p>
+      <div class="ebook-book"><img src="/assets/ebooks/cover.webp" alt="Cover van het e-book Meer groei. Minder handwerk." width="420" height="594" loading="lazy" decoding="async"></div>
+      <p class="ebook-teaser-detail">Van losse lijstjes naar overzicht.<br>Inclusief groeiscan en 30-dagenplan.</p>
+      <button class="ebook-button" data-ebook-open type="button">Gratis download <span aria-hidden="true">↓</span></button>
+      <small>12 pagina’s vol praktische stappen · PDF</small>
+    </div>
+  </aside>
+  <button class="ebook-launcher" data-ebook-launcher data-ebook-open type="button" hidden>Gratis e-book <span aria-hidden="true">↓</span></button>
+  <dialog class="ebook-dialog" data-ebook-dialog aria-labelledby="ebook-dialog-title" aria-describedby="ebook-dialog-description">
+    <button class="ebook-close" data-ebook-close type="button" aria-label="Downloadvenster sluiten">×</button>
+    <div class="ebook-dialog-heading"><span>Gratis download</span><h2 id="ebook-dialog-title">Meer groei. Minder handwerk.</h2><p>Jouw praktische gids voor slimmer werken met bedrijfssoftware.</p></div>
+    <div class="ebook-dialog-content">
+      <div class="ebook-dialog-visual"><div class="ebook-book"><img src="/assets/ebooks/cover.webp" alt="Meer groei. Minder handwerk. Een e-book van Softora." width="420" height="594" loading="lazy" decoding="async"></div><span>Groeiscan + keuzehulp + 30-dagenplan</span></div>
+      <div class="ebook-dialog-copy">
+        <h3 id="ebook-dialog-description">Maak ruimte voor de volgende stap.</h3>
+        <p>Ontdek waar je tijd verliest, welke software bij je past en hoe je klein begint met een verbetering die telt.</p>
+        <form data-ebook-form>
+          <label for="ebook-name">Voornaam</label><input id="ebook-name" name="name" autocomplete="given-name" minlength="2" maxlength="100" required placeholder="Je voornaam">
+          <label for="ebook-email">E-mailadres</label><input id="ebook-email" name="email" type="email" autocomplete="email" maxlength="254" required placeholder="jij@bedrijf.nl">
+          <div class="ebook-honeypot" aria-hidden="true"><label for="ebook-website">Website</label><input id="ebook-website" name="website" tabindex="-1" autocomplete="off"></div>
+          <button class="ebook-button" type="submit">Download PDF <span aria-hidden="true">↓</span></button>
+          <p class="ebook-privacy">Softora ontvangt je naam en e-mailadres voor deze aanvraag. Je krijgt direct toegang tot de PDF. Geen automatische nieuwsbrief. <a href="/privacybeleid" target="_blank" rel="noopener">Privacybeleid</a></p>
+          <p class="ebook-status" data-ebook-status role="status" aria-live="polite"></p>
+        </form>
+        <div class="ebook-success" data-ebook-success hidden tabindex="-1"><h3>Je e-book staat klaar.</h3><p>Veel leesplezier! Kies één verbetering en zet vandaag de eerste stap.</p><a class="ebook-button" data-ebook-download download="Softora-Meer-groei-minder-handwerk.pdf">Download je e-book <span aria-hidden="true">↓</span></a><p class="ebook-success-note">Bewaar de PDF, zodat je de groeiscan en het stappenplan erbij kunt pakken.</p></div>
+      </div>
+    </div>
+  </dialog>
+  <!-- ebook-offer:end -->
 </body>
 </html>

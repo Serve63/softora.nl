@@ -60,7 +60,12 @@ function createPreviewServer() {
       response.writeHead(404).end('Niet beschikbaar in dit lokale blogvoorstel');
       return;
     }
-    if (contentType.startsWith('text/html')) body = String(body).replace('<head>', '<head><meta name="robots" content="noindex, nofollow">').replace(/<script src="\/assets\/public-conversion-tracking\.js[^"]*" defer><\/script>/, '');
+    if (contentType.startsWith('text/html')) body = String(body)
+      .replace('<head>', '<head><meta name="robots" content="noindex, nofollow">')
+      .replace(/<script src="\/assets\/public-conversion-tracking\.js[^"]*" defer><\/script>/, '')
+      .replace(/<!-- ebook-offer:start -->[\s\S]*?<!-- ebook-offer:end -->/, '')
+      .replace(/<script src="\/assets\/articles\/ebook\.js[^"]*" defer><\/script>/, '')
+      .replace(/<link rel="stylesheet" href="\/assets\/articles\/ebook\.css[^"]*">/, '');
     response.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
     response.end(request.method === 'HEAD' ? undefined : body);
   } catch (error) {
