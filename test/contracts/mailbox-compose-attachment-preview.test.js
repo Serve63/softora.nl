@@ -1,27 +1,32 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
 
-function createHarness() {
+function createHarness(t) {
   const created = [];
   const revoked = [];
   const list = { innerHTML: '' };
-  const window = {
-    Blob,
-    URL: {
+  const originalUrl = global.URL;
+  const originalCompose = global.SoftoraMailboxCompose;
+  global.URL = {
       createObjectURL(blob) {
         const url = `blob:https://www.softora.nl/attachment-${created.length}`;
         created.push({ url, blob });
         return url;
       },
       revokeObjectURL(url) { revoked.push(url); },
-    },
   };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox-compose.js'), 'utf8'), { window });
+  const modulePath = require.resolve('../../assets/premium-mailbox-compose.js');
+  delete require.cache[modulePath];
+  const compose = require('../../assets/premium-mailbox-compose.js');
+  t.after(() => {
+    compose.resetOptionalFields();
+    global.URL = originalUrl;
+    if (originalCompose === undefined) delete global.SoftoraMailboxCompose;
+    else global.SoftoraMailboxCompose = originalCompose;
+    delete require.cache[modulePath];
+  });
   return {
-    compose: window.SoftoraMailboxCompose,
+    compose,
     document: { getElementById: (id) => id === 'c-attachment-list' ? list : null },
     list, created, revoked,
   };
@@ -33,8 +38,8 @@ function file(name, text, type = '') {
   return blob;
 }
 
-test('compose opens the exact chosen image/PDF locally and keeps previews separate from send data', async () => {
-  const h = createHarness();
+test('compose opens the exact chosen image/PDF locally and keeps previews separate from send data', async (t) => {
+  const h = createHarness(t);
   const first = file('ontwerp.png', 'first image', 'image/png');
   const second = file('ontwerp.png', 'second image', 'image/png');
   const pdf = file('voorstel.pdf', '%PDF-1.7 proposal');
@@ -65,8 +70,8 @@ test('compose opens the exact chosen image/PDF locally and keeps previews separa
   assert.equal(h.compose.getAttachments().length, 0);
 });
 
-test('compose previews ignore active file MIME types and download unsupported document formats safely', async () => {
-  const h = createHarness();
+test('compose previews ignore active file MIME types and download unsupported document formats safely', async (t) => {
+  const h = createHarness(t);
   await h.compose.addAttachments([
     file('foto.png', '<script>unsafe</script>', 'text/html'),
     file('offerte" & plan.docx', 'office document', 'text/html'),
@@ -75,7 +80,7 @@ test('compose previews ignore active file MIME types and download unsupported do
   assert.equal(h.created[1].blob.type, 'application/octet-stream');
   assert.match(h.list.innerHTML, /download="offerte&quot; &amp; plan\.docx"/);
   assert.match(h.list.innerHTML, /title="Open offerte&quot; &amp; plan\.docx"/);
-  assert.doesNotMatch(h.list.innerHTML, /<script>/);
+  assert.equal(h.list.innerHTML.includes('<script>'), false);
   h.compose.resetOptionalFields(h.document);
 
   assert.equal((await h.compose.addAttachments([file('unsafe.html', 'html')], h.document)).ok, false);
