@@ -12,6 +12,7 @@ const WEAK_PLACEHOLDER_PATTERNS = [
   /\bgepland onderhoud\b|\bunder maintenance\b|\bmaintenance mode\b/i,
   /\bunder construction\b|\bcoming soon\b|\bwebsite in aanbouw\b/i,
   /\bbinnenkort (?:online|beschikbaar|live)\b/i,
+  /\bplease stand by while configuration is in progress\b/i,
 ];
 const SHORT_PAGE_TEXT_LENGTH = 400;
 

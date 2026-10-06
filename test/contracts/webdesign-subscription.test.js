@@ -317,7 +317,8 @@ test('subscription designs get the API house-colour lock in the prompt and on de
   const repository = {
     claim: async () => ({ ok: true, job: { id: 'job-1234567890123456', subscriptionClaim: claim,
       websiteUrl: 'https://example.nl/contact/', customer: { bedrijf: 'Example', dom: 'example.nl' } } }),
-    storeBrandGuard: async (id, token, guard) => { stored.push({ id, token, guard }); return { ok: true }; },
+    beginPreparation: async () => ({ preparation: { token: 'fixture', attempts: 1 } }),
+    savePreparation: async (id, token, expected, result) => { stored.push({ id, token, guard: result.brandGuard }); return { ok: true }; },
     begin: async () => ({ ok: true, job: { id: 'job-1234567890123456', customer: { id: 'c' }, subscriptionBrandGuard: stored[0].guard } }),
     finish: async (_id, _claim, error = '') => { finished.push(error); return { ok: true }; },
   };
@@ -346,7 +347,9 @@ test('subscription designs get the API house-colour lock in the prompt and on de
 test('a failing colour preparation never blocks the subscription design itself', async () => {
   const service = createWebdesignSubscriptionService({ logger: { warn() {} },
     repository: { claim: async () => ({ ok: true, job: { id: 'job-1234567890123456', subscriptionClaim: claim,
-      websiteUrl: 'https://example.nl/', customer: {} } }), storeBrandGuard: () => assert.fail('No guard expected') },
+      websiteUrl: 'https://example.nl/', customer: {} } }),
+      beginPreparation: async () => ({ preparation: { token: 'fixture', attempts: 1 } }),
+      savePreparation: async (_id, _claim, _expected, result) => { assert.equal(result.brandGuard, null); return { ok: true }; } },
     aiToolsCoordinator: { prepareWebsitePreviewImage: async () => ({ generationScan: { referenceImageMode: 'homepage-screenshot', referenceImageUrls: [] } }),
       fetchWebsitePreviewReferenceImages: async () => { throw new Error('screenshot offline'); } } });
   const polled = res();

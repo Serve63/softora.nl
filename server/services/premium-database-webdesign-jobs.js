@@ -1,10 +1,10 @@
-const { isSubscriptionJob, isExpiredWebdesignJob, subscriptionReuseConflict, refreshWebdesignMailReady, startManualWebdesignBatchResponse } = require('./webdesign-subscription');
+const { isSubscriptionJob, isExpiredWebdesignJob, refreshWebdesignMailReady, startManualWebdesignBatchResponse } = require('./webdesign-subscription');
 const { deliverWebdesignImage, createWebdesignDeliveryInterruptedError } = require('./premium-database-webdesign-delivery');
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
 const { randomUUID } = require('crypto');
 const { runPremiumDatabaseWebdesignBatchWorker, sendBatchWorkerResponse, sendMailStockStatusResponse, resolveWorkerConcurrency, resolveWorkerJobLimit } = require('./premium-database-webdesign-batch-worker');
 const { buildWebdesignGenerationProvenance, normalizeWebdesignVariant } = require('./design-photo-generation-policy');
-const { assignWebdesignOwner } = require('./webdesign-owner-assignment');
+const { createWebdesignJobStarter } = require('./webdesign-job-start');
 const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
 const DEVICE_MOCKUP_FILE_VERSION = 'v8';
 const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set([
@@ -1419,117 +1419,10 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
     }
   }
 
-  async function startJob(input = {}) {
-    pruneJobs();
-    const ownerKey = normalizeString(input.ownerKey);
-    if (!ownerKey) {
-      return {
-        ok: false,
-        statusCode: 401,
-        error: 'Niet ingelogd',
-        detail: "Log in om webdesignfoto's te maken.",
-      };
-    }
-
-    const customer = normalizeCustomer(input.customer || input);
-    const websiteUrl = normalizeWebsiteUrl(input.websiteUrl || customer.website || customer.dom);
-    if (!customer.id || !customer.bedrijf || !websiteUrl) {
-      return {
-        ok: false,
-        statusCode: 400,
-        error: 'Onvolledige webdesign-opdracht',
-        detail: 'Stuur minimaal customer.id, customer.bedrijf en websiteUrl mee.',
-      };
-    }
-
-    let existing = null;
-    try {
-      existing = await findRunningJobForCustomer(ownerKey, customer.id);
-    } catch (error) {
-      logPersistentJobLoadError(error);
-      return createWebdesignJobStatusUnavailableResult();
-    }
-    if (existing) {
-      if (subscriptionReuseConflict(input, existing)) return subscriptionReuseConflict(input, existing);
-      return {
-        ok: true,
-        statusCode: 202,
-        job: serializeJob(existing),
-        existing: true,
-      };
-    }
-
-    const requestedJobId = normalizeJobId(input.jobId);
-    const jobId = requestedJobId || randomUUID();
-    let existingById = jobs.get(jobId);
-    if (!existingById) {
-      const loadedById = await loadPersistentJobResult(jobId);
-      if (loadedById.error) return createWebdesignJobStatusUnavailableResult();
-      existingById = loadedById.job;
-    }
-    if (existingById && isExpiredJob(existingById)) {
-      jobs.delete(existingById.id);
-      existingById = null;
-    }
-    if (existingById) {
-      jobs.set(existingById.id, existingById);
-      if (existingById.ownerKey !== ownerKey) {
-        return {
-          ok: false,
-          statusCode: 403,
-          error: 'Geen toegang',
-          detail: 'Deze webdesign-opdracht hoort bij een andere sessie.',
-        };
-      }
-      if (subscriptionReuseConflict(input, existingById)) return subscriptionReuseConflict(input, existingById);
-      return {
-        ok: true,
-        statusCode: 202,
-        job: serializeJob(existingById),
-        existing: true,
-      };
-    }
-    const ownerAssignment = await assignWebdesignOwner(customer, dataOpsStore, logger);
-    if (!ownerAssignment.ok) return ownerAssignment;
-    const job = {
-      id: jobId,
-      ownerKey, assignedDesignOwnerEmail: ownerAssignment.ownerEmail,
-      executionProvider: input.executionProvider === 'codex-subscription' ? 'codex-subscription' : 'api',
-      customer,
-      websiteUrl,
-      variant: normalizeWebdesignVariant(input.variant),
-      status: 'queued',
-      error: null,
-      createdAt: now(),
-      startedAt: null,
-      finishedAt: null,
-      retry: normalizeRetryState(),
-      batchId: normalizeJobId(input.batchId),
-      batchTargetIndex: Number.isFinite(Number(input.batchTargetIndex))
-        ? Math.max(0, Math.floor(Number(input.batchTargetIndex)))
-        : null,
-    };
-    jobs.set(job.id, job);
-    const persisted = await persistJob(job);
-    if (requiresPersistentJobStorage() && !persisted) {
-      jobs.delete(job.id);
-      return {
-        ok: false,
-        statusCode: 503,
-        error: 'Webdesign-opdracht opslaan mislukt',
-        detail: 'De webdesign-opdracht kon tijdelijk niet veilig worden opgeslagen. Probeer opnieuw.',
-      };
-    }
-    if (!processJobsInline) {
-      queueProcessing();
-    }
-    return {
-      ok: true,
-      statusCode: 202,
-      job: serializeJob(job),
-      existing: false,
-    };
-  }
+  const startJob = createWebdesignJobStarter({ pruneJobs, normalizeString, normalizeCustomer, normalizeWebsiteUrl,
+    normalizeJobId, findRunningJobForCustomer, logPersistentJobLoadError, createWebdesignJobStatusUnavailableResult,
+    serializeJob, jobs, loadPersistentJobResult, isExpiredJob, dataOpsStore, logger, now, normalizeRetryState,
+    persistJob, requiresPersistentJobStorage, processJobsInline, queueProcessing });
 
   async function startJobResponse(req, res) {
     const body = req.body && typeof req.body === 'object' ? req.body : {};

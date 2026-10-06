@@ -29,7 +29,7 @@ function read(fileName) {
 test('live momentum page renders the requested dashboard surface', () => {
   const html = read('live-momentum.html');
 
-  assert.match(html, /<title>ATTACK, ATTACK, ATTACK\. \| Softora<\/title>/);
+  assert.match(html, /<title>Winnen \| Softora<\/title>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/winnen">/);
   assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover">/);
   assert.match(html, /<meta name="theme-color" content="#f5f3ef" media="\(max-width: 900px\)">/);

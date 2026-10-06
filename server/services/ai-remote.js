@@ -1,5 +1,6 @@
 const { isOpenAiSafetyBlockedError: isOpenAiSafetyRejectionData, buildOpenAiImageFailureDiagnostic } = require('./openai-image-errors');
 const brandColorGuard = require('./website-brand-color-guard');
+const { createWebsitePreviewDocumentFetcher, buildWebsitePreviewFetchError } = require('./website-preview-fetch-recovery');
 const { extractCssVariableColorHints, extractCssBrandPalette, extractCssBrandColorEvidence, selectBrandStylesheetUrls } = require('./website-brand-colors');
 const { buildOpenAiContextHeaders } = require('./openai-request-context');
 const {
@@ -538,7 +539,7 @@ function createAiRemoteService(deps = {}) {
     return assertWebsitePreviewUrlIsPublic(finalUrlRaw);
   }
 
-  async function tryFetchWebsitePreviewDocument(normalizedUrl, timeoutMs = 25000) {
+  async function tryFetchWebsitePreviewDocumentOnce(normalizedUrl, timeoutMs = 25000) {
     const attempts = [];
     const profiles = buildWebsitePreviewDocumentFetchProfiles();
 
@@ -590,6 +591,7 @@ function createAiRemoteService(deps = {}) {
         attempts.push({
           mode: profile.id,
           status: 0,
+          errorCode: String(error?.cause?.code || error?.code || ''), errorName: String(error?.name || ''),
           error: truncateText(normalizeString(error?.message || 'Fetch mislukt'), 180),
         });
       }
@@ -600,6 +602,10 @@ function createAiRemoteService(deps = {}) {
       attempts,
     };
   }
+
+  const tryFetchWebsitePreviewDocument = createWebsitePreviewDocumentFetcher({
+    fetchDocument: tryFetchWebsitePreviewDocumentOnce, assertPublic: assertWebsitePreviewUrlIsPublic,
+  });
 
   async function tryFetchWebsitePreviewViaReader(normalizedUrl, timeoutMs = 25000) {
     const readerUrl = buildWebsitePreviewReaderUrl(normalizedUrl);
@@ -651,23 +657,6 @@ function createAiRemoteService(deps = {}) {
         error: truncateText(normalizeString(error?.message || 'Reader fetch mislukt'), 180),
       };
     }
-  }
-
-  function buildWebsitePreviewFetchError(attempts = []) {
-    const lastAttemptWithStatus = [...attempts]
-      .reverse()
-      .find((attempt) => Number.isFinite(attempt?.status) && attempt.status > 0);
-    const status = lastAttemptWithStatus ? lastAttemptWithStatus.status : 502;
-    const blocked = attempts.some(
-      (attempt) => attempt?.blocked || [401, 403, 406, 409, 429, 451].includes(Number(attempt?.status || 0))
-    );
-    const err = new Error(
-      blocked
-        ? `Kon deze website niet ophalen (${status}). Deze site blokkeert geautomatiseerde serververzoeken.`
-        : `Kon deze website niet ophalen (${status}).`
-    );
-    err.status = status >= 400 && status < 600 ? status : 502;
-    return err;
   }
 
   function extractCssFontFamilyHints(cssSources = []) {
@@ -1301,6 +1290,7 @@ function createAiRemoteService(deps = {}) {
     }
 
     const scan = extractWebsitePreviewScanFromHtml(html, finalUrl);
+    if (directFetch.recoveredHttp) scan.fetchSource = 'http-recovery';
     if (clientRedirectUrl) {
       scan.fetchSource = 'client-redirect';
       scan.clientRedirectUrl = normalizeWebsitePreviewTargetUrl(clientRedirectUrl) || clientRedirectUrl;

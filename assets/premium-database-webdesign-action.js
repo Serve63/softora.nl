@@ -478,10 +478,23 @@
             return POLL_INTERVAL_MS;
         }
 
+        function formatJobError(message, customerId, company) {
+            let detail = normalizeString(message);
+            if (!detail) return "";
+            const customer = getCustomerById(customerId);
+            const name = normalizeString(company || (customer && customer.bedrijf));
+            const fetchError = detail.match(/^(?:Websiteanalyse mislukt:\s*)?Kon deze website niet ophalen(?:\s*\(\d+\))?\.?\s*(.*)$/i);
+            if (fetchError) {
+                detail = "De bestaande website kon niet worden gelezen. Er is geen ontwerp gemaakt." + (fetchError[1] ? " " + fetchError[1] : "");
+            }
+            return name && !detail.startsWith(name + ": ") ? name + ": " + detail : detail;
+        }
+
         async function finishPendingJob(job, message, outcome) {
             clearPollTimer(job.jobId);
             removePendingJob(job.customerId);
             if (outcome === "success" || outcome === "reconcile") queueFinishedPhotoRefresh(job.customerId);
+            message = formatJobError(message, job.customerId, job.company);
             if (message) setStatusMessage(message, "error");
             if (typeof renderPage === "function") renderPage();
         }
@@ -528,7 +541,7 @@
                     return;
                 }
                 if (job.status === "error") {
-                    await finishPendingJob(storedJob, job.safetyBlocked ? "De AI-aanbieder heeft dit ontwerp geblokkeerd. Er is geen ontwerp opgeslagen." : (normalizeString(job.error) || "Webdesign maken is mislukt."), "failed");
+                    await finishPendingJob(Object.assign({}, storedJob, { company: job.company }), job.safetyBlocked ? "De AI-aanbieder heeft dit ontwerp geblokkeerd. Er is geen ontwerp opgeslagen." : (normalizeString(job.error) || "Webdesign maken is mislukt."), "failed");
                     return;
                 }
                 schedulePoll(jobId, resolveJobPollDelay(job));
@@ -671,6 +684,7 @@
             clearPollTimer(jobId);
             removePendingJob(target.id);
             if (!deferRender && typeof renderPage === "function") renderPage();
+            message = formatJobError(message, target.id, target.bedrijf);
             if (!quiet && message) setStatusMessage(message, "error");
             return { started: false, failed: true, error: message || "" };
         }
