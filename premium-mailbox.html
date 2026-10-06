@@ -86,11 +86,11 @@ main.is-premium-boot-host > .premium-boot-shell.is-booting { visibility: hidden;
 .mail-search-control input[type="search"]::-ms-reveal { display: none; width: 0; height: 0; }
 .mail-search-status { padding: 7px 2px 0; color: var(--text-light); font-size: 11px; line-height: 1.3; }
 .mail-search-status[data-state="error"] { color: #9b3b30; }
-.mail-list-actions { padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--card); flex-shrink: 0; }
-.mail-list-compose { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 38px; padding: 8px 12px; border: 1px solid rgba(155,35,85,.28); border-radius: 6px; background: transparent; color: var(--crimson); font: 600 13px/1 var(--premium-sidebar-font-sans, 'Inter', sans-serif); cursor: pointer; white-space: nowrap; }
+.mail-list-actions { padding: 0; border-bottom: 1px solid var(--border); background: var(--card); flex-shrink: 0; }
+.mail-list-compose { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 54px; padding: 8px 12px; border: 0; border-radius: 0; background: transparent; color: var(--crimson); font: 600 13px/1 var(--premium-sidebar-font-sans, 'Inter', sans-serif); cursor: pointer; white-space: nowrap; }
 .mail-list-compose svg { width: 16px; height: 16px; }
-.mail-list-compose:hover { background: rgba(155,35,85,.06); border-color: var(--crimson); }
-.mail-list-compose:focus-visible { outline: 2px solid rgba(155,35,85,.35); outline-offset: 2px; }
+.mail-list-compose:hover { background: rgba(155,35,85,.06); }
+.mail-list-compose:focus-visible { outline: 2px solid rgba(155,35,85,.35); outline-offset: -2px; }
 .mail-results-scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
 .mail-results-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .mail-search-more { width: calc(100% - 24px); margin: 10px 12px 14px; min-height: 38px; border: 1px solid rgba(155,35,85,.2); border-radius: 6px; background: #fff; color: var(--crimson); font: 600 12px 'Barlow', sans-serif; cursor: pointer; }
