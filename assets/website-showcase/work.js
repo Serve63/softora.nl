@@ -3,7 +3,7 @@
   if (!root) return;
   const cards = [...root.querySelectorAll('[data-work-card]')];
   const dots = [...root.querySelectorAll('[data-work-dot]')];
-  const descriptions = ['Een eigen uitstraling voor een salon met karakter.', 'Persoonlijke begeleiding, helder en krachtig gepresenteerd.', 'Overzicht en vertrouwen, vanaf het eerste bezoek.', 'Aandacht en waardering voor medewerkers.', 'Industriële machinebouw en technische expertise.', 'Persoonlijke aandacht en kleinschalige dagbeleving.'];
+  const descriptions = ['Het karakter van de salon, vertaald naar een eigen online uitstraling.', 'Een duidelijke, sterke presentatie van persoonlijke begeleiding.', 'Direct een overzichtelijk beeld dat vertrouwen geeft.', 'Medewerkers aandacht geven en waardering laten zien.', 'Technische kennis voor industriële machinebouw.', 'Kleinschalige dagbeleving met aandacht voor de persoon.'];
   const names = ['Salon TOF', 'LinsZorgT', 'Administratieportaal', 'Aangedacht', 'IMOTA', 'Dagbeleving LevensKracht'];
   let active = 0;
   function show(index) {

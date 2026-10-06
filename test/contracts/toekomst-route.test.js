@@ -36,7 +36,12 @@ test('new website choice links the published local design with Softora contact t
  assert.match(entry,/href="\/nieuwe-website"/);
  const html=fs.readFileSync(path.join(root,'assets/website-showcase/index.html'),'utf8');
  assert.match(html,/<base href="\/assets\/website-showcase\/">/);
- assert.doesNotMatch(html,/https:\/\/www\.kreatives\.nl/);
+ for(const file of ['index.html','preview.js','work.js']) {
+  const content=fs.readFileSync(path.join(root,'assets/website-showcase',file),'utf8');
+  assert.doesNotMatch(content,/kreatives|31613066250|13 06 62 50/i,'Showcase must not present the source agency as Softora');
+ }
+ assert.match(html,/href="mailto:info@softora\.nl"/);
+ assert.match(html,/href="tel:\+31643262792"/);
  for(const m of html.matchAll(/(?:src|href)="([^"?#]+)(?:[?#][^"]*)?"/g)){
   if(/^(https?:|data:|tel:|mailto:|\/)/.test(m[1])) continue;
   assert.ok(fs.existsSync(path.join(root,'assets/website-showcase',m[1])),m[1]);
