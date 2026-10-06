@@ -36,6 +36,9 @@ test('new website choice links the published local design with Softora contact t
  assert.match(entry,/href="\/nieuwe-website"/);
  const html=fs.readFileSync(path.join(root,'assets/website-showcase/index.html'),'utf8');
  assert.match(html,/<base href="\/assets\/website-showcase\/">/);
+ const processCss=fs.readFileSync(path.join(root,'assets/website-showcase/style-3.css'),'utf8');
+ const stepSize=processCss.match(/\.Werkwijze_name__UsuC7\{[^}]*font-size:clamp\(([^,]+),[^,]+,([\d.]+)rem\)/);
+ assert.ok(stepSize && Number.parseFloat(stepSize[1]) >= 1.125 && Number(stepSize[2]) <= 2.2,'Process labels stay readable on mobile and smaller than the section headings');
  const headerContact=html.match(/<a href="\/contact" class="btn btn-primary Nav_cta__gBZXl">[^]*?<\/a>/)?.[0] || '';
  assert.match(headerContact,/<span class="btn-label">CONTACT<\/span>/);
  const preview=fs.readFileSync(path.join(root,'assets/website-showcase/preview.js'),'utf8');

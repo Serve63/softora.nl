@@ -899,6 +899,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.topbar-title-wrap \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*45;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*overflow-y:\s*auto;[\s\S]*z-index:\s*60;/);
   assert.match(pageSource, /\.mail-detail \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
+  assert.match(pageSource, /\.detail-body \{[^}]*overflow-y:\s*auto;[^}]*scrollbar-width:\s*none;/);
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"[\s\S]*id="mail-items"[\s\S]*id="mailbox-search-more"/);
   const mailList = pageSource.slice(pageSource.indexOf('<div class="mail-list">'), pageSource.indexOf('<!-- MAIL DETAIL -->'));
   const listActions = mailList.match(/<div class="mail-list-actions">[\s\S]*?<\/div>/)?.[0] || '';
