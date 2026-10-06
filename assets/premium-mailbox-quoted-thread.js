@@ -567,7 +567,8 @@
       .map((value) => String(value || '').trim().toLowerCase()).filter(Boolean));
     const headerEmails = text.match(emailPattern) || [];
     if (headerEmails.length) return headerEmails.some((email) => senderEmails.has(email));
-    const name = normalizeMatchText(String(message && message.from || '').replace(/<[^>]*>/g, '').replace(/"/g, ''));
+    // Display name only: the part before the address ("Martijn van de Ven <m@x.nl>").
+    const name = normalizeMatchText(String(message && message.from || '').split('<')[0].replace(/"/g, ''));
     return name.length >= 3 && !name.includes('@') && normalizeMatchText(headerText).includes(name);
   }
 
