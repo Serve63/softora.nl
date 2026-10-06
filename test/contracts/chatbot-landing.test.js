@@ -15,9 +15,10 @@ test('chatbot landing has its own route and leaves account login separate', asyn
   const chooser = parseDocument(fs.readFileSync(path.join(root, 'assets/entry/toekomst.html'), 'utf8'));
   const links = DomUtils.findAll((node) => node.name === 'a', chooser.children);
   const choice = links.find((node) => node.attribs.class === 'choice' && DomUtils.textContent(node).includes('CHATBOT'));
-  assert.equal(choice.attribs['data-service'], '/chatbot');
-  assert.equal(choice.attribs.href, undefined);
-  assert.equal(choice.attribs['aria-disabled'], 'true');
+  assert.equal(choice.attribs.href, '/chatbot');
+  assert.equal(choice.attribs['aria-disabled'], undefined);
+  assert.equal(choice.attribs.tabindex, undefined);
+  assert.doesNotMatch(DomUtils.textContent(choice), /Coming soon/i);
   assert.ok(links.some((node) => node.attribs.href === '/chatbot-login'));
   assert.ok(elements.some((node) => node.name === 'a' && node.attribs.href === '/chatbot-login'));
   const { createPreviewServer } = require('../../scripts/preview-seo-solution');
