@@ -574,7 +574,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20261006-contactform'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909b'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20261006-querynav'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_AUTOPILOT_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_DASHBOARD_AI_CHAT_SCOPE_VERSION = '20260611a'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CONTENT_FRAME_PARAM = 'softora_sidebar_content'/);
@@ -1567,4 +1567,39 @@ test('Contactformulier staat direct onder Mailbox en gebruikt alleen de formulie
   assert.match(readRepoFile('assets/personnel-theme.js'), /getContactFormSidebarLink/);
   assert.match(readRepoFile('assets/premium-mailbox-owner-session.js'), /scope.folder === 'contact-form' \? '\/api\/mailbox\/contact-form\?limit=200'/);
   assert.match(readRepoFile('assets/premium-mailbox.js'), /getSearchUrl: \(\) => contactFormView \? '\/api\/mailbox\/contact-form'/);
+});
+
+
+test('sidebar allows navigation between Mailbox and Contactformulier and blocks only the current view', () => {
+  for (const [search, href, expectedBlocked] of [
+    ['', '/mailbox?folder=contact-form', false],
+    ['?folder=contact-form', '/mailbox', false],
+    ['?folder=contact-form', '/mailbox?folder=contact-form', true],
+    ['', '/mailbox', true],
+  ]) {
+    const events = {};
+    const changed = [];
+    const nav = { scrollTop: 20, scrollLeft: 0 };
+    const anchor = {
+      getAttribute: (key) => key === 'href' ? href : null,
+      classList: { contains: () => false },
+    };
+    const sidebar = { contains: (node) => node === anchor,
+      querySelector: (selector) => selector === '.sidebar-nav' ? nav : null };
+    const document = { readyState: 'complete', cookie: '',
+      documentElement: { dataset: {}, toggleAttribute: (_, enabled) => changed.push(enabled) },
+      querySelector: () => sidebar,
+      addEventListener: (name, listener) => { events[name] = listener; } };
+    const window = { location: { origin: 'https://www.softora.nl', pathname: '/mailbox', search, hash: '' },
+      addEventListener() {} };
+    require('../../assets/premium-sidebar-stability').initialize(window, document);
+    let prevented = false;
+    let stopped = false;
+    events.click({ type: 'click', button: 0, target: { closest: () => anchor },
+      preventDefault: () => { prevented = true; },
+      stopImmediatePropagation: () => { stopped = true; } });
+    assert.equal(prevented, expectedBlocked, `${search} -> ${href}`);
+    assert.equal(stopped, expectedBlocked, `${search} -> ${href}`);
+    assert.deepEqual(changed, expectedBlocked ? [] : [true]);
+  }
 });

@@ -61,6 +61,7 @@
             var targetUrl = new URL(href, window.location.origin);
             return targetUrl.origin === window.location.origin &&
                 targetUrl.pathname === window.location.pathname &&
+                targetUrl.search === String(window.location.search || "") &&
                 targetUrl.hash === window.location.hash;
         } catch (_) {
             return false;
