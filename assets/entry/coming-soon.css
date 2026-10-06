@@ -9,6 +9,8 @@
 .toekomst-ai .meet-label .choice-coming-soon{position:static;flex:none;padding:7px 10px;font-size:8px;letter-spacing:.7px}
 
 .toekomst-ai [aria-disabled="true"]{cursor:default}
+.toekomst-ai .choice[aria-disabled="true"]{opacity:.7}
+.toekomst-ai .choice[aria-disabled="true"] .choice-photo{filter:grayscale(1)}
 .toekomst-ai .choice[aria-disabled="true"]:hover{transform:none;box-shadow:0 5px 15px #3c1a2908}
 .toekomst-ai .choice[aria-disabled="true"]:hover .choice-photo{transform:none}
 .toekomst-ai .choice[aria-disabled="true"]:hover .choice-detail{max-height:0;opacity:0;padding-top:0}
