@@ -206,11 +206,23 @@ test('chooser marks only telephone and SEO as upcoming and enables available ser
  }
 });
 
-test('meeting banner is available and links to Softora contact', () => {
+test('the entire meeting banner is one keyboard-accessible link to Over Softora', () => {
+ const {parseDocument,DomUtils}=require('htmlparser2');
+ const {getIndexablePublicHtmlFileFromPath}=require('../../server/services/public-seo');
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
- const banner=html.match(/<section class="meet-softora"[^]*?<\/section>/)?.[0] || '';
- assert.doesNotMatch(banner,/Coming soon|choice-coming-soon|aria-disabled|tabindex/);
- assert.match(banner,/class="meet-link" href="https:\/\/www\.softora\.nl\/contact"/);
+ const doc=parseDocument(html);
+ const banner=DomUtils.findAll(n=>n.attribs?.class==='meet-softora',doc.children)[0];
+ assert.ok(banner);
+ assert.equal(banner.name,'a');
+ assert.equal(banner.attribs.href,'/over-softora');
+ assert.equal(banner.attribs['aria-labelledby'],'meet-title');
+ assert.equal(banner.attribs.tabindex,undefined);
+ assert.equal(banner.attribs['aria-disabled'],undefined);
+ assert.equal(DomUtils.findAll(n=>n.name==='a'||n.name==='button',banner.children).length,0,'The whole banner must share one destination without nested interactive elements');
+ assert.doesNotMatch(DomUtils.textContent(banner),/Coming soon/);
+ const cta=DomUtils.findAll(n=>n.attribs?.class==='meet-link',banner.children)[0];
+ assert.equal(cta.name,'span');
+ assert.equal(getIndexablePublicHtmlFileFromPath(banner.attribs.href),'premium-over-softora.html');
 });
 
 test('only coming soon cards cannot navigate or enter keyboard tab order', () => {
