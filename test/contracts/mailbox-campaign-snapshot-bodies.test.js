@@ -25,7 +25,7 @@ test('de mailbox-snapshot krijgt alle hoofd- en threadteksten vooraf mee', async
     threadMessages: [
       { id: 'sent:5', uid: 5, folder: 'sent', hasBody: true, body: '' },
       { id: 'allmail:6', mailboxId: 'allmail:9', storageFolder: 'allmail', uid: 9, folder: 'sent', hasBody: true, body: '' },
-      { id: 'sent:7', uid: 7, folder: 'sent', hasBody: true, body: 'Al aanwezig' },
+      { id: 'sent:7', uid: 7, folder: 'sent', hasBody: true, body: 'Al aanwezig', aiPresentation: { status: 'unavailable' } },
       { id: 'sent:uidless', uid: 0, folder: 'sent', hasBody: true, body: '', messageId: '<x@example.test>' },
     ],
   }];
@@ -74,4 +74,29 @@ test('een onopgeloste of lege tekst wordt niet als geladen gemarkeerd', async ()
   ]);
   assert.equal(result[0].bodyLoaded, undefined);
   assert.equal(result[1].bodyLoaded, undefined);
+});
+
+test('een Instantly-gesprek met tekst maar zonder AI-weergave krijgt die vooraf mee', async () => {
+  const calls = [];
+  const hydrate = createMailboxCampaignSnapshotBodies({
+    logger: { info() {} },
+    getMessageBodies: async ({ messages }) => {
+      calls.push(messages);
+      return messages.map((reference) => resolved(reference, 'Tekst uit de index', {
+        aiPresentation: { version: 'mailbox-luna-v1', status: 'ready', sourceBody: 'Tekst uit de index' },
+      }));
+    },
+  });
+  const [conversation] = await hydrate([{
+    id: 'serve@websoftora.com|instantly-thread:7a-abc', mailboxId: 'instantly:01a10fe8-535d-709c-8cbf-d0f95c62f74e',
+    folder: 'inbox', storageFolder: 'instantly', provider: 'instantly', uid: 0,
+    accountEmail: 'serve@websoftora.com', hasBody: true, body: 'Tekst uit de index', bodyLoaded: true,
+    threadMessages: [{ id: 'sent:4', uid: 4, folder: 'sent', hasBody: true, body: 'Klaar', aiPresentation: { status: 'unavailable' } }],
+  }]);
+  assert.deepEqual(calls, [[
+    { account: 'serve@websoftora.com', folder: 'instantly', id: 'instantly:01a10fe8-535d-709c-8cbf-d0f95c62f74e' },
+  ]]);
+  assert.equal(conversation.aiPresentation.status, 'ready');
+  assert.equal(conversation.body, 'Tekst uit de index');
+  assert.equal(conversation.bodyLoaded, true);
 });
