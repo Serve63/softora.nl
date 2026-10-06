@@ -165,6 +165,36 @@ function extractCssBrandPalette(cssSources = [], preferredColors = []) {
   return palette.slice(0, 6);
 }
 
+// Walk each byte once: an unanchored rule regex retries every position in long
+// brace-free source-map comments. Ignore CSS strings/comments and URL parentheses.
+function* iterateCssRules(css) {
+  let start = 0, parts = [], selector = null, quote = '', parentheses = 0;
+  for (let index = 0; index < css.length; index += 1) {
+    const char = css[index];
+    if (char === '\\') { index += 1; continue; }
+    if (quote) { if (char === quote) quote = ''; continue; }
+    if (char === '"' || char === "'") { quote = char; continue; }
+    if (char === '/' && css[index + 1] === '*') {
+      const end = css.indexOf('*/', index + 2);
+      if (end < 0) return;
+      parts.push(css.slice(start, index));
+      index = end + 1; start = index + 1;
+      continue;
+    }
+    if (char === '(') { parentheses += 1; continue; }
+    if (char === ')') { parentheses = Math.max(0, parentheses - 1); continue; }
+    if (parentheses || (char !== '{' && char !== '}')) continue;
+    parts.push(css.slice(start, index));
+    const segment = parts.join('');
+    parts = []; start = index + 1;
+    if (char === '{') selector = segment;
+    else {
+      if (selector !== null) yield [selector, segment];
+      selector = null;
+    }
+  }
+}
+
 function extractCssBrandColorEvidence(cssSources = []) {
   const evidence = new Map();
   for (const raw of cssSources) {
@@ -175,10 +205,9 @@ function extractCssBrandColorEvidence(cssSources = []) {
       if (/^(wp-|bs-|akismet-|swiper-)/.test(name) || !/(?:brand|primary|secondary|accent)/i.test(name)) continue;
       for (const color of extractColorTokensFromCss(declaration)) evidence.set(color, { color, role: name });
     }
-    for (const rule of css.matchAll(/([^{}]+)\{([^{}]+)\}/g)) {
-      const selector = rule[1];
+    for (const [selector, declarations] of iterateCssRules(css)) {
       if (!/(?:button|\.btn|header|navbar|navigation|logo)/i.test(selector) || /cookie|consent|success|danger|warning|admin|woocommerce|swiper/i.test(selector)) continue;
-      for (const declaration of rule[2].matchAll(/(?:^|;)\s*(?:background(?:-color)?|color|fill)\s*:\s*([^;]+)/gi)) {
+      for (const declaration of declarations.matchAll(/(?:^|;)\s*(?:background(?:-color)?|color|fill)\s*:\s*([^;]+)/gi)) {
         const value = declaration[1].replace(/var\(--([a-z0-9-_]+)\)/gi, (_, name) => variables.get(name) || '');
         for (const color of extractColorTokensFromCss(value)) evidence.set(color, { color, role: 'brand-ui' });
       }
