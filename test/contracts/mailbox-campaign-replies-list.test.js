@@ -234,3 +234,35 @@ test('een gedeelde rebuild overschrijft de duurzame lijst niet met een afgekapt 
   assert.equal(result.snapshotMessages.length, 401);
   assert.equal(writes, 0);
 });
+
+test('de pagina-snapshot bewaart vooraf geladen gespreksteksten', async () => {
+  const writes = [];
+  const hydrated = [];
+  const listCampaignReplies = createMailboxCampaignRepliesList({
+    mailboxCampaignRepliesService: {
+      listRepliesWithSnapshot: async () => ({
+        messages: [],
+        snapshotMessages: [{ id: 'inbox:1', messageKey: 'inbox:1', accountEmail: 'serve@softora.nl', receivedAt: '2026-10-06T13:10:00.000Z', hasBody: true, body: '', threadMessages: [] }],
+      }),
+    },
+    instantlyMailboxService: { isConfigured: () => false },
+    filterVisibleMailboxMessages: (value) => value,
+    setUiStateValues: async (...args) => { writes.push(args); },
+    hydrateSnapshotBodies: async (messages) => {
+      hydrated.push(messages.length);
+      return messages.map((message) => ({ ...message, body: 'Volledige tekst', bodyLoaded: true }));
+    },
+    logger: { info() {}, warn() {} },
+    normalizeString: (value) => String(value || '').trim(),
+    truncateText: (value, maxLength) => String(value || '').slice(0, maxLength),
+  });
+  await listCampaignReplies({ limit: 10 });
+  assert.deepEqual(hydrated, []);
+  const result = await listCampaignReplies({ includeSnapshotMessages: true, hydrateBodies: false });
+  assert.deepEqual(hydrated, [1]);
+  assert.equal(result.snapshotMessages[0].body, 'Volledige tekst');
+  assert.equal(
+    parseMailboxCampaignSnapshot(writes[0][1][MAILBOX_CAMPAIGN_SNAPSHOT_KEY]).messages[0].body,
+    'Volledige tekst'
+  );
+});

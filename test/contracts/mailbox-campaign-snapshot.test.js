@@ -255,7 +255,8 @@ test('mailbox campaign snapshot blijft compact en opent de nieuwste mail direct'
     dataUrl: '/api/mailbox/message-image?account=serve%40softora.nl&folder=inbox&id=inbox%3A100&index=0',
   }]);
   assert.equal(parsed.messages[0].bodyImagesTruncated, false);
-  assert.equal(parsed.messages.at(-1).body, '');
+  // Every conversation keeps its body, so none opens with "laden…".
+  assert.match(parsed.messages.at(-1).body, /^Volledige inhoud 99/);
   assert.deepEqual(parsed.messages.at(-1).bodyImages, []);
   assert.equal(parsed.messages.at(-1).bodyImagesTruncated, true);
   assert.equal(parsed.sync.source, 'campaign-replies-snapshot');
@@ -823,4 +824,29 @@ test('mailbox campaign snapshot weigert lege en ongeldige data', () => {
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 2, messages: [] })), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 3, messages: [{}] })), null);
   assert.equal(parseMailboxCampaignSnapshot(JSON.stringify({ version: 7, messages: [{}] })), null);
+});
+
+test('de snapshot bewaart de AI-weergave zonder dubbele brontekst en herstelt die bij lezen', () => {
+  const body = 'Hoi Servé,\n\nDank voor het ontwerp.\n\nGroet, Marijn';
+  const ready = {
+    version: 'mailbox-luna-v1', status: 'ready', gate: false, reason: null,
+    model: 'gpt-6-luna', reasoningEffort: 'max',
+    decision: { contacts: [], labels: ['authored', 'authored', 'signature'] }, sourceBody: body,
+  };
+  const serialized = serializeMailboxCampaignSnapshot({
+    ok: true,
+    messages: [{
+      id: 'inbox:7', uid: 7, folder: 'inbox', accountEmail: 'serve@softora.nl', body, aiPresentation: ready,
+      threadMessages: [
+        { id: 'sent:8', uid: 8, folder: 'sent', accountEmail: 'serve@softora.nl', body: 'Eerdere mail', aiPresentation: { version: 'mailbox-luna-v1', status: 'unavailable' } },
+        { id: 'sent:9', uid: 9, folder: 'sent', accountEmail: 'serve@softora.nl', body: 'Nieuwe tekst', aiPresentation: { ...ready, sourceBody: 'Andere tekst' } },
+      ],
+    }],
+  });
+  assert.equal(serialized.split('Dank voor het ontwerp').length - 1, 1);
+  const [message] = parseMailboxCampaignSnapshot(serialized).messages;
+  assert.deepEqual(message.aiPresentation, ready);
+  assert.deepEqual(message.threadMessages[0].aiPresentation, { version: 'mailbox-luna-v1', status: 'unavailable' });
+  // A presentation of other text is never shown; the detail fetches a fresh one.
+  assert.equal(message.threadMessages[1].aiPresentation, undefined);
 });
