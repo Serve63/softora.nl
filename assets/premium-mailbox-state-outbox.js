@@ -218,9 +218,11 @@
       return { ok: true, pending: true, record: saved };
     }
 
-    async function retry(resourceKey) {
+    async function retry(resourceKey, expectedMutationId = '') {
       const current = await store.get(resourceKey);
-      if (!isCurrentRecord(current)) return false;
+      if (!isCurrentRecord(current) || (expectedMutationId && (
+        current.mutationId !== expectedMutationId || current.status !== 'failed'
+      ))) return false;
       const updated = await store.update(resourceKey, current.mutationId, {
         status: 'pending', attempts: 0, nextAttemptAt: now(),
         leaseOwner: '', leaseUntil: 0, errorMessage: '',
