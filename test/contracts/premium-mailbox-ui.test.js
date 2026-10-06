@@ -5614,6 +5614,8 @@ test('coldmail lijst toont uitsluitend ongelezen bolletje, afzender en datum met
   assert.match(pageSource, /\.unread-dot \{[\s\S]*background:\s*var\(--crimson\);/);
   assert.match(pageSource, /\.mail-results-scroll \{[\s\S]*overflow-y:\s*auto;[\s\S]*scrollbar-width:\s*none;[\s\S]*-ms-overflow-style:\s*none;/);
   assert.match(pageSource, /\.mail-results-scroll::\-webkit\-scrollbar \{[\s\S]*display:\s*none;/);
+  assert.match(pageSource, /\.detail-body \{[^}]*overflow-y:\s*auto;[^}]*scrollbar-width:\s*none;[^}]*-ms-overflow-style:\s*none;/);
+  assert.match(pageSource, /\.detail-body::-webkit-scrollbar \{[^}]*display:\s*none;[^}]*width:\s*0;[^}]*height:\s*0;/);
   assert.match(pageSource, /\.mail-time \{[\s\S]*flex-direction:\s*column;[\s\S]*align-items:\s*flex-end;/);
 });
 
