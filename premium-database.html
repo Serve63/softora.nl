@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/assets/iphone-optimizations.css">
     <title>Softora | Mailsysteem</title>
     <link rel="stylesheet" href="assets/personnel-theme.css?v=20260519b">
-    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260923-softora-purple"><link rel="stylesheet" href="assets/premium-database-mail-ready-menu.css?v=20260914-provider"><link rel="stylesheet" href="assets/premium-database-photo-batch.css?v=20260922-count-fit">
+    <link rel="stylesheet" href="assets/custom-selects.css?v=20260511a"><link rel="stylesheet" href="assets/premium-database-filter-groups.css?v=20260923-softora-purple"><link rel="stylesheet" href="assets/premium-database-mail-ready-menu.css?v=20260914-provider"><link rel="stylesheet" href="assets/premium-database-photo-batch.css?v=20261006-simple">
     <script>
         (function () {
             document.documentElement.setAttribute("data-personnel-loading", "true");
@@ -1321,9 +1321,8 @@
                     <input class="photo-batch-input" id="photoBatchLimitInput" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" spellcheck="false" value="10" aria-label="Specifiek aantal webdesigns">
                 </label>
             </div>
-            <div class="photo-batch-source" role="group" aria-label="Bron"><span>Via welke bron?</span><div class="photo-batch-source__choices"><label><input type="radio" name="photoBatchSource" value="all" checked>Alle <strong id="photoBatchSourceAllCount">0</strong></label><label><input type="radio" name="photoBatchSource" value="searcher">Searcher <strong id="photoBatchSearcherCount">0</strong></label><label><input type="radio" name="photoBatchSource" value="robot">Robot <strong id="photoBatchRobotCount">0</strong></label></div><small class="photo-batch-source__note" id="photoBatchSourceUnknownCount" hidden></small></div>
             <div class="photo-batch-provider" role="group" aria-label="Mailprovider"><span>Voor welke mailprovider?</span><div class="photo-batch-provider__choices"><label><input type="radio" name="photoBatchProvider" value="softora">Softora</label><label><input type="radio" name="photoBatchProvider" value="instantly">Instantly</label></div></div>
-            <div class="photo-batch-summary" id="photoBatchSummary" aria-live="polite"></div>
+            <div class="photo-batch-summary" id="photoBatchSummary" aria-live="polite" hidden></div>
             <div class="mbtns">
                 <button class="mbtn c" id="cancelPhotoBatchButton" type="button">Annuleren</button>
                 <button class="mbtn s" id="startPhotoBatchButton" type="button">Starten</button>
@@ -1373,7 +1372,7 @@
             <img class="photo-preview-image" id="photoPreviewImage" alt="">
             <div class="photo-preview-meta" id="photoPreviewMeta"></div>
         </div>
-    </div><script src="assets/premium-database-photo-batch.js?v=20261003-subscription"></script><script src="assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui"></script>
+    </div><script src="assets/premium-database-photo-batch.js?v=20261006-simple"></script><script src="assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui"></script>
     <script src="assets/premium-database-status-message.js?v=20260926"></script>
     <script src="assets/premium-database-webdesign-asset-state.js?v=20260914-provider"></script><script src="assets/premium-database-coldmail-guard.js?v=20260602a"></script><script src="assets/premium-database-webdesign-bulk.js?v=20261003-resilient"></script><script src="assets/premium-database-webdesign-job-restore.js?v=20260723a"></script><script src="assets/premium-database-webdesign-variant-picker.js?v=20260925-v2-only"></script><script src="assets/premium-database-instantly-status.js?v=20260923-current-campaigns"></script><script src="assets/premium-database-current-campaign-media.js?v=20260924-targeted-visibility"></script><script src="assets/premium-database-webdesign-action.js?v=20261003-subscription"></script><script src="assets/premium-database-webdesign-preview.js?v=20260909-mailsysteem"></script><script src="assets/premium-database-lead-delete.js?v=20260925-design-remove"></script>
     <script src="assets/premium-database-import.js?v=20260923-ready-sync"></script><script src="assets/premium-database-boot.js?v=20260923-provider-readmodel"></script><script src="assets/premium-database-sent-register.js?v=20260927a"></script><script src="assets/premium-readmodel-store.js?v=20260924c"></script><script src="assets/premium-readmodel-client.js?v=20260924a"></script><script src="assets/premium-screen-snapshot.js?v=20260927a"></script><script src="assets/premium-database-screen-snapshot.js?v=20260927a"></script><script src="assets/premium-database-system-mail-count.js?v=20261003-complete-count"></script><script src="assets/premium-database-autopilot-toggle.js?v=20260716a"></script><script src="assets/softora-api-cost-ledger.js?v=20260428a"></script>
@@ -1475,10 +1474,6 @@
             photoBatchOptions: document.getElementById("photoBatchOptions"),
             photoBatchChoiceButtons: Array.from(document.querySelectorAll("[data-photo-batch-mode]")),
             photoBatchAllCount: document.getElementById("photoBatchAllCount"),
-            photoBatchSourceAllCount: document.getElementById("photoBatchSourceAllCount"),
-            photoBatchSearcherCount: document.getElementById("photoBatchSearcherCount"),
-            photoBatchRobotCount: document.getElementById("photoBatchRobotCount"),
-            photoBatchSourceUnknownCount: document.getElementById("photoBatchSourceUnknownCount"),
             photoBatchLimitInput: document.getElementById("photoBatchLimitInput"),
             photoBatchSummary: document.getElementById("photoBatchSummary"),
             cancelPhotoBatchButton: document.getElementById("cancelPhotoBatchButton"),
@@ -1497,7 +1492,7 @@
         const customersCore = window.SoftoraPremiumCustomersCore; const databaseSourceFilter = window.SoftoraPremiumDatabaseSourceFilter;
         const webdesignPhotoSourceSelection = window.SoftoraDatabaseWebdesignSourceSelection.createController({ getSortedCustomers, getFilteredCustomers, isWebdesignPhotoEligible, sourceFilter: databaseSourceFilter });
         const photoBatchController = window.SoftoraDatabasePhotoBatch.createController({
-            nodes, getTargets: webdesignPhotoSourceSelection.getTargets, getSourceCounts: webdesignPhotoSourceSelection.getSourceCounts, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR,
+            nodes, getTargets: webdesignPhotoSourceSelection.getTargets, formatEuroCost, costEur: WEBSITE_PHOTO_COST_EUR,
             closeAddActions, setStatusMessage, generate: generateWebdesignPhotos
         });
         const databaseContactStatus = window.SoftoraDatabaseContactStatus;
