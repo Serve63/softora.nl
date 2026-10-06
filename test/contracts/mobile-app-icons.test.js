@@ -27,7 +27,17 @@ for (const app of apps) {
       const touchIcons = elements.filter((element) => element.tag === 'link' && element.rel === 'apple-touch-icon');
       assert.equal(touchIcons.length, 1, `${page} must not have a competing generic Softora touch icon`);
       assert.equal(touchIcons[0].sizes, '180x180');
-      assert.equal(touchIcons[0].href, `/assets/${app.stem}-app-icon-180.png?v=20261006a`);
+      assert.equal(touchIcons[0].href, `/assets/${app.stem}-app-icon-ios-20261006b.png`);
+      assert.equal(new URL(touchIcons[0].href, 'https://www.softora.nl').search, '');
+      const iconPreloads = elements.filter((element) => element.rel === 'preload' && element.as === 'image' && element.href === touchIcons[0].href);
+      assert.equal(iconPreloads.length, 1, 'The iPhone icon must start loading before opening the share sheet');
+      assert.equal(iconPreloads[0].type, 'image/png');
+      const firstScript = elements.findIndex((element) => element.tag === 'script');
+      assert.ok(firstScript < 0 || elements.indexOf(iconPreloads[0]) < firstScript, 'Load the icon before application scripts');
+      const browserIcons = elements.filter((element) => element.tag === 'link' && element.rel === 'icon');
+      assert.equal(browserIcons.length, 1, 'Browser fallback must not compete with a generic Softora icon');
+      assert.equal(browserIcons[0].href, `/assets/${app.stem}-app-icon-512.png?v=20261006a`);
+      assert.match(read(page), new RegExp(`<title>${app.name} (?:\\||—) `), 'The page title must identify the app even if iOS falls back to it');
       const png = fs.readFileSync(localFile(touchIcons[0].href));
       assert.equal(png.readUInt32BE(16), 180);
       assert.equal(png.readUInt32BE(20), 180);
