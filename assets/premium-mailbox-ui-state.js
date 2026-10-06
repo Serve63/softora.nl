@@ -108,7 +108,6 @@
   async function retryRead(options = {}) {
     const mail = options.mail;
     if (!mail) return { ok: false };
-    const state = getReadState(mail, options.campaignInbox);
     const render = () => {
       options.renderList?.({ openLatest: false });
       if (String(options.getActiveMail?.()) === String(mail.id)) {
@@ -118,8 +117,8 @@
         });
       }
     };
-    if (state.conversationAction?.kind === 'reply' && state.replyTarget?.readError) {
-      return options.dismissReply?.(mail, { render });
+    if (typeof options.readController?.retry === 'function') {
+      return options.readController.retry(mail, { render });
     }
     return options.readController?.markRead?.(mail, { render });
   }

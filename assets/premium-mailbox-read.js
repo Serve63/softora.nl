@@ -401,6 +401,53 @@
       return { ok: true, result: outcome.result };
     }
 
+    async function retry(mail, hooks = {}) {
+      if (!mail) return { ok: false };
+      const candidates = [mail, ...(Array.isArray(mail.threadMessages) ? mail.threadMessages : [])];
+      const target = candidates.find((candidate) => failedRecords.has(getIdentityKey(getIdentity(candidate))));
+      const targetKey = target && getIdentityKey(getIdentity(target));
+      const record = targetKey && failedRecords.get(targetKey);
+      // An incoming conversation is not evidence that the failed action was
+      // dismissal. Unknown errors can only request read-only persistence.
+      if (!record || typeof stateOutbox?.retry !== 'function') return markRead(mail, hooks);
+      const identityKeys = new Set((record.identities || [record.identity]).map(getIdentityKey));
+      const targets = candidates.filter((candidate) => identityKeys.has(getIdentityKey(getIdentity(candidate))));
+      if (!targets.includes(target)) targets.push(target);
+      if (targets.some((candidate) => candidate.readPending || getStateFor(candidate)?.pending)) {
+        return { ok: false, pending: true };
+      }
+      const snapshots = snapshotTargets(targets);
+      const previous = record.previous || snapshots.find((snapshot) => snapshot.target === target) || {};
+      pendingOperations.set(record.mutationId, {
+        kind: record.dismissReply === true ? 'dismiss' : 'read',
+        mail, target, targets, snapshots, previous, hooks, targetKey,
+      });
+      let retried;
+      try {
+        // Reuse the stored payload and its original identity/revision. The
+        // expected ID prevents another tab's newer mutation from being retried.
+        retried = await stateOutbox.retry(record.resourceKey, record.mutationId);
+      } catch (error) {
+        pendingOperations.delete(record.mutationId);
+        return { ok: false, error };
+      }
+      if (!retried) {
+        pendingOperations.delete(record.mutationId);
+        await stateOutbox.hydrate?.();
+        applyConfirmedState(mail);
+        render(hooks, mail, target);
+        return { ok: false, superseded: true };
+      }
+      targets.forEach((candidate) => {
+        candidate.unread = false;
+        candidate.readPending = true;
+        candidate.readError = '';
+      });
+      target.replyDismissPending = record.dismissReply === true;
+      render(hooks, mail, target);
+      return { ok: true, pending: true, mutationId: record.mutationId };
+    }
+
     function getDismissTarget(mail) {
       if (typeof options.getDismissTarget === 'function') return options.getDismissTarget(mail);
       const action = options.getConversationAction?.(mail);
@@ -651,6 +698,7 @@
       getIdentity,
       getConversationTargets,
       markRead,
+      retry,
       persist,
       reconcile: applyConfirmedState,
       rememberConfirmedState,
