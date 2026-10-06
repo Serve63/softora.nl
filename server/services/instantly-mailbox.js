@@ -1183,6 +1183,7 @@ function createInstantlyMailboxService(deps = {}) {
     reply,
     resolveAccountRecord,
     syncOwner,
+    listThreadMessages: async ({ threadId, accountEmail }) => extractInstantlyItems(await apiRequest('emails', { query: { limit: 100, eaccount: normalizeEmail(accountEmail), search: `thread:${normalizeText(threadId)}` } })).map(normalizeInstantlyMessage).filter(Boolean),
   };
 }
 
