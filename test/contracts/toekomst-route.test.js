@@ -219,15 +219,14 @@ test('chooser marks only telephone and SEO as upcoming and enables available ser
  }
 });
 
-test('the entire meeting banner is one keyboard-accessible link to Over Softora', () => {
+test('the entire meeting banner is one keyboard-accessible link to the personal introduction', () => {
  const {parseDocument,DomUtils}=require('htmlparser2');
- const {getIndexablePublicHtmlFileFromPath}=require('../../server/services/public-seo');
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  const doc=parseDocument(html);
  const banner=DomUtils.findAll(n=>n.attribs?.class==='meet-softora',doc.children)[0];
  assert.ok(banner);
  assert.equal(banner.name,'a');
- assert.equal(banner.attribs.href,'/over-softora');
+ assert.equal(banner.attribs.href,'/ons-kennen');
  assert.equal(banner.attribs['aria-labelledby'],'meet-title');
  assert.equal(banner.attribs.tabindex,undefined);
  assert.equal(banner.attribs['aria-disabled'],undefined);
@@ -235,7 +234,12 @@ test('the entire meeting banner is one keyboard-accessible link to Over Softora'
  assert.doesNotMatch(DomUtils.textContent(banner),/Coming soon/);
  const cta=DomUtils.findAll(n=>n.attribs?.class==='meet-link',banner.children)[0];
  assert.equal(cta.name,'span');
- assert.equal(getIndexablePublicHtmlFileFromPath(banner.attribs.href),'premium-over-softora.html');
+ const config=JSON.parse(fs.readFileSync(path.join(root,'vercel.json'),'utf8'));
+ assert.ok(config.rewrites.some(route=>route.source===banner.attribs.href&&route.destination==='/assets/ons-kennen/index.html'));
+ const destination=fs.readFileSync(path.join(root,'assets/ons-kennen/index.html'),'utf8');
+ assert.match(destination,/AANGENAAM\./);
+ assert.match(destination,/Martijn van de Ven/);
+ assert.match(destination,/Servé Creusen/);
 });
 
 test('only coming soon cards cannot navigate or enter keyboard tab order', () => {
