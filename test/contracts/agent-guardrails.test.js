@@ -90,6 +90,26 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
 
+test('production image dependency keeps the patched Sharp security floor and the audit gate', () => {
+  const packageJson = JSON.parse(readRepoFile('package.json'));
+  const lock = JSON.parse(readRepoFile('package-lock.json'));
+  const isPatched = (value) => {
+    const match = String(value).match(/^\^?(\d+)\.(\d+)\.(\d+)$/);
+    if (!match) return false;
+    const [major, minor, patch] = match.slice(1).map(Number);
+    return major > 0 || (major === 0 && (minor > 35 || (minor === 35 && patch >= 5)));
+  };
+  assert.ok(isPatched(packageJson.dependencies.sharp), 'declared Sharp must exclude the vulnerable releases');
+  assert.ok(isPatched(lock.packages['node_modules/sharp'].version), 'locked Sharp must contain the librsvg fix');
+  assert.equal(lock.packages[''].dependencies.sharp, packageJson.dependencies.sharp);
+  const deploySource = readRepoFile('scripts/deploy-production-safe.js');
+  for (const name of Object.keys(packageJson.optionalDependencies).filter((name) => name.startsWith('@img/sharp-'))) {
+    const version = lock.packages['node_modules/' + name].version;
+    assert.ok(deploySource.includes("name: '" + name + "', version: '" + version + "'"), 'manual production deploy must use the same patched binary: ' + name);
+  }
+  assert.equal(packageJson.scripts['check:deps'], 'npm audit --omit=dev');
+});
+
 test('quality lock ignores deleted index entries but keeps existing and untracked files', () => {
   const existingFiles = new Set([
     'scripts/check-quality-lock.js',
@@ -701,15 +721,15 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.equal(packageJson.overrides['deepmerge-ts'], '8.0.1');
   assert.equal(packageJson.overrides.qs, '6.16.0');
   assert.equal(packageJson.dependencies.htmlparser2, '^10.1.0');
-  assert.equal(packageJson.dependencies.sharp, '^0.35.4');
+  assert.equal(packageJson.dependencies.sharp, '^0.35.5');
   assert.equal(packageJson.devDependencies.pg, '8.23.0');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.35.4');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.3.3');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.35.4');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.3.3');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.35.5');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.3.4');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.35.5');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.3.4');
   assert.equal(
     vercelConfig.installCommand,
-    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.4 @img/sharp-linux-arm64@0.35.4 @img/sharp-libvips-linux-arm64@1.3.3'
+    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.5 @img/sharp-linux-arm64@0.35.5 @img/sharp-libvips-linux-arm64@1.3.4'
   );
   const standardIncludeFiles = '{*.html,assets/articles/*.html,assets/entry/toekomst.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/{sharp-linux-x64,sharp-libvips-linux-x64,sharp-linux-arm64,sharp-libvips-linux-arm64}/**}';
   const personalSiteIncludeFiles = '{*.html,assets/articles/*.html,assets/entry/toekomst.html,personal-sites/**,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/**}';
@@ -818,8 +838,8 @@ test('agent guardrails keep local cleanliness checks in the critical path', () =
   assert.match(safeDeploySource, /@img\/sharp-libvips-linux-x64/);
   assert.match(safeDeploySource, /@img\/sharp-linux-arm64/);
   assert.match(safeDeploySource, /@img\/sharp-libvips-linux-arm64/);
-  assert.match(safeDeploySource, /version: '0\.35\.4'/);
-  assert.match(safeDeploySource, /version: '1\.3\.3'/);
+  assert.match(safeDeploySource, /version: '0\.35\.5'/);
+  assert.match(safeDeploySource, /version: '1\.3\.4'/);
   assert.match(safeDeploySource, /check:live-production-version/);
   assert.match(agentsSource, /Productie deployen mag alleen via `npm run deploy:production`/);
   assert.match(agentsSource, /check:live-production-version/);

@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
+const { getMailboxSenderIdentity: getOutboundSenderIdentity } = require('./mailbox-contact-form');
 const { getMailboxMessageDirection, isSameMailboxIdentity } = require('./mailbox-message-provenance');
 const { isOriginalCampaignOutboundMessage } = require('./mailbox-image-ownership');
 

@@ -32,7 +32,7 @@ test('personnel dark mode preserves the shared sidebar, legacy palettes and publ
 test('mailbox laadt het gedeelde afwezigheidsfilter vóór de inbox zonder sidebarwijzigingen', () => {
   const page = readRepoFile('premium-mailbox.html');
   const detector = page.indexOf('premium-mailbox-absence-notice.js?v=20261003a');
-  const inbox = page.indexOf('premium-mailbox-campaign-inbox.js?v=20261003a');
+  const inbox = page.indexOf('premium-mailbox-campaign-inbox.js?v=20261006c');
   assert.ok(detector >= 0 && detector < inbox);
   assert.match(page, /data-sidebar-key="mailbox"/);
   assert.match(page, /data-sidebar-user-name/);
@@ -570,8 +570,8 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20261004b'/);
-  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20260927-locked'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20261006-contactform'/);
+  assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20261006-contactform'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_VERSION = '20260909b'/);
@@ -872,7 +872,7 @@ test('premium vaste lasten centreert bootloader in het zichtbare hoofdvlak', () 
 
 test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mailweergave', () => {
   const pageSource = readRepoFile('premium-mailbox.html');
-  assert.ok(pageSource.indexOf('premium-mailbox-copy.js?v=20261006a') < pageSource.indexOf('premium-mailbox.js?v=20261006b'));
+  assert.ok(pageSource.indexOf('premium-mailbox-copy.js?v=20261006a') < pageSource.indexOf('premium-mailbox.js?v=20261006c'));
   assert.match(readRepoFile('assets/premium-mailbox.js'), /SoftoraMailboxCopy\.renderButton\(m\.id, escapeHtml\)[\s\S]*SoftoraMailboxUiState\.renderReadTools/);
   assert.match(readRepoFile('assets/premium-mailbox-mobile.css'), /\.detail-copy-conversation,[\s\S]*min-width: 44px; min-height: 44px/);
   const themeSource = readRepoFile('assets/personnel-theme.js') + '\n' + readRepoFile('assets/premium-sidebar-links.js');
@@ -938,7 +938,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie/);
   assert.match(pageSource, /<textarea id="c-body"[^>]*><\/textarea><div class="compose-body-loading" id="c-body-loading" role="status"[^>]*hidden><span class="compose-body-spinner"/);
   assert.match(pageSource, /\.compose-body-spinner \{[^}]*animation: mailbox-refresh-spin/);
-  assert.match(pageSource, /assets\/premium-mailbox-campaign-inbox\.js\?v=20261003a/);
+  assert.match(pageSource, /assets\/premium-mailbox-campaign-inbox\.js\?v=20261006c/);
   const browserStorageAssetIndex = pageSource.indexOf('assets/premium-browser-storage.js?v=20260828b');
   const attachmentDigestAssetIndex = pageSource.indexOf('assets/premium-mailbox-attachment-digest.js?v=20260828c');
   const sendStateAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-send-state.js?v=20260831b');
@@ -959,8 +959,8 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.ok(acceptedSendAssetIndex < composeControllerAssetIndex, 'accepted-send state hoort vóór de controller te laden');
   const senderAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-sender.js?v=20261006a');
   assert.ok(senderAssetIndex >= 0 && senderAssetIndex < composeControllerAssetIndex, 'afzenderkeuze hoort vóór de controller te laden');
-  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-owner-session\.js\?v=20260921c"><\/script>[\s\S]*<script src="assets\/premium-mailbox-discovery\.js\?v=20261006a"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260927b"><\/script><script src="assets\/premium-mailbox-detail-state\.js\?v=20260821a"><\/script><script src="assets\/premium-mailbox-detail-stability\.js\?v=20260927b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260924b"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-mailbox-compose-window\.js\?v=20260817c"><\/script><script src="assets\/premium-browser-storage\.js\?v=20260828b"><\/script><script src="assets\/premium-mailbox-attachment-digest\.js\?v=20260828c"><\/script><script src="assets\/premium-mailbox-compose-send-state\.js\?v=20260831b"><\/script><script src="assets\/premium-mailbox-compose-send-resilience\.js\?v=20261006a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-delete\.js\?v=20260820a"><\/script><script src="assets\/premium-mailbox-state-outbox\.js\?v=20261006a"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20261006a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20261006a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-readmodel-store\.js\?v=20260924c"><\/script><script src="assets\/premium-screen-snapshot\.js\?v=20260924b"><\/script><script src="assets\/premium-mailbox-detail-snapshot\.js\?v=20261006a"><\/script><script src="assets\/premium-mailbox-prefetch\.js\?v=20260927b"><\/script><script src="assets\/premium-mailbox-copy\.js\?v=20261006a"><\/script><script src="assets\/premium-mailbox\.js\?v=20261006b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-owner-session\.js\?v=20261006c"><\/script>[\s\S]*<script src="assets\/premium-mailbox-discovery\.js\?v=20261006c"><\/script><script src="assets\/premium-mailbox-list\.js\?v=20260927b"><\/script><script src="assets\/premium-mailbox-detail-state\.js\?v=20260821a"><\/script><script src="assets\/premium-mailbox-detail-stability\.js\?v=20260927b"><\/script><script src="assets\/premium-mailbox-index\.js\?v=20260924b"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-mailbox-compose-window\.js\?v=20260817c"><\/script><script src="assets\/premium-browser-storage\.js\?v=20260828b"><\/script><script src="assets\/premium-mailbox-attachment-digest\.js\?v=20260828c"><\/script><script src="assets\/premium-mailbox-compose-send-state\.js\?v=20260831b"><\/script><script src="assets\/premium-mailbox-compose-send-resilience\.js\?v=20261006a"><\/script>[\s\S]*<script src="assets\/premium-mailbox-delete\.js\?v=20260820a"><\/script><script src="assets\/premium-mailbox-state-outbox\.js\?v=20261006a"><\/script><script src="assets\/premium-mailbox-read\.js\?v=20261006a"><\/script><script src="assets\/premium-mailbox-ui-state\.js\?v=20261006a"><\/script>\s*<script src="assets\/premium-mailbox-boot\.js\?v=20260806a"><\/script><script src="assets\/premium-readmodel-store\.js\?v=20260924c"><\/script><script src="assets\/premium-screen-snapshot\.js\?v=20260924b"><\/script><script src="assets\/premium-mailbox-detail-snapshot\.js\?v=20261006a"><\/script><script src="assets\/premium-mailbox-prefetch\.js\?v=20260927b"><\/script><script src="assets\/premium-mailbox-copy\.js\?v=20261006a"><\/script><script src="assets\/premium-mailbox\.js\?v=20261006c"><\/script>/);
 });
 
 test('premium flynow gebruikt een statisch gestylde dynamische canonical sidebar-host', () => {
@@ -1354,7 +1354,7 @@ test('Samenvatten staat als werkende beheerlink in de gedeelde premium-sidebar',
   assert.match(sidebarLinksSource, /function getSummarizeSidebarLink\(\)[\s\S]*key:\s*'summarize'[\s\S]*href:\s*'\/premium-samenvatten'[\s\S]*label:\s*'Samenvatten'/);
   assert.ok(Object.isFrozen(require('../../assets/premium-sidebar-links')));
   assert.equal(typeof require('../../assets/premium-sidebar-links').renderPremiumSidebarNavigation, 'function');
-  assert.match(themeSource, /getMailboxSidebarLink\(\),\s*getSummarizeSidebarLink\(\),/);
+  assert.match(themeSource, /getMailboxSidebarLink\(\),\s*getContactFormSidebarLink\(\),\s*getSummarizeSidebarLink\(\),/);
   assert.match(themeSource, /ensureStaticSidebarLink\(sidebar, "beheer", window\.SoftoraPremiumSidebarLinks\.getSummarizeSidebarLink\(\), \["websitegenerator", "seo", "qr_code", "packages"\]\)/);
   const comingSoonKeys = themeSource.match(/const PREMIUM_SIDEBAR_COMING_SOON_KEYS = new Set\(\[[\s\S]*?\]\);/)?.[0] || '';
   assert.doesNotMatch(comingSoonKeys, /"summarize"/);
@@ -1546,4 +1546,19 @@ test('Lead Radar, Facebook ads and Google ads use the shared disabled sidebar st
   }
   assert.match(readRepoFile('assets/personnel-theme.js'), /function activateFacebookAdsSidebarLink\(sidebar\) \{ if \(PREMIUM_SIDEBAR_COMING_SOON_KEYS.has\("ads_facebook"\)\) return;/);
   assert.match(readRepoFile('assets/premium-sidebar-profile-prefill.js'), /sharedLinks.COMING_SOON_KEYS.indexOf\(link.key\)/);
+});
+
+
+test('Contactformulier staat direct onder Mailbox en gebruikt alleen de formulierweergave', () => {
+  const sidebar = require('../../assets/premium-sidebar-links');
+  const management = sidebar.getPremiumSidebarSections({ authenticated: true, role: 'admin' }).find((section) => section.label === 'Beheer').links;
+  const mailboxIndex = management.findIndex((link) => link.key === 'mailbox');
+  assert.deepEqual(management[mailboxIndex + 1], sidebar.getContactFormSidebarLink());
+  assert.equal(management[mailboxIndex + 1].href, '/mailbox?folder=contact-form');
+  const rendered = sidebar.renderPremiumSidebarNavigation({}, 'contact_form');
+  assert.match(rendered, /class="sidebar-link magnetic active" data-sidebar-key="contact_form"/);
+  assert.match(readRepoFile('assets/premium-sidebar-profile-prefill.js'), /getContactFormSidebarLink/);
+  assert.match(readRepoFile('assets/personnel-theme.js'), /getContactFormSidebarLink/);
+  assert.match(readRepoFile('assets/premium-mailbox-owner-session.js'), /scope.folder === 'contact-form' \? '\/api\/mailbox\/contact-form\?limit=200'/);
+  assert.match(readRepoFile('assets/premium-mailbox.js'), /getSearchUrl: \(\) => contactFormView \? '\/api\/mailbox\/contact-form'/);
 });

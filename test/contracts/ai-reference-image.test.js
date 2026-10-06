@@ -22,6 +22,15 @@ test('AVIF references remain decodable and convertible with the patched native i
   assert.ok(data.length > 0);
 });
 
+test('SVG references remain rasterizable with the patched librsvg dependency', async () => {
+  const source = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="24"><rect width="32" height="24" fill="#005f66"/></svg>');
+  const { data, info } = await sharp(source).resize(16, 12).jpeg().toBuffer({ resolveWithObject: true });
+  assert.equal(info.format, 'jpeg');
+  assert.equal(info.width, 16);
+  assert.equal(info.height, 12);
+  assert.ok(data.length > 0);
+});
+
 test('website preview reference normalizer keeps valid images already under the OpenAI limit', async () => {
   const bytes = Buffer.alloc(4096, 1);
   const result = await normalizeWebsitePreviewReferenceImage({

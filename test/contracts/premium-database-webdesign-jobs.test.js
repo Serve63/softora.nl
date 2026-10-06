@@ -167,13 +167,13 @@ test('premium database webdesign jobs keep Vercel sharp linux installs explicit'
   const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, 'vercel.json'), 'utf8'));
 
-  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.35.4');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.3.3');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.35.4');
-  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.3.3');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-arm64'], '^0.35.5');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-arm64'], '^1.3.4');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-linux-x64'], '^0.35.5');
+  assert.equal(packageJson.optionalDependencies['@img/sharp-libvips-linux-x64'], '^1.3.4');
   assert.equal(
     vercelConfig.installCommand,
-    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.4 @img/sharp-linux-arm64@0.35.4 @img/sharp-libvips-linux-arm64@1.3.3'
+    'npm ci --include=optional && npm install --os=linux --cpu=arm64 --libc=glibc --include=optional --no-save sharp@0.35.5 @img/sharp-linux-arm64@0.35.5 @img/sharp-libvips-linux-arm64@1.3.4'
   );
   const standardIncludeFiles = '{*.html,assets/articles/*.html,assets/entry/toekomst.html,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/{sharp-linux-x64,sharp-libvips-linux-x64,sharp-linux-arm64,sharp-libvips-linux-arm64}/**}';
   const personalSiteIncludeFiles = '{*.html,assets/articles/*.html,assets/entry/toekomst.html,personal-sites/**,assets/fonts/**,assets/premium-sidebar-profile-prefill.js,node_modules/sharp/**,node_modules/@img/**}';

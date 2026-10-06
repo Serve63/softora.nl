@@ -3,7 +3,7 @@ const { createMailboxComposeSend } = require('./mailbox-compose-send');
 const { createMailboxAttachmentService } = require('./mailbox-attachment-service');
 const { sendMailboxMessage } = require('./mailbox-instantly-integration');
 const { createInstantlyUnknownReplyReconciler } = require('./mailbox-instantly-unknown-reply-reconcile');
-const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
+const { getMailboxSenderIdentity: getOutboundSenderIdentity } = require('./mailbox-contact-form');
 const {
   createMailboxReconcileRequiredError,
   createMailboxRequestPayloadFingerprint,
