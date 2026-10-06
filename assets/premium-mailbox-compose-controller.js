@@ -666,7 +666,9 @@
           Date.now(),
           Math.random().toString(36).slice(2),
         ].join(':');
-        const provider = String(canonicalIdentity?.provider || replyContext && replyContext.provider || '').trim().toLowerCase();
+        const provider = sendMode === 'reply'
+          ? String(canonicalIdentity?.provider || contextAtSend?.provider || '').trim().toLowerCase()
+          : '';
         const attachments = options.compose.getAttachments();
         if (provider === 'instantly' && attachments.length) {
           throw new Error('Instantly ondersteunt geen bijlagen bij antwoorden; verwijder de bijlage of verstuur via de gewone mailbox.');
@@ -775,7 +777,8 @@
           provider,
           providerOwner: sendOwner,
           providerMessageId,
-          providerThreadId: String(result.providerThreadId || contextAtSend?.providerThreadId || '').trim(),
+          providerThreadId: provider === 'instantly'
+            ? String(result.providerThreadId || contextAtSend?.providerThreadId || '').trim() : '',
           messageId: String(result.sentMessage?.messageId || messageId).trim(),
           from: String(result.sentMessage?.from || options.campaignInbox?.getOwnerLabel?.(replyOwner) || account),
           email: String(result.sentMessage?.email || account),
@@ -816,13 +819,13 @@
           softoraSendIntentId: String(
             result.sentMessage?.softoraSendIntentId || result.intentId || acceptedIdentityHeaders.intentId || ''
           ).trim(),
-          softoraReplyTargetMessageId: String(
+          softoraReplyTargetMessageId: sendMode !== 'reply' ? '' : String(
             result.sentMessage?.softoraReplyTargetMessageId ||
             canonicalIdentity?.sourceMessageId ||
             contextAtSend?.messageId ||
             ''
           ).trim(),
-          inReplyTo: String(
+          inReplyTo: sendMode !== 'reply' ? '' : String(
             result.sentMessage?.inReplyTo ||
             canonicalIdentity?.sourceMessageId ||
             contextAtSend?.messageId ||
