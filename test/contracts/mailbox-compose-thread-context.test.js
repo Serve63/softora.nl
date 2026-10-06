@@ -343,6 +343,8 @@ test('Instantly reply requires the exact provider thread and new message does no
     },
   });
   assert.equal(fresh.mode, 'new-message');
+  assert.equal(fresh.provider, 'smtp');
   assert.equal(fresh.providerThreadId, '');
   assert.equal(fresh.replyTargetMessageId, '');
+  assert.equal(fresh.references, '');
 });

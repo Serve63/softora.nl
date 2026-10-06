@@ -169,8 +169,11 @@
     const context = payload?.context && typeof payload.context === 'object' ? payload.context : {};
     const replyIdentity = payload?.replyIdentity && typeof payload.replyIdentity === 'object'
       ? payload.replyIdentity : {};
-    const provider = normalize(payload?.provider || replyIdentity.provider) || 'smtp';
-    const replyTargetMessageId = provider === 'instantly'
+    const mode = normalize(payload?.mode);
+    const isReply = mode === 'reply';
+    const provider = isReply ? normalize(payload?.provider || replyIdentity.provider) || 'smtp' : 'smtp';
+    // A follow-up retains its source as correspondence evidence, never as a reply target.
+    const replyTargetMessageId = !isReply ? '' : provider === 'instantly'
       ? normalizeText(
           payload?.providerMessageId
           || replyIdentity.providerMessageId
@@ -181,11 +184,11 @@
       owner: normalize(payload?.owner),
       accountEmail: normalize(payload?.account),
       provider,
-      mode: normalize(payload?.mode),
+      mode,
       conversationId: normalizeText(replyIdentity.conversationId || context.conversationId),
       replyTargetMessageId,
-      references: normalizeText(context.references),
-      providerThreadId: normalizeText(
+      references: isReply ? normalizeText(context.references) : '',
+      providerThreadId: !isReply ? '' : normalizeText(
         payload?.providerThreadId || replyIdentity.providerThreadId || ''
       ),
     };
