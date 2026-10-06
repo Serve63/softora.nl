@@ -127,7 +127,7 @@ test('toekomst mobile features the first website card and shortens the meeting b
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
  const mobile=css.slice(css.indexOf('/* Mobile chooser:'));
  const choices=Array.from(html.matchAll(/<a class="choice" (?:href|data-service)="([^"]+)"/g),m=>m[1]);
- assert.deepEqual(choices,['/nieuwe-website','/bedrijfssoftware','/voicesoftware','/chatbot','/seo-solution']);
+ assert.deepEqual(choices,['/nieuwe-website','/bedrijfssoftware','/chatbot','/voicesoftware','/seo-solution']);
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
  assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
