@@ -144,6 +144,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/ons-kennen", "destination": "/assets/ons-kennen/index.html" },
     { "source": "/juridisch", "destination": "/assets/juridisch/index.html" },
     { "source": "/bedrijfsgegevens", "destination": "/assets/juridisch/bedrijfsgegevens.html" },
     { "source": "/chatbot", "destination": "/assets/chatbot-landing/index.html" },
