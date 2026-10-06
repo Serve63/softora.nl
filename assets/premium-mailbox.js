@@ -1037,7 +1037,7 @@ function handleMailboxAction(actionEl) {
   const composeActionId = action === 'remove-attachment'
     ? actionEl.getAttribute('data-attachment-index')
     : id;
-  if (mailboxComposeController.handleAction(action, composeActionId, { messageKey: actionEl.getAttribute('data-mailbox-message-key') || '' })) return;
+  if (contactFormView && action === 'new-message') { mailboxComposeController.handleAction('reply-mail', composeActionId, {}); return; } if (mailboxComposeController.handleAction(action, composeActionId, { messageKey: actionEl.getAttribute('data-mailbox-message-key') || '' })) return;
   switch (action) {
     case 'set-folder':
       setFolder(actionEl.getAttribute('data-mailbox-folder') || 'inbox', actionEl);
