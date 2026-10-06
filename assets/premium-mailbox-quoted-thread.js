@@ -560,16 +560,34 @@
     const sent = Object.fromEntries(parts.map((part) => [part.type, Number(part.value)]));
     if (sent.year !== header.year || sent.month !== header.month || sent.day !== header.day ||
       sent.hour !== header.hour || sent.minute !== header.minute) return false;
-    const text = String(headerText || '').toLowerCase();
-    const emailPattern = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/g;
-    const senderEmails = new Set([message && message.email, message && message.accountEmail,
-      ...(String(message && message.from || '').toLowerCase().match(emailPattern) || [])]
-      .map((value) => String(value || '').trim().toLowerCase()).filter(Boolean));
-    const headerEmails = text.match(emailPattern) || [];
-    if (headerEmails.length) return headerEmails.some((email) => senderEmails.has(email));
+    const senderEmails = [message && message.email, message && message.accountEmail,
+      ...(String(message && message.from || '').toLowerCase().match(HEADER_EMAIL_PATTERN) || [])];
     // Display name only: the part before the address ("Martijn van de Ven <m@x.nl>").
-    const name = normalizeMatchText(String(message && message.from || '').split('<')[0].replace(/"/g, ''));
-    return name.length >= 3 && !name.includes('@') && normalizeMatchText(headerText).includes(name);
+    const senderName = String(message && message.from || '').split('<')[0].replace(/"/g, '');
+    return headerNamesSender(headerText, senderEmails, [senderName]);
+  }
+
+  // The sender, not just any address: forward headers also list the recipient
+  // ("Van: Servé Creusen Datum: … Aan: info@klant.nl"). An own address anywhere
+  // counts; otherwise our name counts unless it is bound to another address.
+  const HEADER_EMAIL_PATTERN = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/g;
+  function headerNamesSender(headerText, emails, names) {
+    const own = new Set((Array.isArray(emails) ? emails : [])
+      .map((value) => String(value || '').trim().toLowerCase()).filter((value) => value.includes('@')));
+    const lowered = String(headerText || '').toLowerCase();
+    if ((lowered.match(HEADER_EMAIL_PATTERN) || []).some((email) => own.has(email))) return true;
+    const header = normalizeMatchText(headerText);
+    return (Array.isArray(names) ? names : []).some((value) => {
+      const name = normalizeMatchText(value);
+      if (name.length < 3 || name.includes('@')) return false;
+      let index = header.indexOf(name);
+      while (index >= 0) {
+        const bound = /^\s*[<("]?\s*([^\s<>()"]+@[^\s<>()"]+)/.exec(header.slice(index + name.length));
+        if (!bound || own.has(bound[1].replace(/[>),.;:]+$/, ''))) return true;
+        index = header.indexOf(name, index + 1);
+      }
+      return false;
+    });
   }
 
   // Letters and digits only, with the links compared exactly: clients insert
@@ -592,15 +610,10 @@
   ];
 
   function isOwnCampaignTemplateQuote(headerText, quotedValue, options = {}) {
-    const emailPattern = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/g;
     const senders = (Array.isArray(options.ownSenders) ? options.ownSenders : [])
-      .map((value) => String(value || '').trim().toLowerCase()).filter((value) => value.length >= 3);
-    const headerEmails = String(headerText || '').toLowerCase().match(emailPattern) || [];
-    // An address in the header must be ours exactly; otherwise our sender name.
-    const ownHeader = headerEmails.length
-      ? headerEmails.every((email) => senders.includes(email))
-      : senders.filter((sender) => !sender.includes('@'))
-        .some((name) => normalizeMatchText(headerText).includes(normalizeMatchText(name)));
+      .map((value) => String(value || '').trim()).filter((value) => value.length >= 3);
+    const ownHeader = headerNamesSender(headerText, senders.filter((value) => value.includes('@')),
+      senders.filter((value) => !value.includes('@')));
     if (!ownHeader) return false;
     const quoted = normalizeMatchText(getAuthoredPrefix(quotedValue));
     return OWN_CAMPAIGN_TEMPLATE_SIGNALS.filter((pattern) => pattern.test(quoted)).length >= 2;

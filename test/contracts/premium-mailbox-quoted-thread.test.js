@@ -310,3 +310,24 @@ test('een kopregel met eigen afzender en exacte minuut bewijst ook een ingekort 
     assert.match(quotedThread.stripProvenQuotedOutbound(changed, [sent]).body, /Oorspronkelijk bericht/);
   }
 });
+
+test('een doorstuurkop met het adres van de ontvanger bewijst toch de eigen afzender', () => {
+  const quotedThread = require('../../assets/premium-mailbox-quoted-thread');
+  const sent = {
+    id: 'sent:463', accountEmail: 'serve@softora.nl', email: 'serve@softora.nl', from: 'Servé Creusen', folder: 'sent',
+    date: '2026-09-07T15:24:39.000Z',
+    body: 'Hoi Frank,\n\nIk wilde nog even kort terugkomen op het webdesign dat ik je laatst stuurde.\n\nHeb je toevallig nog de kans gehad om ernaar te kijken?\n\nMet vriendelijke groet,\n\nServé Creusen',
+  };
+  // AI already hid the signature, so only the header can prove this copy.
+  const reply = [
+    'Ha Servé,Kom maar een keer langs.Gr Frank', '',
+    '-------- Oorspronkelijk bericht --------',
+    'Van: Servé Creusen Datum: 07-09-2026 17:24 (GMT+01:00) Aan: info@stickertjesenmeer.com Onderwerp: RE: Kleine vraag Hoi Frank,',
+    'Ik wilde nog even kort terugkomen op het webdesign dat ik je laatst stuurde.',
+    'Heb je toevallig nog de kans gehad om ernaar te kijken?',
+  ].join('\n');
+  assert.equal(quotedThread.stripProvenQuotedOutbound(reply, [sent]).body, 'Ha Servé,Kom maar een keer langs.Gr Frank');
+  // Our name bound to someone else's address is not our mail.
+  const impostor = reply.replace('Van: Servé Creusen Datum', 'Van: Servé Creusen <iemand@anders.nl> Datum');
+  assert.match(quotedThread.stripProvenQuotedOutbound(impostor, [sent]).body, /Oorspronkelijk bericht/);
+});

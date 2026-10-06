@@ -924,7 +924,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.detail-mail-contact-grid \{[^}]*gap:\s*10px;/);
   assert.match(pageSource, /assets\/premium-mailbox-contact-view\.js\?v=20260924a/);
   assert.match(pageSource, /assets\/premium-mailbox-message-presentation\.js\?v=20261006h/);
-  assert.match(pageSource, /assets\/premium-mailbox-quoted-thread\.js\?v=20261006h/,
+  assert.match(pageSource, /assets\/premium-mailbox-quoted-thread\.js\?v=20261007a/,
     'de mailbox laadt de fragmentherkenning met een nieuwe cacheversie');
   assert.match(pageSource, /assets\/premium-mailbox-ai-refresh\.js\?v=20260924c/);
   assert.match(pageSource, /assets\/premium-mailbox-ai-presentation\.js\?v=20260924d/);
