@@ -46,9 +46,7 @@
         if (options.preserveActiveOrders === true) return;
         const activeOrdersEl = document.getElementById("kpiActiveOrders");
         if (!activeOrdersEl) return;
-        activeOrdersEl.querySelectorAll("[data-kpi-active-website], [data-kpi-active-business], [data-kpi-active-voice], [data-kpi-active-chatbot]").forEach(function (element) {
-            element.textContent = "--";
-        });
+        activeOrdersEl.textContent = "--";
         activeOrdersEl.setAttribute("aria-label", "Actieve opdrachten tijdelijk niet geladen");
     }
 

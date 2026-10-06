@@ -458,37 +458,11 @@ function createCustomersPageBootstrapService(deps = {}) {
     return status === 'klaar' || status === 'betaald' || pct >= 100;
   }
 
-  function classifyActiveOrderProductLine(order) {
-    const haystack = [order?.title, order?.description, order?.prompt].join(' ').toLowerCase();
-    if (/chatbot|chatbots|whatsapp\s*bot|widget\s*bot|conversational\s*bot/.test(haystack)) {
-      return 'chatbot';
-    }
-    if (/voice\s*software|voicesoftware|voicebot|spraakbot|belbot|telefonie\s*ai/.test(haystack)) {
-      return 'voice';
-    }
-    if (/bedrijfssoftware|business\s*software|business_software|\bcrm\b|\berp\b/.test(haystack)) {
-      return 'business';
-    }
-    return 'website';
-  }
-
-  function buildActiveOrdersBreakdown(activeOrdersState = {}) {
+  function countActiveOrders(activeOrdersState = {}) {
     const values = activeOrdersState && typeof activeOrdersState.values === 'object' ? activeOrdersState.values : {};
     const orders = parseOrders(readChunkedStateValue(values, orderKey));
     const runtimeMap = parseOrderRuntime(readChunkedStateValue(values, orderRuntimeKey));
-    return orders
-      .filter((order) => !isOrderBuilt(order, runtimeMap))
-      .reduce(
-        (counts, order) => {
-          const productLine = classifyActiveOrderProductLine(order);
-          if (productLine === 'business') counts.business += 1;
-          else if (productLine === 'voice') counts.voice += 1;
-          else if (productLine === 'chatbot') counts.chatbot += 1;
-          else counts.website += 1;
-          return counts;
-        },
-        { website: 0, business: 0, voice: 0, chatbot: 0 }
-      );
+    return orders.filter((order) => !isOrderBuilt(order, runtimeMap)).length;
   }
 
   function buildDashboardPaidOrders(activeOrdersState = {}) {
@@ -533,17 +507,12 @@ function createCustomersPageBootstrapService(deps = {}) {
       .replace(/\u2029/g, '\\u2029');
   }
 
-  function buildDashboardActiveOrdersBootstrapScript(counts) {
-    if (counts === null) {
-      return `<script>(function markActiveOrdersUnavailable(){var root=typeof document!=='undefined'?document.getElementById('kpiActiveOrders'):null;if(!root){if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',markActiveOrdersUnavailable,{once:true});return;}root.querySelectorAll('[data-kpi-active-website],[data-kpi-active-business],[data-kpi-active-voice],[data-kpi-active-chatbot]').forEach(function(el){el.textContent='--';});root.setAttribute('aria-label','Actieve opdrachten tijdelijk niet geladen');})();</script>`;
+  function buildDashboardActiveOrdersBootstrapScript(total) {
+    if (total === null) {
+      return `<script>(function markActiveOrdersUnavailable(){var root=typeof document!=='undefined'?document.getElementById('kpiActiveOrders'):null;if(!root){if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',markActiveOrdersUnavailable,{once:true});return;}root.textContent='--';root.setAttribute('aria-label','Actieve opdrachten tijdelijk niet geladen');})();</script>`;
     }
-    const safeCounts = {
-      website: Math.max(0, Number(counts?.website) || 0),
-      business: Math.max(0, Number(counts?.business) || 0),
-      voice: Math.max(0, Number(counts?.voice) || 0),
-      chatbot: Math.max(0, Number(counts?.chatbot) || 0),
-    };
-    return `<script>(function applyActiveOrders(){var counts=${escapeInlineJson(safeCounts)};var root=typeof document!=='undefined'?document.getElementById('kpiActiveOrders'):null;if(!root){if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',applyActiveOrders,{once:true});return;}var pairs=[['website','[data-kpi-active-website]'],['business','[data-kpi-active-business]'],['voice','[data-kpi-active-voice]'],['chatbot','[data-kpi-active-chatbot]']];pairs.forEach(function(pair){var el=root.querySelector(pair[1]);if(el)el.textContent=String(counts[pair[0]]||0);});root.setAttribute('aria-label','Website opdrachten: '+(counts.website||0)+', bedrijfssoftware: '+(counts.business||0)+', voicesoftware: '+(counts.voice||0)+', chatbots: '+(counts.chatbot||0));})();</script>`;
+    const safeTotal = Math.max(0, Number(total) || 0);
+    return `<script>(function applyActiveOrders(){var total=${escapeInlineJson(safeTotal)};var root=typeof document!=='undefined'?document.getElementById('kpiActiveOrders'):null;if(!root){if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',applyActiveOrders,{once:true});return;}root.textContent=String(total);root.setAttribute('aria-label','Actieve opdrachten: '+total);})();</script>`;
   }
 
   function inferTypeFromOrder(order) {
@@ -730,20 +699,20 @@ function createCustomersPageBootstrapService(deps = {}) {
           !payload.activeOrdersState.values ||
           Object.keys(payload.activeOrdersState.values || {}).length === 0));
 
-    const activeOrdersBreakdown = isDashboardActiveOrdersStateUnavailable(payload?.activeOrdersState)
+    const activeOrdersTotal = isDashboardActiveOrdersStateUnavailable(payload?.activeOrdersState)
       ? null
-      : buildActiveOrdersBreakdown(payload?.activeOrdersState);
+      : countActiveOrders(payload?.activeOrdersState);
     const revenueNeedsPaidOrders = (Array.isArray(payload?.customers) ? payload.customers : [])
       .map((customer, index) => normalizeCustomer(customer, `dashboard-revenue-date-${index}`))
       .some((customer) => customer.databaseStatus === 'klant' && customer.status === 'Betaald' && !customer.datum);
 
-    if (payloadUnavailable || (revenueNeedsPaidOrders && activeOrdersBreakdown === null)) {
+    if (payloadUnavailable || (revenueNeedsPaidOrders && activeOrdersTotal === null)) {
       return {
         SOFTORA_DASHBOARD_TOTAL_REVENUE: '--',
         SOFTORA_DASHBOARD_MAINTENANCE_REVENUE: '--',
         SOFTORA_DASHBOARD_RECURRING_REVENUE: '--',
         SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardUnavailableRevenueChartHtml(),
-        SOFTORA_DASHBOARD_TOTAL_CLIENTS: `--${buildDashboardActiveOrdersBootstrapScript(activeOrdersBreakdown)}`,
+        SOFTORA_DASHBOARD_TOTAL_CLIENTS: `--${buildDashboardActiveOrdersBootstrapScript(activeOrdersTotal)}`,
       };
     }
 
@@ -756,7 +725,7 @@ function createCustomersPageBootstrapService(deps = {}) {
       SOFTORA_DASHBOARD_RECURRING_REVENUE: formatDashboardMoney(summary.recurringRevenue),
       SOFTORA_DASHBOARD_REVENUE_CHART: buildDashboardRevenueChartHtml(payload.customers, dashboardNow, paidOrders),
       SOFTORA_DASHBOARD_TOTAL_CLIENTS:
-        String(summary.totalCustomers) + buildDashboardActiveOrdersBootstrapScript(activeOrdersBreakdown),
+        String(summary.totalCustomers) + buildDashboardActiveOrdersBootstrapScript(activeOrdersTotal),
     };
   }
 
