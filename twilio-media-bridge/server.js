@@ -431,15 +431,14 @@ const mathijsVoiceTestGate = createMathijsVoiceTestGate({
 const mathijsVoiceTestLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   limit: 1,
-  keyGenerator: () => 'mathijs-single-test',
+  keyGenerator: (req) => BRIDGE_DEBUG_TOKEN && isDebugRequestAuthorized(req)
+    ? 'mathijs-single-test' : 'mathijs-denied-test',
   standardHeaders: true,
   legacyHeaders: false,
   message: { ok: false, error: 'De eenmalige stemtest is al aangevraagd.' },
 });
-app.post('/debug/mathijs-voice-test', (req, res, next) => {
+app.post('/debug/mathijs-voice-test', mathijsVoiceTestLimiter, async (req, res) => {
   if (!BRIDGE_DEBUG_TOKEN || !isDebugRequestAuthorized(req)) return res.status(403).json({ ok: false, error: 'Forbidden' });
-  return next();
-}, mathijsVoiceTestLimiter, async (req, res) => {
   if (!GEMINI_API_KEY) return res.status(503).json({ ok: false, error: 'Google key ontbreekt.' });
   if (!mathijsVoiceTestGate.claim()) return res.status(409).json({ ok: false, error: 'Eenmalige stemtest is uitgeschakeld, verlopen of al gebruikt.' });
   try {
