@@ -57,7 +57,7 @@ test('HTTP recovery keeps the working document URL, CSS colours and screenshot r
   assert.equal(generationScan.sourceUrl, httpWebsite);
   assert.equal(generationScan.fetchSource, 'http-recovery');
   assert.ok(generationScan.brandPalette.includes('#8b2252'));
-  assert.ok(generationScan.referenceImageUrls[0].endsWith(httpWebsite));
+  assert.equal(generationScan.referenceImageUrls[0], `https://image.thum.io/get/width/1200/crop/1600/allowJPG/noanimate/${httpWebsite}`);
   assert.ok(generationScan.referenceImageUrls[1].includes(encodeURIComponent(httpWebsite)));
   assert.equal(generationScan.requireReferenceImages, true);
   assert.deepEqual(requests.map(request => request.url), [website, website, httpWebsite, 'http://voorbeeld.test/brand.css']);
@@ -68,7 +68,7 @@ test('healthy HTTPS stays on HTTPS and never makes a downgrade or reader request
   const { requests, coordinator } = createPipeline(async url => documentResponse(url, '<h1>Werkende bedrijfswebsite</h1>'));
   const { fetched, generationScan } = await coordinator.prepareWebsitePreviewImage(website, pipelineOptions());
   assert.equal(fetched.finalUrl, website);
-  assert.ok(generationScan.referenceImageUrls[0].endsWith(website));
+  assert.equal(generationScan.referenceImageUrls[0], `https://image.thum.io/get/width/1200/crop/1600/allowJPG/noanimate/${website}`);
   assert.deepEqual(requests.map(request => request.url), [website]);
 });
 
