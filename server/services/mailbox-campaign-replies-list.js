@@ -35,6 +35,7 @@ function createMailboxCampaignRepliesList({
   }),
   normalizeString,
   truncateText,
+  hydrateSnapshotBodies = null,
 }) {
   const readCampaignSnapshot = createMailboxCampaignSnapshotRead({ getUiStateValues, mailboxIndexStore, filterVisibleMailboxMessages });
   return async function listCampaignReplies({
@@ -55,7 +56,12 @@ function createMailboxCampaignRepliesList({
     }
     const { value: { replies, snapshotBaseReplies }, cache } = await campaignVersionCache(
       JSON.stringify([owner, limit, hydrateBodies, includeSnapshotMessages]),
-      () => listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies, includeSnapshotMessages })
+      async () => {
+        const sets = await listMailboxCampaignReplySets({ mailboxCampaignRepliesService, limit, owner, hydrateBodies, includeSnapshotMessages });
+        // The page snapshot carries every body, so no conversation opens with "laden…".
+        if (!includeSnapshotMessages || typeof hydrateSnapshotBodies !== 'function') return sets;
+        return { ...sets, snapshotBaseReplies: await hydrateSnapshotBodies(sets.snapshotBaseReplies) };
+      }
     );
     const indexedAt = Date.now();
     const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText, includeSnapshotMessages });
