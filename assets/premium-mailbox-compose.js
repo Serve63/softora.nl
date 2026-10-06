@@ -3,6 +3,11 @@
 
   let rewriteUsed = false;
   let selectedAttachments = [];
+  const attachmentPreviewUrls = new Map();
+  const PREVIEW_CONTENT_TYPES = {
+    gif: 'image/gif', jpeg: 'image/jpeg', jpg: 'image/jpeg',
+    pdf: 'application/pdf', png: 'image/png', txt: 'text/plain', webp: 'image/webp',
+  };
   const MAX_ATTACHMENTS = 5;
   const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
   const MAX_TOTAL_BYTES = 5 * 1024 * 1024;
@@ -56,19 +61,46 @@
     if (!rewriteUsed) button.textContent = fallbackLabel;
   }
 
+  function releaseAttachmentPreview(attachment) {
+    const url = attachmentPreviewUrls.get(attachment);
+    if (!url) return;
+    global.URL?.revokeObjectURL?.(url);
+    attachmentPreviewUrls.delete(attachment);
+  }
+
+  function getAttachmentPreviewUrl(attachment) {
+    if (attachmentPreviewUrls.has(attachment)) return attachmentPreviewUrls.get(attachment);
+    if (typeof global.URL?.createObjectURL !== 'function' || typeof global.Blob !== 'function') return '';
+    const extension = attachment.filename.split('.').pop().toLowerCase();
+    // Use an inert type from the validated extension, never a file-supplied HTML type.
+    const blob = new global.Blob([attachment.file], {
+      type: PREVIEW_CONTENT_TYPES[extension] || 'application/octet-stream',
+    });
+    const url = global.URL.createObjectURL(blob);
+    attachmentPreviewUrls.set(attachment, url);
+    return url;
+  }
+
   function renderAttachments(documentRef = global.document) {
     const target = documentRef?.getElementById?.('c-attachment-list');
     if (!target) return;
-    target.innerHTML = selectedAttachments.map((attachment, index) => `
+    target.innerHTML = selectedAttachments.map((attachment, index) => {
+      const filename = String(attachment.filename || 'Bijlage').replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      }[character]));
+      const url = getAttachmentPreviewUrl(attachment);
+      const extension = attachment.filename.split('.').pop().toLowerCase();
+      const download = PREVIEW_CONTENT_TYPES[extension] ? '' : ` download="${filename}"`;
+      return `
       <span class="compose-attachment-chip">
-        <span>${String(attachment.filename || 'Bijlage').replace(/[&<>"']/g, (character) => ({
-          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-        }[character]))}</span>
+        ${url ? `<a class="compose-attachment-open" href="${url}" target="_blank" rel="noopener noreferrer" title="Open ${filename}"${download}>${filename}</a>` : `<span>${filename}</span>`}
         <button type="button" data-mailbox-action="remove-attachment" data-attachment-index="${index}" aria-label="Bijlage verwijderen">×</button>
-      </span>`).join('');
+      </span>`;
+    }).join('');
   }
 
   function resetOptionalFields(documentRef = global.document) {
+    selectedAttachments.forEach(releaseAttachmentPreview);
     selectedAttachments = [];
     ['c-cc', 'c-bcc'].forEach((id) => {
       const field = documentRef?.getElementById?.(id);
@@ -610,6 +642,7 @@
   function removeAttachment(index, documentRef = global.document) {
     const safeIndex = Number(index);
     if (!Number.isInteger(safeIndex) || safeIndex < 0 || safeIndex >= selectedAttachments.length) return;
+    releaseAttachmentPreview(selectedAttachments[safeIndex]);
     selectedAttachments.splice(safeIndex, 1);
     renderAttachments(documentRef);
   }

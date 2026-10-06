@@ -8,7 +8,7 @@ const read = (relativePath) => fs.readFileSync(path.join(__dirname, '../..', rel
 test('mailbox laadt de pagina-eigen mobiele laag als laatste en ondersteunt veilige schermranden', () => {
   const page = read('premium-mailbox.html');
   assert.match(page, /content="width=device-width, initial-scale=1\.0, viewport-fit=cover"/);
-  assert.ok(page.indexOf('premium-mailbox-mobile.css?v=20261006a') > page.indexOf('</style>'));
+  assert.ok(page.indexOf('premium-mailbox-mobile.css?v=20261006b') > page.indexOf('</style>'));
   const mailboxScriptIndex = page.indexOf('premium-mailbox.js?v=20261006a');
   assert.ok(mailboxScriptIndex >= 0);
   assert.ok(page.indexOf('premium-mailbox-mobile.js?v=20260907a') > mailboxScriptIndex);
