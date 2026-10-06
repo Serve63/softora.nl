@@ -405,8 +405,8 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.ok(res.body.indexOf('assets/personnel-appearance.js') > stabilityIndex,
     'saved theme is restored after page boot scripts, before the first paint');
   assert.match(res.body, /data-personnel-loading/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20260909b/);
-  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20260909b/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.css\?v=20261006-querynav/);
+  assert.match(res.body, /\/assets\/premium-sidebar-stability\.js\?v=20261006-querynav/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.css\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-sidebar-autopilot\.js\?v=20260611a/);
   assert.match(res.body, /\/assets\/premium-dashboard-ai-chat-scope\.js\?v=20260611a/);
@@ -1336,6 +1336,6 @@ test('Lead Radar delivery initialiseert de premium sidebar precies één keer en
   assert.equal(res.statusCode, 200);
   assert.match(res.body, /<body data-sidebar-nav-ready="1">/);
   assert.equal((res.body.match(/assets\/lead-radar-sidebar\.js\?v=/g) || []).length, 0);
-  assert.equal((res.body.match(/assets\/premium-sidebar-stability\.js\?v=20260909b/g) || []).length, 1);
+  assert.equal((res.body.match(/assets\/premium-sidebar-stability\.js\?v=20261006-querynav/g) || []).length, 1);
   assert.match(res.body, /assets\/personnel-theme\.js\?v=20261006-contactform/);
 });
