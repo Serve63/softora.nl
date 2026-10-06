@@ -923,7 +923,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.compose-box \{[^}]*height:\s*min\(700px,\s*calc\(100vh - 28px\)\);[^}]*min-height:\s*min\(480px,\s*calc\(100vh - 28px\)\);/);
   assert.match(mobileCssSource, /\.compose-resize-zone \{ display: none; \}/);
   assert.match(pageSource, /assets\/premium-mailbox-signature\.js\?v=20260921b/);
-  const composeAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose.js?v=20261006a');
+  const composeAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose.js?v=20261006b');
   assert.match(pageSource, /\.compose-attachment-open \{ color: inherit; text-decoration: none; cursor: pointer; \}/);
   assert.match(mobileCssSource, /\.compose-attachment-open \{ display: block; line-height: 44px; \}/);
   assert.doesNotMatch(pageSource, /<button[^>]+(?:spellcheck-compose|undo-spelling)/);

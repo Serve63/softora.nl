@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
+const { getMailboxMessageDirection, isSameMailboxIdentity } = require('./mailbox-message-provenance');
+const { isOriginalCampaignOutboundMessage } = require('./mailbox-image-ownership');
 
 const normalizeText = (value) => String(value || '').trim();
 const normalizeEmail = (value) => normalizeText(value).toLowerCase();
@@ -175,8 +177,10 @@ function createMailboxComposeThreadContext(deps = {}) {
     const messageId = normalizeMessageId(stored?.messageId);
     const requestedMessageId = normalizeMessageId(context.messageId);
     const sentRecipients = normalizeText(stored?.to).toLowerCase().match(/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/g) || [];
-    const participantMatches = folder === 'sent'
-      ? normalizeEmail(stored?.email) === account && sentRecipients.includes(recipient)
+    // Storage folder is not direction: Gmail also keeps outgoing copies in coldmail.
+    const outbound = getMailboxMessageDirection(stored) === 'sent';
+    const participantMatches = outbound
+      ? isSameMailboxIdentity(stored?.email, account) && sentRecipients.includes(recipient)
       : normalizeEmail(stored?.replyTo || stored?.email) === recipient;
     if (!messageId || normalizeEmail(stored?.accountEmail) !== account
       || normalizeText(stored?.folder).toLowerCase() !== folder || !participantMatches
@@ -184,7 +188,8 @@ function createMailboxComposeThreadContext(deps = {}) {
       throw inputError('De eerdere mail hoort niet bij deze afzender en ontvanger.', 'MAILBOX_CORRESPONDENCE_SOURCE_MISMATCH', 409);
     }
     // An initial campaign mail alone must never exempt another coldmail from its guards.
-    if (folder === 'sent' && stored.originalCampaignOutbound !== false) return '';
+    if (outbound && (stored.originalCampaignOutbound !== false ||
+      isOriginalCampaignOutboundMessage({ ...stored, folder: 'sent' }))) return '';
     return messageId;
   }
 
