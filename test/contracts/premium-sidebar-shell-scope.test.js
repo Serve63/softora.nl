@@ -900,6 +900,13 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*overflow-y:\s*auto;[\s\S]*z-index:\s*60;/);
   assert.match(pageSource, /\.mail-detail \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"[\s\S]*id="mail-items"[\s\S]*id="mailbox-search-more"/);
+  const mailList = pageSource.slice(pageSource.indexOf('<div class="mail-list">'), pageSource.indexOf('<!-- MAIL DETAIL -->'));
+  const listActions = mailList.match(/<div class="mail-list-actions">[\s\S]*?<\/div>/)?.[0] || '';
+  assert.match(listActions, /data-mailbox-action="compose-new-mail"/);
+  assert.ok(mailList.indexOf('id="mailbox-search-status"') < mailList.indexOf(listActions));
+  assert.ok(mailList.indexOf(listActions) < mailList.indexOf('id="mail-results-scroll"'));
+  assert.match(pageSource, /\.mail-list-actions \{[^}]*flex-shrink:\s*0;/);
+  assert.doesNotMatch(pageSource.match(/<div class="topbar">[\s\S]*?<!-- LAYOUT -->/)?.[0] || '', /compose-new-mail/);
   assert.doesNotMatch(pageSource, /mailbox-search-clear|mail-search-clear/);
   assert.match(pageSource, /\.detail-mail-block \{[\s\S]*width:\s*min\(100%,\s*900px\);[\s\S]*margin:\s*0 auto;/);
   assert.match(pageSource, /\.detail-mail-block \{[^}]*min-height:\s*min\(620px,\s*calc\(100vh - 92px\)\)/);
