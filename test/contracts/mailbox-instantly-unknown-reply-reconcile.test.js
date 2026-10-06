@@ -172,3 +172,19 @@ test('proof-only preflight lost een onzeker Instantly-antwoord via de thread op'
   assert.equal(res.body.result.status, 'accepted');
   assert.equal(current.status, 'accepted');
 });
+
+test('database staat onzeker -> niet verzonden alleen toe met afgeronde, opgeloste status', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.resolve(__dirname, '../..');
+  const migration = fs.readFileSync(
+    path.join(root, 'supabase/migrations/20261006141500_mailbox_send_unknown_resolved_not_sent.sql'), 'utf8');
+  const schema = fs.readFileSync(path.join(root, 'supabase/data-ops-schema.sql'), 'utf8');
+  const rule = /\(old\.status = 'unknown' and new\.status = 'failed'\s+and new\.dispatch_state = 'finished'\s+and new\.reconcile_required = false\s+and new\.sent_reconcile_required = false\)/;
+  assert.match(migration, rule);
+  assert.match(schema, rule);
+  // accepted blijft nooit terug te draaien.
+  for (const sql of [migration, schema]) {
+    assert.doesNotMatch(sql, /old\.status = 'accepted' and new\.status/);
+  }
+});
