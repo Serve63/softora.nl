@@ -62,7 +62,8 @@ test('legacy knowledge URLs lead to the unified overview and article routes', as
 test('the local toekomst chooser retains the latest public landing destinations', async () => {
   const html = await (await fetch(origin + '/toekomst')).text();
   for (const route of ['/chatbot', '/seo-solution']) {
-    assert.ok(html.includes('<a class="choice" data-service="' + route + '"'));
+    const attribute = route === '/chatbot' ? 'href' : 'data-service';
+    assert.ok(html.includes('<a class="choice" ' + attribute + '="' + route + '"'));
     const response = await fetch(origin + route, { redirect: 'manual' });
     assert.equal(response.status, 302);
     assert.equal(response.headers.get('location'), 'https://www.softora.nl' + route);
