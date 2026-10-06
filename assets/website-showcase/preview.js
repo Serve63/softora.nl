@@ -79,7 +79,7 @@
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     });
   }
-  $$('.Nav_cta__gBZXl,.Nav_overlayCta__mfK3I').forEach(button => button.addEventListener('click', openModal));
+  $$('.Nav_overlayCta__mfK3I').forEach(button => button.addEventListener('click', openModal));
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') { toggleNav(false); closeModal(); }
   });
