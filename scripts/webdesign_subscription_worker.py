@@ -45,6 +45,8 @@ class SubscriptionLimit(RuntimeError):
     pass
 
 def subscription_limit(folder):
+    if not (folder / 'codex-events.jsonl').is_file():
+        return False
     for line in (folder / 'codex-events.jsonl').read_text().splitlines():
         try:
             event = json.loads(line)
@@ -56,6 +58,23 @@ def subscription_limit(folder):
             if any(code in json.dumps(event).lower() for code in ('usage_limit_reached', 'rate_limit_exceeded', 'subscription_limit', "you've hit your usage limit", 'usage limit reached')):
                 return True
     return False
+
+def subscription_paused():
+    for peer in range(2):
+        try:
+            state = json.loads(state_file(peer).read_text())
+        except (FileNotFoundError, ValueError):
+            continue
+        if (state.get('phase') == 'cooldown' or state.get('limit')) and state.get('retryAt', 0) > time.time():
+            return True
+    return False
+
+def check_job_active(job):
+    live = call('/poll', {'claim': job['claim'], 'heartbeatJobId': job['id']})
+    if not live.get('ok'):
+        raise RuntimeError('Geen bevestiging van opdrachtstatus.')
+    if not live.get('allowed'):
+        raise JobStopped('Opdracht is gestopt.')
 
 def encode_result(folder):
     output, target = folder / 'design.png', folder / 'design.jpg'
@@ -78,7 +97,7 @@ def call(path, payload):
     request = Request(API + path, data=json.dumps({'lane': 'webdesign-photo', **payload}).encode(),
                       headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'}, method='POST')
     try:
-        with urlopen(request, timeout=180) as response:
+        with urlopen(request, timeout=360 if path == '/poll' else 180) as response:
             return json.load(response)
     except HTTPError as error:
         if error.code == 409:
@@ -119,14 +138,16 @@ def download_reference(job, folder):
     raise RuntimeError('Geen bruikbaar homepage-bronbeeld beschikbaar.')
 
 def generate(job, folder, slot=0):
+    # Do not keep retrying reference downloads for a cancelled/expired job.
+    check_job_active(job)
     binary, env = codex_binary(), subscription_environment()
     status = subprocess.run([binary, 'login', 'status'], env=env, capture_output=True, text=True, timeout=30)
     if status.returncode or 'chatgpt' not in (status.stdout + status.stderr).lower():
         raise RuntimeError('Codex is niet via ChatGPT ingelogd.')
     reference = download_reference(job, folder)
-    live = call('/poll', {'claim': job['claim'], 'heartbeatJobId': job['id']})
-    if not live.get('allowed'):
-        raise JobStopped('Opdracht is gestopt.')
+    check_job_active(job)
+    if subscription_paused():
+        raise RuntimeError('Abonnementwerker wacht op herstel van de limiet.')
     prompt = ('Use the built-in image_gen tool to generate exactly one new portrait webdesign image, 1024x1536. '
               'Use the attached homepage screenshot as the required brand reference. Preserve the company identity, '
               'logo and brand colors while improving the design. This is subscription-only: never use API keys, '
@@ -153,13 +174,9 @@ def step(slot=0):
     state_path = state_file(slot)
     save = lambda value: write_state(value, slot)
     state = json.loads(state_path.read_text()) if state_path.exists() else {}
-    for peer in range(2):
-        try:
-            peer_state = json.loads(state_file(peer).read_text()) if state_file(peer).exists() else {}
-        except ValueError:
-            continue
-        if peer_state.get('phase') == 'cooldown' and peer_state.get('retryAt', 0) > time.time():
-            return
+    # Quota pauses new image work; already generated results must still upload.
+    if state.get('phase') not in ('generating', 'deliver') and subscription_paused():
+        return
     if state.get('phase') == 'cooldown':
         state = {}
     if not state:
@@ -170,6 +187,8 @@ def step(slot=0):
         if not polled.get('ok'):
             raise RuntimeError('Geen veilige opdrachtoverdracht.')
         if not polled.get('job'):
+            if polled.get('waiting'):
+                return
             save({})
             return
         state = {'phase': 'prepare', 'job': polled['job']}
@@ -188,6 +207,7 @@ def step(slot=0):
             state['error'] = not (folder / 'design.png').is_file()
             if isinstance(error, SubscriptionLimit):
                 state['limit'] = True
+                state['retryAt'] = time.time() + 600
             if not state['error']:
                 encode_result(folder)
         state['phase'] = 'deliver'
@@ -201,6 +221,9 @@ def step(slot=0):
             state['error'] = False
         except Exception:
             state['error'] = True
+            if subscription_limit(folder):
+                state['limit'] = True
+                state['retryAt'] = time.time() + 600
         state['phase'] = 'deliver'
         save(state)
     payload = {'jobId': job['id'], 'claim': job['claim']}

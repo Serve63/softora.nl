@@ -1,9 +1,7 @@
 'use strict';
 const { createHash } = require('node:crypto');
-const { buildWebdesignPipelineOptions } = require('./design-photo-generation-policy');
-const { createWebsiteGenerationHelpers } = require('./website-generation');
-const { prepareWebsitePreviewBrandGuard, assertWebsitePreviewBrandColors } = require('./website-brand-color-guard');
-const { buildWebsitePreviewPromptFromScan } = createWebsiteGenerationHelpers();
+const { assertWebsitePreviewBrandColors } = require('./website-brand-color-guard');
+const { prepareSubscriptionClaim } = require('./webdesign-subscription-preparation');
 const isSubscriptionJob = (job) => job?.executionProvider === 'codex-subscription';
 function isExpiredWebdesignJob(job, currentTime, ttlMs) {
   // Waiting on a Mac or quota must not expire a durable subscription queue.
@@ -58,24 +56,9 @@ async function startManualWebdesignBatchResponse(req, res, deps) {
   return res.status(202).json({ ok: true, batch: serializeBatch(batch, []) });
 }
 
-// Same house-colour lock as the API path: palette in the prompt, checked again on delivery.
-async function prepareSubscriptionBrandGuard(job, generationScan, { repository, aiToolsCoordinator, logger }) {
-  try {
-    const references = await aiToolsCoordinator.fetchWebsitePreviewReferenceImages(generationScan);
-    const guard = await prepareWebsitePreviewBrandGuard(generationScan, references);
-    if (!guard?.palette.length) return null;
-    const stored = await repository.storeBrandGuard(job.id, job.subscriptionClaim, guard);
-    if (stored.ok !== true) throw new Error('Huiskleurcontrole niet opgeslagen.');
-    return guard;
-  } catch (error) {
-    // The Mac still requires its own screenshot; only the extra colour lock is skipped.
-    logger.warn?.('[WebdesignSubscription][brand-guard]', job.id, error.message);
-    return null;
-  }
-}
-
 // Called only after the existing KVK worker bearer-token gate.
-function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, coordinator, logger = console }) {
+function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, coordinator, logger = console,
+  preparationTimeoutMs = 120000, now = Date.now }) {
   return {
     async poll(req, res) {
       const claim = String(req.body?.claim || '');
@@ -88,19 +71,8 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
       }
       const claimed = await repository.claim(claim);
       if (!claimed.job) return res.json({ ok: true, job: null });
-      const job = claimed.job;
-      try {
-        const { generationScan } = await aiToolsCoordinator.prepareWebsitePreviewImage(job.websiteUrl,
-          buildWebdesignPipelineOptions({ source: 'premium-database', company: job.customer.bedrijf, domain: job.customer.dom }));
-        const brandGuard = await prepareSubscriptionBrandGuard(job, generationScan, { repository, aiToolsCoordinator, logger });
-        return res.json({ ok: true, job: { id: job.id, claim: job.subscriptionClaim,
-          prompt: buildWebsitePreviewPromptFromScan({ ...generationScan, referenceImageCount: 1,
-            verifiedBrandPalette: brandGuard?.palette.map((color) => color.hex) }),
-          referenceUrls: generationScan.referenceImageUrls, company: job.customer.bedrijf } });
-      } catch (error) {
-        await repository.finish(job.id, job.subscriptionClaim, 'Websiteanalyse mislukt: ' + String(error.message || 'Website niet bereikbaar.').slice(0, 500));
-        throw error;
-      }
+      return res.json(await prepareSubscriptionClaim(claimed.job,
+        { repository, aiToolsCoordinator, logger, preparationTimeoutMs, now }));
     },
     async complete(req, res) {
       const body = req.body || {};
