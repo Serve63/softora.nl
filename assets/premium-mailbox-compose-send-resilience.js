@@ -644,6 +644,87 @@
     patchMarker(storage, marker, { state: 'failed', staging: [] }, options);
     return successor;
   }
+  // Een eerdere poging in dezelfde mailcontext met andere inhoud blokkeert lokaal tot de
+  // server zegt wat er met die poging gebeurd is. Vraag die serverwaarheid eerst op, zodat
+  // een verlopen of al afgeronde poging nooit blijvend nieuwe mails tegenhoudt.
+  const STALE_DISPATCH_GRACE_MS = 60_000;
+  function markerSendStartedAt(marker) {
+    const startedAt = Number(marker?.sendStartedAt);
+    return Number.isFinite(startedAt) && startedAt > 0 ? startedAt : Number(marker?.updatedAt) || 0;
+  }
+  async function reconcileScopeConflicts(
+    storage, fetchImpl, serialize, payloadBase, payloadFingerprint, localScopeFingerprint, options = {}
+  ) {
+    const conflicts = listMarkers(storage).filter((marker) => (
+      UNRESOLVED_STATES.has(marker.state)
+      && marker.localScopeFingerprint === localScopeFingerprint
+      && marker.payloadFingerprint !== payloadFingerprint
+      && !markerIsProvenPreDispatch(marker)
+    ));
+    const outcome = { accepted: 0, inFlight: 0, unconfirmed: 0 };
+    for (const conflict of conflicts) {
+      let marker = conflict;
+      if (!marker.reconcileProof) {
+        outcome.inFlight += 1;
+        continue;
+      }
+      const attemptPayload = { ...payloadBase, idempotencyKey: marker.idempotencyKey };
+      let preflight;
+      try {
+        preflight = await runPreflight(
+          fetchImpl,
+          { idempotencyKey: marker.idempotencyKey, reconcileProof: marker.reconcileProof },
+          attemptPayload,
+          markerAttachmentMetadata(marker),
+          serialize,
+          { ...options, proofOnly: true }
+        );
+      } catch (error) {
+        const neverRegistered = error?.code === 'MAILBOX_SEND_MUTABLE_PROOF_REQUIRED';
+        const deadlinePassed = getNow(options) - markerSendStartedAt(marker)
+          > SEND_DEADLINE_MS + STALE_DISPATCH_GRACE_MS;
+        if (neverRegistered && deadlinePassed) {
+          patchMarker(storage, marker, { state: 'failed', staging: [] }, options);
+        } else {
+          outcome.inFlight += 1;
+        }
+        continue;
+      }
+      if (preflight.status === 'accepted') {
+        const durableIdentity = extractDurableIdentity(preflight.result.acceptedResult);
+        patchMarker(storage, marker, { state: 'accepted', durableIdentity }, options);
+        outcome.accepted += 1;
+      } else if (preflight.status === 'failed') {
+        patchMarker(storage, marker, { state: 'failed', staging: [] }, options);
+      } else if (normalize(preflight.result?.reservationConflictStatus) === 'unknown') {
+        if (marker.state !== 'processing') marker = patchMarker(storage, marker, { state: 'processing' }, options);
+        outcome.unconfirmed += 1;
+      } else {
+        outcome.inFlight += 1;
+      }
+    }
+    if (outcome.unconfirmed) {
+      throw createProtocolError(
+        'MAILBOX_SEND_PREVIOUS_UNCONFIRMED',
+        'Je vorige versie van deze mail is door de mailprovider nog niet bevestigd. Softora controleert dat automatisch; probeer het over een paar minuten opnieuw.',
+        { status: 409, retryable: true }
+      );
+    }
+    if (outcome.inFlight) {
+      throw createProtocolError(
+        'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT',
+        'Je vorige versie van deze mail wordt nog verstuurd. Wacht even en probeer het dan opnieuw.',
+        { status: 409, retryable: true }
+      );
+    }
+    if (outcome.accepted) {
+      throw createProtocolError(
+        'MAILBOX_SEND_PREVIOUS_VERSION_SENT',
+        'Een eerdere versie van deze mail is al verzonden. Er is niets nieuws verstuurd.',
+        { status: 409 }
+      );
+    }
+  }
   function ensureLocks(options = {}) {
     const locks = Object.prototype.hasOwnProperty.call(options, 'locks')
       ? options.locks
@@ -715,6 +796,15 @@
             effectivePayloadFingerprint = marker.payloadFingerprint;
             attachmentsUnavailable = true;
           } else {
+            await reconcileScopeConflicts(
+              storage,
+              fetchImpl,
+              serialize,
+              payloadBase,
+              payloadFingerprint,
+              localScopeFingerprint,
+              options
+            );
             marker = selectMarker(
               storage,
               payloadBase.idempotencyKey,

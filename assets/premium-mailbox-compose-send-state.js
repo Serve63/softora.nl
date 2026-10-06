@@ -477,7 +477,7 @@
       if (!replaceProvenPreDispatch || !allProvenPreDispatch) {
         throw createProtocolError(
           'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT',
-          'Voor deze mailcontext bestaat nog een onopgeloste verzending met andere inhoud of bijlagen; er is niets opnieuw verzonden.'
+          'Je vorige versie van deze mail wordt nog verstuurd. Wacht even en probeer het dan opnieuw.'
         );
       }
     }

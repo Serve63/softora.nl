@@ -133,3 +133,14 @@ test('browser honors provider cooldown without 500ms retries while healthy mailb
   assert.equal(calls.filter((url) => url.includes('instantly')).length, 2);
   controller.destroy();
 });
+
+test('Instantly-antwoord krijgt ruimer de tijd dan leesacties zodat trage replies niet onzeker eindigen', async () => {
+  const { READ_TIMEOUT_MS, REPLY_TIMEOUT_MS } = require('../../server/services/instantly-mailbox-api');
+  const h = harness();
+  await h.api.request('emails/reply', { method: 'POST', body: { test: true } });
+  await h.api.request('emails', { query: { eaccount: 'serve@example.test' } });
+  assert.equal(h.calls[0][2], REPLY_TIMEOUT_MS);
+  assert.equal(h.calls[1][2], READ_TIMEOUT_MS);
+  assert.ok(REPLY_TIMEOUT_MS > READ_TIMEOUT_MS);
+  assert.ok(REPLY_TIMEOUT_MS < 45_000, 'moet binnen de browser-verzenddeadline blijven');
+});
