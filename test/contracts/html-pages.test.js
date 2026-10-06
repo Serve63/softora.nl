@@ -141,7 +141,7 @@ test('personnel appearance includes the standalone company iframe and excludes p
     const res = createResponseRecorder();
     await coordinator.sendSeoManagedHtmlPageResponse({ originalUrl: '/' + file }, res, () => {}, file);
     if (file === 'premium-kvk-database.html') {
-      assert.match(res.body, /personnel-appearance\.js\?v=20261006-contactform" data-theme-owner="serve@example\.test"/);
+      assert.match(res.body, /personnel-appearance\.js\?v=20261006-querynav" data-theme-owner="serve@example\.test"/);
       assert.ok(res.body.indexOf('premium-readmodel-store.js') < res.body.indexOf('personnel-appearance.js'));
       assert.ok(res.body.indexOf('personnel-appearance.js') < res.body.indexOf('</head>'));
     } else assert.doesNotMatch(res.body, /personnel-appearance/);
@@ -400,8 +400,8 @@ test('html page coordinator injects critical premium sidebar shell before theme 
   assert.ok(themeIndex < stabilityIndex, 'stability stylesheet hoort na pagina-CSS te laden zodat sidebar-polish wint');
   assert.ok(interPreloadIndex < themeIndex, 'lokale sidebar fonts horen voor de theme css te preloaden');
   assert.match(res.body, /softora-personnel-first-paint/);
-  assert.match(res.body, /personnel-appearance\.css\?v=20261006-contactform/);
-  assert.match(res.body, /personnel-appearance\.js\?v=20261006-contactform/);
+  assert.match(res.body, /personnel-appearance\.css\?v=20261006-querynav/);
+  assert.match(res.body, /personnel-appearance\.js\?v=20261006-querynav/);
   assert.ok(res.body.indexOf('assets/personnel-appearance.js') > stabilityIndex,
     'saved theme is restored after page boot scripts, before the first paint');
   assert.match(res.body, /data-personnel-loading/);
@@ -491,7 +491,7 @@ test('html page coordinator applies a strict path-specific CSP to the password r
     .map((match) => match[1])
     .sort();
   assert.deepEqual(renderedScriptSources, [
-    '/assets/personnel-appearance.js?v=20261006-contactform',
+    '/assets/personnel-appearance.js?v=20261006-querynav',
     '/assets/premium-readmodel-store.js?v=20260924c',
     '/assets/premium-session-watchdog.js?v=20260927a',
     'assets/premium-password-register-app.js',
@@ -1337,5 +1337,5 @@ test('Lead Radar delivery initialiseert de premium sidebar precies één keer en
   assert.match(res.body, /<body data-sidebar-nav-ready="1">/);
   assert.equal((res.body.match(/assets\/lead-radar-sidebar\.js\?v=/g) || []).length, 0);
   assert.equal((res.body.match(/assets\/premium-sidebar-stability\.js\?v=20261006-querynav/g) || []).length, 1);
-  assert.match(res.body, /assets\/personnel-theme\.js\?v=20261006-contactform/);
+  assert.match(res.body, /assets\/personnel-theme\.js\?v=20261006-querynav/);
 });
