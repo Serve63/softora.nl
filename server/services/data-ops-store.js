@@ -1,3 +1,4 @@
+const { createWebdesignJobStartRepository } = require('../repositories/webdesign-job-start');
 const { readOutboundGuardKeys } = require('./outbound-guard-key-reader');
 const { createMailboxStatsMessagesRepository } = require('../repositories/mailbox-stats-messages');
 const { createHash } = require('crypto');
@@ -2247,24 +2248,6 @@ function createSoftoraDataOpsStore(deps = {}) {
     return (result.data || []).map(normalizeWebdesignBatchChunkRow).sort((left, right) => left.index - right.index);
   }
 
-  async function findRunningWebdesignJob(ownerKey, customerId) {
-    const result = await run('find-running-webdesign-job', (client) =>
-      client
-        .from(TABLES.webdesignJobs)
-        .select('job_id,owner_key,customer_id,website_url,status,error,payload,created_at,started_at,finished_at')
-        .eq('owner_key', normalizeString(ownerKey))
-        .eq('customer_id', normalizeString(customerId))
-        .in('status', ['queued', 'running'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      getWebdesignStatusReadOptions()
-    );
-    if (!result.ok) throw createWebdesignJobStatusReadError(result);
-    if (!result.data || !isRegularWebdesignJobRow(result.data)) return null;
-    return normalizeWebdesignJobRow(result.data);
-  }
-
   async function listVisibleWebdesignBatches(ownerKey) {
     const normalizedOwnerKey = normalizeString(ownerKey);
     const cacheKey = `webdesign-batches:${normalizedOwnerKey}`;
@@ -2335,7 +2318,9 @@ function createSoftoraDataOpsStore(deps = {}) {
   }
 
   return { ...createWebdesignOwnerRotationRepository({ run, getWriteOperationOptions, normalizeString }),
-    findRunningWebdesignJob,
+    ...createWebdesignJobStartRepository({ run, TABLES, normalizeString, getWebdesignStatusReadOptions,
+      createWebdesignJobStatusReadError, isRegularWebdesignJobRow, normalizeWebdesignJobRow,
+      buildWebdesignJobRow, getWriteOperationOptions, getWebdesignJob, forgetReads }),
     getDataOpsCounts,
     getWebdesignBatch,
     getWebdesignJob,

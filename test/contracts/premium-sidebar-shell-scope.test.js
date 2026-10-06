@@ -32,7 +32,7 @@ test('personnel dark mode preserves the shared sidebar, legacy palettes and publ
 test('mailbox laadt het gedeelde afwezigheidsfilter vóór de inbox zonder sidebarwijzigingen', () => {
   const page = readRepoFile('premium-mailbox.html');
   const detector = page.indexOf('premium-mailbox-absence-notice.js?v=20261003a');
-  const inbox = page.indexOf('premium-mailbox-campaign-inbox.js?v=20261006c');
+  const inbox = page.indexOf('premium-mailbox-campaign-inbox.js?v=20261006h');
   assert.ok(detector >= 0 && detector < inbox);
   assert.match(page, /data-sidebar-key="mailbox"/);
   assert.match(page, /data-sidebar-user-name/);
@@ -923,8 +923,8 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /\.detail-mail-contact-item \{[^}]*display:\s*block;/);
   assert.match(pageSource, /\.detail-mail-contact-grid \{[^}]*gap:\s*10px;/);
   assert.match(pageSource, /assets\/premium-mailbox-contact-view\.js\?v=20260924a/);
-  assert.match(pageSource, /assets\/premium-mailbox-message-presentation\.js\?v=20260921c/);
-  assert.match(pageSource, /assets\/premium-mailbox-quoted-thread\.js\?v=20261006g/,
+  assert.match(pageSource, /assets\/premium-mailbox-message-presentation\.js\?v=20261006h/);
+  assert.match(pageSource, /assets\/premium-mailbox-quoted-thread\.js\?v=20261006h/,
     'de mailbox laadt de fragmentherkenning met een nieuwe cacheversie');
   assert.match(pageSource, /assets\/premium-mailbox-ai-refresh\.js\?v=20260924c/);
   assert.match(pageSource, /assets\/premium-mailbox-ai-presentation\.js\?v=20260924d/);
@@ -944,7 +944,7 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.match(pageSource, /data-mailbox-action="rewrite-compose">Voorgestelde reactie/);
   assert.match(pageSource, /<textarea id="c-body"[^>]*><\/textarea><div class="compose-body-loading" id="c-body-loading" role="status"[^>]*hidden><span class="compose-body-spinner"/);
   assert.match(pageSource, /\.compose-body-spinner \{[^}]*animation: mailbox-refresh-spin/);
-  assert.match(pageSource, /assets\/premium-mailbox-campaign-inbox\.js\?v=20261006c/);
+  assert.match(pageSource, /assets\/premium-mailbox-campaign-inbox\.js\?v=20261006h/);
   const browserStorageAssetIndex = pageSource.indexOf('assets/premium-browser-storage.js?v=20260828b');
   const attachmentDigestAssetIndex = pageSource.indexOf('assets/premium-mailbox-attachment-digest.js?v=20260828c');
   const sendStateAssetIndex = pageSource.indexOf('assets/premium-mailbox-compose-send-state.js?v=20260831b');
@@ -1449,7 +1449,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-system-mail-count\.js\?v=20261003-complete-count/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260924-readmodel/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(source, /premium-database-webdesign-action\.js\?v=20261003-subscription/);
+  assert.match(source, /premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
   assert.match(source, /premium-database-table-helpers\.js\?v=20261001-email-guard/);
   assert.match(source, /const count = databaseTableHelpers\.getPhotoHeaderCount\(customers, \{ showPhotoColumn: showPhotoColumn, activeStatus: state\.activeStatus,/);
 });

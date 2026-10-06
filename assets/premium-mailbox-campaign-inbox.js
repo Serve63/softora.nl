@@ -42,7 +42,7 @@
   const logicalDeleteApi = global.SoftoraMailboxLogicalDelete || (
     typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-logical-delete.js') : null
   );
-  const messagePresentation = messagePresentationModule.create({ quotedThread: quotedThreadApi, splitQuotedReply, getProvenOutboundThreadMessages, getMessageTimestamp, getDirectParentMessageIds, isSentMessageByProvenance, findExactQuotedOutbound });
+  const messagePresentation = messagePresentationModule.create({ quotedThread: quotedThreadApi, splitQuotedReply, getProvenOutboundThreadMessages, getMessageTimestamp, getDirectParentMessageIds, isSentMessageByProvenance, findExactQuotedOutbound, getOwnSenders: (mail) => [mail?.accountEmail, getOwnerLabel(getMessageOwner(mail))] });
   const ownerPreference = ownerPreferenceApi?.create?.() || null;
   const pageBootstrapConsumedOwners = new Set();
 

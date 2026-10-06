@@ -2660,7 +2660,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260925-v2-only/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261003-subscription/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
   assert.doesNotMatch(webdesignVariantPickerScriptSource, /v1-prompt-only|V1_VARIANT/);
   assert.doesNotMatch(webdesignActionScriptSource, /v1-prompt-only/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
@@ -2921,7 +2921,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   );
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20261006-simple/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261003-subscription/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260914-provider/);
@@ -3080,7 +3080,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20261003-resilient/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261003-subscription/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeString\(variant\)\.toLowerCase\(\) !== "v2-visual-dna"/);
@@ -3122,7 +3122,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
   assert.match(pageSource, /assets\/premium-database-instantly-status\.js\?v=20260923-current-campaigns/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261003-subscription/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
   assert.doesNotMatch(webdesignActionScriptSource, /webdesigns klaar en naar Mailklaar verplaatst|Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(webdesignActionScriptSource, /costReporter\.consume\(customerIds\)/);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \}; const databaseSortedLists = window\.SoftoraDatabaseSortedLists\.create/);
@@ -4650,12 +4650,58 @@ test('premium database webdesign action keeps a failed job visible and never ann
   assert.ok(errorMessage);
   assert.equal(
     errorMessage.message,
-    'Het V2-bronbeeld kon tijdelijk niet worden geladen. De lead is vrijgegeven; probeer het webdesign opnieuw.'
+    'Softora Testmodus: Het V2-bronbeeld kon tijdelijk niet worden geladen. De lead is vrijgegeven; probeer het webdesign opnieuw.'
   );
   assert.equal(errorMessage.autoClear, undefined);
   assert.equal(photoRefreshes, 0);
   assert.equal(messages.some((item) => item.tone === 'success'), false);
 });
+
+for (const phase of ['start', 'poll']) {
+  for (const [error, detail] of [
+    ['Websiteanalyse mislukt: Kon deze website niet ophalen (422).', 'De bestaande website kon niet worden gelezen. Er is geen ontwerp gemaakt.'],
+    ['Websiteanalyse mislukt: Kon deze website niet ophalen (403). Deze site blokkeert geautomatiseerde serververzoeken.', 'De bestaande website kon niet worden gelezen. Er is geen ontwerp gemaakt. Deze site blokkeert geautomatiseerde serververzoeken.'],
+    ['Websiteanalyse mislukt: Deze website is in onderhoud.', 'Websiteanalyse mislukt: Deze website is in onderhoud.'],
+    ['Je abonnementlimiet is bereikt. De wachtrij pauzeert.', 'Je abonnementlimiet is bereikt. De wachtrij pauzeert.'],
+  ]) test(`webdesign ${phase} failure identifies its company and preserves the actual reason: ${error}`, async () => {
+    const messages = [], timers = [];
+    let photoRefreshes = 0;
+    const state = { klanten: [{ id: 'customer-scan', bedrijf: 'Voorbeeldbedrijf', website: 'https://voorbeeld.test' }] };
+    const client = loadDatabaseWebdesignActionClient({
+      document: {
+        getElementById: () => null,
+        createElement: () => ({ ...createClassListNode(), style: {} }),
+        querySelectorAll: () => [],
+        head: { appendChild() {} }, body: { appendChild() {} },
+      },
+      setTimeout(callback, delay) { const timer = { callback, delay }; timers.push(timer); return timer; },
+      clearTimeout() {},
+      fetch: async (_url, options) => ({ ok: true, json: async () => ({ job: {
+        id: 'job-scan', customerId: 'customer-scan', company: 'Voorbeeldbedrijf',
+        status: phase === 'poll' && options.method === 'POST' ? 'queued' : 'error', error,
+      } }) }),
+    });
+    const controller = client.createController({
+      state, escapeHtml: String, shouldShowWebsitePhoto: () => true,
+      isValidWebsitePhotoDataUrl: () => false,
+      resolveCustomerWebsiteUrl: () => 'https://voorbeeld.test', isWebdesignPhotoEligible: () => true,
+      openWebsitePhotoPreview() {}, renderPage() {},
+      setStatusMessage(message, tone) { messages.push({ message, tone }); },
+      refreshPhotos: async () => { photoRefreshes++; },
+    });
+    await controller.generateForCustomer('customer-scan');
+    if (phase === 'poll') {
+      state.klanten = []; // Restored jobs also need their company when the row is not loaded.
+      const pollTimer = timers.find(timer => timer.delay === 0);
+      assert.ok(pollTimer);
+      pollTimer.callback();
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.deepEqual(messages.filter(item => item.tone === 'error').map(item => item.message), ['Voorbeeldbedrijf: ' + detail]);
+    assert.equal(photoRefreshes, 0);
+    assert.equal(messages.some(item => item.tone === 'success'), false);
+  });
+}
 
 for (const safetyPhase of ['start', 'poll']) test(`premium database webdesign action explains safety blocks during ${safetyPhase} without leaking provider details`, async () => {
   const messages = [];
@@ -4729,7 +4775,7 @@ for (const safetyPhase of ['start', 'poll']) test(`premium database webdesign ac
   }
   assert.equal(photoRefreshes, 0);
 
-  assert.deepEqual(messages.filter((item) => item.tone === 'error').map(item => item.message), ['De AI-aanbieder heeft dit ontwerp geblokkeerd. Er is geen ontwerp opgeslagen.']);
+  assert.deepEqual(messages.filter((item) => item.tone === 'error').map(item => item.message), ['Softora Testmodus: De AI-aanbieder heeft dit ontwerp geblokkeerd. Er is geen ontwerp opgeslagen.']);
   assert.doesNotMatch(JSON.stringify(messages), /request ID|safety_violations|sexual|help\.openai\.com/i);
 });
 

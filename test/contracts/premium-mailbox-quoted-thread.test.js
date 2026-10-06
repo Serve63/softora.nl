@@ -284,3 +284,29 @@ test('een citaat met rechte aanhalingstekens bewijst dezelfde verzonden mail met
   const altered = reply.replace('onzekere', 'drukke');
   assert.equal(quotedThread.stripProvenQuotedOutbound(altered, [sent]).body, altered.trim());
 });
+
+test('een kopregel met eigen afzender en exacte minuut bewijst ook een ingekort of verminkt citaat', () => {
+  const quotedThread = require('../../assets/premium-mailbox-quoted-thread');
+  const sent = {
+    id: 'sent:schakel', accountEmail: 'martijnvandeven@softora.nl', email: 'martijnvandeven@softora.nl', from: 'Martijn van de Ven',
+    folder: 'sent', date: '2026-08-18T14:13:05.000Z',
+    body: 'Hoi Tessa,\n\nLeuk dat je weer even bericht! Donderdag in de foyer van De Schalm is helemaal prima.\n\nZou half 11 voor je uitkomen? Dan spreken we daar af. De demo kost € 1550.\n\nMet vriendelijke groet,\nMartijn van de Ven',
+  };
+  // Samsung glues the greeting onto the header line, cuts the signature, writes EUR and inserts ">" mid-sentence.
+  const reply = [
+    'Hoi Martijn,Half 11 is prima.', '',
+    '-------- Oorspronkelijk bericht --------',
+    'Van: Martijn van de Ven <martijnvandeven@softora.nl> Datum: 18-08-2026 16:13 (GMT+01:00) Aan: communicatie@schakel-nu.nl Onderwerp: Re: Kleine vraag Hoi Tessa,',
+    'Leuk dat je weer even bericht! Donderdag in de foyer van De > Schalm is helemaal prima.',
+    'Zou half 11 voor je uitkomen? Dan spreken we daar af. De demo kost EUR 1550.',
+  ].join('\n');
+  assert.equal(quotedThread.stripProvenQuotedOutbound(reply, [sent]).body, 'Hoi Martijn,Half 11 is prima.');
+  // Another minute, an added sentence or an added link is not our mail.
+  for (const changed of [
+    reply.replace('16:13', '16:14'),
+    reply.replace('Dan spreken we daar af.', 'Dan spreken we daar af. Graag ook koffie.'),
+    reply.replace('helemaal prima.', 'helemaal prima. https://example.test/extra'),
+  ]) {
+    assert.match(quotedThread.stripProvenQuotedOutbound(changed, [sent]).body, /Oorspronkelijk bericht/);
+  }
+});
