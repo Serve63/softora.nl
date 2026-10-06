@@ -102,6 +102,28 @@ Code- en mocktests starten geen externe gesprekken. Activeer echte tests of camp
 pas na een expliciet afgesproken budget en testnummer; zet geen betaalde fallback aan.
 Rollback: kies de bestaande `Gemini 3.1 Live`-optie of stop de campagne.
 
+### Mathijs, de eigen telefonische Softora-assistent
+
+Inkomende gesprekken via `/api/twilio/voice` gaan standaard rechtstreeks naar Gemini 3.8
+met het vaste profiel `softora_mathijs`. De eerste woorden zijn
+"Hallo, met Mathijs van Softora.nl", gevolgd door een korte AI-introductie en hulpvraag.
+De bedrijfskennis en gespreksgrenzen staan in `twilio-media-bridge/assistant-profile.js`.
+Dit profiel gebruikt geen eventueel ouder salesprompt uit `GEMINI_SYSTEM_PROMPT`.
+Uitgaande campagnes behouden hun ingestelde prompt en openingsbericht.
+
+Mathijs beantwoordt bedrijfs- en algemene supportvragen. Klantdossiers, live opdrachtstatus,
+agenda, mailverzending en doorverbinden zijn nog niet gekoppeld. Hij verwijst daarvoor naar
+het team zonder te beweren dat hij een afspraak, bericht of terugbelverzoek heeft vastgelegd.
+Werk de openbare kennis bij als diensten of contactgegevens wijzigen.
+
+De bestaande webhookverificatie, caller-allowlist en media-token blijven verplicht.
+Een expliciet gekozen `stack` blijft ondersteund. Voor de oude testkeuze met toetsen 1, 2 en 3
+zet je server-side `TWILIO_INBOUND_PROVIDER_MENU=true`; standaard staat dit menu uit.
+Controleer bij aansluiting dat het Twilio-nummer naar deze voice-webhook wijst.
+De Google-key blijft uitsluitend als server-side Render-secret staan. Zonder key is Mathijs
+niet belklaar. Voer geen echte Google-sessie of beltest uit zonder afgesproken budget;
+code- en mocktests doen geen betaalde aanvragen.
+
 ### Extra env vars voor `Voer opdracht uit` automation (Actieve Opdrachten)
 
 Zet deze aan als je bij `Voer opdracht uit` direct alles wilt laten lopen:
