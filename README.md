@@ -124,7 +124,8 @@ De Google-key blijft uitsluitend als server-side Render-secret staan. Zonder key
 niet belklaar. Voer geen echte Google-sessie of beltest uit zonder afgesproken budget;
 code- en mocktests doen geen betaalde aanvragen.
 
-Een eenmalige stemtest kan via de bestaande debugtoegang met
+Met een ingestelde Google-key vereisen alle debugroutes een `BRIDGE_DEBUG_TOKEN`, ook
+wanneer `NODE_ENV` niet is ingesteld. Een eenmalige stemtest kan via deze private toegang met
 `POST /debug/mathijs-voice-test`. Deze test is standaard uitgeschakeld. Alleen een expliciet
 budget mag aanleiding zijn om `MATHIJS_VOICE_TEST_ENABLED=true` en een ISO-tijdstip als
 `MATHIJS_VOICE_TEST_EXPIRES_AT` in te stellen (hooguit 10 minuten vooruit).

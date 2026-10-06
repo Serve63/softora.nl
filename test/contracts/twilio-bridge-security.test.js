@@ -18,10 +18,10 @@ test('twilio media bridge public health stays minimal', () => {
   assert.doesNotMatch(healthRoute[0], /requestedModel|modelAliasApplied|voice|latencyTuning|prompt|fingerprint|autoStart|ambient/);
 });
 
-test('twilio media bridge debug routes fail closed in production without token', () => {
+test('twilio media bridge debug routes fail closed with a configured Google key or in production without token', () => {
   const source = readBridgeSource();
   assert.match(source, /const IS_PRODUCTION =/);
-  assert.match(source, /if \(!BRIDGE_DEBUG_TOKEN\) return !IS_PRODUCTION;/);
+  assert.match(source, /if \(!BRIDGE_DEBUG_TOKEN\) return !IS_PRODUCTION && !GEMINI_API_KEY;/);
 });
 
 test('twilio media bridge requires media token for websocket upgrades in production', () => {

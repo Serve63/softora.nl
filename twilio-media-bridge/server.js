@@ -319,7 +319,7 @@ function summarizeGeminiMessage(msg) {
 }
 
 function isDebugRequestAuthorized(req) {
-  if (!BRIDGE_DEBUG_TOKEN) return !IS_PRODUCTION;
+  if (!BRIDGE_DEBUG_TOKEN) return !IS_PRODUCTION && !GEMINI_API_KEY;
   const queryToken = String(req.query?.token || '').trim();
   const headerToken = String(req.get('x-bridge-debug-token') || '').trim();
   return queryToken === BRIDGE_DEBUG_TOKEN || headerToken === BRIDGE_DEBUG_TOKEN;
@@ -428,7 +428,7 @@ const mathijsVoiceTestGate = createMathijsVoiceTestGate({
   expiresAt: process.env.MATHIJS_VOICE_TEST_EXPIRES_AT,
 });
 app.post('/debug/mathijs-voice-test', async (req, res) => {
-  if (!isDebugRequestAuthorized(req)) return res.status(403).json({ ok: false, error: 'Forbidden' });
+  if (!BRIDGE_DEBUG_TOKEN || !isDebugRequestAuthorized(req)) return res.status(403).json({ ok: false, error: 'Forbidden' });
   if (!GEMINI_API_KEY) return res.status(503).json({ ok: false, error: 'Google key ontbreekt.' });
   if (!mathijsVoiceTestGate.claim()) return res.status(409).json({ ok: false, error: 'Eenmalige stemtest is uitgeschakeld, verlopen of al gebruikt.' });
   try {
