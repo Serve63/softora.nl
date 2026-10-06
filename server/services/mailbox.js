@@ -1,4 +1,4 @@
-const { createMailboxAiPresentations } = require('./mailbox-ai-presentations');
+const { createMailboxContactFormService } = require('./mailbox-contact-form'); const { createMailboxAiPresentations } = require('./mailbox-ai-presentations');
 const { createMailboxMessageResponse } = require('./mailbox-message-response');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
@@ -2215,7 +2215,7 @@ function createMailboxService(deps = {}) {
   return {
     processAiPresentations: mailboxAiPresentations.processQueue,
     accountsResponse, attachmentCleanupResponse, attachmentUploadResponse,
-    campaignRepliesResponse,
+    campaignRepliesResponse, contactFormResponse: createMailboxContactFormService({ mailboxIndexStore, enrichMessages: (messages) => mailboxAiPresentations.enrichTree(messages), logger }).response,
     contactTimelineResponse: mailboxDiscoveryService.contactTimelineResponse,
     getMessageBodiesResponse,
     getMessageResponse,

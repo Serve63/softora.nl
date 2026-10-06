@@ -24,6 +24,7 @@
       icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 9v11"></path></svg>' };
   }
 
+  function getContactFormSidebarLink() { return { key: 'contact_form', href: '/mailbox?folder=contact-form', label: 'Contactformulier', icon: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path stroke-linecap="round" d="M8 7h8M8 11h8M8 15h4"></path></svg>' }; }
   function getMailboxSidebarLink() { return { key: "mailbox", href: "/mailbox", label: "Mailbox", icon: '<svg class="sidebar-link-mailbox-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"></path></svg>' }; }
 
     function getCustomersSidebarLink() {
@@ -113,7 +114,7 @@
         ];
         const managementLinks = [
             getCustomersSidebarLink(),
-            getMailboxSidebarLink(), getSummarizeSidebarLink(), getWebdesignSidebarLink(),
+            getMailboxSidebarLink(), getContactFormSidebarLink(), getSummarizeSidebarLink(), getWebdesignSidebarLink(),
             {
                 key: "seo",
                 href: "/premium-seo",
@@ -227,7 +228,7 @@
     function renderPremiumSidebarNavigation(session, activeKey) {
         return getPremiumSidebarSections(session).map(section => '<div class="' + section.className + '"><div class="sidebar-section-label">' + section.label + '</div>' + section.links.map(link => renderSidebarLink(link, activeKey)).join('') + '</div>').join('');
     }
-  const api = Object.freeze({ getWebdesignSidebarLink, getLeadRadarSidebarLink, getSummarizeSidebarLink, getMailboxSidebarLink,
+  const api = Object.freeze({ getContactFormSidebarLink, getWebdesignSidebarLink, getLeadRadarSidebarLink, getSummarizeSidebarLink, getMailboxSidebarLink,
     getCustomersSidebarLink, getDatabaseSidebarLink, getPremiumSidebarAdminExtraLinks,
     getPremiumSidebarSections, renderSidebarLink, renderPremiumSidebarNavigation,
     COMING_SOON_KEYS: Object.freeze(Array.from(PREMIUM_SIDEBAR_COMING_SOON_KEYS)), COMING_SOON_LOCK_SVG });

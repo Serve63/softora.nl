@@ -148,7 +148,7 @@
     return ACCOUNT_OWNERS[normalizeEmail(value)] || '';
   }
 
-  function getMessageOwner(mail) {
+  function getMessageOwner(mail) { if (mail?.contactFormSource === true && normalizeEmail(mail.accountEmail) === 'info@softora.nl') return 'serve';
     if (String(mail && mail.provider || '').trim().toLowerCase() === 'instantly') {
       const provenOwner = String(mail && mail.providerOwner || '').trim().toLowerCase();
       return isPersonalOwner(provenOwner) ? normalizeOwner(provenOwner) : '';
@@ -337,7 +337,7 @@
     const mailboxId = String(mail && (mail.mailboxId || mail.id) || '').trim();
     return account && mailboxId ? `${account}|mailbox:${mailboxId}` : '';
   }
-
+  function getComposeAction(action, mail) { return action === 'new-message' && mail?.contactFormSource === true && normalizeEmail(mail.accountEmail) === 'info@softora.nl' ? 'reply-mail' : action; }
   function getConversationAction(mail) {
     if (!mail) return null;
     const root = { ...mail, mailboxConversationRoot: true };
@@ -542,7 +542,7 @@
       storageFolder: String(message.storageFolder || '').trim().toLowerCase(),
       direction: String(message.direction || '').trim().toLowerCase(),
       sourceFolders: Array.isArray(message.sourceFolders) ? message.sourceFolders : [],
-      campaign: message.campaign || null,
+      campaign: message.campaign || null, contactFormSource: message.contactFormSource === true,
       outreach: message.outreach || null,
       conversationId: String(message.conversationId || mail && mail.conversationId || '').trim(),
       threadMessages: Array.isArray(message.threadMessages) ? message.threadMessages : [],
@@ -557,7 +557,7 @@
     return normalizeEmail(mail && mail.accountEmail) || normalizeEmail(fallbackAccount);
   }
 
-  function resolveReplyAccount(mail, fallbackAccount, selectedOwner) {
+  function resolveReplyAccount(mail, fallbackAccount, selectedOwner) { if (mail?.contactFormSource === true && normalizeEmail(mail.accountEmail) === 'info@softora.nl' && (!selectedOwner || ['serve', 'both'].includes(selectedOwner))) return 'info@softora.nl';
     return replyIdentityApi?.resolveReplyAccount(mail, fallbackAccount, selectedOwner, {
       normalizeEmail,
       normalizeOwner,
@@ -1145,7 +1145,7 @@
     getConversationId,
     getConversationVisibilityKey,
     getStableCampaignConversationId,
-    getConversationAction,
+    getComposeAction, getConversationAction,
     needsConversationReply,
     getActionMessageKey,
     getFolder,
