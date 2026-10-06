@@ -345,7 +345,7 @@ function createHtmlPageCoordinator(options = {}) {
   }
 
   function buildDashboardUnavailableActiveOrdersScript() {
-    return `<script>(function markActiveOrdersUnavailable(){var root=typeof document!=='undefined'?document.getElementById('kpiActiveOrders'):null;if(!root){if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',markActiveOrdersUnavailable,{once:true});return;}root.querySelectorAll('[data-kpi-active-website],[data-kpi-active-business],[data-kpi-active-voice],[data-kpi-active-chatbot]').forEach(function(el){el.textContent='--';});root.setAttribute('aria-label','Actieve opdrachten tijdelijk niet geladen');})();</script>`;
+    return `<script>(function markActiveOrdersUnavailable(){var root=typeof document!=='undefined'?document.getElementById('kpiActiveOrders'):null;if(!root){if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',markActiveOrdersUnavailable,{once:true});return;}root.textContent='--';root.setAttribute('aria-label','Actieve opdrachten tijdelijk niet geladen');})();</script>`;
   }
 
   function buildDashboardBootstrapTimeoutFallback(fileName) {

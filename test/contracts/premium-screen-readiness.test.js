@@ -274,13 +274,13 @@ test('Dashboard and Opdrachten load readiness checks before releasing their boot
   assert.match(dashboardRefresh, /if \(!complete\) \{\s*\/\/ Keep the boot shell up while recovery reads are still running\.\s*return false;/);
   assert.match(dashboardRefresh, /if \(!results\[0\] && results\[1\]\) showUnavailable\(\)/);
   assert.match(guardrails, /premium-screen-readiness\.test\.js/);
-  assert.match(dashboardRefresh, /requiredActions: \['#dashboardAiChatToggle', '#aiManagementConfigSave'\]/);
+  assert.match(dashboardRefresh, /requiredActions: \['#aiManagementConfigSave'\]/);
   assert.match(dashboardRefresh, /contentReady: isRenderedContentReady/);
-  assert.match(dashboardRefresh, /\^\\d\+\$\/\.test\(active\.querySelector/);
-  assert.match(dashboardRefresh, /chat\?\.dataset\.softoraActionBound === 'true' && save\?\.dataset\.softoraActionBound === 'true'/);
+  assert.match(dashboardRefresh, /\^\\d\+\$\/\.test\(active\.textContent/);
+  assert.match(dashboardRefresh, /save\?\.dataset\.softoraActionBound === 'true'/);
   assert.match(dashboardChat, /toggleButton\.dataset\.softoraActionBound = 'true';/);
   assert.match(dashboard, /aiManagementConfigSave\.dataset\.softoraActionBound = 'true';/);
-  assert.match(dashboard, /id="dashboardAiChatToggle"/);
+  assert.doesNotMatch(dashboard, /dashboardAiChatToggle/);
   assert.match(dashboard, /id="aiManagementConfigSave"/);
   assert.match(dashboardCore, /if \(!isPremiumDashboardScreenReadyForRelease\(\)\) return false;/);
   assert.match(ordersPage, /premium-screen-readiness\.js\?v=20260923a/);

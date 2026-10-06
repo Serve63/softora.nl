@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
 
 const {
   createCustomersPageBootstrapService,
@@ -745,7 +746,7 @@ test('dashboard bootstrap toont geen nep-nullen wanneer alleen opdrachten gelade
   assert.equal(replacements.SOFTORA_DASHBOARD_TOTAL_REVENUE, '--');
   assert.equal(replacements.SOFTORA_DASHBOARD_RECURRING_REVENUE, '--');
   assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /^--<script>/);
-  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /"website":2/);
+  assert.match(replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS, /var total=2;/);
 });
 
 test('dashboard bootstrap behandelt een lege formele klantenlijst als geldige nul', async () => {
@@ -908,11 +909,13 @@ test('customers page bootstrap vult dashboard actieve-opdrachten teller server-s
   });
 
   const script = replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS;
-  assert.match(script, /"website":1/);
-  assert.match(script, /"business":1/);
-  assert.match(script, /"voice":1/);
-  assert.match(script, /"chatbot":1/);
-  assert.match(script, /data-kpi-active-website/);
+  const element = { textContent: '--', setAttribute(name, value) { this[name] = value; } };
+  vm.runInNewContext(script.match(/<script>([\s\S]*?)<\/script>/)[1], {
+    document: { getElementById: () => element },
+  });
+  assert.equal(element.textContent, '4', 'all active product types count once; built orders are excluded');
+  assert.equal(element['aria-label'], 'Actieve opdrachten: 4');
+  assert.doesNotMatch(script, /data-kpi-active-(website|business|voice|chatbot)|Website opdrachten/);
 });
 
 test('customers page bootstrap toont dashboard data als tijdelijk niet geladen in plaats van nep-nullen', async () => {
