@@ -201,7 +201,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
-  assert.match(page, /assets\/premium-mailbox\.js\?v=20261006a/);
+  assert.match(page, /assets\/premium-mailbox\.js\?v=20261006b/);
   assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20261006a/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20260826a/);
@@ -235,7 +235,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c') < page.indexOf('premium-mailbox-compose-send-state.js?v=20260831b'));
   assert.ok(page.indexOf('premium-mailbox-compose-send-state.js?v=20260831b') < page.indexOf('premium-mailbox-compose-send-resilience.js?v=20260908a'));
   assert.ok(page.indexOf('premium-mailbox-compose-send-resilience.js?v=20260908a') < page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b'));
-  assert.ok(page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b') < page.indexOf('premium-mailbox-compose-controller.js?v=20260926a'));
+  assert.ok(page.indexOf('premium-mailbox-compose-accepted-send.js?v=20260827b') < page.indexOf('premium-mailbox-compose-controller.js?v=20261006a'));
   assert.equal(typeof composeSendStateModule.selectMarker, 'function');
   assert.equal(typeof composeSendResilienceModule.create, 'function');
   assert.equal(typeof attachmentDigestModule.bind, 'function');
@@ -4746,7 +4746,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20261006a/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20261006b/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20261001a/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20261003a/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20260924b/);
@@ -4847,7 +4847,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260924a/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20261006a/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20261006b/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -5711,7 +5711,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /assets\/premium-mailbox-compose-send-state\.js\?v=20260831b/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20260908a/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20260827b/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20260926a/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20261006a/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });
@@ -5728,7 +5728,7 @@ test('premium mailbox kan vanuit de mailcontext een voorgestelde reactie schrijv
   assert.match(composeControllerSource, /\/api\/mailbox\/rewrite/);
   assert.match(scriptSource, /function loadMailboxSenderProfile\(senderEmail = getMailboxAccount\(\)\)/);
   assert.match(scriptSource, /SoftoraCampaignSenderSettings\.loadProfileForSender/);
-  assert.match(composeControllerSource, /const replyAccount = options\.normalizeEmail\(replyContext && replyContext\.accountEmail\) \|\| options\.getAccount\(\);/);
+  assert.match(composeControllerSource, /const replyAccount = replyContext\?\.isFreshMessage \? sender\.getSelection\(\)\.accountEmail[\s\S]*?: options\.normalizeEmail\(replyContext && replyContext\.accountEmail\) \|\| options\.getAccount\(\);/);
   assert.match(composeControllerSource, /const senderProfile = await options\.loadSenderProfile\(replyAccount\);/);
   assert.match(composeControllerSource, /account: replyAccount,/);
   assert.match(composeControllerSource, /senderProfile,/);
@@ -10144,7 +10144,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
   assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20261006a/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20261006a/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20261006b/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);

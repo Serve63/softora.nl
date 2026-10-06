@@ -709,6 +709,7 @@ const mailboxComposeController = window.SoftoraMailboxComposeController.create({
   display: window.SoftoraMailboxDisplay,
   getActiveFolder: () => activeFolder,
   getAccount: () => getMailboxAccount(),
+  getAccounts: () => mailboxAccounts, whenAccountsReady: () => mailboxAccountsLoad,
   getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(),
   findMail: findMailById,
   normalizeEmail: normalizeMailboxEmail,

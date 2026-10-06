@@ -14,6 +14,10 @@
     });
     let replyContext = null;
     let replyOwner = '';
+    const senderModule = global.SoftoraMailboxComposeSender || (
+      typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-compose-sender.js') : null
+    );
+    const sender = senderModule?.create(options);
     let composeGeneration = 0;
     let spellingGeneration = 0;
     let spellingRequest = null;
@@ -225,6 +229,7 @@
     }
 
     function setReplyContext(mail) {
+      sender?.reset();
       if (!mail) {
         replyContext = null;
         replyOwner = '';
@@ -288,6 +293,12 @@
     }
 
     function assertReplyOwner(accountEmail = '') {
+      if (replyContext?.isFreshMessage) {
+        const selected = sender.getSelection();
+        if (selected.accountEmail !== accountEmail) throw new Error('De gekozen afzender is gewijzigd; controleer je bericht.');
+        replyOwner = selected.owner;
+        return;
+      }
       const selectedOwner = String(options.getOwner?.() || '').trim().toLowerCase();
       const accountOwner = normalize(
         options.campaignInbox?.getOwnerByAccount?.(accountEmail)
@@ -356,6 +367,22 @@
       updateSpellingButton();
     }
 
+    function startNewMessage() {
+      if (sendRequestActive || rewriteRequestActive) {
+        options.toast('Wacht tot de huidige verwerking klaar is.');
+        return;
+      }
+      if (!sender) { options.toast('De afzenderkeuze ontbreekt; vernieuw de mailbox.'); return; }
+      open();
+      replyContext = { mode: 'new-message', isFreshMessage: true };
+      ['c-to', 'c-subject', 'c-body'].forEach((id) => {
+        const field = documentRef?.getElementById(id);
+        if (field) field.value = '';
+      });
+      void sender.open().catch((error) => options.toast(String(error?.message || error)));
+      updateSpellingButton();
+    }
+
     function reply(mail, requestedMessageKey = '') {
       if (!mail) return;
       options.compose.resetOptionalFields();
@@ -393,6 +420,7 @@
       const source = exact || mail;
       const action = options.campaignInbox.getConversationAction?.(exact ? { ...exact, threadMessages: [] } : mail);
       if (!action || action.kind !== 'new-message') return;
+      sender?.reset();
       options.compose.resetOptionalFields();
       replyContext = options.compose.buildNewMessageContext(source, {
         latestMessage: action.message,
@@ -452,8 +480,10 @@
       setBodyLoading(true, isSuggestedReply ? 'Reactie voorstellen…' : 'Tekst verbeteren…');
       if (sendBtn) sendBtn.disabled = true;
       try {
-        const replyAccount = options.normalizeEmail(replyContext && replyContext.accountEmail) || options.getAccount();
+        const replyAccount = replyContext?.isFreshMessage ? sender.getSelection().accountEmail
+          : options.normalizeEmail(replyContext && replyContext.accountEmail) || options.getAccount();
         assertReplyOwner(replyAccount);
+        sender?.setBusy(true);
         const senderProfile = await options.loadSenderProfile(replyAccount);
         const response = await options.fetch('/api/mailbox/rewrite', {
           method: 'POST',
@@ -492,6 +522,7 @@
         ) || (isSuggestedReply ? 'Reactie voorstellen mislukt' : 'Mailtekst verbeteren mislukt'));
       } finally {
         rewriteRequestActive = false;
+        sender?.setBusy(false);
         setBodyLoading(false);
         options.compose.finish(
           rewriteBtn,
@@ -617,7 +648,8 @@
         const canonicalIdentity = contextAtSend?.replyIdentity && typeof contextAtSend.replyIdentity === 'object'
           ? { ...contextAtSend.replyIdentity }
           : null;
-        const account = contextAtSend?.mode === 'reply' && canonicalIdentity?.accountEmail
+        const account = contextAtSend?.isFreshMessage ? sender.getSelection().accountEmail
+          : contextAtSend?.mode === 'reply' && canonicalIdentity?.accountEmail
           ? options.normalizeEmail(canonicalIdentity.accountEmail)
           : contextAtSend
             ? getReplyAccount(currentMail || contextAtSend, contextAtSend.accountEmail)
@@ -626,6 +658,7 @@
         if (contextAtSend) contextAtSend.accountEmail = account;
         if (replyContext) replyContext.accountEmail = account;
         assertReplyOwner(account);
+        sender?.setBusy(true);
         const sendOwner = replyOwner;
         const sendMode = contextAtSend?.mode === 'reply' ? 'reply' : 'new-message';
         let idempotencyKey = String(contextAtSend?.sendIdempotencyKey || '').trim() || global.crypto?.randomUUID?.() || [
@@ -843,6 +876,7 @@
         options.toast(global.SoftoraMailboxError?.normalize?.(error, 'Mail verzenden mislukt') || 'Mail verzenden mislukt');
       } finally {
         sendRequestActive = false;
+        sender?.setBusy(false);
         if (sendBtn) {
           sendBtn.disabled = false;
           sendBtn.removeAttribute?.('aria-busy');
@@ -852,7 +886,8 @@
     }
 
     function handleAction(action, id, actionContext = {}) {
-      if (action === 'close-compose') close();
+      if (action === 'compose-new-mail') startNewMessage();
+      else if (action === 'close-compose') close();
       else if (action === 'send-mail') void send();
       else if (action === 'rewrite-compose') void rewrite();
       else if (action === 'spellcheck-compose') void spellcheck();
@@ -919,6 +954,7 @@
       reply,
       rewrite,
       spellcheck,
+      startNewMessage,
       undoSpelling,
       reconcile: acceptedSendState.reconcile,
       send,
