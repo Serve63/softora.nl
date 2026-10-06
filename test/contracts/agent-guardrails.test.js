@@ -1020,3 +1020,19 @@ test('production mail dependencies retain the September 2026 security fixes', ()
   }
   assert.equal(pkg.scripts['check:deps'], 'npm audit --omit=dev');
 });
+
+
+test('callcenter stream regression remains in the ordinary contract suite without paid providers', () => {
+  const pkg = JSON.parse(readRepoFile('package.json'));
+  const bridgePkg = JSON.parse(readRepoFile('twilio-media-bridge/package.json'));
+  const lock = JSON.parse(readRepoFile('package-lock.json'));
+  assert.equal(pkg.devDependencies.alawmulaw, '6.0.0');
+  assert.equal(pkg.dependencies.alawmulaw, undefined, 'the website production dependencies must stay unchanged');
+  assert.equal(lock.packages['node_modules/alawmulaw'].dev, true);
+  assert.match(bridgePkg.dependencies.alawmulaw, /6\.0\.0/);
+  assert.equal(pkg.scripts['test:contracts'], 'node --test test/contracts/*.test.js');
+  const regression = readRepoFile('test/contracts/twilio-bridge-callcenter-ambience.test.js');
+  assert.match(regression, /GEMINI_API_KEY: '', GOOGLE_API_KEY: '', AMBIENT_ONLY_MODE: 'true'/);
+  assert.match(regression, /ws:\/\/127\.0\.0\.1:/);
+  assert.match(regression, /x-bridge-media-token/);
+});

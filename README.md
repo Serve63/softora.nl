@@ -70,16 +70,24 @@ TWILIO_API_EDGE=dublin
 
 # Office ambience onder Gemini phone calls
 AMBIENT_ENABLED=true
-AMBIENT_NOISE_LEVEL=0.22
-AMBIENT_DUCK_LEVEL=0.10
+AMBIENT_NOISE_LEVEL=0.18
+AMBIENT_DUCK_LEVEL=0.08
 NOISE_GATE_RMS=250
 # Testmodus: alleen ambience, geen Gemini
 # AMBIENT_ONLY_MODE=false
-# Standaard gebruikt deze repo de voorbereide office loop:
-# AMBIENT_ASSET_PATH=assets/office-freesound-community-6322-8k.raw
+# Vrij gelicentieerde callcenteropname met een doorlopende lus van 95 seconden:
+AMBIENT_ASSET_PATH=assets/callcenter-dnlburnett-335711-8k.raw
 # Eigen raw 8k mono PCM loopbestand kan ook:
 # AMBIENT_ASSET_PATH=assets/jouw-office-loop-8k.raw
 ```
+
+De callcenteropname is "Ambience - Busy office-call center.wav" van [dnlburnett](https://freesound.org/people/dnlburnett/sounds/335711/),
+onder [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Bronvermelding en de
+bewerkingen staan in `twilio-media-bridge/assets/CALLCENTER-LICENSE.txt`.
+De brug laadt de lus eenmaal bij het opstarten en mengt hem uitsluitend in de uitgaande
+20 ms telefoonframes; er wordt geen aparte audioprovider aangeroepen. Tijdens het praten
+wordt de achtergrond zachter. `AMBIENT_ONLY_MODE` blijft een aparte testschakelaar en mag
+pas worden uitgezet wanneer een echt Gemini-/Twilio-gesprek binnen het afgesproken budget valt.
 
 ### Gemini 3.8 Live activeren
 
