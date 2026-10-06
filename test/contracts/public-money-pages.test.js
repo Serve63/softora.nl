@@ -121,7 +121,7 @@ test('bedrijfssoftware landing explains its own workflows and retains the noinde
   assert.doesNotMatch(source, /rel="canonical"|application\/ld\+json/);
   assert.match(source, /<meta property="og:url" content="https:\/\/www\.softora\.nl\/bedrijfssoftware">/);
   assert.match(source, /<meta name="twitter:card" content="summary_large_image">/);
-  assert.match(source, /Grip op je werk\.<br>Ruimte voor<br>/);
+  assert.match(source, /Van losse<br>systemen naar<br><span class="hero-accent">één helder geheel\./);
   for (const text of ['Minder dubbel werk', 'Meer overzicht', 'Je werk begrijpen', 'Een gerichte eerste versie', 'In de praktijk verbeteren', 'Bedrijfssoftware op maat']) assert.ok(source.includes(text), text);
   for (const route of ['/crm-systeem-op-maat', '/maatwerk-platform', '/ai-automatisering', '/kennisbank/wat-is-offerte-automatisering', '/kennisbank/wat-is-bedrijfssoftware-op-maat', '/blog/bedrijfssoftware-laten-maken-kosten', '/blog/maatwerk-software-offerte-beoordelen', '/blog']) assert.ok(source.includes('href="' + route + '"'), route);
   assert.match(source, /data-softora-public-seo="internal-links"/);
