@@ -910,7 +910,7 @@ test('customers page bootstrap vult dashboard actieve-opdrachten teller server-s
 
   const script = replacements.SOFTORA_DASHBOARD_TOTAL_CLIENTS;
   const element = { textContent: '--', setAttribute(name, value) { this[name] = value; } };
-  vm.runInNewContext(script.match(/<script>([\s\S]*?)<\/script>/)[1], {
+  vm.runInNewContext(script.slice(script.indexOf('<script>') + '<script>'.length, script.indexOf('</script>')), {
     document: { getElementById: () => element },
   });
   assert.equal(element.textContent, '4', 'all active product types count once; built orders are excluded');

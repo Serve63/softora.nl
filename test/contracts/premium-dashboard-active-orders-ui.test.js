@@ -37,22 +37,18 @@ test('premium dashboard leest actieve opdrachten uit chunked Supabase state', ()
   assert.match(pageSource, /typeof dashboardCore\.getCustomerRevenueDate === 'function'/);
   assert.match(pageSource, /dashboardCore\.getCustomerRevenueDate\(customer, paidOrders, now\)/);
   assert.match(pageSource, /data-kpi-active-total/);
-  assert.match(pageSource, /Actieve opdrachten: \$\{total\}/);
+  assert.match(pageSource, /dashboardCore\.updateActiveOrdersDisplay\(activeOrders\)/);
   assert.doesNotMatch(pageSource, /data-kpi-active-(website|business|voice|chatbot)|kpi-active-count|classifyPremiumDashboardOrderProductLine/);
 });
 
 
 test('dashboard refresh displays one total for all active order types and an empty list', () => {
-  const page = fs.readFileSync(path.join(__dirname, '../../premium-personeel-dashboard.html'), 'utf8');
-  const source = page.slice(page.indexOf('function updateKpiActiveOrdersDisplay('), page.indexOf('function normalizePremiumDashboardCustomerDatabaseStatus('));
+  const dashboardCore = require('../../assets/premium-dashboard-core');
   const element = { textContent: '--', setAttribute(name, value) { this[name] = value; } };
-  const context = { document: { getElementById: () => element } };
-  const vm = require('node:vm');
-  vm.createContext(context);
-  vm.runInContext(source, context);
-  context.updateKpiActiveOrdersDisplay(['Website', 'CRM', 'Voice', 'Chatbot', 'Other'].map(title => ({ title })));
+  const doc = { getElementById: () => element };
+  dashboardCore.updateActiveOrdersDisplay(['Website', 'CRM', 'Voice', 'Chatbot', 'Other'].map(title => ({ title })), doc);
   assert.equal(element.textContent, '5');
   assert.equal(element['aria-label'], 'Actieve opdrachten: 5');
-  context.updateKpiActiveOrdersDisplay([]);
+  dashboardCore.updateActiveOrdersDisplay([], doc);
   assert.equal(element.textContent, '0');
 });
