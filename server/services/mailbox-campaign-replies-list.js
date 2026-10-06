@@ -64,7 +64,12 @@ function createMailboxCampaignRepliesList({
       }
     );
     const indexedAt = Date.now();
-    const { messages, snapshotMessages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText, includeSnapshotMessages });
+    const merged = await mergeCampaignReplies({ baseReplies: replies, snapshotBaseReplies, instantlyMailboxService, limit, owner, refreshInstantly, filterVisibleMailboxMessages, normalizeString, truncateText, includeSnapshotMessages });
+    const { messages, instantlyReplies, snapshotInstantlyReplies, instantlySync } = merged;
+    // Instantly conversations join after the cached index pass; fill only what they still miss (AI presentation).
+    const snapshotMessages = includeSnapshotMessages && typeof hydrateSnapshotBodies === 'function'
+      ? await hydrateSnapshotBodies(merged.snapshotMessages)
+      : merged.snapshotMessages;
     const mergedAt = Date.now();
     const result = {
       ok: true,
