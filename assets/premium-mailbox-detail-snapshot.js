@@ -17,7 +17,8 @@
       return session?.authenticated ? String(session.userId || session.email || '').trim().toLowerCase() : '';
     });
     const identity = getIdentity();
-    const key = 'mailbox-prepared-views:v1';
+    // Previous rendered HTML can contain quotes that the current renderer now proves.
+    const key = 'mailbox-prepared-views:v2';
     const maxTotalChars = 3_000_000;
     const maxAgeMs = 24 * 60 * 60 * 1000;
     const views = new Map();
@@ -91,7 +92,7 @@
   function instance() {
     if (!snapshot && global.SoftoraScreenSnapshot) {
       snapshot = global.SoftoraScreenSnapshot.create({
-        key: 'premium-mailbox-detail:v1',
+        key: 'premium-mailbox-detail:v2',
         elements: [{ id: 'mail-detail', html: true }],
         inertIds: ['mail-detail'],
         maxChars: MAX_CHARS,
