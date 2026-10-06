@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createController, formatEuroCost } = require('../../assets/premium-database-photo-batch');
 
-test('opening a manual batch shows subscription usage and the Mac requirement without starting generation', () => {
+test('opening a manual batch hides the summary and does not start generation', () => {
   const nodes = {
     generatePhotosButton: { disabled: false }, photoBatchChoiceButtons: [],
     photoBatchLimitInput: { value: '', focus() {} }, photoBatchAllCount: {}, photoBatchSummary: {},
@@ -15,7 +15,8 @@ test('opening a manual batch shows subscription usage and the Mac requirement wi
   });
   controller.open();
   assert.equal(nodes.photoBatchAllCount.textContent, '100 bedrijven');
-  assert.equal(nodes.photoBatchSummary.textContent, '10 bedrijven · via je abonnement · Mac aan met internet');
+  assert.equal(nodes.photoBatchSummary.textContent, '');
+  assert.equal(nodes.photoBatchSummary.hidden, true);
   assert.equal(nodes.startPhotoBatchButton.disabled, true);
 });
 
@@ -34,9 +35,16 @@ test('batch generation requires an explicit provider and passes the chosen desti
   controller.open();
   controller.bind();
   assert.equal(nodes.startPhotoBatchButton.disabled, true);
+  nodes.photoBatchLimitInput.value = '0';
+  nodes.startPhotoBatchButton.onStart();
+  assert.deepEqual(calls, []);
+  assert.equal(nodes.photoBatchSummary.textContent, 'Vul minimaal 1 in.');
+  assert.equal(nodes.photoBatchSummary.hidden, false);
+  nodes.photoBatchLimitInput.value = '10';
   provider.checked = true;
   provider.onChange();
   assert.equal(nodes.startPhotoBatchButton.disabled, false);
+  assert.equal(nodes.photoBatchSummary.hidden, true);
   nodes.photoBatchLimitInput.value = '10';
   nodes.startPhotoBatchButton.onStart();
   assert.deepEqual(calls, [[10, { silentProgress: true, mailProvider: 'instantly', source: 'all' }]]);
