@@ -12,10 +12,10 @@ const GOOGLE_SEARCH_FAVICON_HREF = '/assets/softora-search-favicon.png?v=2026082
 const ROUND_FAVICON_HREF = '/assets/softora-favicon-round.png?v=20260616a';
 const HOME_SCREEN_ICON_HREF = '/assets/softora-touch-icon.png?v=20260615a';
 const PAGE_HOME_SCREEN_ICONS = Object.freeze({
-  'live-momentum.html': '/assets/winnen-app-icon-180.png?v=20261006a',
-  'live-momentum-access.html': '/assets/winnen-app-icon-180.png?v=20261006a',
-  'sportschool.html': '/assets/bulk-season-app-icon-180.png?v=20261006a',
-  'logboek-cut.html': '/assets/cut-season-app-icon-180.png?v=20261006a',
+  'live-momentum.html': '/assets/winnen-app-icon-ios-20261006b.png',
+  'live-momentum-access.html': '/assets/winnen-app-icon-ios-20261006b.png',
+  'sportschool.html': '/assets/bulk-season-app-icon-ios-20261006b.png',
+  'logboek-cut.html': '/assets/cut-season-app-icon-ios-20261006b.png',
 });
 const STRUCTURED_DATA_LOGO_URL = 'https://www.softora.nl/assets/softora-touch-icon.png';
 const BROKEN_STRUCTURED_DATA_LOGO_PATTERN = /https:\/\/www\.softora\.nl\/assets\/61C2BCF5-70E9-4789-AFDE-FA18C862D58A\.PNG/;
@@ -79,25 +79,31 @@ test('html pages use the size-corrected square search favicon, browser favicon, 
     assert.doesNotMatch(source, BROKEN_STRUCTURED_DATA_LOGO_PATTERN, `${fileName} should not reference the missing structured-data logo`);
     if (!source.includes('rel="icon"')) return;
     pagesWithFavicons.push(fileName);
-    const expectedSearchFaviconHref =
-      fileName === 'premium-website.html' ? GOOGLE_SEARCH_FAVICON_HREF : SEARCH_FAVICON_HREF;
-    const searchFaviconTag = `<link rel="icon" type="image/png" href="${expectedSearchFaviconHref}" sizes="512x512">`;
-    const roundFaviconTag = `<link rel="icon" type="image/png" href="${ROUND_FAVICON_HREF}" sizes="any">`;
-    assert.match(
-      source,
-      new RegExp(searchFaviconTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-      `${fileName} should expose the stable Google Search favicon`
-    );
-    assert.match(
-      source,
-      new RegExp(roundFaviconTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-      `${fileName} should load the round favicon`
-    );
-    assert.ok(
-      source.indexOf(searchFaviconTag) < source.indexOf(roundFaviconTag),
-      `${fileName} should expose the search favicon before the filled browser favicon`
-    );
     const appHomeScreenIcon = PAGE_HOME_SCREEN_ICONS[fileName];
+    if (appHomeScreenIcon) {
+      const faviconHref = appHomeScreenIcon.replace('-ios-20261006b.png', '-512.png?v=20261006a');
+      const faviconTag = `<link rel="icon" type="image/png" href="${faviconHref}" sizes="512x512">`;
+      assert.match(source, new RegExp(faviconTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${fileName} must use its app icon as browser fallback`);
+    } else {
+      const expectedSearchFaviconHref =
+        fileName === 'premium-website.html' ? GOOGLE_SEARCH_FAVICON_HREF : SEARCH_FAVICON_HREF;
+      const searchFaviconTag = `<link rel="icon" type="image/png" href="${expectedSearchFaviconHref}" sizes="512x512">`;
+      const roundFaviconTag = `<link rel="icon" type="image/png" href="${ROUND_FAVICON_HREF}" sizes="any">`;
+      assert.match(
+        source,
+        new RegExp(searchFaviconTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+        `${fileName} should expose the stable Google Search favicon`
+      );
+      assert.match(
+        source,
+        new RegExp(roundFaviconTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+        `${fileName} should load the round favicon`
+      );
+      assert.ok(
+        source.indexOf(searchFaviconTag) < source.indexOf(roundFaviconTag),
+        `${fileName} should expose the search favicon before the filled browser favicon`
+      );
+    }
     const expectedHomeScreenIcon = appHomeScreenIcon || HOME_SCREEN_ICON_HREF;
     const homeScreenIconTag = `<link rel="apple-touch-icon"${appHomeScreenIcon ? ' sizes="180x180"' : ''} href="${expectedHomeScreenIcon}">`;
     assert.match(
