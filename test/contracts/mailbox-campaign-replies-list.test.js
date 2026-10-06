@@ -259,7 +259,8 @@ test('de pagina-snapshot bewaart vooraf geladen gespreksteksten', async () => {
   await listCampaignReplies({ limit: 10 });
   assert.deepEqual(hydrated, []);
   const result = await listCampaignReplies({ includeSnapshotMessages: true, hydrateBodies: false });
-  assert.deepEqual(hydrated, [1]);
+  // Once for the cached index set, once after Instantly conversations joined (it only requests what is still missing).
+  assert.deepEqual(hydrated, [1, 1]);
   assert.equal(result.snapshotMessages[0].body, 'Volledige tekst');
   assert.equal(
     parseMailboxCampaignSnapshot(writes[0][1][MAILBOX_CAMPAIGN_SNAPSHOT_KEY]).messages[0].body,
