@@ -366,6 +366,7 @@ function createLeadsPageBootstrapService(deps = {}) {
       item?.coldcallingStack || item?.stack || item?.callingStack || item?.callingEngine
     ).replace(/[\s-]+/g, '_');
     if (stackRaw === 'retell_ai') return 'Retell AI';
+    if (stackRaw === 'gemini_flash_3_8_live' || stackRaw === 'gemini_3_8_live') return 'Gemini 3.8 Live';
     if (stackRaw === 'gemini_flash_3_1_live' || stackRaw === 'gemini_3_1_live' || stackRaw === 'gemini') {
       return 'Gemini 3.1 Live';
     }

@@ -220,12 +220,8 @@
 
   function normalizeColdcallingStack(value) {
     const raw = String(value || '').trim().toLowerCase();
-    if (
-      raw === 'gemini_flash_3_1_live' ||
-      raw === 'gemini flash 3.1 live' ||
-      raw === 'gemini_3_1_live' ||
-      raw === 'gemini'
-    ) {
+    if (['gemini_flash_3_8_live', 'gemini_3_8_live', 'gemini-3.8-live', 'gemini 3.8 live', 'gemini flash 3.8 live'].includes(raw)) return 'gemini_flash_3_8_live';
+    if (['gemini_flash_3_1_live', 'gemini flash 3.1 live', 'gemini_3_1_live', 'gemini'].includes(raw)) {
       return 'gemini_flash_3_1_live';
     }
     if (
@@ -249,6 +245,7 @@
 
   function getColdcallingStackLabel(value) {
     const normalized = normalizeColdcallingStack(value);
+    if (normalized === 'gemini_flash_3_8_live') return 'Gemini 3.8 Live';
     if (normalized === 'gemini_flash_3_1_live') return 'Gemini 3.1 Live';
     if (normalized === 'openai_realtime_1_5') return 'OpenAI Realtime 1.5';
     if (normalized === 'hume_evi_3') return 'Hume Evi 3';

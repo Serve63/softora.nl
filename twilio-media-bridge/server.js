@@ -6,6 +6,7 @@ const express = require('express');
 const WebSocket = require('ws');
 const { mulaw } = require('alawmulaw');
 const { createSpeechTurnState } = require('./audio-turn-state');
+const { createGeminiSessionSetupSender, resolveGeminiSessionModel } = require('./gemini-session');
 const {
   OUTPUT_FRAME_DURATION_MS,
   loadAmbientLoopBuffer,
@@ -228,9 +229,9 @@ function buildGeminiWsUrl() {
   )}`;
 }
 
-function buildGeminiSetupPayload() {
+function buildGeminiSetupPayload(model = GEMINI_MODEL) {
   return buildGeminiSetupEnvelope({
-    model: GEMINI_MODEL,
+    model,
     voiceName: GEMINI_VOICE,
     systemPrompt: SYSTEM_PROMPT,
     seedInitialHistory: false,
@@ -322,7 +323,8 @@ function isDebugRequestAuthorized(req) {
   return queryToken === BRIDGE_DEBUG_TOKEN || headerToken === BRIDGE_DEBUG_TOKEN;
 }
 
-function probeGeminiSetup(timeoutMs = 9000) {
+function probeGeminiSetup(timeoutMs = 9000, stack = '') {
+  const model = resolveGeminiSessionModel(stack, GEMINI_MODEL);
   return new Promise((resolve) => {
     if (!GEMINI_API_KEY) {
       resolve({ ok: false, stage: 'config', error: 'GEMINI_API_KEY/GOOGLE_API_KEY ontbreekt' });
@@ -350,7 +352,7 @@ function probeGeminiSetup(timeoutMs = 9000) {
     }
 
     ws.on('open', () => {
-      ws.send(JSON.stringify(buildGeminiSetupPayload()));
+      ws.send(JSON.stringify(buildGeminiSetupPayload(model)));
     });
 
     ws.on('message', (chunk) => {
@@ -360,7 +362,7 @@ function probeGeminiSetup(timeoutMs = 9000) {
         finish({
           ok: true,
           stage: 'setupComplete',
-          model: GEMINI_MODEL,
+          model,
           voice: GEMINI_VOICE,
         });
         return;
@@ -412,7 +414,7 @@ app.get('/debug/gemini-setup', async (req, res) => {
     return res.status(403).json({ ok: false, error: 'Forbidden' });
   }
   const timeoutMs = Math.max(3000, Math.min(20000, Number(req.query?.timeoutMs || 9000) || 9000));
-  const result = await probeGeminiSetup(timeoutMs);
+  const result = await probeGeminiSetup(timeoutMs, req.query?.stack);
   return res.status(result.ok ? 200 : 500).json({
     ...result,
     timestamp: new Date().toISOString(),
@@ -524,6 +526,11 @@ wss.on('connection', (twilioWs, _request, url) => {
         perMessageDeflate: false,
         handshakeTimeout: GEMINI_WS_HANDSHAKE_TIMEOUT_MS,
       });
+  const sendGeminiSetup = createGeminiSessionSetupSender({
+    configuredModel: GEMINI_MODEL,
+    buildPayload: buildGeminiSetupPayload,
+    onSetup: (model) => { sessionSummary.model = model; },
+  });
   const connectionStartedAtMs = Date.now();
   try {
     if (twilioWs?._socket && typeof twilioWs._socket.setNoDelay === 'function') {
@@ -699,7 +706,7 @@ wss.on('connection', (twilioWs, _request, url) => {
           geminiWs._socket.setNoDelay(true);
         }
       } catch {}
-      geminiWs.send(JSON.stringify(buildGeminiSetupPayload()));
+      sendGeminiSetup({ socket: geminiWs, streamSid, stack });
     });
 
     geminiWs.on('message', (chunk) => {
@@ -805,6 +812,7 @@ wss.on('connection', (twilioWs, _request, url) => {
         sessionSummary.stack = requestedStack;
       }
       sessionSummary.streamSid = streamSid;
+      sendGeminiSetup({ socket: geminiWs, streamSid, stack });
       if (BRIDGE_VERBOSE_LOGS) {
         console.log(
           `[Bridge] Twilio start streamSid=${streamSid || '(leeg)'} stack=${stack || '(leeg)'}`
@@ -897,7 +905,7 @@ wss.on('connection', (twilioWs, _request, url) => {
   });
 
   console.log(
-    `[Bridge] Connected stack=${stack} stream=${streamSid || '-'} model=${GEMINI_MODEL} voice=${GEMINI_VOICE} ambient=${AMBIENT_LOOP.enabled} ambientOnly=${AMBIENT_ONLY_MODE}`
+    `[Bridge] Connected stack=${stack} stream=${streamSid || '-'} model=${resolveGeminiSessionModel(stack, GEMINI_MODEL)} voice=${GEMINI_VOICE} ambient=${AMBIENT_LOOP.enabled} ambientOnly=${AMBIENT_ONLY_MODE}`
   );
 });
 

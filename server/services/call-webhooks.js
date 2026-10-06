@@ -161,6 +161,7 @@ function createCallWebhookRuntime(deps = {}) {
     const digit = normalizeString(digitValue);
     if (digit === '1') return 'retell_ai';
     if (digit === '2') return 'gemini_flash_3_1_live';
+    if (digit === '3') return 'gemini_flash_3_8_live';
     return '';
   }
 
@@ -280,7 +281,7 @@ function createCallWebhookRuntime(deps = {}) {
           `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Gather input="dtmf" numDigits="1" timeout="7" action="${escapeHtml(actionUrl)}" method="POST">
-    <Say language="nl-NL" voice="alice">Maak een keuze. Toets 1 voor Retell A I. Toets 2 voor Gemini 3 punt 1 Live.</Say>
+    <Say language="nl-NL" voice="alice">Maak een keuze. Toets 1 voor Retell A I. Toets 2 voor Gemini 3 punt 1 Live. Toets 3 voor Gemini 3 punt 8 Live.</Say>
   </Gather>
   <Say language="nl-NL" voice="alice">Geen keuze ontvangen. Het gesprek wordt nu beeindigd.</Say>
   <Hangup />

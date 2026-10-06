@@ -90,6 +90,7 @@ function createRuntimeHelpers(options = {}) {
 
   const getColdcallingStackLabel = (stack) => {
     const normalized = normalizeColdcallingStack(stack);
+    if (normalized === 'gemini_flash_3_8_live') return 'Gemini 3.8 Live';
     if (normalized === 'gemini_flash_3_1_live') return 'Gemini 3.1 Live';
     if (normalized === 'openai_realtime_1_5') return 'OpenAI Realtime 1.5';
     if (normalized === 'hume_evi_3') return 'Hume Evi 3';
@@ -102,6 +103,7 @@ function createRuntimeHelpers(options = {}) {
     );
     if (stack === 'retell_ai') return 'retell';
     if (
+      stack === 'gemini_flash_3_8_live' ||
       stack === 'gemini_flash_3_1_live' ||
       stack === 'openai_realtime_1_5' ||
       stack === 'hume_evi_3'
