@@ -36,6 +36,10 @@ test('new website choice links the published local design with Softora contact t
  assert.match(entry,/href="\/nieuwe-website"/);
  const html=fs.readFileSync(path.join(root,'assets/website-showcase/index.html'),'utf8');
  assert.match(html,/<base href="\/assets\/website-showcase\/">/);
+ const headerContact=html.match(/<a href="\/contact" class="btn btn-primary Nav_cta__gBZXl">[^]*?<\/a>/)?.[0] || '';
+ assert.match(headerContact,/<span class="btn-label">CONTACT<\/span>/);
+ const preview=fs.readFileSync(path.join(root,'assets/website-showcase/preview.js'),'utf8');
+ assert.doesNotMatch(preview,/\$\$\('[^']*Nav_cta__gBZXl/,'Header contact link must navigate without opening the redesign dialog');
  for(const file of ['index.html','preview.js','work.js']) {
   const content=fs.readFileSync(path.join(root,'assets/website-showcase',file),'utf8');
   assert.doesNotMatch(content,/kreatives|31613066250|13 06 62 50/i,'Showcase must not present the source agency as Softora');
