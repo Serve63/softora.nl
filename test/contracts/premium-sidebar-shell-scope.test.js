@@ -1603,3 +1603,11 @@ test('sidebar allows navigation between Mailbox and Contactformulier and blocks 
     assert.deepEqual(changed, expectedBlocked ? [] : [true]);
   }
 });
+
+test('Gemini 3.8 provider choice preserves the coldcall premium shell and PIN guard', () => {
+  const page = readRepoFile('premium-ai-lead-generator.html');
+  assert.match(page, /value="gemini_flash_3_8_live">Gemini 3\.8 Live/);
+  assert.match(page, /assets\/coldcalling-dashboard\.js\?v=20261006a/);
+  assert.match(page, /assets\/premium-risky-action-pin\.js\?v=20260512a/);
+  assert.match(page, /data-static-sidebar="1"/);
+});

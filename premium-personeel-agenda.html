@@ -1849,8 +1849,8 @@
             .toLowerCase()
             .replace(/[\s-]+/g, '_');
         if (stackRaw === 'retell_ai') return 'Retell AI';
-        if (stackRaw === 'gemini_flash_3_1_live' || stackRaw === 'gemini_3_1_live' || stackRaw === 'gemini') {
-            return 'Gemini 3.1 Live';
+        if (['gemini_flash_3_8_live', 'gemini_3_8_live', 'gemini_flash_3_1_live', 'gemini_3_1_live', 'gemini'].includes(stackRaw)) {
+            return stackRaw.includes('3_8') ? 'Gemini 3.8 Live' : 'Gemini 3.1 Live';
         }
         if (stackRaw === 'openai_realtime_1_5' || stackRaw === 'openai_realtime' || stackRaw === 'openai') {
             return 'Meer volgt...';

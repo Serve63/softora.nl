@@ -211,3 +211,16 @@ test('call webhooks store retell webhook events and trigger post-call automation
   assert.equal(context.automationCalls.length, 1);
   assert.equal(context.automationCalls[0].callId, 'call_retell');
 });
+
+test('Gemini 3.8 inbound selection sends the stack through Twilio start custom parameters', () => {
+  const context = createRuntime();
+  const req = createReq({
+    path: '/api/twilio/voice',
+    body: { CallSid: 'CA38', From: '+31612345678', To: '+31880000000', Digits: '3' },
+    headers: { 'x-webhook-secret': 'twilio-secret' },
+  });
+  const res = createRes();
+  context.runtime.handleTwilioInboundVoice(req, res);
+  assert.match(res.textBody, /<Parameter name="stack" value="gemini_flash_3_8_live" \/>/);
+  assert.equal(context.upserts[0].stack, 'gemini_flash_3_8_live');
+});

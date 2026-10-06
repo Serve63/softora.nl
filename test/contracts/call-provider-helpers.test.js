@@ -585,3 +585,62 @@ test('call provider helpers wrap call-status responses and recording urls consis
     /Recordings\/RE1234567890abcdef1234567890abcdef\.mp3$/
   );
 });
+
+test('Gemini 3.8 routes through its configured bridge and keeps the stack on callbacks', async () => {
+  const calls = [];
+  const helpers = createHelpers({
+    env: {
+      TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_8_LIVE: 'wss://gemini38.example/twilio-media',
+      TWILIO_FROM_NUMBER_GEMINI_FLASH_3_8_LIVE: '+31622222222',
+      TWILIO_MEDIA_BRIDGE_DEBUG_TOKEN: 'test-debug-token',
+    },
+    fetchJsonWithTimeout: async (url, options) => {
+      calls.push({ url: new URL(url), method: options.method, headers: options.headers });
+      return { response: { ok: true, status: 200 }, data: { ok: true, model: 'models/gemini-3.8-live', sid: 'CA38' } };
+    },
+  });
+  const campaign = { coldcallingStack: 'gemini_flash_3_8_live' };
+  const payload = helpers.buildTwilioOutboundPayload({ phone: '06 12 34 56 78' }, campaign);
+  assert.equal(payload.From, '+31622222222');
+  assert.equal(new URL(payload.Url).searchParams.get('stack'), campaign.coldcallingStack);
+  assert.equal(new URL(payload.StatusCallback).searchParams.get('stack'), campaign.coldcallingStack);
+  const mediaWsUrl = helpers.getTwilioMediaWsUrlForStack(campaign.coldcallingStack);
+  assert.equal(mediaWsUrl, 'wss://gemini38.example/twilio-media');
+  await helpers.createTwilioOutboundCall(payload, { stack: campaign.coldcallingStack, mediaWsUrl });
+  assert.equal(calls[0].url.pathname, '/healthz');
+  assert.equal(calls[1].url.searchParams.get('stack'), campaign.coldcallingStack);
+  assert.equal(calls[1].headers['x-bridge-debug-token'], 'test-debug-token');
+  assert.equal(calls[2].method, 'POST');
+});
+
+for (const setup of [
+  { status: 200, data: { ok: true, model: 'models/gemini-3.1-flash-live-preview' } },
+  { status: 200, data: { ok: true } },
+  { status: 403, data: { ok: false } },
+  { status: 500, data: { ok: false, model: 'models/gemini-3.8-live' } },
+]) {
+  test(`Gemini 3.8 blocks dialing when setup status ${setup.status} does not confirm the requested model (${setup.data.model || 'missing'})`, async () => {
+    let outboundCalls = 0;
+    const helpers = createHelpers({
+      fetchJsonWithTimeout: async (url, options) => {
+        if (options.method === 'POST') outboundCalls += 1;
+        if (new URL(url).pathname === '/healthz') return { response: { ok: true, status: 200 }, data: { ok: true } };
+        return { response: { ok: setup.status === 200, status: setup.status }, data: setup.data };
+      },
+    });
+    await assert.rejects(helpers.createTwilioOutboundCall({ To: '+31612345678' }, {
+      stack: 'gemini_flash_3_8_live', mediaWsUrl: 'wss://gemini38.example/twilio-media',
+    }), /Gemini .*geblokkeerd|Gemini bridge setup-check mislukt/);
+    assert.equal(outboundCalls, 0);
+  });
+}
+
+test('Gemini 3.8 can reuse existing Gemini bridge configuration without changing legacy routing', () => {
+  const helpers = createHelpers({ env: {
+    TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE: 'wss://legacy-gemini.example/twilio-media',
+    TWILIO_FROM_NUMBER_GEMINI_FLASH_3_1_LIVE: '+31633333333',
+  } });
+  assert.equal(helpers.getTwilioMediaWsUrlForStack('gemini_flash_3_8_live'), 'wss://legacy-gemini.example/twilio-media');
+  assert.equal(helpers.getTwilioFromNumberForStack('gemini_flash_3_8_live'), '+31633333333');
+  assert.equal(helpers.getTwilioMediaWsUrlForStack('gemini'), 'wss://legacy-gemini.example/twilio-media');
+});

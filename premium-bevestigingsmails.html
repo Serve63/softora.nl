@@ -1211,6 +1211,7 @@ Softora.nl | +31 6 43 26 27 92</textarea>
             <select class="mf-sel" id="coldcallingStack" aria-label="Coldcalling provider">
               <option value="retell_ai" selected>Retell AI</option>
               <option value="gemini_flash_3_1_live">Gemini 3.1 Live</option>
+              <option value="gemini_flash_3_8_live">Gemini 3.8 Live</option>
             </select>
             <div class="mf-help">Kies welke AI-stack de software gebruikt voor coldcalling.</div>
           </div>
@@ -1459,15 +1460,14 @@ function isPremiumAiLeadGeneratorPath() {
 
 function normalizeColdcallingStack(value) {
   const raw = String(value || '').trim().toLowerCase();
-  if (raw === 'gemini' || raw === 'gemini_3_1_live' || raw === 'gemini_flash_3_1_live') {
-    return 'gemini_flash_3_1_live';
-  }
+  if (['gemini_flash_3_8_live', 'gemini_3_8_live', 'gemini-3.8-live'].includes(raw)) return 'gemini_flash_3_8_live';
+  if (['gemini', 'gemini_3_1_live', 'gemini_flash_3_1_live'].includes(raw)) return 'gemini_flash_3_1_live';
   return 'retell_ai';
 }
 
 function getColdcallingStackLabel(value) {
   const normalized = normalizeColdcallingStack(value);
-  if (normalized === 'gemini_flash_3_1_live') return 'Gemini 3.1 Live';
+  if (normalized.startsWith('gemini_')) return normalized === 'gemini_flash_3_8_live' ? 'Gemini 3.8 Live' : 'Gemini 3.1 Live';
   return 'Retell AI';
 }
 
