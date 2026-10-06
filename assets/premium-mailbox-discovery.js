@@ -6,6 +6,9 @@
   const MAX_HIDE_CONTACT_MESSAGES = 100;
   const CONTACT_TIMELINE_TIMEOUT_MS = 15_000;
   const EMAIL_PATTERN = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+  const provenance = global.SoftoraMailboxMessageProvenance || (
+    typeof module !== 'undefined' && module.exports ? require('./premium-mailbox-message-provenance.js') : null
+  );
 
   function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();
@@ -15,21 +18,34 @@
     return Array.from(new Set((String(value || '').match(EMAIL_PATTERN) || []).map(normalizeEmail)));
   }
 
+  function getOwnIdentities(mail, accountEmails = []) {
+    return new Set([
+      ...(Array.isArray(accountEmails) ? accountEmails : []), mail?.accountEmail, mail?.providerAccountEmail,
+    ].filter(Boolean).map(provenance.normalizeIdentity));
+  }
+
+  function getContactEmail(mail, accountEmails = []) {
+    const stored = normalizeEmail(mail?.externalContactEmail);
+    return stored && !getOwnIdentities(mail, accountEmails).has(provenance.normalizeIdentity(stored))
+      ? stored : resolveExternalContact(mail, accountEmails);
+  }
+
   function resolveExternalContact(mail, accountEmails = []) {
-    const own = new Set((Array.isArray(accountEmails) ? accountEmails : []).map(normalizeEmail).filter(Boolean));
+    const own = getOwnIdentities(mail, accountEmails);
     const replyTo = extractEmails(mail?.replyTo);
     const sender = extractEmails(mail?.email);
     const recipients = extractEmails([
       mail?.to, mail?.toDisplay, mail?.cc, mail?.bcc, mail?.deliveredTo,
     ].filter(Boolean).join(' '));
-    const outbound = String(mail?.folder || mail?.direction || '').toLowerCase() === 'sent';
+    const outbound = provenance.isSent(mail, { account: (Array.isArray(accountEmails) ? accountEmails : [])
+      .find((account) => provenance.normalizeIdentity(account) === provenance.normalizeIdentity(mail?.email)) });
     return (outbound ? [...recipients, ...replyTo, ...sender] : [...replyTo, ...sender, ...recipients])
-      .find((email) => !own.has(email)) || '';
+      .find((email) => !own.has(provenance.normalizeIdentity(email))) || '';
   }
 
   function getContactDossier(mail, options = {}) {
     const accounts = Array.isArray(options.accountEmails) ? options.accountEmails : [];
-    const contactEmail = normalizeEmail(mail?.externalContactEmail) || resolveExternalContact(mail, accounts);
+    const contactEmail = getContactEmail(mail, accounts);
     const active = String(options.activeFolder || '').toLowerCase() === 'outreach' && Boolean(contactEmail);
     if (!active) return { active: false, contactEmail: '', title: String(options.fallbackTitle || '') };
     const campaignInbox = options.campaignInbox;
@@ -98,7 +114,7 @@
   }
 
   function getRoutedContact(message, accountEmails) {
-    return resolveExternalContact(message, accountEmails) || normalizeEmail(message?.externalContactEmail);
+    return resolveExternalContact(message, accountEmails) || getContactEmail(message, accountEmails);
   }
 
   function isProvenOutbound(message) {
@@ -116,7 +132,8 @@
     const allowedAccounts = new Set(accounts);
     const canonicalOwner = normalizePersonalOwner(options.canonicalOwner);
     const ownerResolver = typeof options.getMessageOwner === 'function' ? options.getMessageOwner : null;
-    const valid = Boolean(contact && accounts.length && canonicalOwner && ownerResolver);
+    const valid = Boolean(contact && accounts.length && canonicalOwner && ownerResolver &&
+      !getOwnIdentities(null, accounts).has(provenance.normalizeIdentity(contact)));
     const getOwner = (message) => {
       if (!ownerResolver) return '';
       const resolvedOwner = normalizePersonalOwner(ownerResolver(message));
@@ -291,7 +308,7 @@
   function renderTimelineSummary(mail, escapeHtml, dossier = {}) {
     if (!mail || typeof escapeHtml !== 'function' || (!mail.contactTimelineLoaded && !dossier.active)) return '';
     const complete = mail.contactTimelineLoaded === true && !mail.contactTimelineNeedsRefresh && Number(mail.contactTimelineTotal) > 0;
-    const contact = String(mail.externalContactEmail || dossier.contactEmail || '').trim();
+    const contact = String(dossier.contactEmail || mail.externalContactEmail || '').trim();
     let summary;
     if (complete) {
       const messages = Math.max(0, Number(mail.contactTimelineTotal) || 0);
@@ -413,6 +430,7 @@
           normalized.searchMatch = message.searchMatch || null;
           normalized.searchQuery = query;
           normalized.externalContactEmail = message.externalContactEmail || normalized.externalContactEmail || '';
+          normalized.externalContactEmail = getContactEmail(normalized, options.getAccountEmails?.());
           normalized.technicalThreadKey = message.technicalThreadKey || normalized.technicalThreadKey || '';
           normalized.conversationId = message.conversationId || normalized.conversationId || '';
           normalized.canonicalOwner = message.canonicalOwner || normalized.canonicalOwner || '';
@@ -485,8 +503,9 @@
 
     async function loadContactTimeline(mail, { append = false, force = false, deferRender = false, signal } = {}) {
       if (!mail || options.getActiveMail?.() !== mail.id) return false;
-      if (mail.contactTimelineLoaded && Number(mail.contactTimelineTotal) > 0 && !mail.contactTimelineNeedsRefresh && !append && !force) return true;
-      const contactEmail = mail.externalContactEmail || resolveExternalContact(mail, options.getAccountEmails?.());
+      const contactEmail = getContactEmail(mail, options.getAccountEmails?.());
+      if (mail.contactTimelineLoaded && Number(mail.contactTimelineTotal) > 0 && !mail.contactTimelineNeedsRefresh && !append && !force &&
+        (!mail.externalContactEmail || normalizeEmail(mail.externalContactEmail) === contactEmail)) return true;
       if (!contactEmail) return false;
       const timelineAccounts = Array.from(new Set(
         (options.getAccountEmails?.() || []).map(normalizeEmail).filter(Boolean)
@@ -593,9 +612,11 @@
     // request and merge as loadContactTimeline, without touching the active
     // timeline request or rendering. A later open finds the dossier complete.
     async function prefetchContactTimeline(mail, { signal } = {}) {
-      if (!mail || (mail.contactTimelineLoaded && Number(mail.contactTimelineTotal) > 0 && !mail.contactTimelineNeedsRefresh)) return false;
+      if (!mail) return false;
+      const contactEmail = getContactEmail(mail, options.getAccountEmails?.());
+      if (mail.contactTimelineLoaded && Number(mail.contactTimelineTotal) > 0 && !mail.contactTimelineNeedsRefresh &&
+        (!mail.externalContactEmail || normalizeEmail(mail.externalContactEmail) === contactEmail)) return false;
       if (mail.contactTimelineLoading || options.getActiveMail?.() === mail.id) return false;
-      const contactEmail = mail.externalContactEmail || resolveExternalContact(mail, options.getAccountEmails?.());
       if (!contactEmail) return false;
       const timelineAccounts = Array.from(new Set(
         (options.getAccountEmails?.() || []).map(normalizeEmail).filter(Boolean)
@@ -640,7 +661,7 @@
         (options.getAccountEmails?.() || []).map(normalizeEmail).filter(Boolean)
       )).sort();
       const rootAccount = getTimelineAccount(mail);
-      const frozenContact = normalizeEmail(mail.externalContactEmail) || resolveExternalContact(mail, frozenAccounts);
+      const frozenContact = getContactEmail(mail, frozenAccounts);
       const frozenOwner = normalizePersonalOwner(options.getMessageOwner?.(mail));
       const frozenScope = createContactTimelineScope(frozenContact, {
         accountEmails: frozenAccounts,
@@ -654,7 +675,7 @@
         const currentAccounts = Array.from(new Set(
           (options.getAccountEmails?.() || []).map(normalizeEmail).filter(Boolean)
         )).sort();
-        const currentContact = normalizeEmail(mail.externalContactEmail) || resolveExternalContact(mail, currentAccounts);
+        const currentContact = getContactEmail(mail, currentAccounts);
         const currentOwner = normalizePersonalOwner(options.getMessageOwner?.(mail));
         const currentScope = createContactTimelineScope(currentContact, {
           accountEmails: currentAccounts,
