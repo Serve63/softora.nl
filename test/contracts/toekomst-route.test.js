@@ -36,6 +36,7 @@ test('new website choice links the published local design with Softora contact t
  assert.match(entry,/href="\/nieuwe-website"/);
  const html=fs.readFileSync(path.join(root,'assets/website-showcase/index.html'),'utf8');
  assert.match(html,/<base href="\/assets\/website-showcase\/">/);
+ assert.doesNotMatch(html,/class="work-contact"/,'Project showcase does not include a separate contact CTA');
  const processCss=fs.readFileSync(path.join(root,'assets/website-showcase/style-3.css'),'utf8');
  const stepSize=processCss.match(/\.Werkwijze_name__UsuC7\{[^}]*font-size:clamp\(([^,]+),[^,]+,([\d.]+)rem\)/);
  assert.ok(stepSize && Number.parseFloat(stepSize[1]) >= 1.125 && Number(stepSize[2]) <= 2.2,'Process labels stay readable on mobile and smaller than the section headings');
