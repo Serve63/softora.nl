@@ -7,6 +7,7 @@ const WebSocket = require('ws');
 const { mulaw } = require('alawmulaw');
 const { createSpeechTurnState } = require('./audio-turn-state');
 const { MATHIJS_PROFILE, resolveAssistantConversation } = require('./assistant-profile');
+const { createMathijsVoiceTestGate, runMathijsVoiceTest } = require('./mathijs-voice-test');
 const { createGeminiSessionSetupSender, resolveGeminiSessionModel } = require('./gemini-session');
 const {
   OUTPUT_FRAME_DURATION_MS,
@@ -420,6 +421,25 @@ app.get('/debug/gemini-setup', async (req, res) => {
     ...result,
     timestamp: new Date().toISOString(),
   });
+});
+
+const mathijsVoiceTestGate = createMathijsVoiceTestGate({
+  enabled: process.env.MATHIJS_VOICE_TEST_ENABLED,
+  expiresAt: process.env.MATHIJS_VOICE_TEST_EXPIRES_AT,
+});
+app.post('/debug/mathijs-voice-test', async (req, res) => {
+  if (!isDebugRequestAuthorized(req)) return res.status(403).json({ ok: false, error: 'Forbidden' });
+  if (!GEMINI_API_KEY) return res.status(503).json({ ok: false, error: 'Google key ontbreekt.' });
+  if (!mathijsVoiceTestGate.claim()) return res.status(409).json({ ok: false, error: 'Eenmalige stemtest is uitgeschakeld, verlopen of al gebruikt.' });
+  try {
+    const result = await runMathijsVoiceTest({
+      createSocket: () => new WebSocket(buildGeminiWsUrl(), { handshakeTimeout: GEMINI_WS_HANDSHAKE_TIMEOUT_MS }),
+      voiceName: GEMINI_VOICE,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(502).json({ ok: false, error: error.message });
+  }
 });
 
 app.get('/debug/recent-sessions', (req, res) => {
