@@ -65,7 +65,7 @@
     "nodemailer": "^10.0.13",
     "nspell": "^2.1.5",
     "playwright": "^1.61.1",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.5"
   },
   "overrides": {
     "deepmerge-ts": "8.0.1",
