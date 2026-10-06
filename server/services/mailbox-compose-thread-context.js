@@ -204,7 +204,7 @@ function createMailboxComposeThreadContext(deps = {}) {
     const conversationId = normalizeText(replyIdentity.conversationId || context.conversationId).slice(0, 2000);
     const idempotencyKey = normalizeText(body.idempotencyKey).slice(0, 240);
     if (!idempotencyKey) throw inputError('Een veilige verzend-ID ontbreekt.', 'MAILBOX_SEND_IDEMPOTENCY_REQUIRED');
-    const base = baseContext({ account, recipient, owner, senderName, mode, conversationId, idempotencyKey, provider });
+    const base = baseContext({ account, recipient, owner, senderName, mode, conversationId, idempotencyKey, provider: replyIdentity.provider });
     if (mode === 'new-message') {
       const correspondenceSourceMessageId = await resolveNewMessageCorrespondence({ context, account, recipient });
       return { ...base, providerThreadId: '', replyTargetMessageId: '', references: '', correspondenceSourceMessageId };

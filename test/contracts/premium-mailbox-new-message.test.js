@@ -56,7 +56,7 @@ test('de bovenbalk opent een losse composer met expliciete afzenderkeuze', () =>
   const page = fs.readFileSync(path.join(__dirname, '../../premium-mailbox.html'), 'utf8');
   assert.match(page, /class="topbar-compose"[^>]*data-mailbox-action="compose-new-mail"[^>]*>[\s\S]*?Mail verzenden[\s\S]*?<\/button>/);
   assert.match(page, /id="compose-from-field" hidden><label[^>]*for="c-from">Van<\/label><select id="c-from" required disabled>/);
-  assert.ok(page.indexOf('premium-mailbox-compose-sender.js?v=20261006a') < page.indexOf('premium-mailbox-compose-controller.js?v=20261006a'));
+  assert.ok(page.indexOf('premium-mailbox-compose-sender.js?v=20261006a') < page.indexOf('premium-mailbox-compose-controller.js?v=20261006b'));
   const wiring = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox.js'), 'utf8');
   assert.match(wiring, /getAccounts: \(\) => mailboxAccounts, whenAccountsReady: \(\) => mailboxAccountsLoad/);
 });

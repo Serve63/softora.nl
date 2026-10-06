@@ -5,6 +5,7 @@ const attachmentDigestModule = require('../../assets/premium-mailbox-attachment-
 const resilienceModule = require('../../assets/premium-mailbox-compose-send-resilience');
 const composeController = require('../../assets/premium-mailbox-compose-controller');
 const { createMailboxComposeThreadContext } = require('../../server/services/mailbox-compose-thread-context');
+const { createMailboxComposeRuntime } = require('../../server/services/mailbox-compose-runtime');
 const { createMailboxSendProvenanceStore } = require('../../server/services/mailbox-send-provenance-store');
 const {
   createMailboxReconcileProof,
@@ -131,13 +132,13 @@ function preflightResult(payload, status = 'ready', overrides = {}) {
     owner: payload.owner,
     accountEmail: payload.account,
     recipientEmail: payload.to,
-    provider: payload.provider || 'smtp',
+    provider: payload.mode === 'reply' ? payload.provider || 'smtp' : 'smtp',
     mode: payload.mode,
     conversationId: payload.context?.conversationId || '',
-    replyTargetMessageId: payload.replyIdentity?.sourceMessageId || payload.context?.messageId || '',
-    references: payload.context?.references || '',
-    providerThreadId: payload.providerThreadId || payload.replyIdentity?.providerThreadId || '',
-    scopeFingerprint: `${payload.provider || 'smtp'}-${payload.mode}-scope:${'a'.repeat(64)}`,
+    replyTargetMessageId: payload.mode === 'reply' ? payload.replyIdentity?.sourceMessageId || payload.context?.messageId || '' : '',
+    references: payload.mode === 'reply' ? payload.context?.references || '' : '',
+    providerThreadId: payload.mode === 'reply' ? payload.providerThreadId || payload.replyIdentity?.providerThreadId || '' : '',
+    scopeFingerprint: `${payload.mode === 'reply' ? payload.provider || 'smtp' : 'smtp'}-${payload.mode}-scope:${'a'.repeat(64)}`,
     requestPayloadFingerprint: 'b'.repeat(64),
     attachmentsMetadata: payload.attachmentsMetadata || [],
     issuedAtMs: 1,
@@ -261,6 +262,158 @@ function createProtocol(options = {}) {
     logger: { warn() {} },
   });
 }
+
+function createRealFollowupPreflight(payload, storedMessage) {
+  const previewStore = createMailboxSendProvenanceStore();
+  let latestIntent;
+  let acceptedIntent = null;
+  const runtime = createMailboxComposeRuntime({
+    attachmentSigningSecret: 'followup-http-test-secret',
+    composeSendDependencies: {},
+    mailboxComposeThreadContext: createMailboxComposeThreadContext({
+      getOwnerIdentity: () => ({ profileKey: 'serve', name: 'Servé Creusen' }),
+      mailboxIndexStore: {
+        async getMessageForReplyProof(input) {
+          assert.equal(input.accountEmail, payload.account);
+          assert.equal(input.id, payload.context.id);
+          return storedMessage;
+        },
+      },
+    }),
+    mailboxSendProvenanceStore: {
+      async findByIdempotencyKey() { return acceptedIntent; },
+      async preflight(input) {
+        latestIntent = previewStore.preview(input);
+        return { intent: latestIntent, conflict: null };
+      },
+    },
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    normalizeString: (value) => String(value || '').trim(),
+    logger: { error() {} },
+  });
+  return {
+    async preflight(body) {
+      const res = {
+        statusCode: 0, body: null,
+        setHeader() {},
+        status(value) { this.statusCode = value; return this; },
+        json(value) { this.body = value; return this; },
+      };
+      await runtime.preflightMessageResponse({ body }, res);
+      return response(res.statusCode, res.body);
+    },
+    accept() {
+      acceptedIntent = {
+        ...latestIntent, status: 'accepted', dispatchState: 'finished',
+        reconcileRequired: false, sentReconcileRequired: false,
+        providerAcceptedAt: new Date().toISOString(),
+      };
+    },
+  };
+}
+
+test('follow-up with source headers and attachment accepts the real HTTP preflight and reconciles without resend', async (t) => {
+  for (const variant of [
+    { name: 'SMTP sent source', account: 'serve@softora.nl', folder: 'sent', provider: '' },
+    { name: 'Gmail coldmail sent copy', account: 'serve.creusen7@gmail.com', folder: 'coldmail', provider: '' },
+    { name: 'stale Instantly source fields', account: 'serve@softora.nl', folder: 'sent', provider: 'instantly' },
+  ]) {
+    await t.test(variant.name, async () => {
+      const payload = basePayload({
+        account: variant.account, provider: variant.provider, mode: 'new-message',
+        providerMessageId: 'old-provider-message', providerThreadId: 'old-provider-thread',
+        context: { ...basePayload().context, id: `${variant.folder}:42`, folder: variant.folder },
+      });
+      const stored = {
+        ...payload.context, accountEmail: payload.account, email: payload.account,
+        to: payload.to, direction: 'sent', originalCampaignOutbound: false,
+      };
+      const server = createRealFollowupPreflight(payload, stored);
+      const attachments = [createProductionAttachment('ontwerp.png', 'image/png', 4)];
+      const metadata = await createProductionMetadata(attachments);
+      const storage = new MemoryStorage();
+      const seeded = await seedMarker({ storage, payload, attachmentsMetadata: metadata });
+      resilienceModule.compareAndSwapMarker(storage, {
+        ...seeded, reconcileProof: null,
+      }, seeded.casToken, { now: () => 1, randomUUID: createRandomUUID('old-scope-failure') });
+      let uploads = 0;
+      let sends = 0;
+      const keys = [];
+      const fetch = async (url, request) => {
+        const body = parseRequest(request);
+        keys.push(body.idempotencyKey);
+        if (url.endsWith('/preflight')) {
+          const result = await server.preflight(body);
+          assert.equal(result.status, 200);
+          const data = await result.json();
+          assert.equal(data.result.provider, 'smtp');
+          assert.equal(data.result.replyTargetMessageId, '');
+          assert.equal(data.result.providerThreadId, '');
+          assert.equal(data.result.reconcileProof.references, '');
+          assert.equal(data.result.conversationId, payload.context.conversationId);
+          if (data.result.status === 'ready') {
+            assert.equal(data.result.correspondenceSourceMessageId, stored.messageId);
+          }
+          return result;
+        }
+        sends += 1;
+        assert.equal(body.context.messageId, stored.messageId);
+        assert.equal(body.context.references, stored.references);
+        assert.deepEqual(body.reconcileProof.attachmentsMetadata, metadata);
+        server.accept();
+        throw new Error('response lost after provider acceptance');
+      };
+      const uploadAttachments = async (selected, options) => {
+        uploads += 1;
+        assert.equal(options.payload.reconcileProof.replyTargetMessageId, '');
+        return selected.map((attachment) => ({
+          reference: 'staged-followup', filename: attachment.filename,
+          contentType: attachment.contentType, size: attachment.size, sha256: attachment.sha256,
+          referenceVersion: 2, expiresAt: Date.now() + 1_800_000,
+        }));
+      };
+      await assert.rejects(createProtocol({ storage, fetch }).execute({
+        payload, attachments, uploadAttachments,
+      }), /response lost after provider acceptance/);
+      const recovered = await createProtocol({ storage, fetch }).execute({
+        payload: { ...payload, idempotencyKey: 'new-click-must-reuse-original-key' },
+        attachments, uploadAttachments,
+      });
+      assert.equal(recovered.recoveredByPreflight, true);
+      assert.equal(recovered.idempotencyKey, payload.idempotencyKey);
+      assert.equal(sends, 1);
+      assert.equal(uploads, 1);
+      assert.ok(keys.every((key) => key === payload.idempotencyKey));
+    });
+  }
+});
+
+test('follow-up rejects mismatched real preflight scope before uploading or sending', async (t) => {
+  const payload = basePayload({ mode: 'new-message' });
+  const server = createRealFollowupPreflight(payload, {
+    ...payload.context, accountEmail: payload.account, email: payload.to, direction: 'received',
+  });
+  for (const [field, value] of Object.entries({
+    owner: 'martijn', accountEmail: 'martijn@softora.nl', provider: 'instantly', mode: 'reply',
+    conversationId: 'different-conversation', replyTargetMessageId: '<wrong@example.nl>',
+    providerThreadId: 'unexpected-thread',
+  })) {
+    await t.test(field, async () => {
+      await assert.rejects(createProtocol({
+        fetch: async (url, request) => {
+          assert.equal(url, '/api/mailbox/send/preflight');
+          const real = await server.preflight(parseRequest(request));
+          assert.equal(real.status, 200);
+          const data = await real.json();
+          return response(200, { ...data, result: { ...data.result, [field]: value } });
+        },
+      }).execute({
+        payload, attachments: [createProductionAttachment('ontwerp.png', 'image/png', 4)],
+        uploadAttachments() { assert.fail('mismatched scope must not upload'); },
+      }), (error) => error.code === 'MAILBOX_SEND_PREFLIGHT_SCOPE_MISMATCH');
+    });
+  }
+});
 
 test('real SMTP reply accepts the server-canonical References chain before dispatch', async () => {
   const original = basePayload();
@@ -2426,7 +2579,7 @@ test('uploadplan- en PUT-timeout vóór send herstellen via row-missing naar exa
   }
 });
 
-test('controller bewaart een exacte https-link plus echte attachmentfile door preflight upload send en accepted kaart', async () => {
+test('controller bewaart link en attachment bij vervolg vanuit Instantly zonder replyheaders in de send of kaart', async () => {
   const storage = new MemoryStorage();
   const locks = createLockManager();
   const overlayClasses = new Set();
@@ -2450,6 +2603,8 @@ test('controller bewaart een exacte https-link plus echte attachmentfile door pr
   const initialMail = {
     id: 'inbox:initial', accountEmail: 'serve@softora.nl', email: 'first@example.nl',
     subject: 'Eerste onderwerp', conversationId: 'Conversation:Initial',
+    provider: 'instantly', providerMessageId: 'old-provider-message', providerThreadId: 'old-provider-thread',
+    messageId: '<prior-message@example.nl>', references: '<ancestor@example.nl>',
   };
   const nextMail = {
     id: 'inbox:next', accountEmail: 'serve@softora.nl', email: 'second@example.nl',
@@ -2499,6 +2654,8 @@ test('controller bewaart een exacte https-link plus echte attachmentfile door pr
         return {
           id: mail.id, mailboxId: mail.id, accountEmail: mail.accountEmail,
           to: mail.email, subject: mail.subject, conversationId: mail.conversationId,
+          provider: mail.provider, providerMessageId: mail.providerMessageId, providerThreadId: mail.providerThreadId,
+          messageId: mail.messageId, references: mail.references,
           mode: 'new-message',
         };
       },
@@ -2561,6 +2718,12 @@ test('controller bewaart een exacte https-link plus echte attachmentfile door pr
   assert.equal(sendPayload.body, exactBody);
   assert.equal(sendPayload.to, 'first@example.nl');
   assert.equal(sendPayload.subject, 'Eerste onderwerp');
+  assert.equal(sendPayload.mode, 'new-message');
+  assert.equal(sendPayload.provider, undefined);
+  assert.equal(sendPayload.providerMessageId, undefined);
+  assert.equal(sendPayload.providerThreadId, undefined);
+  assert.equal(sendPayload.context.messageId, '<prior-message@example.nl>');
+  assert.equal(sendPayload.context.references, '<ancestor@example.nl>');
   assert.deepEqual(sendPayload.reconcileProof, readyProof);
   assert.equal(sendPayload.attachments[0].reference, 'opaque-0');
   assert.equal(sendPayload.attachments[0].filename, 'bewijs.pdf');
@@ -2569,6 +2732,9 @@ test('controller bewaart een exacte https-link plus echte attachmentfile door pr
   assert.equal(acceptedRecords.length, 1);
   assert.equal(acceptedRecords[0].message.body, exactBody);
   assert.equal(acceptedRecords[0].message.to, 'first@example.nl');
+  assert.equal(acceptedRecords[0].message.inReplyTo, '');
+  assert.equal(acceptedRecords[0].message.softoraReplyTargetMessageId, '');
+  assert.equal(acceptedRecords[0].message.providerThreadId, '');
   assert.equal(fields['c-to'].value, 'second@example.nl');
   assert.equal(fields['c-subject'].value, 'Tweede onderwerp');
   assert.equal(fields['c-body'].value, 'Nieuwe composerbody');
