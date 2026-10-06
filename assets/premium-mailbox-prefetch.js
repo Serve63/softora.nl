@@ -25,6 +25,10 @@
     const staleAttempts = new WeakMap();
     const now = options.now || (() => Date.now());
     const concurrency = Math.max(1, Math.min(3, Number(options.concurrency) || 3));
+    // When every conversation already arrives complete with the page, only the
+    // rows on screen, the pointed-at row and the next ones are prepared; the
+    // rest of a long list stays untouched instead of hundreds of background reads.
+    const drainAll = options.drainAll !== false;
     let priorityId = '';
     const listElement = options.getListElement?.();
 
@@ -44,7 +48,7 @@
       const activeIndex = list.findIndex(isActive);
       const byId = new Map(list.map((mail) => [String(mail.id), mail]));
       const priority = [priorityId, ...visibleIds()].map((id) => byId.get(String(id))).filter(Boolean);
-      const ordered = [...priority, ...(activeIndex >= 0 ? list.slice(activeIndex + 1, activeIndex + 1 + max) : []), ...list];
+      const ordered = [...priority, ...(activeIndex >= 0 ? list.slice(activeIndex + 1, activeIndex + 1 + max) : []), ...(drainAll ? list : [])];
       // A dossier that a list refresh marked stale is warmed again (at most
       // once a minute, so a dossier that cannot refresh is not retried per render).
       const staleDue = (mail) => mail.contactTimelineNeedsRefresh === true &&
