@@ -127,7 +127,7 @@ test('reopening the visible conversation never downgrades it to a version withou
 test('the Mailbox wires the detail snapshot before its page script and captures every complete conversation', () => {
   const repoRoot = path.join(__dirname, '../..');
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
-  const adapter = page.indexOf('assets/premium-mailbox-detail-snapshot.js?v=20260927b');
+  const adapter = page.indexOf('assets/premium-mailbox-detail-snapshot.js?v=20261006a');
   assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < adapter);
   assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924b') < adapter);
   assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20261006b'));
@@ -295,4 +295,21 @@ test('prepared views reject partial/error screens, expire, and evict to a fixed 
   assert.ok(saved.reduce((sum, [, entry]) => sum + entry.html.length, 0) <= 3000000);
   h.advance(24 * 60 * 60 * 1000);
   assert.equal(cache.restore('view11'), false);
+});
+
+
+test('prepared HTML from before the quote-proof correction is never restored after reload', async () => {
+  const h = preparedHarness();
+  const view = 'outreach|serve||account|inbox:1';
+  h.records.set('mailbox-prepared-views:v1', { owner: 'serve', value: {
+    entries: [[view, { html: '<article>Old unfiltered quoted history</article>', at: 1000 }]],
+  } });
+  const current = h.create(); await current.ready;
+  assert.equal(current.restore(view), false);
+  assert.equal(h.detail.innerHTML, '');
+  assert.equal(current.remember(view, '<article>Current authored reply</article>'), true);
+  await current.flush();
+  const reloaded = h.create(); await reloaded.ready;
+  assert.equal(reloaded.restore(view), true);
+  assert.equal(h.detail.innerHTML, '<article>Current authored reply</article>');
 });

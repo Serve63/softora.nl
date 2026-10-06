@@ -535,6 +535,51 @@
       !/[\p{L}\p{N}]/u.test(sent[index + excerpt.length] || '');
   }
 
+  function matchesDomainJoinedCopy(quotedValue, message) {
+    // Apple Mail can drop the space after a domain wrapped in an inline span.
+    // Compare the complete original text; tolerate only those source-proven
+    // domain boundaries, preserving links, punctuation and all other words.
+    const linkText = (value) => String(value || '')
+      .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s<>]+)\)/gi, '$1 $2')
+      .replace(/(?:\[(https?:\/\/[^\]\s]+)\]|<(https?:\/\/[^>\s]+)>)/gi, '$1$2');
+    const source = getAuthoredPrefix(message && (message.body || message.text || ''));
+    // Check destinations before Unicode/space normalization. URL paths and
+    // queries are case-sensitive, and joining text can change the hostname.
+    const sourceUrls = linkText(source).match(/https?:\/\/[^\s<>]+/gi) || [];
+    const quotedUrls = linkText(quotedValue).match(/https?:\/\/[^\s<>]+/gi) || [];
+    if (sourceUrls.length !== quotedUrls.length || sourceUrls.some((url, i) => url !== quotedUrls[i])) return false;
+    const literal = (value) => linkText(value)
+      .replace(/^\s*(?:>\s*)+/gm, '')
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+      .normalize('NFKC').replace(/\s+/g, ' ').trim();
+    let quoted = literal(quotedValue);
+    let sent = literal(source);
+    if (sent.length < 80) return false;
+
+    // A client may append attachment names to its quote. Only the original
+    // sent message's attachment metadata can prove that such a suffix is noise.
+    const filenames = new Set((Array.isArray(message?.attachments) ? message.attachments : [])
+      .map((attachment) => literal(attachment?.filename)).filter(Boolean));
+    while (filenames.size) {
+      const suffix = /\s*<([^<>]+)>$/.exec(quoted);
+      if (!suffix || !filenames.has(suffix[1])) break;
+      quoted = quoted.slice(0, suffix.index).trimEnd();
+    }
+
+    const domains = new Set(Array.from(sent.matchAll(
+      /(?<![a-z0-9@._-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63})\s+(?=[\p{L}\p{N}])/giu
+    ), (match) => match[1]));
+    if (!domains.size) return false;
+    for (const domain of domains) {
+      const escaped = domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const boundary = new RegExp(`(?<![a-z0-9@._-])${escaped}\\s+(?=[\\p{L}\\p{N}])`, 'gu');
+      sent = sent.replace(boundary, domain);
+      quoted = quoted.replace(boundary, domain);
+    }
+    return quoted === sent;
+  }
+
+
   function findExactProvenOutbound(quotedValue, outboundMessages, options = {}) {
     const quotedText = normalizeMatchText(quotedValue);
     if (!quotedText) return null;
@@ -562,7 +607,7 @@
         ));
         if (!bodyText) return false;
         if (options.quoteHeader && matchesExcerptHeader(options.quoteHeader, message, options) &&
-          containsLiteralExcerpt(quotedValue, message)) return true;
+          (containsLiteralExcerpt(quotedValue, message) || matchesDomainJoinedCopy(quotedValue, message))) return true;
         const exactScopedDirectParent = options.directParentScopeProven === true &&
           exactDirectParent;
         if (quotedText === bodyText) return bodyText.length >= 8 || exactScopedDirectParent;
