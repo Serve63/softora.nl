@@ -1,4 +1,7 @@
-(function () {
+(function (initialize) {
+  if (typeof module === 'object' && module.exports) module.exports = initialize;
+  else initialize(window, document);
+})(function (window, document) {
   'use strict';
   var teaser = document.querySelector('[data-ebook-teaser]');
   var dialog = document.querySelector('[data-ebook-dialog]');
@@ -13,7 +16,7 @@
   var ready = false;
   var sending = false;
   var finished = false;
-  var remaining = Math.max(0, 10000 - performance.now());
+  var remaining = Math.max(0, 10000 - window.performance.now());
   var started;
   var timer;
 
@@ -30,13 +33,13 @@
     window.clearTimeout(timer);
     if (opened || document.hidden) return;
     if (ready) return reveal();
-    started = performance.now();
+    started = window.performance.now();
     timer = window.setTimeout(reveal, remaining);
   }
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
       window.clearTimeout(timer);
-      if (started) remaining = Math.max(0, remaining - (performance.now() - started));
+      if (started !== undefined) remaining = Math.max(0, remaining - (window.performance.now() - started));
     } else schedule();
   });
   document.addEventListener('close', function () { if (ready) reveal(); }, true);
@@ -68,10 +71,10 @@
     if (sending || !form.reportValidity()) return;
     sending = true; submit.disabled = true; submit.setAttribute('aria-busy', 'true');
     submit.textContent = 'Je e-book wordt klaargezet…'; status.textContent = '';
-    var controller = new AbortController();
+    var controller = new window.AbortController();
     var timeout = window.setTimeout(function () { controller.abort(); }, 20000);
     try {
-      var response = await fetch('/api/public-ebook', {
+      var response = await window.fetch('/api/public-ebook', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
         body: JSON.stringify({ name: form.elements.name.value.trim(), email: form.elements.email.value.trim(),
           website: form.elements.website.value, page: window.location.pathname.replace(/\/$/, '') }),
@@ -92,4 +95,4 @@
       submit.removeAttribute('aria-busy'); submit.textContent = 'Download PDF ↓';
     }
   });
-})();
+});

@@ -1,8 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const vm = require('node:vm');
-const source = fs.readFileSync(require.resolve('../../assets/articles/ebook.js'), 'utf8');
+const initialize = require('../../assets/articles/ebook.js');
 
 function browser(initialTime = 0) {
   let time = initialTime, nextId = 0;
@@ -26,7 +24,8 @@ function browser(initialTime = 0) {
   element('[data-ebook-form]').elements = { name: element('name'), email: element('email'), website: element('website') };
   const window = { setTimeout(fn, delay) { const id = ++nextId; timers.set(id, { fn, at: time + delay }); return id; },
     clearTimeout(id) { timers.delete(id); } };
-  vm.runInNewContext(source, { document, window, performance: { now: () => time }, AbortController });
+  window.performance = { now: () => time };
+  initialize(window, document);
   return { document, element, tick(ms) {
     const target = time + ms;
     for (;;) {
