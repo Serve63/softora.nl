@@ -408,6 +408,9 @@
       .join(' ')
       .normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '')
+      // Clients swap typographic and straight quotes ("zo’n" is quoted as "zo'n").
+      .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
+      .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')
       // Mail clients rewrite links: "[label](url)" in a quote is the same text
       // as "label [url]" or "label url" in the sent copy.
       .replace(/\[([^\]\n]*)\]\((?:https?:\/\/|mailto:)[^)\s]*\)/gi, ' $1 ')

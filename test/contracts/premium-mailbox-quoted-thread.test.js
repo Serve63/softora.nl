@@ -271,3 +271,16 @@ test('a quoted sent mail is proven even when the client rewrote its link as mark
     directParentMessageIds: ['sent-1@softora.nl'], directParentScopeProven: true, incomingAt: '2026-09-22T12:17:19.000Z',
   }).matchedMessages.length, 0);
 });
+
+test('een citaat met rechte aanhalingstekens bewijst dezelfde verzonden mail met gekrulde', () => {
+  const quotedThread = require('../../assets/premium-mailbox-quoted-thread');
+  const sent = {
+    accountEmail: 'martijnven@websoftora.com', messageId: '<sent@example.test>',
+    body: 'Hoi,\n\nWat vervelend dat je zo’n onzekere periode achter de rug hebt. Helemaal begrijpelijk dat je nu even niet in je website wilt investeren.\n\nMet vriendelijke groet,\nMartijn van de Ven',
+  };
+  const reply = 'Dank je wel!\n\nRenata\n\nMartijn van de Ven schreef op 2026-10-06 16:33:\n\nHoi,\n\nWat vervelend dat je zo\'n onzekere periode achter de rug hebt. Helemaal begrijpelijk dat je nu even niet in je website wilt investeren.\n\nMet vriendelijke groet,\nMartijn van de Ven';
+  assert.equal(quotedThread.stripProvenQuotedOutbound(reply, [sent]).body, 'Dank je wel!\n\nRenata');
+  // A changed word is still not the same mail.
+  const altered = reply.replace('onzekere', 'drukke');
+  assert.equal(quotedThread.stripProvenQuotedOutbound(altered, [sent]).body, altered.trim());
+});
