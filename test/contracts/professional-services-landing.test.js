@@ -30,7 +30,7 @@ for (const page of pages) {
     assert.equal((await fetch(origin + '/bedrijfssoftware.html')).status, 404);
     assert.equal((await fetch(origin + page.route, { method: 'POST' })).status, 405);
     const chooser = fs.readFileSync(path.join(root, 'assets/entry/toekomst.html'), 'utf8');
-    assert.ok(chooser.includes('<a class="choice" href="' + page.route + '"'));
+    assert.ok(chooser.includes('<a class="choice" data-service="' + page.route + '"'));
   });
   test(page.route + ' has valid lightweight imagery and topic-specific accessible demos', async () => {
     const ids = new Set(elements.map((node) => node.attribs.id).filter(Boolean));
