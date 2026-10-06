@@ -16,15 +16,47 @@ const MAILBOX_CAMPAIGN_SNAPSHOT_ENCODING = 'gzip-base64-v1';
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS = 45_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS = 25_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_IMAGE_CHARS = 80_000;
-// Keep the durable bootstrap focused on the complete conversation list. The
-// newest few bodies remain instant; older bodies are fetched from the mailbox
-// index only when opened, so hundreds of historical rows still fit in the
-// first HTML response without delaying it.
-const MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT = 10;
+// Every conversation carries its bodies, so none opens with "laden…". The
+// byte budget below drops the oldest bodies first if the mailbox outgrows it.
+const MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT = MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES;
+const MAILBOX_CAMPAIGN_SNAPSHOT_MAX_AI_PRESENTATION_CHARS = 20_000;
 const MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT = 10;
 
 function text(value, maxLength = 1000) {
   return String(value || '').slice(0, Math.max(0, Number(maxLength) || 0));
+}
+
+// A ready AI presentation repeats the exact body as sourceBody. The snapshot
+// stores that copy once and restores it on read; a presentation for any other
+// text is dropped, so the detail fetches it instead of trusting a stale one.
+function compactAiPresentation(value, body) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const { sourceBody, sourceBodyFromBody, ...rest } = value;
+  if (JSON.stringify(rest).length > MAILBOX_CAMPAIGN_SNAPSHOT_MAX_AI_PRESENTATION_CHARS) return null;
+  if (sourceBodyFromBody === true) return body ? { ...rest, sourceBodyFromBody: true } : null;
+  if (sourceBody === undefined) return rest;
+  return body && String(sourceBody) === body ? { ...rest, sourceBodyFromBody: true } : null;
+}
+
+function expandAiPresentation(message) {
+  const presentation = message && message.aiPresentation;
+  if (!presentation) return message;
+  if (presentation.sourceBodyFromBody !== true) return message;
+  const { sourceBodyFromBody, ...rest } = presentation;
+  if (!message.body) {
+    const { aiPresentation, ...withoutPresentation } = message;
+    return withoutPresentation;
+  }
+  return { ...message, aiPresentation: { ...rest, sourceBody: message.body } };
+}
+
+function expandSnapshotMessage(message) {
+  const expanded = expandAiPresentation(message);
+  return {
+    ...expanded,
+    threadMessages: (Array.isArray(expanded.threadMessages) ? expanded.threadMessages : [])
+      .map(expandAiPresentation),
+  };
 }
 
 function getMailboxCampaignSnapshotMessageIdentity(message, fallbackAccountEmail = '') {
@@ -216,6 +248,7 @@ function sanitizeThreadMessage(value, options = {}) {
   const body = options.includeBody === false
     ? ''
     : text(rawBody, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_THREAD_BODY_CHARS);
+  const aiPresentation = compactAiPresentation(source.aiPresentation, body);
   const bodyImageEvidenceKnown =
     source.bodyImageEvidenceKnown === true ||
     (
@@ -275,6 +308,7 @@ function sanitizeThreadMessage(value, options = {}) {
     bodyTruncated: Boolean(source.bodyTruncated || rawBody.length > body.length),
     bodyImagesTruncated: Boolean(source.bodyImagesTruncated || sourceBodyImages.length > bodyImages.length),
     bodyImages,
+    ...(aiPresentation ? { aiPresentation } : {}),
   };
 }
 
@@ -294,6 +328,7 @@ function sanitizeMessage(value, options = {}) {
   const body = options.includeBody === false
     ? ''
     : text(rawBody, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_BODY_CHARS);
+  const aiPresentation = compactAiPresentation(source.aiPresentation, body);
   const bodyImageEvidenceKnown =
     source.bodyImageEvidenceKnown === true ||
     (
@@ -378,6 +413,7 @@ function sanitizeMessage(value, options = {}) {
     campaign: sanitizeCampaign(source.campaign),
     outreach: sanitizeOutreach(source.outreach),
     bodyImages,
+    ...(aiPresentation ? { aiPresentation } : {}),
     threadMessages: (Array.isArray(source.threadMessages) ? source.threadMessages : [])
       .map((message) => sanitizeThreadMessage(message, {
         includeBody: options.includeBody !== false,
@@ -395,6 +431,8 @@ function serialize(value) {
     if (!source || typeof source !== 'object') return source;
     const compact = {};
     for (const [key, entry] of Object.entries(source)) {
+      // The AI decision is validated exactly in the browser (contacts: [] included).
+      if (key === 'aiPresentation') { compact[key] = entry; continue; }
       if (entry === '' || entry === false || entry === 0 || entry === null
         || (Array.isArray(entry) && entry.length === 0)) continue;
       compact[key] = compactMessage(entry);
@@ -542,10 +580,10 @@ function parseMailboxCampaignSnapshot(rawValue) {
         : null,
       messages: parsed.messages
         .slice(0, MAILBOX_CAMPAIGN_SNAPSHOT_MAX_MESSAGES)
-        .map((message, index) => sanitizeMessage(message, {
+        .map((message, index) => expandSnapshotMessage(sanitizeMessage(message, {
           includeBody: index < MAILBOX_CAMPAIGN_SNAPSHOT_BODY_MESSAGE_COUNT,
           includeImages: index < MAILBOX_CAMPAIGN_SNAPSHOT_IMAGE_MESSAGE_COUNT,
-        })),
+        }))),
       sync: parsed.sync && typeof parsed.sync === 'object'
         ? { ...parsed.sync, source: 'campaign-replies-snapshot' }
         : null,

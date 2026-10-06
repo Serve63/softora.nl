@@ -40,7 +40,7 @@ const {
 const { createMailboxMessageBodiesService } = require('./mailbox-message-bodies'); const { createMailboxProviderThreadAuditService } = require('./mailbox-provider-thread-audit'); const { createMailboxDiscoveryService } = require('./mailbox-discovery'); const { createMailboxOutreachScope } = require('./mailbox-outreach-scope');
 const { createMailboxWebdesignLinkProvenance } = require('./mailbox-webdesign-link-provenance'); const { buildAutomatedReplyEvidence } = require('./mailbox-automated-reply');
 const { assertMailboxMessageVisible, filterVisibleMailboxMessages } = require('./mailbox-delivery-failure-visibility');
-const { createMailboxCampaignRepliesList } = require('./mailbox-campaign-replies-list');
+const { createMailboxCampaignRepliesList } = require('./mailbox-campaign-replies-list'); const { createMailboxCampaignSnapshotBodies } = require('./mailbox-campaign-snapshot-bodies');
 const {
   MAILBOX_MESSAGE_IMAGE_MAX_INDEX,
   decodeMailboxMessageImage,
@@ -531,7 +531,7 @@ function createMailboxService(deps = {}) {
     instantlyMailboxService,
     filterVisibleMailboxMessages,
     setUiStateValues, getUiStateValues, mailboxIndexStore, getSupabaseClient, env,
-    logger,
+    logger, hydrateSnapshotBodies: createMailboxCampaignSnapshotBodies({ getMessageBodies: (input) => getMessageBodies(input), logger }),
     normalizeString,
     truncateText,
   });
@@ -1874,7 +1874,7 @@ function createMailboxService(deps = {}) {
     defaultLimit: DEFAULT_SYNC_LIMIT,
   });
   const mailboxAiPresentations = createMailboxAiPresentations({ env, getOpenAiApiKey, getSupabaseClient, logger });
-  const { getInstantlyMessage, getMessageBodiesResponse } = createMailboxMessageBodiesService({
+  const { getInstantlyMessage, getMessageBodies, getMessageBodiesResponse } = createMailboxMessageBodiesService({
     mailboxIndexStore, assertReadableAccount, getProviderAccount: getInstantlyVisibilityDeps(instantlyMailboxService).getProviderAccount, canUseMailboxIndex, assertMailboxMessageVisible, normalizeFolder, fetchMessagesFromImap, logger, enrichMessages: mailboxAiPresentations.enrich,
   }); const { providerThreadAuditResponse } = createMailboxProviderThreadAuditService({ assertReadableAccount, fetchMessagesFromImap, isValidEmail, logger, mailboxIndexStore });
   function getElapsedMs(startedAt) {
