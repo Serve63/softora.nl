@@ -2267,7 +2267,12 @@ begin
   if not (
     old.status = new.status or
     (old.status = 'prepared' and new.status in ('accepted', 'unknown', 'failed')) or
-    (old.status = 'unknown' and new.status = 'accepted')
+    (old.status = 'unknown' and new.status = 'accepted') or
+    -- Alleen na aantoonbare providercontrole: onzeker blijkt niet verzonden.
+    (old.status = 'unknown' and new.status = 'failed'
+      and new.dispatch_state = 'finished'
+      and new.reconcile_required = false
+      and new.sent_reconcile_required = false)
   ) then
     raise exception using
       errcode = '23514',
