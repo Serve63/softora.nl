@@ -10339,7 +10339,7 @@ test('geopende mail staat als één rustig mailblok met antwoordactie na het ont
   assert.match(scriptSource, /function renderMailboxConversationAction\(action, mailId, options = \{\}\)[\s\S]*const label = isNewMessage \? 'Nieuw bericht sturen' : 'Beantwoorden'/);
   assert.match(scriptSource, /const conversationAction = options && options\.mail[\s\S]*getConversationAction/);
   assert.match(scriptSource, /data-mailbox-message-key="\$\{escapeHtml\(messageKey\)\}"/);
-  assert.match(scriptSource, /mailboxComposeController\.handleAction\(action, composeActionId, \{[\s\S]*messageKey: actionEl\.getAttribute\('data-mailbox-message-key'\)/);
+  assert.match(scriptSource, /mailboxComposeController\.handleAction\(composeAction, composeActionId, \{[\s\S]*messageKey: composeAction !== action \? '' : actionEl\.getAttribute\('data-mailbox-message-key'\)/);
   assert.match(fs.readFileSync(composeControllerScriptPath, 'utf8'), /resolveReplySource\(mail, requestedMessageKey[\s\S]*normalizeRequestedMessageKey\(requestedMessageKey\)[\s\S]*getActionMessageKey\(message\) === requested[\s\S]*exactAction\?\.kind !== 'reply'[\s\S]*open het bericht opnieuw/);
   assert.match(scriptSource, /section && section\.type === 'quote'[\s\S]*renderedSections\.push\(rootActionHtml\)/);
   assert.match(scriptSource, /renderMailboxRootIncomingMeta\(m\)/);

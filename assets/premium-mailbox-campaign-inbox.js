@@ -337,7 +337,7 @@
     const mailboxId = String(mail && (mail.mailboxId || mail.id) || '').trim();
     return account && mailboxId ? `${account}|mailbox:${mailboxId}` : '';
   }
-
+  function getComposeAction(action, mail) { return action === 'new-message' && mail?.contactFormSource === true && normalizeEmail(mail.accountEmail) === 'info@softora.nl' ? 'reply-mail' : action; }
   function getConversationAction(mail) {
     if (!mail) return null;
     const root = { ...mail, mailboxConversationRoot: true };
@@ -1145,7 +1145,7 @@
     getConversationId,
     getConversationVisibilityKey,
     getStableCampaignConversationId,
-    getConversationAction,
+    getComposeAction, getConversationAction,
     needsConversationReply,
     getActionMessageKey,
     getFolder,

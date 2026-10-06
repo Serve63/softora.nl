@@ -97,18 +97,11 @@ test('formuliergesprek haalt ook een vervolg op dat uitsluitend het vorige antwo
 
 
 test('extra formulierbericht behoudt de bewezen replyketen terwijl gewone nieuwe berichten ongewijzigd blijven', () => {
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const vm = require('node:vm');
-  const source = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox.js'), 'utf8');
-  const handler = source.slice(source.indexOf('function handleMailboxAction('), source.indexOf('function bindMailboxActions('));
-  for (const contactFormView of [true, false]) {
-    const calls = [];
-    const context = { contactFormView, mailboxComposeController: { handleAction(...args) { calls.push(args); return true; } } };
-    vm.runInNewContext(handler + '; dispatch = handleMailboxAction;', context);
-    context.dispatch({ getAttribute(name) { return { 'data-mailbox-action': 'new-message', 'data-mailbox-id': 'inbox:1', 'data-mailbox-message-key': 'message:reply@softora.nl' }[name] || ''; } });
-    assert.equal(calls[0][0], contactFormView ? 'reply-mail' : 'new-message');
-    assert.equal(calls[0][1], 'inbox:1');
-    assert.equal(calls[0][2].messageKey, contactFormView ? undefined : 'message:reply@softora.nl');
-  }
+  const conversation = buildContactFormConversations([root, reply])[0];
+  assert.equal(campaignInbox.getConversationAction(conversation).kind, 'new-message');
+  assert.equal(campaignInbox.getComposeAction('new-message', conversation), 'reply-mail');
+  assert.equal(campaignInbox.getComposeAction('new-message', { ...conversation, contactFormSource: false }), 'new-message');
+  assert.equal(campaignInbox.getComposeAction('new-message', { ...conversation, accountEmail: 'serve@softora.nl' }), 'new-message');
+  assert.equal(campaignInbox.getComposeAction('reply-mail', conversation), 'reply-mail');
+  assert.equal(campaignInbox.getComposeAction('new-message', null), 'new-message');
 });
