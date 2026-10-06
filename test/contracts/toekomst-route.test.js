@@ -116,7 +116,7 @@ test('toekomst mobile features the first website card and shortens the meeting b
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
  assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
- assert.match(html,/ai-medewerker\.css\?v=juridisch-footer-20261003/);
+ assert.match(html,/ai-medewerker\.css\?v=coming-soon-20261006/);
 });
 
 test('toekomst footer uses a quiet centered article link with a direct blog destination', () => {
@@ -173,4 +173,17 @@ test('toekomst reduces only the SEO login image within the shared icon column', 
  assert.match(seo,/login-avatar--seo/);
  assert.doesNotMatch(chatbot,/login-avatar--seo/);
  assert.match(css,/\.login-avatar--seo img\{width:85%;height:85%\}/);
+});
+
+test('chooser marks the four upcoming services while keeping the website available', () => {
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ const cards=[...html.matchAll(/<a class="choice" href="([^"]+)"[^]*?<\/a>/g)];
+ assert.equal(cards.length,5);
+ for(const [card,href] of cards){
+  if(href==='/nieuwe-website') assert.doesNotMatch(card,/Coming soon|choice-coming-soon/);
+  else {
+   assert.match(card,/aria-label="[^"]*Coming soon"/);
+   assert.match(card,/<span class="choice-coming-soon" aria-hidden="true">Coming soon<\/span>/);
+  }
+ }
 });

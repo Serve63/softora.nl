@@ -104,3 +104,10 @@
  .toekomst-ai .footer-copyright{grid-row:2;justify-self:center;min-height:44px}
  .toekomst-ai .footer-personnel{display:none}
 }
+
+/* Service availability badges stay readable over every photograph. */
+.toekomst-ai .choice-coming-soon{position:absolute;top:18px;left:16px;z-index:3;display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border:1px solid #f5d6e5;border-radius:999px;background:#8b2252;color:#fff8fb;box-shadow:0 0 0 3px #8b22522b,0 4px 14px #28101c26;font-size:9px;font-weight:700;line-height:1;letter-spacing:1.1px;text-transform:uppercase;pointer-events:none}
+.toekomst-ai .choice-coming-soon::before{content:"";width:5px;height:5px;flex:none;border-radius:50%;background:#f0c1d7}
+@media(max-width:1000px){.toekomst-ai .choice-coming-soon{top:14px;left:10px;padding:8px 9px;gap:5px;font-size:8px;letter-spacing:.7px}}
+
+.toekomst-ai .choice:has(.choice-coming-soon) .arrow{display:none}
