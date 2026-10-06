@@ -606,7 +606,7 @@ test('bedrijfssoftware overtuigingspagina maakt het knelpunt en de eerste oploss
   assert.match(source, /<title>Bedrijfssoftware — Meer grip, minder gedoe \| Softora<\/title>/);
   assert.match(source, /<meta name="robots" content="noindex, nofollow">/);
   assert.doesNotMatch(source, /rel="canonical"|application\/ld\+json/);
-  assert.match(source, /Minder zoeken, overtypen en schakelen tussen losse systemen/);
+  assert.match(source, /Stop met zoeken, dubbel invoeren en schakelen tussen verschillende systemen/);
   assert.match(source, /de handeling die jouw team het meeste tijd kost/);
   assert.match(source, /We brengen de handelingen, systemen en knelpunten in kaart/);
   assert.match(source, /bouwen de belangrijkste stappen/);
