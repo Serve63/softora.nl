@@ -418,7 +418,7 @@
       try {
         const params = new URLSearchParams({ q: query, owner: options.getOwner?.() || 'both', limit: '20' });
         if (append && nextCursor) params.set('cursor', nextCursor);
-        const response = await fetchImpl(`/api/mailbox/search?${params}`, {
+        const response = await fetchImpl(`${options.getSearchUrl?.() || '/api/mailbox/search'}?${params}`, {
           credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' },
           ...(searchController ? { signal: searchController.signal } : {}),
         });

@@ -91,6 +91,7 @@ function registerMailboxRoutes(app, deps = {}) {
     const result = await coordinator.processAiPresentations();
     return res.status(result.unavailable ? 503 : 200).json({ ok: !result.unavailable, ...result });
   });
+  app.get('/api/mailbox/contact-form', requireAdmin, (req, res) => coordinator.contactFormResponse(req, res));
   app.get('/api/mailbox/accounts', requireAdmin, (req, res) => coordinator.accountsResponse(req, res));
   app.get('/api/mailbox/campaign-replies', requireAdmin, (req, res) =>
     coordinator.campaignRepliesResponse(req, res)

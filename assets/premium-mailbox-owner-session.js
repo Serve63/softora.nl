@@ -447,7 +447,7 @@
           return campaignResult.fromCache !== true;
         }
         const response = await options.fetch(
-          `/api/mailbox/messages?account=${encodeURIComponent(scope.account)}&folder=${encodeURIComponent(scope.folder)}&limit=50`,
+          scope.folder === 'contact-form' ? '/api/mailbox/contact-form?limit=200' : `/api/mailbox/messages?account=${encodeURIComponent(scope.account)}&folder=${encodeURIComponent(scope.folder)}&limit=50`,
           {
             credentials: 'same-origin',
             cache: 'no-store',
@@ -487,7 +487,7 @@
         }
         setBusy(false);
         return true;
-      } catch (error) {
+      } catch (error) { if (scope.folder === 'contact-form') global.console?.warn?.('[Mailbox][ContactForm]', error?.message);
         if (!canApply(candidate) || loadSignal?.aborted || isAbortError(error)) {
           setBusy(false);
           return false;
