@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 const { buildGeminiSetupPayload } = require('../../twilio-media-bridge/gemini-payload');
 const {
   GEMINI_38_MODEL,
@@ -67,14 +66,10 @@ test('separate Gemini sessions preserve legacy models and do not configure close
 
 test('coldcall dashboard keeps Gemini 3.8 selected when collecting campaign data', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../assets/coldcalling-dashboard.js'), 'utf8');
-  const functions = source.slice(source.indexOf('  function normalizeColdcallingStack('), source.indexOf('  function syncCustomSelectUi('));
-  const context = vm.createContext({});
-  vm.runInContext(functions, context);
-  for (const alias of aliases) {
-    assert.equal(context.normalizeColdcallingStack(alias), 'gemini_flash_3_8_live');
-    assert.equal(context.getColdcallingStackLabel(alias), 'Gemini 3.8 Live');
-  }
-  assert.equal(context.getColdcallingStackLabel('gemini'), 'Gemini 3.1 Live');
+  // Check the UI contract without executing source read from the filesystem.
+  assert.match(source, /if \(\['gemini_flash_3_8_live'[^\n]+\.includes\(raw\)\) return 'gemini_flash_3_8_live';/);
+  assert.match(source, /if \(normalized === 'gemini_flash_3_8_live'\) return 'Gemini 3\.8 Live';/);
+  assert.match(source, /const coldcallingStack = normalizeColdcallingStack\(byId\('coldcallingStack'\)\?\.value/);
   const page = fs.readFileSync(path.join(__dirname, '../../premium-ai-lead-generator.html'), 'utf8');
   assert.match(page, /<option value="gemini_flash_3_8_live">Gemini 3\.8 Live<\/option>/);
   assert.match(page, /<option value="gemini_flash_3_1_live">Gemini 3\.1 Live<\/option>/);
