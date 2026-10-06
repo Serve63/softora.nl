@@ -307,6 +307,7 @@
           directParentScopeProven: true,
           incomingAt: incomingTimestamp ? new Date(incomingTimestamp).toISOString() : '',
           stripReferenceAppendixWhenSingleMatch: true,
+          ownSenders: typeof options.getOwnSenders === 'function' ? options.getOwnSenders(mail) : [],
         }
       );
       return result && typeof result.body === 'string'

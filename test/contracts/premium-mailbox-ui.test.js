@@ -195,10 +195,10 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   const page = readPage();
   assert.match(page, /<title>Mailbox – Softora\.nl<\/title>/);
   assert.doesNotMatch(page, /Coldmail Inbox/);
-  assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20261006g/);
+  assert.match(page, /assets\/premium-mailbox-quoted-thread\.js\?v=20261006h/);
   assert.match(page, /assets\/premium-mailbox-signature\.js\?v=20260921b/);
   assert.match(page, /assets\/premium-mailbox-contact-view\.js\?v=20260924a/);
-  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20260921c/);
+  assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20261006h/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20261006f/);
@@ -213,7 +213,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-owner-session\.js\?v=20261006c/);
   assert.match(page, /assets\/premium-mailbox-owner-preference\.js\?v=20260822a/);
   assert.match(page, /assets\/premium-mailbox-reply-identity\.js\?v=20260812a/);
-  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20261006c/);
+  assert.match(page, /assets\/premium-mailbox-campaign-inbox\.js\?v=20261006h/);
   assert.match(page, /assets\/premium-mailbox-error\.js\?v=20260818a/);
   assert.match(page, /assets\/premium-mailbox-compose\.js\?v=20261006b/);
   assert.match(page, /assets\/premium-mailbox-attachment-digest\.js\?v=20260828c/);
@@ -223,11 +223,11 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-index\.js\?v=20261006d/);
   assert.match(page, /assets\/premium-mailbox-detail-state\.js\?v=20260821a/);
   assert.match(page, /assets\/premium-mailbox-detail-stability\.js\?v=20260927b/);
-  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20261006g') < page.indexOf('premium-mailbox-signature.js?v=20260921b'));
-  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
-  assert.ok(page.indexOf('premium-mailbox-contact-view.js?v=20260924a') < page.indexOf('premium-mailbox-message-presentation.js?v=20260921c'));
-  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20260921c') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
-  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20261006c'));
+  assert.ok(page.indexOf('premium-mailbox-quoted-thread.js?v=20261006h') < page.indexOf('premium-mailbox-signature.js?v=20260921b'));
+  assert.ok(page.indexOf('premium-mailbox-signature.js?v=20260921b') < page.indexOf('premium-mailbox-message-presentation.js?v=20261006h'));
+  assert.ok(page.indexOf('premium-mailbox-contact-view.js?v=20260924a') < page.indexOf('premium-mailbox-message-presentation.js?v=20261006h'));
+  assert.ok(page.indexOf('premium-mailbox-message-presentation.js?v=20261006h') < page.indexOf('premium-mailbox-logical-delete.js?v=20260820a'));
+  assert.ok(page.indexOf('premium-mailbox-logical-delete.js?v=20260820a') < page.indexOf('premium-mailbox-campaign-inbox.js?v=20261006h'));
   assert.ok(page.indexOf('premium-mailbox-detail-state.js?v=20260821a') < page.indexOf('premium-mailbox-detail-stability.js?v=20260927b'));
   assert.ok(page.indexOf('premium-mailbox-detail-stability.js?v=20260927b') < page.indexOf('premium-mailbox-index.js?v=20261006d'));
   assert.ok(page.indexOf('premium-mailbox-compose-window.js?v=20260817c') < page.indexOf('premium-browser-storage.js?v=20260828b'));
@@ -4747,8 +4747,8 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
   assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20261006f/);
-  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20261006g/);
-  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20261006c/);
+  assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20261006h/);
+  assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20261006h/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20261006d/);
   let nowMs = Date.parse('2026-07-22T17:30:00.000Z');
   const requests = [];
@@ -11050,14 +11050,21 @@ test('Resin Art JR reverse-header en References-footer verdwijnen alleen bij é�
   );
   assert.doesNotMatch(linksVariant, /Links:|\[1\].*softora\.nl/);
 
+  // Without a sent copy our own cold email is still recognised by its header
+  // (this mailbox's sender) and template sentences; the quote is hidden.
   const noParent = campaignInboxModule.stripProvenQuotedOutbound(incomingBody, {
     ...incoming,
     inReplyTo: '',
     threadMessages: [],
   });
-  assert.match(noParent, /Servé Creusen schreef op 2026-08-19 10:10:/);
-  assert.match(noParent, /References:/);
-  assert.match(noParent, /\[2\] https:\/\/www\.resinartjr\.nl\//);
+  assert.doesNotMatch(noParent, /Servé Creusen schreef op 2026-08-19 10:10:|Afgelopen week kwam ik/);
+  assert.match(noParent, /Dank voor het ontwerp/);
+  // Someone else's quote, or ours without the template sentences, stays visible.
+  const foreignQuote = incomingBody.replace('Servé Creusen schreef op', 'Kim Jansen schreef op');
+  assert.match(campaignInboxModule.stripProvenQuotedOutbound(foreignQuote, { ...incoming, inReplyTo: '', threadMessages: [] }), /Kim Jansen schreef op 2026-08-19 10:10:/);
+  const personalQuote = incomingBody.replace('Afgelopen week kwam ik jullie website resinartjr.nl tegen.', 'Zoals besproken stuur ik je de offerte.')
+    .replace('Uit enthousiasme heb ik een fris webdesign gemaakt.', 'Laat maar weten wat je ervan vindt.');
+  assert.match(campaignInboxModule.stripProvenQuotedOutbound(personalQuote, { ...incoming, inReplyTo: '', threadMessages: [] }), /Servé Creusen schreef op 2026-08-19 10:10:/);
 });
 
 test('Tessa quote blijft bewezen bij formatteringsdrift en verliest ook de gekoppelde Links-footer', () => {

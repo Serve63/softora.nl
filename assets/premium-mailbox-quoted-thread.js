@@ -524,6 +524,105 @@
       sent.hour === hour && sent.minute === Number(time[2]);
   }
 
+  // A quote header proves our own sent copy when it names that copy's sender
+  // (address, or display name when the client shows no address) and the exact
+  // sending minute. Formats: 2026-10-06 16:33, 07-09-2026 17:24, 6 okt 2026,
+  // "do., jul. 23, 2026 om 10:13".
+  function parseQuoteHeaderMinute(text) {
+    const source = String(text || '');
+    let year = 0, month = 0, day = 0, index = -1;
+    const monthOf = (name) => EXCERPT_MONTHS.findIndex((names) => names.includes(String(name || '').toLowerCase().replace(/\./g, ''))) + 1;
+    let match = /\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/.exec(source);
+    if (match) { year = Number(match[1]); month = Number(match[2]); day = Number(match[3]); index = match.index + match[0].length; }
+    if (!match && (match = /\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})\b/.exec(source))) {
+      day = Number(match[1]); month = Number(match[2]); year = Number(match[3]); index = match.index + match[0].length;
+    }
+    if (!match && (match = /\b(\d{1,2})\s+([a-z]+)\.?,?\s+(\d{4})\b/i.exec(source)) && monthOf(match[2])) {
+      day = Number(match[1]); month = monthOf(match[2]); year = Number(match[3]); index = match.index + match[0].length;
+    } else if (month === 0 && (match = /\b([a-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})\b/i.exec(source)) && monthOf(match[1])) {
+      month = monthOf(match[1]); day = Number(match[2]); year = Number(match[3]); index = match.index + match[0].length;
+    }
+    if (!year || !month || !day || index < 0) return null;
+    const time = /\b(\d{1,2}):(\d{2})(?:\s*([ap])\.?m\.?)?\b/i.exec(source.slice(index));
+    if (!time) return null;
+    const hour = time[3] ? Number(time[1]) % 12 + (time[3].toLowerCase() === 'p' ? 12 : 0) : Number(time[1]);
+    return { year, month, day, hour, minute: Number(time[2]) };
+  }
+
+  function quoteHeaderProvesSentCopy(headerText, message, options = {}) {
+    const header = parseQuoteHeaderMinute(headerText);
+    const timestamp = getMessageTimestamp(message);
+    if (!header || !timestamp) return false;
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: options.headerTimeZone || 'Europe/Amsterdam', hourCycle: 'h23',
+      year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+    }).formatToParts(new Date(timestamp));
+    const sent = Object.fromEntries(parts.map((part) => [part.type, Number(part.value)]));
+    if (sent.year !== header.year || sent.month !== header.month || sent.day !== header.day ||
+      sent.hour !== header.hour || sent.minute !== header.minute) return false;
+    const text = String(headerText || '').toLowerCase();
+    const emailPattern = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/g;
+    const senderEmails = new Set([message && message.email, message && message.accountEmail,
+      ...(String(message && message.from || '').toLowerCase().match(emailPattern) || [])]
+      .map((value) => String(value || '').trim().toLowerCase()).filter(Boolean));
+    const headerEmails = text.match(emailPattern) || [];
+    if (headerEmails.length) return headerEmails.some((email) => senderEmails.has(email));
+    const name = normalizeMatchText(String(message && message.from || '').replace(/<[^>]*>/g, '').replace(/"/g, ''));
+    return name.length >= 3 && !name.includes('@') && normalizeMatchText(headerText).includes(name);
+  }
+
+  // Letters and digits only, with the links compared exactly: clients insert
+  // ">" mid-sentence, rewrap lines, swap quotes and break link markup, but a
+  // changed word, link or attachment is never the same message.
+  function lettersOnly(value) {
+    // Clients also write the euro sign out as "EUR".
+    return normalizeMatchText(value).replace(/€/g, 'eur').replace(/[^\p{L}\p{N}]+/gu, '');
+  }
+
+  // Our own original cold email, quoted after it left the conversation (no
+  // sent copy to compare). The header must name one of our senders and the
+  // quote must carry at least two fixed sentences of the campaign template.
+  const OWN_CAMPAIGN_TEMPLATE_SIGNALS = [
+    /\bafgelopen week kwam ik (?:jullie|je|uw) website\b/,
+    /\b(?:uit|vanuit) enthousiasme\b.{0,180}\b(?:fris|nieuw)\s+webdesign\b/,
+    /\bik heb\b.{0,100}\b(?:fris|nieuw)\s+webdesign\b.{0,80}\bgemaakt\b/,
+    /\bik ben oprecht benieuwd wat (?:je|jullie|u) ervan vind/,
+    /\b(?:ontwerp|webdesign)\b.{0,100}\b(?:bijlage|online preview)\b/,
+  ];
+
+  function isOwnCampaignTemplateQuote(headerText, quotedValue, options = {}) {
+    const emailPattern = /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}/g;
+    const senders = (Array.isArray(options.ownSenders) ? options.ownSenders : [])
+      .map((value) => String(value || '').trim().toLowerCase()).filter((value) => value.length >= 3);
+    const headerEmails = String(headerText || '').toLowerCase().match(emailPattern) || [];
+    // An address in the header must be ours exactly; otherwise our sender name.
+    const ownHeader = headerEmails.length
+      ? headerEmails.every((email) => senders.includes(email))
+      : senders.filter((sender) => !sender.includes('@'))
+        .some((name) => normalizeMatchText(headerText).includes(normalizeMatchText(name)));
+    if (!ownHeader) return false;
+    const quoted = normalizeMatchText(getAuthoredPrefix(quotedValue));
+    return OWN_CAMPAIGN_TEMPLATE_SIGNALS.filter((pattern) => pattern.test(quoted)).length >= 2;
+  }
+
+  function linksOf(value) {
+    return (String(value || '').match(/https?:\/\/[^\s<>()\[\]"']+/g) || [])
+      .map((url) => url.replace(/[.,;:!?]+$/, ''));
+  }
+
+  function matchesHeaderProvenCopy(quotedValue, message, options) {
+    if (!options.quoteHeaderText || !quoteHeaderProvesSentCopy(options.quoteHeaderText, message, options)) return false;
+    const quoted = getAuthoredPrefix(quotedValue);
+    const sent = getAuthoredPrefix(message && (message.body || message.text || ''));
+    const sentLetters = lettersOnly(sent);
+    const quotedLetters = lettersOnly(quoted);
+    // The header already proves sender and minute, so a client that cuts the
+    // greeting or signature still quotes our mail. Nothing may be added to it.
+    if (sentLetters.length < 40 || quotedLetters.length < 40 || !sentLetters.includes(quotedLetters)) return false;
+    const sentLinks = linksOf(sent);
+    return linksOf(quoted).every((url) => sentLinks.includes(url));
+  }
+
   function containsLiteralExcerpt(quotedValue, message) {
     // Selected-text replies need the reverse comparison. Preserve URLs and
     // punctuation here: altered quotes and personal additions are never copies.
@@ -586,6 +685,10 @@
   function findExactProvenOutbound(quotedValue, outboundMessages, options = {}) {
     const quotedText = normalizeMatchText(quotedValue);
     if (!quotedText) return null;
+    // Some clients glue the greeting onto the collapsed header line; the
+    // complete segment then still contains the complete sent message.
+    const rawQuotedText = options.rawQuotedValue ? normalizeMatchText(options.rawQuotedValue) : '';
+    const quoteContains = (candidate) => quotedText.includes(candidate) || Boolean(rawQuotedText && rawQuotedText.includes(candidate));
     const directParentMessageIds = new Set(
       (Array.isArray(options.directParentMessageIds) ? options.directParentMessageIds : [])
         .map(normalizeMessageId)
@@ -621,9 +724,10 @@
               : quotedText === candidateText || quotedText.startsWith(`${candidateText} `)
           )
         );
+        if (matchesHeaderProvenCopy(quotedValue, message, options)) return true;
         return (
-          (bodyText.length >= 80 && quotedText.includes(bodyText)) ||
-          (authoredText.length >= 80 && quotedText.includes(authoredText)) ||
+          (bodyText.length >= 80 && quoteContains(bodyText)) ||
+          (authoredText.length >= 80 && quoteContains(authoredText)) ||
           (exactScopedDirectParent && containsScopedDirectParentText(bodyText)) ||
           (exactScopedDirectParent && containsScopedDirectParentText(authoredText))
         );
@@ -652,10 +756,15 @@
     const removed = [];
     const matchedMessages = [];
     parsed.segments.forEach((segment) => {
-      const match = findExactProvenOutbound(stripQuotedEnvelope(segment.text), outboundMessages, {
-        ...options, quoteHeader: segment.header,
+      const quoteHeaderText = [segment.header, ...String(segment.text || '').split('\n').slice(0, 4)].join('\n');
+      const quotedValue = stripQuotedEnvelope(segment.text);
+      const match = findExactProvenOutbound(quotedValue, outboundMessages, {
+        ...options, quoteHeader: segment.header, rawQuotedValue: segment.text, quoteHeaderText,
       });
-      if (!match) return;
+      if (!match) {
+        if (isOwnCampaignTemplateQuote(quoteHeaderText, quotedValue, options)) removed.push(segment);
+        return;
+      }
       const expandedStart = getProvenWrappedGmailHeaderStart(parsed.lines, segment);
       removed.push(expandedStart < segment.start ? { ...segment, start: expandedStart } : segment);
       matchedMessages.push(match);
