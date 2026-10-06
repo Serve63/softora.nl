@@ -7,7 +7,8 @@ test('voicesoftware route and toekomst entry serve the complete public page', ()
   const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
   assert.ok(config.rewrites.some(r => r.source === '/voicesoftware' && r.destination === '/assets/voicesoftware/index.html'));
   const entry = fs.readFileSync(path.join(root, 'assets/entry/toekomst.html'), 'utf8');
-  assert.match(entry, /href="\/voicesoftware"/);
+  assert.match(entry, /data-service="\/voicesoftware" role="link" aria-disabled="true"/);
+  assert.doesNotMatch(entry, /href="\/voicesoftware"/);
   const html = fs.readFileSync(path.join(root, 'assets/voicesoftware/index.html'), 'utf8');
   assert.match(html, /AI-TELEFONIST VAN SOFTORA/);
   assert.match(html, /De telefoon gaat\.<br>Jij werkt<br>/);

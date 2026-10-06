@@ -30,13 +30,15 @@ test('local preview serves the landing and images without exposing APIs or repos
   assert.equal(post.status, 405);
 });
 
-test('SEO Solution is reachable from the chooser while login keeps its own destination', () => {
+test('SEO Solution chooser is disabled while login keeps its own destination', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
   assert.ok(config.rewrites.some((route) => route.source === '/seo-solution' && route.destination === '/assets/seo-solution/index.html'));
   const chooser = parseDocument(fs.readFileSync(path.join(root, 'assets/entry/toekomst.html'), 'utf8'));
   const links = DomUtils.findAll((node) => node.name === 'a', chooser.children);
   const seoChoice = links.find((node) => node.attribs.class === 'choice' && DomUtils.textContent(node).includes('SEO SOLUTION'));
-  assert.equal(seoChoice.attribs.href, '/seo-solution');
+  assert.equal(seoChoice.attribs['data-service'], '/seo-solution');
+  assert.equal(seoChoice.attribs.href, undefined);
+  assert.equal(seoChoice.attribs['aria-disabled'], 'true');
   assert.ok(links.some((node) => node.attribs.href === '/seo-login'));
   assert.ok(elements.some((node) => node.name === 'a' && node.attribs.href === '/seo-login'));
 });
