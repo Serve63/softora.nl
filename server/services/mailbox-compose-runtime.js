@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { createMailboxComposeSend } = require('./mailbox-compose-send');
 const { createMailboxAttachmentService } = require('./mailbox-attachment-service');
 const { sendMailboxMessage } = require('./mailbox-instantly-integration');
+const { createInstantlyUnknownReplyReconciler } = require('./mailbox-instantly-unknown-reply-reconcile');
 const { getOutboundSenderIdentity } = require('./outbound-sender-identity');
 const {
   createMailboxReconcileRequiredError,
@@ -259,6 +260,11 @@ function createMailboxComposeRuntime(dependencies = {}) {
     onProviderDispatchStarting,
     logger = console,
   } = dependencies;
+  const reconcileUnknownInstantlyReply = createInstantlyUnknownReplyReconciler({
+    instantlyMailboxService,
+    mailboxSendProvenanceStore,
+    logger,
+  });
   const resolvedMailboxAttachmentService = mailboxAttachmentService || createMailboxAttachmentService({
     getSupabaseClient,
     secret: attachmentSigningSecret || process.env.PREMIUM_SESSION_SECRET || '',
@@ -597,7 +603,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
             initiallyReadIntent,
             normalizeString
           );
-          const durableIntent = typeof mailboxSendProvenanceStore.reconcilePreflight === 'function'
+          let durableIntent = typeof mailboxSendProvenanceStore.reconcilePreflight === 'function'
             ? await mailboxSendProvenanceStore.reconcilePreflight(
                 idempotencyKey,
                 initiallyReadIntent
@@ -608,6 +614,7 @@ function createMailboxComposeRuntime(dependencies = {}) {
               new Error('Het eerder gelezen duurzame verzendintent is verdwenen.')
             );
           }
+          durableIntent = await reconcileUnknownInstantlyReply(durableIntent);
           const reconcileProof = assertMailboxReconcileProofMatchesIntent(
             suppliedProof,
             durableIntent,
@@ -653,7 +660,15 @@ function createMailboxComposeRuntime(dependencies = {}) {
         }
       }
       const { canonicalBody, reservationCheck, threadProvenance } = await prepareMessage(body, { checkReservation: true });
-      const conflict = reservationCheck?.conflict || null;
+      let conflict = reservationCheck?.conflict || null;
+      if (conflict) {
+        conflict = await reconcileUnknownInstantlyReply(conflict);
+        // Een andere, aantoonbaar niet-verzonden poging blokkeert deze mail niet meer.
+        if (conflict?.status === 'failed' && conflict?.dispatchState === 'finished'
+          && conflict.idempotencyKey !== normalizeString(body.idempotencyKey)) {
+          conflict = null;
+        }
+      }
       let retryStatus = 'ready';
       let acceptedResult = null;
       let reconcileProof = null;
@@ -720,9 +735,9 @@ function createMailboxComposeRuntime(dependencies = {}) {
           reservationReady: Boolean(
             reservationCheck?.intent?.sendIdentityKey
             && reservationCheck?.intent?.sendScopeKey
-            && !reservationCheck?.conflict
+            && !conflict
           ),
-          reservationConflictStatus: normalizeString(reservationCheck?.conflict?.status),
+          reservationConflictStatus: normalizeString(conflict?.status),
         },
       });
     } catch (error) {
