@@ -23,7 +23,7 @@ test('SEO login stays separate from the landing page and unavailable until accou
  assert.ok(config.rewrites.some(r=>r.source==='/seo-login' && r.destination==='/assets/seo-login/index.html'));
  const entry=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  assert.match(entry,/href="\/seo-login"/);
- assert.match(entry,/<a class="choice" href="\/seo-solution"/);
+ assert.match(entry,/<a class="choice" data-service="\/seo-solution"/);
  const login=fs.readFileSync(path.join(root,'assets/seo-login/index.html'),'utf8');
  assert.match(login,/SEO-accountkoppeling is binnenkort beschikbaar/);
  assert.match(login,/type="password"[^>]*disabled/);
@@ -62,7 +62,8 @@ test('toekomst uses SEO Solution consistently', () => {
 
 test('final chooser labels and direct product destinations stay intact', () => {
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
- for(const route of ['nieuwe-website','seo-solution','chatbot','voicesoftware']) assert.match(html,new RegExp('<a class="choice" href="/'+route+'"'));
+ assert.match(html,/<a class="choice" href="\/nieuwe-website"/);
+ for(const route of ['seo-solution','chatbot','voicesoftware']) assert.match(html,new RegExp('<a class="choice" data-service="/'+route+'"'));
  assert.doesNotMatch(html,/<a[^>]*class="ai-feature"/);
  for(const file of ['assets/entry/toekomst.html','assets/seo-login/index.html']) {
   const content=fs.readFileSync(path.join(root,file),'utf8');
@@ -111,7 +112,7 @@ test('toekomst mobile features the first website card and shortens the meeting b
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  const css=fs.readFileSync(path.join(root,'assets/entry/ai-medewerker.css'),'utf8');
  const mobile=css.slice(css.indexOf('/* Mobile chooser:'));
- const choices=Array.from(html.matchAll(/<a class="choice" href="([^"]+)"/g),m=>m[1]);
+ const choices=Array.from(html.matchAll(/<a class="choice" (?:href|data-service)="([^"]+)"/g),m=>m[1]);
  assert.deepEqual(choices,['/nieuwe-website','/bedrijfssoftware','/voicesoftware','/chatbot','/seo-solution']);
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
@@ -177,7 +178,7 @@ test('toekomst reduces only the SEO login image within the shared icon column', 
 
 test('chooser marks the four upcoming services while keeping the website available', () => {
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
- const cards=[...html.matchAll(/<a class="choice" href="([^"]+)"[^]*?<\/a>/g)];
+ const cards=[...html.matchAll(/<a class="choice" (?:href|data-service)="([^"]+)"[^]*?<\/a>/g)];
  assert.equal(cards.length,5);
  for(const [card,href] of cards){
   if(href==='/nieuwe-website') assert.doesNotMatch(card,/Coming soon|choice-coming-soon/);
@@ -192,5 +193,20 @@ test('meeting banner also displays its upcoming availability', () => {
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  const banner=html.match(/<section class="meet-softora"[^]*?<\/section>/)?.[0] || '';
  assert.match(banner,/<span class="choice-coming-soon">Coming soon<\/span>/);
- assert.match(banner,/class="meet-link" href="https:\/\/www.softora.nl\/contact"/);
+ assert.match(banner,/class="meet-link" role="link" aria-disabled="true" tabindex="-1"/);
+});
+
+test('coming soon cards and meeting CTA cannot navigate or enter keyboard tab order', () => {
+ const {parseDocument,DomUtils}=require('htmlparser2');
+ const doc=parseDocument(fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8'));
+ const disabled=DomUtils.findAll(n=>n.attribs?.['aria-disabled']==='true',doc.children);
+ assert.equal(disabled.length,5);
+ for(const node of disabled){
+  assert.equal(node.attribs.href,undefined);
+  assert.equal(node.attribs.tabindex,'-1');
+  assert.equal(node.attribs.onclick,undefined);
+ }
+ const active=DomUtils.findAll(n=>n.attribs?.class==='choice' && n.attribs.href,doc.children);
+ assert.equal(active.length,1);
+ assert.equal(active[0].attribs.href,'/nieuwe-website');
 });
