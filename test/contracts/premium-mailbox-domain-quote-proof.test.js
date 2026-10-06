@@ -138,15 +138,25 @@ test('domain boundary proof requires a unique sent copy and exact quoted sender 
   }
 });
 
-test('ready AI retains the unmatched quote when the parent belongs to another mailbox', () => {
+test('ready AI retains an unmatched quote that another mailbox sent', () => {
   const { body, parent, incoming } = fixture();
+  // The header names another sender: no sent copy here and not our own mail.
+  const foreignBody = body.replace(`<${sender}>`, '<other-owner@example.test>');
+  const foreignAi = { ...incoming.aiPresentation, sourceBody: foreignBody };
   for (const parents of [[], [{ ...parent, accountEmail: 'other-owner@example.test' }]]) {
-    const view = campaign.getRootMessagePresentation(body, { ...incoming, threadMessages: parents });
+    const view = campaign.getRootMessagePresentation(foreignBody, { ...incoming, body: foreignBody, aiPresentation: foreignAi, threadMessages: parents });
     assert.match(view.body, /het volgende geschreven:/);
     assert.match(view.body, /fris webdesign/);
     assert.ok(view.body.includes(authored));
     assert.ok(view.contact.beforeLines.includes(`Tel: ${ownPhone}`));
   }
+});
+
+test('our own cold email is hidden even when its sent copy left the conversation', () => {
+  const { body, incoming } = fixture();
+  const view = campaign.getRootMessagePresentation(body, { ...incoming, threadMessages: [] });
+  assert.doesNotMatch(view.body, /het volgende geschreven:|fris webdesign/);
+  assert.ok(view.body.includes(authored));
 });
 
 test('an unquoted inline answer remains visible between quoted blocks', () => {
