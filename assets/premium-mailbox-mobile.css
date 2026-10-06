@@ -184,6 +184,7 @@
   .mail-list { width: min(310px, 42vw); }
   .mail-item,
   .mail-item-open { min-height: 60px; }
+  .detail-copy-conversation,
   .detail-hide-conversation,
   .detail-reply { min-width: 44px; min-height: 44px; }
   .toast { bottom: calc(16px + env(safe-area-inset-bottom)); max-width: calc(100vw - 24px); white-space: normal; line-height: 1.35; }

@@ -954,6 +954,7 @@ function renderMailboxDetailHtml(m) {
           <div class="detail-subject-row">
             <div class="detail-subject">${escapeHtml(detailTitle)}</div>
             <div class="detail-head-tools">
+              ${window.SoftoraMailboxCopy.renderButton(m.id, escapeHtml)}
               ${window.SoftoraMailboxUiState.renderReadTools(readState, m.id, escapeHtml)}
               <button class="detail-hide-conversation" type="button" data-mailbox-action="delete-mail" data-mailbox-id="${escapeHtml(m.id)}" aria-label="Gesprek alleen uit Softora verbergen" title="Alleen uit Softora verbergen">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
@@ -1046,6 +1047,7 @@ function handleMailboxAction(actionEl) {
     case 'delete-mail':
       void deleteMail(id);
       break;
+    case 'copy-conversation': void mailboxCopyController.copy(id); break;
     case 'mark-read':
       void window.SoftoraMailboxUiState.handleReadAction(action, { mail: findMailById(id), campaignInbox: window.SoftoraMailboxCampaignInbox, readController: mailboxReadController, dismissReply: (mail, hooks) => mailboxReadController.dismissReply(mail, hooks), renderList, getActiveMail: () => activeMail, openMail });
       break;
@@ -1082,6 +1084,7 @@ bindMailboxActions(); window.SoftoraMailboxIndex?.bindImageRecovery({ getActiveM
 mailboxDiscoveryController = window.SoftoraMailboxDiscovery?.create({ document, fetch: (...args) => window.fetch(...args), getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), getMessageOwner: (mail) => window.SoftoraMailboxCampaignInbox.getMessageOwner(mail), getAccountEmails: getMailboxAccountEmails, getMessages: () => mails, setMessages: (value) => { mails = value; }, getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, getListElement: () => document.getElementById('mail-results-scroll'), normalizeMessage: (message) => normalizeMailboxApiMessage(message, { folder: 'outreach' }), renderList, openMail, resetDetail: resetDetailEmpty });
 const mailboxFreshnessStore = window.SoftoraReadModelStore?.readLastKnown ? window.SoftoraReadModelStore : null, rememberedMailboxFreshness = { ...(mailboxFreshnessStore?.readLastKnown('mailbox-freshness', 36 * 60 * 60 * 1000) || {}) }; mailboxRefreshController = window.SoftoraMailboxRefresh?.create({ autoStart: false, initiallyChecking: true, rememberedFreshness: rememberedMailboxFreshness, onFreshness: (scopeKey, at) => { rememberedMailboxFreshness[scopeKey] = at; mailboxFreshnessStore?.rememberLastKnown('mailbox-freshness', rememberedMailboxFreshness); }, getAccount: () => activeMailboxAccount, getFolder: () => activeFolder, getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), loadMessages: loadMailboxMessages, toast });
 let mailboxAccountsLoad = null, mailboxPrefetch = null;
+const mailboxCopyController = window.SoftoraMailboxCopy.create({ document, getMail: findMailById, getActiveId: () => activeMail, getScope: () => ({ folder: activeFolder, owner: window.SoftoraMailboxCampaignInbox.getOwner(), account: activeMailboxAccount }), getToken: () => mailboxOwnerView.getToken(), isTokenCurrent: isMailboxViewCurrent, getPending: (id) => mailboxDetailController?.getPending?.(id), getDiscovery: () => mailboxDiscoveryController, getIndex: () => window.SoftoraMailboxIndex, whenAccountsReady: () => mailboxAccountsLoad?.catch(() => {}), openMail, toast, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl });
 mailboxDetailController = window.SoftoraMailboxDetailStability?.createController?.({
   getMail: findMailById, ensureToken: () => mailboxOwnerView.ensureToken(), isTokenCurrent: isMailboxViewCurrent,
   getScope: () => ({ folder: activeFolder, owner: activeFolder === 'outreach' ? window.SoftoraMailboxCampaignInbox.getOwner() : '', account: activeFolder === 'outreach' ? '' : activeMailboxAccount }), getVisibilityKey: (mail) => window.SoftoraMailboxCampaignInbox.getConversationVisibilityKey(mail),
