@@ -11,6 +11,7 @@
   const completedValue = document.querySelector('[data-momentum-mobile-completed]');
   const message = document.querySelector('[data-momentum-mobile-message]');
   const nextStep = document.querySelector('[data-momentum-mobile-next]');
+  const focusScore = document.querySelector('[data-momentum-mobile-focus-score]');
 
   if (!page || !grid || !viewButtons.length) return;
 
@@ -22,6 +23,7 @@
     endGameHint: document.querySelector('.end-game-scroll-hint'),
     endGameGoals: document.querySelector('.end-game-goals')
   };
+  const dayPicker = window.SoftoraMomentumMobileDay?.createController({ window, document, grid, mobileQuery, onChange: syncSummary });
 
   function getMessage(score, completed, total, noData = false) {
     if (noData) return ['Deze dag staat op geen data en telt niet mee.', 'Klik op de datum om te herstellen.'];
@@ -32,18 +34,21 @@
   }
 
   function syncSummary() {
-    const todayCells = Array.from(grid.querySelectorAll('.status.is-today'));
-    const cellsByTask = new Map(todayCells.map((cell) => [Number(cell.dataset.task), cell]));
-    Array.from(grid.querySelectorAll('.habit-name')).forEach((row, index) => {
+    const selectedDay = dayPicker?.sync();
+    const todayCells = selectedDay?.cells || Array.from(grid.querySelectorAll('.status.is-today'));
+    const cellsByTask = new Map(todayCells.filter((cell) => cell.dataset.task !== undefined).map((cell) => [Number(cell.dataset.task), cell]));
+    const rows = Array.from(grid.querySelectorAll('.habit-name'));
+    rows.forEach((row, index) => {
       const cell = cellsByTask.get(index);
       const state = !cell || cell.classList.contains('is-on-hold') ? 'neutral'
         : cell.classList.contains('is-done') ? 'done'
         : cell.classList.contains('is-missed') ? 'missed' : 'neutral';
       row.dataset.momentumTodayState = state;
     });
-    const noData = todayCells.some((cell) => cell.classList.contains('is-on-hold'));
-    const completed = todayCells.filter((cell) => cell.classList.contains('is-done')).length;
-    const total = noData ? 0 : todayCells.length;
+    const noData = selectedDay?.noData || todayCells.some((cell) => cell.classList.contains('is-on-hold'));
+    const scoredCells = todayCells.filter((cell) => rows[Number(cell.dataset.task)]?.dataset.goalDraft !== 'true');
+    const completed = scoredCells.filter((cell) => cell.classList.contains('is-done')).length;
+    const total = noData ? 0 : scoredCells.length;
     const score = total ? Math.round((completed / total) * 100) : 0;
     const [summaryMessage, summaryNextStep] = getMessage(score, completed, total, noData);
 
@@ -55,6 +60,10 @@
     if (completedValue) completedValue.textContent = noData ? 'Geen data' : `${completed} / ${total}`;
     if (message) message.textContent = summaryMessage;
     if (nextStep) nextStep.textContent = summaryNextStep;
+    if (focusScore) {
+      focusScore.textContent = noData ? '—' : `${score}%`;
+      focusScore.setAttribute('aria-label', `Doelen voltooid ${selectedDay?.label || 'vandaag'}${noData ? ': geen data' : `: ${score}%`}`);
+    }
   }
 
   function focusMonthOnToday() {
@@ -122,4 +131,5 @@
 
   setView(page.dataset.momentumMobileView || 'today');
   syncSummary();
+  window.setInterval(syncSummary, 60 * 1000);
 })();

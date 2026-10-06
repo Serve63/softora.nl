@@ -22,7 +22,7 @@
   <link rel="stylesheet" href="/assets/live-momentum-endgame-vakantieradar.css?v=20260810a">
   <link rel="stylesheet" href="/assets/live-momentum-video.css?v=20260904b">
   <link rel="stylesheet" href="/assets/live-momentum-history.css?v=20260814b">
-  <link rel="stylesheet" href="/assets/live-momentum-mobile.css?v=20261006b">
+  <link rel="stylesheet" href="/assets/live-momentum-mobile.css?v=20261007a">
   <link rel="stylesheet" href="/assets/live-momentum-day-hold.css?v=20260825a">
   <link rel="stylesheet" href="/assets/live-momentum-endgame-mission-copy.css?v=20260815a">
   <link rel="stylesheet" href="/assets/settings-module-back.css?v=20260818a">
@@ -128,12 +128,19 @@
 
     <header class="momentum-mobile-list-heading">
       <div>
-        <span>Focus</span>
-        <h2>Doelen voor vandaag:</h2>
+        <div class="momentum-mobile-focus"><span>Focus</span><output data-momentum-mobile-focus-score aria-live="polite" aria-label="Doelen voltooid vandaag">0%</output></div>
+        <h2>Doelen voor <span class="momentum-mobile-day-picker">
+          <button type="button" class="momentum-mobile-day-trigger" data-momentum-mobile-day-trigger aria-haspopup="menu" aria-expanded="false" aria-controls="momentum-mobile-day-menu"><span data-momentum-mobile-day-label>vandaag</span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"></path></svg></button>
+          <span class="momentum-mobile-day-menu" id="momentum-mobile-day-menu" role="menu" aria-label="Kies een dag" hidden>
+            <button type="button" role="menuitemradio" aria-checked="true" data-momentum-mobile-day="today">Vandaag</button>
+            <button type="button" role="menuitemradio" aria-checked="false" data-momentum-mobile-day="yesterday">Gisteren</button>
+          </span>
+        </span>:</h2>
       </div>
     </header>
     <section class="habit-board" aria-label="Dagelijkse taken">
       <div class="habit-grid" role="table" aria-label="Momentum taken"></div>
+      <p class="momentum-mobile-day-empty" data-momentum-mobile-day-empty hidden>Geen opgeslagen doelen voor gisteren.</p>
     </section>
     <div class="end-game-heading">
       <h2 class="end-game-title">HET EINDSPEL</h2>
@@ -209,7 +216,8 @@
   <script src="/assets/live-momentum-history-state.js?v=20260825a" defer></script>
   <script src="/assets/live-momentum-day-hold.js?v=20260825a" defer></script>
   <script src="/assets/live-momentum.js?v=20260901a" defer></script>
-  <script src="/assets/live-momentum-mobile.js?v=20261006a" defer></script>
+  <script src="/assets/live-momentum-mobile-day.js?v=20261007a" defer></script>
+  <script src="/assets/live-momentum-mobile.js?v=20261007a" defer></script>
   <script src="/assets/live-momentum-focus-mode.js?v=20260813a" defer></script>
 </body>
 </html>
