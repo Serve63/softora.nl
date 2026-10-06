@@ -146,8 +146,8 @@ test('the contact timeline is prefetched without touching the open conversation'
 
 test('the Mailbox wires the prefetch after its detail controller and warms after each complete render', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
-  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20260927b');
-  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20261006e'));
+  const prefetchScript = page.indexOf('assets/premium-mailbox-prefetch.js?v=20261006f');
+  assert.ok(prefetchScript > 0 && prefetchScript < page.indexOf('assets/premium-mailbox.js?v=20261006f'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /afterCommit: \(mail, \{ changed \}\) => \{ mailboxPrefetch\?\.schedule\?\.\(\);/);
   // The outreach list holds grouped copies; the detail opens the stored message, so that one is warmed.
@@ -317,4 +317,22 @@ test('bij het opstarten flitst de "selecteer een e-mail"-tekst niet voordat het 
   assert.match(source, /resetDetailEmpty\(\{ boot: true \}\);\n\s+await loadMailboxMessages\(\{ openLatest:/);
   // Every other reset (empty list, deleted conversation, owner switch) still shows the visible prompt.
   assert.equal((source.match(/resetDetailEmpty\(\{ boot: true \}\)/g) || []).length, 1);
+});
+
+test('met complete pagina-gesprekken bereidt de mailbox alleen zichtbare en volgende gesprekken voor', async () => {
+  const mails = Array.from({ length: 40 }, (_, index) => ({ id: String(index), bodyLoaded: true }));
+  const calls = [];
+  const list = {
+    addEventListener() {},
+    getBoundingClientRect: () => ({ top: 0, bottom: 400, height: 400 }),
+    querySelectorAll: () => ['20', '21'].map((id) => ({ getBoundingClientRect: () => ({ top: 10, bottom: 60 }), getAttribute: () => id })),
+  };
+  const prefetch = create({
+    drainAll: false, max: 3, getMails: () => mails, getActiveMail: () => '0', getListElement: () => list,
+    discovery: { async prefetchContactTimeline(mail) { calls.push(mail.id); } },
+  });
+  await prefetch.warmNow();
+  assert.deepEqual(calls.sort(), ['1', '2', '20', '21', '3']);
+  const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
+  assert.match(source, /mailboxPrefetch = window\.SoftoraMailboxPrefetch\?\.create\(\{ drainAll: false, getMails/);
 });
