@@ -124,6 +124,17 @@ De Google-key blijft uitsluitend als server-side Render-secret staan. Zonder key
 niet belklaar. Voer geen echte Google-sessie of beltest uit zonder afgesproken budget;
 code- en mocktests doen geen betaalde aanvragen.
 
+Met een ingestelde Google-key vereisen alle debugroutes een `BRIDGE_DEBUG_TOKEN`, ook
+wanneer `NODE_ENV` niet is ingesteld. Een eenmalige stemtest kan via deze private toegang met
+`POST /debug/mathijs-voice-test`. Deze test is standaard uitgeschakeld. Alleen een expliciet
+budget mag aanleiding zijn om `MATHIJS_VOICE_TEST_ENABLED=true` en een ISO-tijdstip als
+`MATHIJS_VOICE_TEST_EXPIRES_AT` in te stellen (hooguit 10 minuten vooruit).
+Een gedeelde aanvraaglimiet staat hooguit één geautoriseerde aanvraag per tien minuten toe.
+De server accepteert daarnaast één test per proces en begrenst de Google-sessie en audio tot 90 seconden.
+De test controleert drie gespreksturns en geeft transcripties en WAV-audio terug.
+Hij start geen Twilio-belactie; de gewone lijn kan daarbij in ambience-testmodus blijven.
+Schakel de test na gebruik uit en verwijder tijdelijke debugcredentials.
+
 ### Extra env vars voor `Voer opdracht uit` automation (Actieve Opdrachten)
 
 Zet deze aan als je bij `Voer opdracht uit` direct alles wilt laten lopen:
