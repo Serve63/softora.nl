@@ -6,6 +6,7 @@ const express = require('express');
 const WebSocket = require('ws');
 const { mulaw } = require('alawmulaw');
 const { createSpeechTurnState } = require('./audio-turn-state');
+const { MATHIJS_PROFILE, resolveAssistantConversation } = require('./assistant-profile');
 const { createGeminiSessionSetupSender, resolveGeminiSessionModel } = require('./gemini-session');
 const {
   OUTPUT_FRAME_DURATION_MS,
@@ -229,11 +230,11 @@ function buildGeminiWsUrl() {
   )}`;
 }
 
-function buildGeminiSetupPayload(model = GEMINI_MODEL) {
+function buildGeminiSetupPayload(model = GEMINI_MODEL, systemPrompt = SYSTEM_PROMPT) {
   return buildGeminiSetupEnvelope({
     model,
     voiceName: GEMINI_VOICE,
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt,
     seedInitialHistory: false,
     realtimeInputConfig: {
       automaticActivityDetection: {
@@ -510,16 +511,14 @@ wss.on('connection', (twilioWs, _request, url) => {
     twilioWs.close(1011, 'GEMINI_API_KEY ontbreekt');
     return;
   }
-  if (!AMBIENT_ONLY_MODE && GEMINI_REQUIRE_CUSTOM_PROMPT && !CUSTOM_SYSTEM_PROMPT) {
-    console.error('[Bridge] GEMINI_SYSTEM_PROMPT ontbreekt terwijl GEMINI_REQUIRE_CUSTOM_PROMPT=true');
-    twilioWs.close(1011, 'GEMINI_SYSTEM_PROMPT ontbreekt');
-    return;
-  }
   if (!AMBIENT_ONLY_MODE && GEMINI_SYSTEM_PROMPT_LOCKED && hasPromptOverrideHints(url.searchParams)) {
     console.warn('[Bridge] Prompt override hints in query gedetecteerd en genegeerd (prompt lock actief).');
   }
 
   let stack = sessionSummary.stack;
+  let conversation = resolveAssistantConversation({
+    systemPrompt: SYSTEM_PROMPT, initialMessage: INITIAL_MESSAGE, autoStart: GEMINI_AUTO_START,
+  });
   const geminiWs = AMBIENT_ONLY_MODE
     ? null
     : new WebSocket(buildGeminiWsUrl(), {
@@ -528,7 +527,7 @@ wss.on('connection', (twilioWs, _request, url) => {
       });
   const sendGeminiSetup = createGeminiSessionSetupSender({
     configuredModel: GEMINI_MODEL,
-    buildPayload: buildGeminiSetupPayload,
+    buildPayload: (model) => buildGeminiSetupPayload(model, conversation.systemPrompt),
     onSetup: (model) => { sessionSummary.model = model; },
   });
   const connectionStartedAtMs = Date.now();
@@ -719,8 +718,8 @@ wss.on('connection', (twilioWs, _request, url) => {
         if (BRIDGE_VERBOSE_LOGS) {
           console.log(`[Bridge] setupComplete stack=${stack}`);
         }
-        if (GEMINI_AUTO_START && INITIAL_MESSAGE && !autoStartSent) {
-          const initialPayload = buildGeminiInitialRealtimeInputPayload(INITIAL_MESSAGE);
+        if (conversation.autoStart && conversation.initialMessage && !autoStartSent) {
+          const initialPayload = buildGeminiInitialRealtimeInputPayload(conversation.initialMessage);
           if (initialPayload) {
             geminiWs.send(JSON.stringify(initialPayload));
             autoStartSent = true;
@@ -810,6 +809,17 @@ wss.on('connection', (twilioWs, _request, url) => {
       if (requestedStack) {
         stack = requestedStack;
         sessionSummary.stack = requestedStack;
+      }
+      conversation = resolveAssistantConversation({
+        profile: customParameters.assistant,
+        systemPrompt: SYSTEM_PROMPT, initialMessage: INITIAL_MESSAGE, autoStart: GEMINI_AUTO_START,
+      });
+      sessionSummary.assistant = conversation.profile;
+      sessionSummary.autoStart = conversation.autoStart;
+      if (!AMBIENT_ONLY_MODE && conversation.profile !== MATHIJS_PROFILE &&
+          GEMINI_REQUIRE_CUSTOM_PROMPT && !CUSTOM_SYSTEM_PROMPT) {
+        closeBoth('GEMINI_SYSTEM_PROMPT ontbreekt');
+        return;
       }
       sessionSummary.streamSid = streamSid;
       sendGeminiSetup({ socket: geminiWs, streamSid, stack });

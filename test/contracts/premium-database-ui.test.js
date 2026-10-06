@@ -396,7 +396,7 @@ test('premium database source filter recognizes only durable KVK transfers', () 
   );
 });
 
-test('webdesign bulk honors the selected Searcher or Robot source', async () => {
+test('webdesign bulk uses all eligible companies regardless of a stale source selection', async () => {
   const photoBatch = require('../../assets/premium-database-photo-batch');
   function testElement() {
     const base = createClassListNode();
@@ -448,7 +448,7 @@ test('webdesign bulk honors the selected Searcher or Robot source', async () => 
   const controller = photoBatch.createController({
     nodes,
     getTargets: (source) => ({ all: [1, 2, 3, 4, 5], searcher: [1, 2, 3], robot: [4, 5] }[source] || []),
-    getSourceCounts: () => ({ all: 5, searcher: 3, robot: 2 }),
+    getSourceCounts: () => assert.fail('The removed source breakdown must not be read'),
     costEur: 0.04,
     closeAddActions() {},
     setStatusMessage() {},
@@ -462,10 +462,10 @@ test('webdesign bulk honors the selected Searcher or Robot source', async () => 
   nodes.startPhotoBatchButton.click();
 
   await Promise.resolve();
-  assert.deepEqual(generated, { limit: 2, options: { silentProgress: true, mailProvider: 'softora', source: 'robot' } });
-  assert.equal(nodes.photoBatchSearcherCount.textContent, '3');
-  assert.equal(nodes.photoBatchRobotCount.textContent, '2');
-  assert.equal(nodes.photoBatchSourceUnknownCount.hidden, true);
+  assert.deepEqual(generated, { limit: 5, options: { silentProgress: true, mailProvider: 'softora', source: 'all' } });
+  assert.equal(nodes.photoBatchAllCount.textContent, '5 bedrijven');
+  assert.equal(nodes.photoBatchSummary.textContent, '');
+  assert.equal(nodes.photoBatchSummary.hidden, true);
 });
 
 test('Mailklaar view maps only canonical eligible rows to the contextual Mailklaar badge', () => {
@@ -2501,19 +2501,12 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /data-photo-batch-mode="custom"/);
   assert.match(pageSource, /id="photoBatchLimitInput" type="text" inputmode="numeric" pattern="\[0-9\]\*"/);
   assert.doesNotMatch(pageSource, /id="photoBatchLimitInput" type="number"/);
-  assert.match(pageSource, /id="photoBatchSummary" aria-live="polite"/);
-  assert.match(pageSource, /name="photoBatchSource" value="all" checked/);
-  assert.match(pageSource, /name="photoBatchSource" value="searcher"/);
-  assert.match(pageSource, /name="photoBatchSource" value="robot"/);
-  assert.match(pageSource, /id="photoBatchSearcherCount">0<\/strong>/);
-  assert.match(pageSource, /id="photoBatchRobotCount">0<\/strong>/);
+  assert.match(pageSource, /id="photoBatchSummary" aria-live="polite" hidden/);
+  assert.doesNotMatch(pageSource, /photoBatchSource|photoBatchSearcherCount|photoBatchRobotCount|Via welke bron\?/);
   const photoBatchCss = fs.readFileSync(path.join(__dirname, '../../assets/premium-database-photo-batch.css'), 'utf8');
-  assert.match(pageSource, /premium-database-photo-batch\.css\?v=20260922-count-fit/);
+  assert.match(pageSource, /premium-database-photo-batch\.css\?v=20261006-simple/);
   assert.match(photoBatchCss, /\.photo-batch-option\.is-active/);
-  assert.match(photoBatchCss, /photo-batch-source__choices/);
-  assert.match(photoBatchCss, /grid-template-columns: minmax\(0, \.92fr\) minmax\(0, 1\.18fr\) minmax\(0, 1fr\)/);
-  assert.match(photoBatchCss, /\.photo-batch-source__choices strong \{ flex: 0 0 auto;[^}]*overflow: visible;[^}]*text-overflow: clip;/);
-  assert.doesNotMatch(photoBatchCss, /\.photo-batch-source__choices strong \{[^}]*text-overflow: ellipsis;/);
+  assert.doesNotMatch(photoBatchCss, /photo-batch-source|content: 'Totaal'/);
   assert.match(photoBatchCss, /overflow-wrap: anywhere/);
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../../assets/premium-database-photo-batch.js'), 'utf8'), /photoBatchPricingNote|Vooraf: geschatte beeldprijs/);
   assert.match(pageSource, /function isWebdesignPhotoEligible\(customer\)/);
@@ -2917,7 +2910,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function buildWebsitePreviewUrlCandidates\(customer\)/);
   assert.doesNotMatch(pageSource, /async function generateWebsitePhotoData\(customer\)/);
   assert.match(pageSource, /const webdesignPhotoSourceSelection = window\.SoftoraDatabaseWebdesignSourceSelection\.createController\(/);
-  assert.match(pageSource, /getSourceCounts: webdesignPhotoSourceSelection\.getSourceCounts/);
+  assert.doesNotMatch(pageSource, /getSourceCounts: webdesignPhotoSourceSelection\.getSourceCounts/);
   assert.match(pageSource, /webdesignPhotoSourceSelection\.getTargets\(limit, source\)/);
   assert.match(pageSource, /assets\/premium-database-webdesign-source-selection\.js\?v=20260917-source/);
   assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
@@ -2926,7 +2919,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
     fs.readFileSync(path.join(__dirname, '../../assets/premium-database-webdesign-source-selection.js'), 'utf8'),
     /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/
   );
-  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20261003-subscription/);
+  assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20261006-simple/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261003-subscription/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
@@ -3004,13 +2997,13 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const photoBatchController = window\.SoftoraDatabasePhotoBatch\.createController\(\{/);
   assert.doesNotMatch(pageSource, /function getWebdesignPhotoSourceCounts\(\)/);
   assert.match(photoBatchScriptSource, /function createController\(options\)/);
-  assert.match(photoBatchScriptSource, /const selectedCost = Number\.isFinite\(costEur\) \? selectedCount \* costEur : null;/);
+  assert.doesNotMatch(photoBatchScriptSource, /const selectedCost|Mac aan met internet|Niet geclassificeerd/);
   assert.match(photoBatchScriptSource, /if \(!Number\.isFinite\(value\)\) return "prijs na generatie";/);
   assert.match(photoBatchScriptSource, /function formatPhotoBatchCount\(count\) \{[\s\S]*count === 1 \? " bedrijf" : " bedrijven"/);
   assert.match(photoBatchScriptSource, /let cachedTargetCount = null;/);
   assert.match(photoBatchScriptSource, /function getTargetCount\(summaryOptions\) \{[\s\S]*cachedTargetCount = Math\.max\(0, getTargets\("all"\)\.length\);[\s\S]*return cachedTargetCount;[\s\S]*\}/);
   assert.match(photoBatchScriptSource, /function open\(\)/);
-  assert.match(photoBatchScriptSource, /const total = getTargetCount\(\{ force: true, source \}\);/);
+  assert.match(photoBatchScriptSource, /const total = getTargetCount\(\{ force: true \}\);/);
   assert.match(photoBatchScriptSource, /function resolveSelection\(\)/);
   assert.match(photoBatchScriptSource, /function ensureInputFocusStyles\(\)/);
   assert.match(photoBatchScriptSource, /\.photo-batch-input:focus/);

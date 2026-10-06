@@ -257,8 +257,11 @@ function createCallWebhookRuntime(deps = {}) {
     const rawStack = normalizeString(req.query?.stack || req.body?.stack || '');
     const explicitStack = rawStack ? normalizeColdcallingStack(rawStack) : '';
     const rawDigits = normalizeString(req.body?.Digits || req.query?.Digits || '');
-    const stackFromDigit = mapTwilioInboundDigitToStack(rawDigits);
-    const stack = normalizeColdcallingStack(explicitStack || stackFromDigit || 'retell_ai');
+    const providerMenuEnabled = /^(1|true|yes)$/i.test(normalizeString(env.TWILIO_INBOUND_PROVIDER_MENU));
+    const stackFromDigit = providerMenuEnabled ? mapTwilioInboundDigitToStack(rawDigits) : '';
+    const stack = normalizeColdcallingStack(
+      explicitStack || stackFromDigit || (providerMenuEnabled ? 'retell_ai' : 'gemini_flash_3_8_live')
+    );
     const callSid = normalizeString(req.body?.CallSid || req.query?.CallSid || '');
     const to = normalizeString(req.body?.To || req.query?.To || '');
     const from = normalizeString(req.body?.From || req.query?.From || '');
@@ -273,7 +276,7 @@ function createCallWebhookRuntime(deps = {}) {
       );
     }
 
-    if (!explicitStack) {
+    if (providerMenuEnabled && !explicitStack) {
       if (!rawDigits) {
         const actionUrl = buildTwilioInboundSelectionActionUrl(req);
         return sendTwimlXml(
@@ -305,6 +308,7 @@ function createCallWebhookRuntime(deps = {}) {
     const mediaWsUrl = mediaWsBaseUrl;
     const streamParameterXml = buildTwilioStreamParameterXml({
       stack,
+      assistant: stack === 'gemini_flash_3_8_live' ? 'softora_mathijs' : '',
       callSid,
       to,
       from,

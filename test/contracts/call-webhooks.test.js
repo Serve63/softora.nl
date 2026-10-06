@@ -213,7 +213,7 @@ test('call webhooks store retell webhook events and trigger post-call automation
 });
 
 test('Gemini 3.8 inbound selection sends the stack through Twilio start custom parameters', () => {
-  const context = createRuntime();
+  const context = createRuntime({ env: { TWILIO_INBOUND_PROVIDER_MENU: 'true' } });
   const req = createReq({
     path: '/api/twilio/voice',
     body: { CallSid: 'CA38', From: '+31612345678', To: '+31880000000', Digits: '3' },
@@ -223,4 +223,66 @@ test('Gemini 3.8 inbound selection sends the stack through Twilio start custom p
   context.runtime.handleTwilioInboundVoice(req, res);
   assert.match(res.textBody, /<Parameter name="stack" value="gemini_flash_3_8_live" \/>/);
   assert.equal(context.upserts[0].stack, 'gemini_flash_3_8_live');
+});
+
+
+test('incoming calls reach Mathijs on Gemini 3.8 directly without a provider menu', () => {
+  const context = createRuntime();
+  const req = createReq({
+    path: '/api/twilio/voice',
+    body: { CallSid: 'CAMathijs', From: '+31612345678' },
+    headers: { 'x-webhook-secret': 'twilio-secret' },
+  });
+  const res = createRes();
+  context.runtime.handleTwilioInboundVoice(req, res);
+  assert.match(res.textBody, /<Connect>/);
+  assert.doesNotMatch(res.textBody, /<Gather|Maak een keuze/);
+  assert.match(res.textBody, /<Parameter name="stack" value="gemini_flash_3_8_live" \/>/);
+  assert.match(res.textBody, /<Parameter name="assistant" value="softora_mathijs" \/>/);
+  assert.equal(context.upserts[0].direction, 'inbound');
+  assert.equal(context.upserts[0].stack, 'gemini_flash_3_8_live');
+});
+
+test('the old provider menu can be restored without changing the direct assistant default', () => {
+  const context = createRuntime({ env: { TWILIO_INBOUND_PROVIDER_MENU: 'true' } });
+  const res = createRes();
+  context.runtime.handleTwilioInboundVoice(createReq({
+    headers: { 'x-webhook-secret': 'twilio-secret' },
+  }), res);
+  assert.match(res.textBody, /<Gather/);
+  assert.match(res.textBody, /Toets 3 voor Gemini 3 punt 8 Live/);
+  assert.equal(context.upserts.length, 0);
+  const invalid = createRes();
+  context.runtime.handleTwilioInboundVoice(createReq({
+    body: { Digits: '9' }, headers: { 'x-webhook-secret': 'twilio-secret' },
+  }), invalid);
+  assert.match(invalid.textBody, /Ongeldige keuze/);
+  assert.doesNotMatch(invalid.textBody, /<Stream/);
+});
+
+for (const stack of ['retell_ai', 'gemini_flash_3_1_live']) {
+  test(`explicit ${stack} routing retains its campaign prompt`, () => {
+    const context = createRuntime();
+    const res = createRes();
+    context.runtime.handleTwilioInboundVoice(createReq({
+      query: { stack }, headers: { 'x-webhook-secret': 'twilio-secret' },
+    }), res);
+    assert.match(res.textBody, new RegExp(`name="stack" value="${stack}"`));
+    assert.doesNotMatch(res.textBody, /name="assistant"/);
+  });
+}
+
+test('the direct assistant preserves webhook authentication and the caller allowlist', () => {
+  const context = createRuntime({ env: { TWILIO_ALLOWED_CALLERS: '+31612345678' } });
+  const unauthorized = createRes();
+  context.runtime.handleTwilioInboundVoice(createReq(), unauthorized);
+  assert.match(unauthorized.textBody, /Verzoek niet toegestaan/);
+  assert.doesNotMatch(unauthorized.textBody, /<Stream/);
+  const rejected = createRes();
+  context.runtime.handleTwilioInboundVoice(createReq({
+    body: { From: '+31699999999' }, headers: { 'x-webhook-secret': 'twilio-secret' },
+  }), rejected);
+  assert.match(rejected.textBody, /<Reject/);
+  assert.doesNotMatch(rejected.textBody, /<Stream/);
+  assert.equal(context.upserts.length, 0);
 });
