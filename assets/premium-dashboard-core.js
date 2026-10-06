@@ -18,6 +18,14 @@ function escapeHtml(str) {
             .replace(/'/g, '&#039;');
     }
 
+function updateActiveOrdersDisplay(activeOrders, doc = root.document) {
+        const element = doc && doc.getElementById('kpiActiveOrders');
+        if (!element) return;
+        const total = Array.isArray(activeOrders) ? activeOrders.length : 0;
+        element.textContent = String(total);
+        element.setAttribute('aria-label', `Actieve opdrachten: ${total}`);
+    }
+
 function normalizeDashboardString(value) {
         return String(value || '').trim();
     }
@@ -562,6 +570,7 @@ function formatMoneyEUR(amount) {
 
 	    return Object.freeze({
 	        escapeHtml,
+        updateActiveOrdersDisplay,
         normalizeDashboardString,
         normalizeDashboardTime,
         normalizeDashboardDate,

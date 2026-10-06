@@ -4,17 +4,17 @@ const fs = require('fs');
 const path = require('path');
 const dashboardDataStatus = require('../../assets/premium-dashboard-data-status');
 
-test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', () => {
+test('premium dashboard verwijdert de Ruben Nijhuis chatbot', () => {
   const pagePath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const pageSource = fs.readFileSync(pagePath, 'utf8');
   const chatSource = fs.readFileSync(path.join(__dirname, '../../assets/premium-dashboard-ai-chat.js'), 'utf8');
 
-  assert.match(pageSource, /id="dashboardAiChat"/);
-  assert.match(pageSource, /<span>Ruben Nijhuis<\/span>/);
-  assert.match(pageSource, /<strong>Ruben Nijhuis<\/strong>/);
+  assert.doesNotMatch(pageSource, /id="dashboardAiChat"/);
+  assert.doesNotMatch(pageSource, /<span>Ruben Nijhuis<\/span>/);
+  assert.doesNotMatch(pageSource, /<strong>Ruben Nijhuis<\/strong>/);
   assert.doesNotMatch(pageSource, /Je Softora-collega voor context, keuzes en overzicht in de software\./);
-  assert.match(pageSource, /placeholder="Vraag het aan Ruben Nijhuis\.\.\."/);
-  assert.match(pageSource, /assets\/premium-dashboard-ai-chat\.js\?v=20260922a/);
+  assert.doesNotMatch(pageSource, /placeholder="Vraag het aan Ruben Nijhuis\.\.\."/);
+  assert.doesNotMatch(pageSource, /assets\/premium-dashboard-ai-chat\.js\?v=20260922a/);
   assert.match(chatSource, /const CHAT_ENDPOINTS = \['\/api\/ai\/ruben-chat', '\/api\/ai\/dashboard-chat', '\/api\/ai-dashboard-chat'\];/);
   assert.match(chatSource, /bubble\.textContent = 'Ruben Nijhuis denkt na\.\.\.';/);
   assert.match(chatSource, /formatStatus\('Ruben Nijhuis verwerkt je vraag\.\.\.', ''\);/);
@@ -46,7 +46,7 @@ test('premium dashboard chat presenteert Ruben Nijhuis als centrale assistent', 
   );
 });
 
-test('premium dashboard chat blijft beperkt tot het personeel dashboard', () => {
+test('premium dashboard en database tonen geen chatbotwidget', () => {
   const dashboardPath = path.join(__dirname, '../../premium-personeel-dashboard.html');
   const databasePath = path.join(__dirname, '../../premium-database.html');
   const themePath = path.join(__dirname, '../../assets/personnel-theme.js');
@@ -56,7 +56,7 @@ test('premium dashboard chat blijft beperkt tot het personeel dashboard', () => 
   const themeSource = fs.readFileSync(themePath, 'utf8');
   const scopeSource = fs.readFileSync(scopePath, 'utf8');
 
-  assert.match(dashboardSource, /id="dashboardAiChat"/);
+  assert.doesNotMatch(dashboardSource, /id="dashboardAiChat"/);
   assert.doesNotMatch(databaseSource, /id="dashboardAiChat"/);
   assert.match(themeSource, /function enforceDashboardAiChatScope\(\)/);
   assert.match(themeSource, /#dashboardAiChat, \.dashboard-ai-chat/);
@@ -158,7 +158,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.match(coreSource, /function readDashboardCustomersBootstrapPayload\(scriptId = 'softoraCustomersBootstrap'\) \{/);
   assert.match(pageSource, /const dashboardCustomersBootstrapPayload = readDashboardCustomersBootstrapPayload\(\);/);
   assert.match(pageSource, /function normalizePremiumDashboardCustomerDatabaseStatus\(item\)/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260922c/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20261006-total/);
   assert.doesNotMatch(pageSource, /assets\/premium-dashboard-core\.js\?v=20260722a/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /window\.SoftoraPremiumDashboardCore \|\|/);
@@ -181,7 +181,7 @@ test('premium dashboard telt alleen databaseklanten als totale klanten', () => {
   assert.doesNotMatch(pageSource, /if \(!loaded && !hadPremiumDashboardBootstrapData\) renderPremiumDashboardOrders\(\);/);
   assert.match(pageSource, /ordersHydrated: false,/);
   assert.match(pageSource, /customersHydrated: false,/);
-  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20260923a/);
+  assert.match(pageSource, /assets\/premium-dashboard-data-status\.js\?v=20261006-total/);
   assert.match(dataStatusSource, /const unavailableMessage = "Supabase-data tijdelijk niet geladen\. Je data is niet verwijderd; probeer zo opnieuw\.";/);
   assert.match(dataStatusSource, /let hasClearedUnavailable = false;/);
   assert.match(dataStatusSource, /clear\(\) \{\s*hasClearedUnavailable = true;\s*setStatus\(""\);/);
@@ -251,10 +251,9 @@ test('premium dashboard datastatus behoudt geldige actieve opdrachten bij klantt
       values: { softora_order_runtime_premium_v1: '{"7":{"statusKey":"running"}}' },
     },
   };
-  const activeValues = ['2', '0', '0', '0'].map((textContent) => ({ textContent }));
   const activeOrdersElement = {
     attributes: {},
-    querySelectorAll() { return activeValues; },
+    textContent: '2',
     setAttribute(name, value) { this.attributes[name] = value; },
   };
   const elements = {
@@ -274,11 +273,11 @@ test('premium dashboard datastatus behoudt geldige actieve opdrachten bij klantt
     assert.equal(elements.kpiRevenueYear.textContent, '--');
     assert.equal(elements.kpiRecurringRevenue.textContent, '--');
     assert.equal(elements.kpiTotalClients.textContent, '--');
-    assert.deepEqual(activeValues.map((item) => item.textContent), ['2', '0', '0', '0']);
+    assert.equal(activeOrdersElement.textContent, '2');
     assert.equal(activeOrdersElement.attributes['aria-label'], undefined);
 
     dashboardDataStatus.setKpisUnavailable();
-    assert.deepEqual(activeValues.map((item) => item.textContent), ['--', '--', '--', '--']);
+    assert.equal(activeOrdersElement.textContent, '--');
     assert.equal(activeOrdersElement.attributes['aria-label'], 'Actieve opdrachten tijdelijk niet geladen');
   } finally {
     if (previousDocument === undefined) delete global.document;
@@ -377,7 +376,7 @@ test('premium dashboard opent AI beheer configuratie met doel en toegestane midd
   assert.match(pageSource, /scheduleDays: \['monday', 'tuesday', 'wednesday', 'thursday', 'friday'\]/);
   assert.match(pageSource, /scheduleStart: '08:30'/);
   assert.match(pageSource, /scheduleEnd: '17:00'/);
-  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20260922c/);
+  assert.match(pageSource, /assets\/premium-dashboard-core\.js\?v=20261006-total/);
   assert.match(pageSource, /SoftoraPremiumDashboardCore/);
   assert.match(pageSource, /const aiManagementScheduleDayInputs = Array\.from\(document\.querySelectorAll\('\[data-ai-schedule-day\]'\)\);/);
   assert.match(pageSource, /aiManagementScheduleStartInput\.value = config\.scheduleStart;/);

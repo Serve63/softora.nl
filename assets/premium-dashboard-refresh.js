@@ -24,8 +24,7 @@
             return value && value !== '--';
         })) return false;
         const active = doc.getElementById('kpiActiveOrders');
-        return Boolean(active && ['website', 'business', 'voice', 'chatbot'].every(type =>
-            /^\d+$/.test(active.querySelector(`[data-kpi-active-${type}]`)?.textContent?.trim() || '')));
+        return Boolean(active && /^\d+$/.test(active.textContent?.trim() || ''));
     }
 
     function clearRecovery() {
@@ -108,13 +107,12 @@
                 customers: state.customersHydrated,
                 activeOrders: state.ordersHydrated,
             },
-            requiredActions: ['#dashboardAiChatToggle', '#aiManagementConfigSave'],
+            requiredActions: ['#aiManagementConfigSave'],
             requiredImages: Array.from((main || doc).querySelectorAll('img:not([loading="lazy"])')),
             contentReady: isRenderedContentReady,
             actionsBound: () => {
-                const chat = doc.getElementById('dashboardAiChatToggle');
                 const save = doc.getElementById('aiManagementConfigSave');
-                return chat?.dataset.softoraActionBound === 'true' && save?.dataset.softoraActionBound === 'true';
+                return save?.dataset.softoraActionBound === 'true';
             },
         });
         if (ready) dashboardCore?.releasePremiumDashboardBootShell?.();
@@ -128,9 +126,8 @@
 
     function actionsBound() {
         const doc = root.document;
-        const chat = doc?.getElementById?.('dashboardAiChatToggle');
         const save = doc?.getElementById?.('aiManagementConfigSave');
-        return chat?.dataset.softoraActionBound === 'true' && save?.dataset.softoraActionBound === 'true';
+        return save?.dataset.softoraActionBound === 'true';
     }
 
     // With complete server data the screen is ready as soon as its controls are
