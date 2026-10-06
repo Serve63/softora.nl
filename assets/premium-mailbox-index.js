@@ -577,6 +577,16 @@ function needsThreadBodyHydration(message) {
   );
 }
 
+// Root and every earlier message carry their complete body (page snapshot or
+// prefetch), so the conversation can be shown before its contact dossier.
+function isConversationReadable(mail) {
+  return Boolean(
+    mail && mail.bodyLoaded === true && !mail.bodyTruncated && mail.bodyLoading !== true &&
+    !(mail.aiPresentationUnknown === true && mail.aiPresentation === undefined) &&
+    !(Array.isArray(mail.threadMessages) ? mail.threadMessages : []).some(isThreadBodyVisiblyPending)
+  );
+}
+
 function needsThreadRoutingHydration(message) {
   const source = message && typeof message === 'object' ? message : {};
   return source.recipientRoutingEvidenceKnown !== true && source.recipientRoutingHydrationAttempted !== true;
@@ -1021,6 +1031,7 @@ window.SoftoraMailboxIndex = {
   needsThreadLinkHydration,
   needsThreadImageHydration,
   needsThreadBodyHydration,
+  isConversationReadable,
   needsThreadRoutingHydration,
   retryBody,
   setStatus,

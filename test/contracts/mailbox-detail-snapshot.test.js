@@ -130,7 +130,7 @@ test('the Mailbox wires the detail snapshot before its page script and captures 
   const adapter = page.indexOf('assets/premium-mailbox-detail-snapshot.js?v=20261006a');
   assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < adapter);
   assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924b') < adapter);
-  assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20261006c'));
+  assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20261006d'));
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   assert.match(source, /snapshot: window\.SoftoraMailboxDetailSnapshot, shouldCaptureSnapshot: \(\) => true/);
   const snapshotAdapter = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-detail-snapshot.js'), 'utf8');
@@ -143,8 +143,9 @@ test('a conversation is first shown complete: cleaned AI text and a loaded conta
   const source = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox.js'), 'utf8');
   // Page-bootstrap bodies carry no AI presentation; fetching it first avoids raw text followed by the cleaned version.
   assert.match(source, /needsRootHydration: \(mail, openOptions\) => \(openOptions\.forceRootHydration \|\| !mail\.bodyLoaded \|\| \(mail\.aiPresentationUnknown === true && mail\.aiPresentation === undefined\) \|\| mail\.recipientRoutingNeedsHydration\) && !openOptions\.skipBodyFetch,/);
-  // The contact timeline needs the account list; without it the first render says "x berichten geladen".
-  assert.match(source, /return mailboxAccountsLoad \? mailboxAccountsLoad\.catch\(\(\) => \{\}\)\.then\(load\) : load\(\); \},/);
+  // The contact timeline needs the account list; a conversation that is not yet readable waits for it, so its first
+  // render does not say "x berichten geladen". A readable one is shown at once (see mailbox-prefetch.test.js).
+  assert.match(source, /const loaded = mailboxAccountsLoad \? mailboxAccountsLoad\.catch\(\(\) => \{\}\)\.then\(load\) : load\(\); if \(ready\) \{ void loaded; return true; \} return loaded; \},/);
   assert.match(source, /const accountLoad = mailboxAccountsLoad = loadMailboxAccounts\(\)\.finally\(\(\) => \{ mailboxAccountsLoad = null; \}\);/);
   const index = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-index.js'), 'utf8');
   const inbox = fs.readFileSync(path.join(repoRoot, 'assets/premium-mailbox-campaign-inbox.js'), 'utf8');
