@@ -30,7 +30,18 @@ for (const page of pages) {
     assert.equal((await fetch(origin + '/bedrijfssoftware.html')).status, 404);
     assert.equal((await fetch(origin + page.route, { method: 'POST' })).status, 405);
     const chooser = fs.readFileSync(path.join(root, 'assets/entry/toekomst.html'), 'utf8');
-    assert.ok(chooser.includes('<a class="choice" data-service="' + page.route + '"'));
+    const choice = DomUtils.findAll((node) => node.name === 'a' && node.attribs.class === 'choice', parseDocument(chooser).children)
+      .find((node) => (node.attribs.href || node.attribs['data-service']) === page.route);
+    assert.ok(choice);
+    if (page.route === '/bedrijfssoftware') {
+      assert.equal(choice.attribs.href, page.route);
+      assert.equal(choice.attribs['aria-disabled'], undefined);
+      assert.doesNotMatch(DomUtils.textContent(choice), /Coming soon/i);
+    } else {
+      assert.equal(choice.attribs.href, undefined);
+      assert.equal(choice.attribs['aria-disabled'], 'true');
+      assert.match(DomUtils.textContent(choice), /Coming soon/i);
+    }
   });
   test(page.route + ' has valid lightweight imagery and topic-specific accessible demos', async () => {
     const ids = new Set(elements.map((node) => node.attribs.id).filter(Boolean));

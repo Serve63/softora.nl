@@ -72,7 +72,9 @@ test('toekomst uses SEO Solution consistently', () => {
 test('final chooser labels and direct product destinations stay intact', () => {
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  assert.match(html,/<a class="choice" href="\/nieuwe-website"/);
- for(const route of ['seo-solution','chatbot','voicesoftware']) assert.match(html,new RegExp('<a class="choice" data-service="/'+route+'"'));
+ assert.match(html,/<a class="choice" href="\/chatbot"/);
+ assert.match(html,/<a class="choice" href="\/bedrijfssoftware"/);
+ for(const route of ['seo-solution','voicesoftware']) assert.match(html,new RegExp('<a class="choice" data-service="/'+route+'"'));
  assert.doesNotMatch(html,/<a[^>]*class="ai-feature"/);
  for(const file of ['assets/entry/toekomst.html','assets/seo-login/index.html']) {
   const content=fs.readFileSync(path.join(root,file),'utf8');
@@ -185,37 +187,50 @@ test('toekomst reduces only the SEO login image within the shared icon column', 
  assert.match(css,/\.login-avatar--seo img\{width:85%;height:85%\}/);
 });
 
-test('chooser marks the four upcoming services while keeping the website available', () => {
+test('chooser marks only telephone and SEO as upcoming and enables available services', () => {
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  const cards=[...html.matchAll(/<a class="choice" (?:href|data-service)="([^"]+)"[^]*?<\/a>/g)];
  assert.equal(cards.length,5);
  for(const [card,href] of cards){
-  if(href==='/nieuwe-website') assert.doesNotMatch(card,/Coming soon|choice-coming-soon/);
-  else {
+  if(['/voicesoftware','/seo-solution'].includes(href)) {
    assert.match(card,/aria-label="[^"]*Coming soon"/);
    assert.match(card,/<span class="choice-coming-soon" aria-hidden="true">Coming soon<\/span>/);
+  } else {
+   assert.doesNotMatch(card,/Coming soon|choice-coming-soon|aria-disabled|tabindex/);
+   assert.ok(card.includes('href="'+href+'"'));
   }
  }
 });
 
-test('meeting banner also displays its upcoming availability', () => {
+test('meeting banner is available and links to Softora contact', () => {
  const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
  const banner=html.match(/<section class="meet-softora"[^]*?<\/section>/)?.[0] || '';
- assert.match(banner,/<span class="choice-coming-soon">Coming soon<\/span>/);
- assert.match(banner,/class="meet-link" role="link" aria-disabled="true" tabindex="-1"/);
+ assert.doesNotMatch(banner,/Coming soon|choice-coming-soon|aria-disabled|tabindex/);
+ assert.match(banner,/class="meet-link" href="https:\/\/www\.softora\.nl\/contact"/);
 });
 
-test('coming soon cards and meeting CTA cannot navigate or enter keyboard tab order', () => {
+test('only coming soon cards cannot navigate or enter keyboard tab order', () => {
  const {parseDocument,DomUtils}=require('htmlparser2');
  const doc=parseDocument(fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8'));
  const disabled=DomUtils.findAll(n=>n.attribs?.['aria-disabled']==='true',doc.children);
- assert.equal(disabled.length,5);
+ assert.equal(disabled.length,2);
+ assert.deepEqual(disabled.map(n=>n.attribs['data-service']),['/voicesoftware','/seo-solution']);
  for(const node of disabled){
   assert.equal(node.attribs.href,undefined);
   assert.equal(node.attribs.tabindex,'-1');
   assert.equal(node.attribs.onclick,undefined);
  }
  const active=DomUtils.findAll(n=>n.attribs?.class==='choice' && n.attribs.href,doc.children);
- assert.equal(active.length,1);
- assert.equal(active[0].attribs.href,'/nieuwe-website');
+ assert.deepEqual(active.map(n=>n.attribs.href),['/nieuwe-website','/bedrijfssoftware','/chatbot']);
+});
+
+test('upcoming cards have a muted appearance without hover navigation cues', () => {
+ const css=fs.readFileSync(path.join(root,'assets/entry/coming-soon.css'),'utf8');
+ assert.match(css,/\.toekomst-ai \.choice\[aria-disabled="true"\]\{opacity:\.7\}/);
+ assert.match(css,/\.toekomst-ai \.choice\[aria-disabled="true"\] \.choice-photo\{filter:grayscale\(1\)\}/);
+ assert.match(css,/\.choice:has\(\.choice-coming-soon\) \.arrow\{display:none\}/);
+ assert.match(css,/\.choice\[aria-disabled="true"\]:hover\{transform:none;/);
+ assert.match(css,/\.choice\[aria-disabled="true"\]:hover \.choice-photo\{transform:none\}/);
+ const html=fs.readFileSync(path.join(root,'assets/entry/toekomst.html'),'utf8');
+ assert.match(html,/coming-soon\.css\?v=20261006d/);
 });
