@@ -160,6 +160,7 @@ function createCallProviderRecordingHelpers(options = {}) {
 
   function getTwilioStackEnvSuffixes(stack) {
     const normalized = normalizeColdcallingStack(stack);
+    if (normalized === 'gemini_flash_3_8_live') return ['GEMINI_FLASH_3_8_LIVE', 'GEMINI_FLASH_3_1_LIVE', 'GEMINI'];
     if (normalized === 'gemini_flash_3_1_live') return ['GEMINI_FLASH_3_1_LIVE', 'GEMINI'];
     if (normalized === 'openai_realtime_1_5') {
       return ['OPENAI_REALTIME_1_5', 'OPENAI_REALTIME', 'OPENAI'];

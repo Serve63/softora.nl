@@ -16,6 +16,7 @@ function normalizeString(value, fallback = '') {
 
 function normalizeColdcallingStack(value) {
   const raw = normalizeString(value).toLowerCase();
+  if (['gemini_flash_3_8_live', 'gemini_3_8_live', 'gemini-3.8-live', 'gemini 3.8 live', 'gemini flash 3.8 live'].includes(raw)) return 'gemini_flash_3_8_live';
   if (
     raw === 'gemini_flash_3_1_live' ||
     raw === 'gemini flash 3.1 live' ||

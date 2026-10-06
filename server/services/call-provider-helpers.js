@@ -598,7 +598,7 @@ function createCallProviderHelpers(options = {}) {
       );
     }
 
-    if (stack !== 'gemini_flash_3_1_live') {
+    if (!['gemini_flash_3_1_live', 'gemini_flash_3_8_live'].includes(stack)) {
       return { ok: true, stage: 'healthz' };
     }
 
@@ -611,6 +611,7 @@ function createCallProviderHelpers(options = {}) {
     }
 
     const parsedGeminiSetupUrl = new URL(geminiSetupUrl);
+    parsedGeminiSetupUrl.searchParams.set('stack', stack);
     parsedGeminiSetupUrl.searchParams.set(
       'timeoutMs',
       String(Math.max(3000, warmupTimeoutMs - 1000))
@@ -634,6 +635,9 @@ function createCallProviderHelpers(options = {}) {
       warmupTimeoutMs
     );
 
+    if (stack === 'gemini_flash_3_8_live' && geminiSetupData?.model !== 'models/gemini-3.8-live') {
+      throw new Error('Gemini 3.8 Live is niet bevestigd door de media bridge; belactie geblokkeerd.');
+    }
     if (geminiSetupResponse.status === 403) {
       return { ok: true, stage: 'healthz-only' };
     }

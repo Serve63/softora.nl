@@ -2,7 +2,7 @@
 
 Coldcalling backend + statische dashboardpagina's met stack-routing:
 - `Retell AI` stack -> Retell outbound
-- `Gemini Flash 3.1 Live` / `OpenAI Realtime 1.5` / `Hume Evi 3` -> Twilio outbound + media stream
+- `Gemini 3.8 Live` / `Gemini Flash 3.1 Live` / `OpenAI Realtime 1.5` / `Hume Evi 3` -> Twilio outbound + media stream
 
 ## Stack
 
@@ -55,6 +55,8 @@ TWILIO_OUTBOUND_TWIML_URL=https://jouwdomein.nl/api/twilio/voice
 TWILIO_STATUS_CALLBACK_URL=https://jouwdomein.nl/api/twilio/status
 TWILIO_WEBHOOK_SECRET=your_twilio_webhook_secret
 TWILIO_MEDIA_WS_URL=wss://twilio-media-bridge-ln3f.onrender.com/twilio-media
+TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_8_LIVE=wss://example.com/twilio-media
+TWILIO_FROM_NUMBER_GEMINI_FLASH_3_8_LIVE=+31xxxxxxxxx
 TWILIO_MEDIA_WS_URL_GEMINI_FLASH_3_1_LIVE=wss://example.com/twilio-media
 TWILIO_FROM_NUMBER_GEMINI_FLASH_3_1_LIVE=+31xxxxxxxxx
 
@@ -78,6 +80,27 @@ NOISE_GATE_RMS=250
 # Eigen raw 8k mono PCM loopbestand kan ook:
 # AMBIENT_ASSET_PATH=assets/jouw-office-loop-8k.raw
 ```
+
+### Gemini 3.8 Live activeren
+
+Kies in de coldcall-generator `Gemini 3.8 Live` (`gemini_flash_3_8_live`).
+De officiële Live API-model-ID is `gemini-3.8-live`:
+https://ai.google.dev/gemini-api/docs/live-api/get-started-sdk.
+Deploy eerst de bijgewerkte `twilio-media-bridge` op de bestaande bridge-host.
+De bridge houdt de ingestelde `GEMINI_MODEL` voor bestaande 3.1-campagnes,
+maar selecteert `models/gemini-3.8-live` voor een expliciete 3.8-sessie.
+De keuze komt uit Twilio `start.customParameters`; setup wacht op dat bericht.
+De aparte 3.8-URL en het aparte afzendnummer zijn optioneel; bestaande
+Gemini/Twilio-configuratie blijft de fallback. Stel de bestaande bridge-debugtoken
+server-side in als `TWILIO_MEDIA_BRIDGE_DEBUG_TOKEN` zodat de setupcontrole mag lopen.
+Voor een 3.8-belactie moet de bridge exact `models/gemini-3.8-live` bevestigen;
+een oude bridge, verkeerde model-ID of geweigerde setupcontrole blokkeert vóór Twilio belt.
+Gebruik geen publieke debugtoken of API-key in frontendbestanden.
+
+Een echte Gemini-sessie of Twilio-belactie kan providerkosten veroorzaken.
+Code- en mocktests starten geen externe gesprekken. Activeer echte tests of campagnes
+pas na een expliciet afgesproken budget en testnummer; zet geen betaalde fallback aan.
+Rollback: kies de bestaande `Gemini 3.1 Live`-optie of stop de campagne.
 
 ### Extra env vars voor `Voer opdracht uit` automation (Actieve Opdrachten)
 
