@@ -116,7 +116,7 @@ test('toekomst mobile features the first website card and shortens the meeting b
  assert.match(mobile,/\.toekomst-ai \.choice:last-child\{grid-column:auto;height:285px\}/);
  assert.match(mobile,/\.toekomst-ai \.choice\[href="\/nieuwe-website"\]\{grid-column:1\/-1;height:200px\}/);
  assert.match(mobile,/\.toekomst-ai \.meet-softora\{height:200px;min-height:0;/);
- assert.match(html,/ai-medewerker\.css\?v=coming-soon-20261006/);
+ assert.match(html,/ai-medewerker\.css\?v=juridisch-footer-20261003/);
 });
 
 test('toekomst footer uses a quiet centered article link with a direct blog destination', () => {
