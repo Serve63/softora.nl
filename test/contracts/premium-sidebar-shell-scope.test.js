@@ -570,7 +570,7 @@ test('personnel theme canonical shell is explicitly opt-in', () => {
   assert.match(prefillSource, /data-sidebar-active-prefilled/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_CRITICAL_HEAD_SNIPPET/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_STABILITY_ASSETS/);
-  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20261006-contactform'/);
+  assert.match(htmlPagesSource, /PREMIUM_PERSONNEL_THEME_VERSION = '20261006-querynav'/);
   assert.match(htmlPagesSource, /PREMIUM_SIDEBAR_PREFILL_VERSION = '20261006-contactform'/);
   assert.match(htmlPagesSource, /assets\/premium-sidebar-profile-prefill\.js\?v=\$\{PREMIUM_SIDEBAR_PREFILL_VERSION\}/);
   assert.doesNotMatch(htmlPagesSource, /LEAD_RADAR_SIDEBAR_VERSION|lead-radar-sidebar\.js/);
@@ -1571,6 +1571,17 @@ test('Contactformulier staat direct onder Mailbox en gebruikt alleen de formulie
 
 
 test('sidebar allows navigation between Mailbox and Contactformulier and blocks only the current view', () => {
+  // Both the capture listener and the anchor listener must distinguish mailbox views.
+  // Testing stability alone misses the later theme listener that cancels the same click.
+  const theme = readRepoFile('assets/personnel-theme.js');
+  const currentTarget = theme.split('function isSidebarNavigationCurrentTarget(href) {')[1]
+    .split('function canWarmSidebarNavigationTarget(href) {')[0];
+  const warmTarget = theme.split('function canWarmSidebarNavigationTarget(href) {')[1]
+    .split('function warmSidebarNavigationTarget(url) {')[0];
+  for (const [name, source] of [['current view', currentTarget], ['prefetch view', warmTarget]]) {
+    assert.match(source, /targetUrl\.search === String\(window\.location\.search \|\| ""\)/,
+      `${name} must compare the folder query before treating a sidebar target as current`);
+  }
   for (const [search, href, expectedBlocked] of [
     ['', '/mailbox?folder=contact-form', false],
     ['?folder=contact-form', '/mailbox', false],

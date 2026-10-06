@@ -1071,7 +1071,7 @@
         try {
             const targetUrl = new URL(normalizeSidebarNavigationTarget(href), window.location.origin);
             return targetUrl.origin === window.location.origin &&
-                targetUrl.pathname === window.location.pathname &&
+                targetUrl.pathname === window.location.pathname && targetUrl.search === String(window.location.search || "") &&
                 targetUrl.hash === window.location.hash;
         } catch (_) {
             return false;
@@ -1083,7 +1083,7 @@
         try {
             const targetUrl = new URL(href, window.location.origin);
             if (targetUrl.origin !== window.location.origin) return false;
-            if (targetUrl.pathname === window.location.pathname && targetUrl.hash === window.location.hash) return false;
+            if (targetUrl.pathname === window.location.pathname && targetUrl.search === String(window.location.search || "") && targetUrl.hash === window.location.hash) return false;
             return targetUrl.pathname === "/mailbox" || targetUrl.pathname === "/winnen" || targetUrl.pathname.indexOf("/premium-") === 0;
         } catch (_) {
             return false;
