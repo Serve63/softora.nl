@@ -907,6 +907,12 @@ test('premium mailbox behoudt alleen de vaste premium-sidebar bij responsive mai
   assert.ok(mailList.indexOf('id="mailbox-search-status"') < mailList.indexOf(listActions));
   assert.ok(mailList.indexOf(listActions) < mailList.indexOf('id="mail-results-scroll"'));
   assert.match(pageSource, /\.mail-list-actions \{[^}]*flex-shrink:\s*0;/);
+  assert.match(pageSource, /\.mail-list-actions \{[^}]*padding:\s*0;/,
+    'het hele verzendvak is klikbaar zonder lege buitenmarges');
+  assert.match(pageSource, /\.mail-list-compose \{[^}]*width:\s*100%;[^}]*min-height:\s*54px;[^}]*border:\s*0;[^}]*border-radius:\s*0;/,
+    'mail verzenden vult de rij zonder een losse knoprand');
+  assert.match(pageSource, /\.mail-list-compose:focus-visible \{[^}]*outline-offset:\s*-2px;/,
+    'toetsenbordfocus blijft binnen de volledige klikbare rij zichtbaar');
   assert.doesNotMatch(pageSource.match(/<div class="topbar">[\s\S]*?<!-- LAYOUT -->/)?.[0] || '', /compose-new-mail/);
   assert.doesNotMatch(pageSource, /mailbox-search-clear|mail-search-clear/);
   assert.match(pageSource, /\.detail-mail-block \{[\s\S]*width:\s*min\(100%,\s*900px\);[\s\S]*margin:\s*0 auto;/);
