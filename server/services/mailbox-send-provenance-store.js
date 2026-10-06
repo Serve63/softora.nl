@@ -941,6 +941,16 @@ function createMailboxSendProvenanceStore(deps = {}) {
     }
   }
 
+  // Alleen na een aantoonbare providercontrole: de provider kent dit onzekere bericht niet.
+  const resolveUnknownAsNotSent = (intentId, reason) => updateIntent(intentId, {
+    status: 'failed', dispatch_state: 'finished', dispatch_lease_expires_at: null,
+    reconcile_required: false, sent_reconcile_required: false,
+    error_text: normalizeString(reason).slice(0, 1000) || 'Provider bevestigde dat niets is verzonden',
+  }, 'niet verzonden', { statuses: ['unknown'] }, {
+    isAlreadyApplied: (intent) => intent?.status === 'failed' && intent?.dispatchState === 'finished'
+      && intent?.reconcileRequired === false && intent?.sentReconcileRequired === false,
+  });
+
   async function listAcceptedMessages({ accountEmails = [], limit = 500 } = {}) {
     const emails = Array.from(new Set(accountEmails.map(normalizeEmail).filter(Boolean)));
     if (!emails.length || !isSupabaseConfigured()) return [];
@@ -1076,6 +1086,7 @@ function createMailboxSendProvenanceStore(deps = {}) {
     preview,
     reconcilePreflight,
     reserve,
+    resolveUnknownAsNotSent,
     startDispatch,
   };
 }

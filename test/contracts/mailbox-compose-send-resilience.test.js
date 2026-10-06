@@ -730,12 +730,12 @@ test('andere inhoud omzeilt nooit een dispatching poging in dezelfde mailcontext
     state: 'dispatching',
     sendStartedAt: 900,
   });
-  let networkCalls = 0;
+  const calls = [];
   const protocol = createProtocol({
     storage,
-    fetch: async () => {
-      networkCalls += 1;
-      throw new Error('netwerk mag niet starten');
+    fetch: async (url, request) => {
+      calls.push({ url, payload: parseRequest(request) });
+      throw new Error('netwerk onbereikbaar');
     },
   });
 
@@ -747,7 +747,10 @@ test('andere inhoud omzeilt nooit een dispatching poging in dezelfde mailcontext
     attachments: [],
   }), (error) => error.code === 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT');
 
-  assert.equal(networkCalls, 0);
+  // Alleen een bewijscontrole van de oude poging; nooit een verzending of nieuwe inhoud.
+  assert.deepEqual(calls.map((call) => call.url), ['/api/mailbox/send/preflight']);
+  assert.deepEqual(Object.keys(calls[0].payload).sort(), ['idempotencyKey', 'reconcileProof']);
+  assert.equal(calls[0].payload.idempotencyKey, dispatchingPayload.idempotencyKey);
   assert.equal(
     resilienceModule.readMarker(storage, dispatchingPayload.idempotencyKey).state,
     'dispatching'
@@ -769,12 +772,12 @@ test('duurzame identiteit houdt zelfs een armed marker fail-closed vóór elk ne
       messageId: '<uncertain-durable@softora.nl>',
     },
   });
-  let networkCalls = 0;
+  const calls = [];
   const protocol = createProtocol({
     storage,
-    fetch: async () => {
-      networkCalls += 1;
-      throw new Error('netwerk mag niet starten');
+    fetch: async (url, request) => {
+      calls.push({ url, payload: parseRequest(request) });
+      throw new Error('netwerk onbereikbaar');
     },
   });
 
@@ -786,7 +789,8 @@ test('duurzame identiteit houdt zelfs een armed marker fail-closed vóór elk ne
     attachments: [],
   }), (error) => error.code === 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT');
 
-  assert.equal(networkCalls, 0);
+  assert.deepEqual(calls.map((call) => call.url), ['/api/mailbox/send/preflight']);
+  assert.deepEqual(Object.keys(calls[0].payload).sort(), ['idempotencyKey', 'reconcileProof']);
   const stored = resilienceModule.readMarker(storage, uncertainPayload.idempotencyKey);
   assert.equal(stored.state, 'armed');
   assert.equal(stored.durableIdentity.intentId, 'send:uncertain-durable');
@@ -2739,4 +2743,106 @@ test('controller bewaart link en attachment bij vervolg vanuit Instantly zonder 
   assert.equal(fields['c-subject'].value, 'Tweede onderwerp');
   assert.equal(fields['c-body'].value, 'Nieuwe composerbody');
   assert.equal(overlayClasses.has('open'), true);
+});
+
+async function runAgainstStaleDispatch({ previousStatus, previousOverrides = {}, preflightResponse, now }) {
+  const storage = new MemoryStorage();
+  const stalePayload = basePayload({
+    idempotencyKey: 'browser:stale-dispatch',
+    body: 'Eerste versie die tijdens verzenden vastliep.',
+  });
+  await seedMarker({ storage, payload: stalePayload, state: 'dispatching', sendStartedAt: 1 });
+  const currentPayload = basePayload({
+    idempotencyKey: 'browser:edited-version',
+    body: 'Aangepaste versie na de vastgelopen poging.',
+  });
+  const calls = [];
+  const protocol = createProtocol({
+    storage,
+    now,
+    fetch: async (url, request) => {
+      const requestPayload = parseRequest(request);
+      calls.push({ url, payload: requestPayload });
+      if (url.endsWith('/preflight') && requestPayload.idempotencyKey === stalePayload.idempotencyKey) {
+        if (preflightResponse) return preflightResponse();
+        return response(200, {
+          ok: true,
+          result: preflightResult(
+            { ...stalePayload, reconcileProof: requestPayload.reconcileProof },
+            previousStatus,
+            previousOverrides
+          ),
+        });
+      }
+      if (url.endsWith('/preflight')) {
+        return response(200, { ok: true, result: preflightResult(requestPayload) });
+      }
+      return response(200, { ok: true, result: acceptedSendResult('edited-version') });
+    },
+  });
+  let outcome;
+  try {
+    outcome = { result: await protocol.execute({ payload: currentPayload, attachments: [] }) };
+  } catch (error) {
+    outcome = { error };
+  }
+  return { ...outcome, calls, storage, stalePayload, currentPayload };
+}
+
+test('vastgelopen poging die de server als mislukt kent blokkeert een aangepaste versie niet meer', async () => {
+  const run = await runAgainstStaleDispatch({ previousStatus: 'failed' });
+  assert.equal(run.error, undefined);
+  assert.deepEqual(run.calls.map((call) => call.url), [
+    '/api/mailbox/send/preflight',
+    '/api/mailbox/send/preflight',
+    '/api/mailbox/send',
+  ]);
+  assert.equal(run.calls[2].payload.body, run.currentPayload.body);
+  assert.equal(resilienceModule.readMarker(run.storage, run.stalePayload.idempotencyKey).state, 'failed');
+  assert.equal(resilienceModule.readMarker(run.storage, run.currentPayload.idempotencyKey).state, 'accepted');
+});
+
+test('vastgelopen poging die toch verzonden is stopt de nieuwe versie met een duidelijke melding', async () => {
+  const run = await runAgainstStaleDispatch({ previousStatus: 'accepted' });
+  assert.equal(run.error?.code, 'MAILBOX_SEND_PREVIOUS_VERSION_SENT');
+  assert.equal(run.calls.some((call) => call.url === '/api/mailbox/send'), false);
+  assert.equal(resilienceModule.readMarker(run.storage, run.stalePayload.idempotencyKey).state, 'accepted');
+});
+
+test('onbevestigde providerstatus blijft fail-closed met een begrijpelijke melding', async () => {
+  const run = await runAgainstStaleDispatch({
+    previousStatus: 'processing',
+    previousOverrides: { reservationReady: false, reservationConflictStatus: 'unknown' },
+  });
+  assert.equal(run.error?.code, 'MAILBOX_SEND_PREVIOUS_UNCONFIRMED');
+  assert.equal(run.calls.some((call) => call.url === '/api/mailbox/send'), false);
+  assert.equal(resilienceModule.readMarker(run.storage, run.stalePayload.idempotencyKey).state, 'processing');
+});
+
+test('nog lopende eerdere verzending blijft blokkeren', async () => {
+  const run = await runAgainstStaleDispatch({
+    previousStatus: 'processing',
+    previousOverrides: { reservationReady: false, reservationConflictStatus: 'prepared' },
+  });
+  assert.equal(run.error?.code, 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT');
+  assert.equal(run.calls.some((call) => call.url === '/api/mailbox/send'), false);
+  assert.equal(resilienceModule.readMarker(run.storage, run.stalePayload.idempotencyKey).state, 'dispatching');
+});
+
+test('poging die de server nooit registreerde wordt pas na de verzenddeadline vrijgegeven', async () => {
+  const early = await runAgainstStaleDispatch({
+    preflightResponse: mutableProofRequiredResponse,
+    now: () => 30_000,
+  });
+  assert.equal(early.error?.code, 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT');
+  assert.equal(early.calls.some((call) => call.url === '/api/mailbox/send'), false);
+
+  const late = await runAgainstStaleDispatch({
+    preflightResponse: mutableProofRequiredResponse,
+    now: () => 10 * 60_000,
+  });
+  assert.equal(late.error, undefined);
+  assert.equal(late.calls.at(-1).url, '/api/mailbox/send');
+  assert.equal(late.calls.at(-1).payload.body, late.currentPayload.body);
+  assert.equal(resilienceModule.readMarker(late.storage, late.stalePayload.idempotencyKey).state, 'failed');
 });

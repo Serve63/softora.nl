@@ -6,6 +6,8 @@ const WINDOW_MS = 60_000;
 const READ_BUDGET = 18;
 const AUDIT_BACKOFF_MS = 15 * 60_000;
 const CAPABILITY_BACKOFF_MS = 60 * 60_000;
+const READ_TIMEOUT_MS = 20_000;
+const REPLY_TIMEOUT_MS = 38_000;
 const hash = (value) => createHash('sha256').update(String(value)).digest('hex').slice(0, 24);
 
 function retryDelayMs(value, nowMs) {
@@ -88,7 +90,9 @@ function createInstantlyMailboxApi({ config, assertConfigured, fetchJsonWithTime
     });
     const options = { method, headers: { Accept: 'application/json', Authorization: `Bearer ${config.apiKey}` } };
     if (body !== undefined) { options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(body); }
-    const { response, data } = await fetchJsonWithTimeout(url.toString(), options, 20_000);
+    // Instantly verstuurt een antwoord synchroon; geef die schrijfactie ruimer de tijd dan leesacties.
+    const timeoutMs = method === 'POST' && route === 'emails/reply' ? REPLY_TIMEOUT_MS : READ_TIMEOUT_MS;
+    const { response, data } = await fetchJsonWithTimeout(url.toString(), options, timeoutMs);
     if (response?.ok) return data;
     const status = Number(response?.status) || 502;
     const detail = String(data?.message || data?.error || data?.detail || '').trim();
@@ -111,4 +115,4 @@ function createInstantlyMailboxApi({ config, assertConfigured, fetchJsonWithTime
     persistAudits: async () => { if (Object.keys(pendingAudits).length) { const patch = { ...pendingAudits }; await persist(patch); for (const key of Object.keys(patch)) delete pendingAudits[key]; } },
   };
 }
-module.exports = { createInstantlyMailboxApi, retryDelayMs };
+module.exports = { createInstantlyMailboxApi, retryDelayMs, READ_TIMEOUT_MS, REPLY_TIMEOUT_MS };
