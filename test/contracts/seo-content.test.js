@@ -983,7 +983,7 @@ test('seo linkmachine run date keeps fresh support articles above orphan risk', 
 
   const internalLinkStructure = pages.find((page) => page.path === '/blog/wat-is-interne-linkstructuur');
   assert.ok(internalLinkStructure.html.includes('href="/bedrijfssoftware-op-maat"'));
-  assert.ok(internalLinkStructure.html.includes('href="/crm-systeem-op-maat"'));
+  assert.ok(internalLinkStructure.html.includes('href="/blog/wat-is-een-crm-systeem"'));
   assert.ok(internalLinkStructure.html.includes('href="/ai-automatisering"'));
   assert.ok(internalLinkStructure.html.includes('href="/website-laten-maken"'));
   assert.match(internalLinkStructure.html, /Controleer op orphan pages, doodlopende routes en overlap/);
@@ -1091,20 +1091,20 @@ test('interne-linkgids gebruikt native quality v2 zonder generieke opvulling', (
   });
 
   assert.equal(item.qualityVersion, 2);
-  assert.equal(item.updatedAt, '2026-09-23');
+  assert.equal(item.updatedAt, '2026-10-07');
   assert.equal(item.publishedAt, '2026-06-01');
   assert.equal(item.growthEventKind, 'other_growth_action');
   assert.ok(item.wordCount >= 850);
   assert.equal(item.faq.length, 0);
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/wat-is-interne-linkstructuur">/);
-  assert.match(html, /"dateModified":"2026-09-23"/);
+  assert.match(html, /"dateModified":"2026-10-07"/);
   assert.match(html, /Er is geen vast ideaal aantal links/);
   assert.match(html, /Voorbeeld, geen klantresultaat/);
   assert.match(html, /Test daarna met Tab en Enter/);
   assert.doesNotMatch(html, /minimaal twee inhoudelijk passende uitgaande links|minimaal twee bestaande pagina’s/);
   assert.match(html, /href="\/bedrijfssoftware-op-maat">bedrijfssoftware op maat<\/a>/);
-  assert.match(html, /href="\/crm-systeem-op-maat">CRM op maat<\/a>/);
-  assert.match(html, /href="\/ai-automatisering">AI-automatisering voor een controleerbare workflow<\/a>/);
+  assert.match(html, /href="\/bedrijfssoftware-op-maat">CRM op maat<\/a>/);
+  assert.match(html, /href="\/blog\/ai-processen-automatiseren-zonder-controle-verliezen">AI-automatisering voor een controleerbare workflow<\/a>/);
   assert.doesNotMatch(html, /<section class="artikel-faq"/);
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
   const supportingHtml = buildSeoContentArticleHtml(
@@ -1837,7 +1837,7 @@ test('website-migratiegids maakt URL-besluiten, livebewijs en herstel controleer
   assert.match(html, /href="\/blog\/website-laten-maken-mkb-paginas">benodigde MKB-websitepagina’s<\/a>/);
   assert.match(html, /https:\/\/wa\.me\/31643262792/);
   assert.match(conversionHtml, /href="\/kennisbank\/website-migratie-zonder-seo-verlies">website-migratieplan<\/a>/);
-  assert.match(linksHtml, /href="\/kennisbank\/website-migratie-zonder-seo-verlies">website-migratie<\/a>/);
+  assert.match(linksHtml, /href="\/blog\/website-migratie-zonder-seo-verlies">website-migratie<\/a>/);
   assert.doesNotMatch(html, /nul SEO-verlies garanderen|garandeert ranking|altijd online/i);
   assert.doesNotMatch(html, /<section class="artikel-faq"/);
   assert.doesNotMatch(html, /Welke eerste stap meestal het meeste oplevert/);
