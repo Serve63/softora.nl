@@ -14,6 +14,15 @@
     return String(value || '').trim().toLowerCase();
   }
 
+  // The server derives this manifest from the same configured owner scope as
+  // contact-timeline. Provider identities must not become SMTP sender options.
+  function getTimelineAccountEmails(accountEmails = [], timelineAccounts = {}) {
+    const source = Array.isArray(accountEmails) ? accountEmails : [];
+    const providerAccounts = ['serve', 'martijn'].flatMap((owner) =>
+      Array.isArray(timelineAccounts?.[owner]) ? timelineAccounts[owner] : []);
+    return Array.from(new Set([...source, ...providerAccounts].map(normalizeEmail).filter(Boolean)));
+  }
+
   function extractEmails(value) {
     return Array.from(new Set((String(value || '').match(EMAIL_PATTERN) || []).map(normalizeEmail)));
   }
@@ -837,6 +846,7 @@
     extractEmails,
     getContactDossier,
     getSearchResultKey,
+    getTimelineAccountEmails,
     mergeContactTimeline,
     renderRootSentCardStart,
     renderSearchSnippet,

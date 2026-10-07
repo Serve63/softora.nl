@@ -198,6 +198,7 @@ function createMailboxDiscoveryService(deps = {}) {
   return {
     contactTimelineResponse,
     getContactTimeline,
+    getOwnerAccounts,
     searchMailbox,
     searchMailboxResponse,
   };

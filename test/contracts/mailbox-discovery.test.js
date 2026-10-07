@@ -277,6 +277,51 @@ test('gedeelde outreachscope voegt provideraccounts toe en filtert de normale li
   assert.deepEqual(calls[0].contactEmails.sort(), ['eric@outreach.example', 'newsletter@example']);
 });
 
+test('Instantly timeline uses the server account manifest and retains exact owner and contact checks', async () => {
+  const identities = { serve: 'serve@future-provider.example', martijn: 'martijn@other-provider.example' };
+  const scope = createMailboxOutreachScope({ getInstantlyAccounts: (owner) => [{ email: identities[owner] }] });
+  const service = createMailboxDiscoveryService({ mailboxOutreachScope: scope });
+  const manifest = service.getOwnerAccounts();
+  const accounts = discoveryUi.getTimelineAccountEmails(['SERVE@SOFTORA.NL', 'serve@softora.nl', ''], manifest);
+  assert.equal(accounts.filter((email) => email === 'serve@softora.nl').length, 1);
+  assert.ok(accounts.includes(identities.serve) && accounts.includes(identities.martijn));
+  const root = {
+    id: 'instantly:reply', provider: 'instantly', providerOwner: 'serve',
+    accountEmail: identities.serve, providerAccountEmail: identities.serve, canonicalOwner: 'serve',
+    email: 'contact@example.nl', to: identities.serve, folder: 'inbox',
+    body: 'Ontvangen antwoord', bodyLoaded: true,
+  };
+  const sent = { ...root, id: 'instantly:sent', folder: 'sent', email: identities.serve, to: root.email, body: 'Ons ontwerp' };
+  let activeId = root.id;
+  const requests = [];
+  const controller = discoveryUi.create({
+    document: { getElementById: () => null, querySelector: () => null },
+    getActiveMail: () => activeId, getAccountEmails: () => accounts,
+    getMessageOwner: campaignInbox.getMessageOwner,
+    fetch: async (url) => {
+      requests.push(new URL(url, 'https://softora.test'));
+      return { ok: true, json: async () => ({ ok: true, totalCount: 5, messages: [root, sent,
+        { ...sent, id: 'wrong-owner', accountEmail: identities.martijn, providerOwner: 'martijn', canonicalOwner: 'martijn' },
+        { ...sent, id: 'unknown-account', accountEmail: 'unconfigured@example.nl', providerAccountEmail: 'unconfigured@example.nl' },
+        { ...sent, id: 'wrong-contact', to: 'other@example.nl' },
+      ] }) };
+    },
+  });
+  assert.equal(await controller.loadContactTimeline(root, { deferRender: true }), true);
+  assert.equal(requests[0].searchParams.get('owner'), 'serve');
+  assert.equal(requests[0].searchParams.get('contact'), root.email);
+  assert.deepEqual(root.threadMessages.map((message) => message.id), [sent.id]);
+  assert.equal(root.contactTimelineRejectedCount, 3);
+  for (const invalid of [
+    { ...root, id: 'unknown-root', accountEmail: 'unconfigured@example.nl', providerAccountEmail: 'unconfigured@example.nl' },
+    { ...root, id: 'unproven-root', providerOwner: '' },
+  ]) {
+    activeId = invalid.id;
+    assert.equal(await controller.loadContactTimeline(invalid, { force: true }), false);
+  }
+  assert.equal(requests.length, 1);
+});
+
 test('contacttijdlijn merge gebruikt exact e-mailadres, dedupet en bewaart technische threadgrenzen', () => {
   const root = {
     id: 'martijn@softora.nl|inbox:55',
