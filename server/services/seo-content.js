@@ -1,4 +1,4 @@
-const { getBackLabelForCollection, renderContentNavigation, renderReadingNavigation, sectionId } = require('./seo-content-reading-layout');
+const { getBackLabelForCollection, renderContentNavigation, renderReadingNavigation, renderArticleSections, renderSeoParagraph } = require('./seo-content-reading-layout');
 const { SEO_CONTENT_AUTHOR, buildContributorSchema, buildReviewSchema, hasSupportedReview } = require('./seo-content-attribution');
 const { SEO_CONTENT_QUALITY_V2_ITEMS } = require('./seo-content-quality-v2');
 const { WEBSITE_PROPOSAL_CONTENT_ITEM } = require('./seo-content-website-proposal');
@@ -7,7 +7,7 @@ const { CRM_COST_CONTENT_ITEM } = require('./seo-content-crm-kosten');
 const { BUSINESS_SOFTWARE_EXPLAINER } = require('./seo-content-business-software-explainer');
 const { LEAD_SCORING_CONTENT_ITEM } = require('./seo-content-lead-scoring');
 const { WEBSITE_CRM_CONTENT_ITEM } = require('./seo-content-website-crm');
-const { buildSeoImageObject, buildSeoImagePreviewMeta, getSeoImageSitemapEntries } = require('./seo-content-image-search');
+const { buildSeoImageObject, buildSeoImagePreviewMeta, getSeoImageSitemapEntries, getSeoArticleImages, renderSeoImageResponsiveAttributes, renderSeoSupportImage } = require('./seo-content-image-search');
 const DEFAULT_SITE_ORIGIN = 'https://www.softora.nl';
 const DEFAULT_OG_IMAGE_PATH = '/assets/seo-content/website-leads-analytics-softora.jpg';
 const DEFAULT_LOGO_PATH = '/assets/softora-touch-icon.png';
@@ -2434,7 +2434,9 @@ function enrichSeoContentItem(item, { nowMs = Date.now() } = {}) {
     sections,
     faq,
   });
-  const wordCount = countSeoContentWords(base);
+  const wordCount = item.wordCountBasis === 'article-paragraphs'
+    ? sections.reduce((total, section) => total + section.paragraphs.reduce((sum, paragraph) => sum + countWords(getSeoParagraphText(paragraph)), 0), 0)
+    : countSeoContentWords(base);
   return Object.freeze({
     ...base,
     minWordCount: getSeoContentMinimumWordCount(base),
@@ -2476,7 +2478,7 @@ function getSeoContentSitemapEntries(options = {}) {
   const itemEntries = getSeoContentItems(options).map((item) => ({
     path: getSeoContentPathForItem(item),
     lastmod: item.updatedAt || item.publishedAt,
-    images: getSeoImageSitemapEntries(getSeoContentImageForItem(item), item.secondaryImage),
+    images: getSeoImageSitemapEntries(...getSeoArticleImages(item, getSeoContentImageForItem(item))),
   }));
   return [...collectionEntries, ...itemEntries].filter((entry) => entry.path);
 }
@@ -2736,7 +2738,7 @@ function buildMainEntityForItem(item, site, canonicalUrl) {
     headline: item.title,
     description: item.description,
     articleSection: cluster.label,
-    image: [buildSeoImageObject(imageUrl, image)],
+    image: (item.sections.some(section => section.image?.src) ? getSeoArticleImages(item, image) : [image]).map(entry => buildSeoImageObject(buildAbsoluteUrl(site, entry.src), entry)),
     wordCount: Number(item.wordCount) || countSeoContentWords(item),
     about: {
       '@type': 'Thing',
@@ -2900,48 +2902,6 @@ function renderFaqBlock(item) {
   ].join('\n');
 }
 
-function renderSecondaryImage(item) {
-  const image = item && item.secondaryImage;
-  if (!image || !image.src) return '';
-  const dimensions =
-    Number(image.width) > 0 && Number(image.height) > 0
-      ? ` width="${Number(image.width)}" height="${Number(image.height)}"`
-      : '';
-  return [
-    '    <figure class="artikel-support-image">',
-    `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${dimensions} loading="lazy" decoding="async" fetchpriority="low">`,
-    image.caption ? `      <figcaption>${escapeHtml(image.caption)}</figcaption>` : '',
-    '    </figure>',
-  ].filter(Boolean).join('\n');
-}
-
-function renderSeoParagraph(paragraph) {
-  if (!paragraph || typeof paragraph !== 'object' || Array.isArray(paragraph)) {
-    return escapeHtml(paragraph);
-  }
-  const text = getSeoParagraphText(paragraph);
-  const links = Array.isArray(paragraph.links) ? paragraph.links : [];
-  if (!links.length) return escapeHtml(text);
-  const matches = [];
-  for (const link of links) {
-    const anchor = String(link && link.anchor || '').trim();
-    const href = String(link && link.href || '').trim();
-    const index = anchor ? text.indexOf(anchor) : -1;
-    if (index < 0 || !/^\/[a-z0-9][a-z0-9/-]*$/i.test(href)) continue;
-    matches.push({ anchor, href, index });
-  }
-  matches.sort((a, b) => a.index - b.index);
-  const output = [];
-  let cursor = 0;
-  for (const match of matches) {
-    if (match.index < cursor) continue;
-    output.push(escapeHtml(text.slice(cursor, match.index)));
-    output.push(`<a href="${escapeHtml(match.href)}">${escapeHtml(match.anchor)}</a>`);
-    cursor = match.index + match.anchor.length;
-  }
-  output.push(escapeHtml(text.slice(cursor)));
-  return output.join('');
-}
 
 function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } = {}) {
   if (!item) return '';
@@ -3019,17 +2979,12 @@ function buildSeoContentArticleHtml(item, { siteOrigin = DEFAULT_SITE_ORIGIN } =
     renderReadingNavigation(item, escapeHtml),
     '  </section>',
     '  <figure class="artikel-img">',
-    `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions} loading="eager" decoding="async" fetchpriority="high">`,
+    `    <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${imageDimensions}${renderSeoImageResponsiveAttributes(image, escapeHtml)} loading="eager" decoding="async" fetchpriority="high">`,
     `    <figcaption>${escapeHtml(item.title)}</figcaption>`,
     '  </figure>',
     '  <article class="artikel-body">',
-    ...item.sections.map((section, index) =>
-      [
-        `    <h2 id="${sectionId(section, index)}">${escapeHtml(section.heading)}</h2>`,
-        ...section.paragraphs.map((paragraph) => `    <p>${renderSeoParagraph(paragraph)}</p>`),
-      ].join('\n')
-    ),
-    renderSecondaryImage(item),
+    ...renderArticleSections(item, escapeHtml),
+    renderSeoSupportImage(item.secondaryImage, escapeHtml),
     renderFaqBlock(item),
     renderAuthorityBlock(item),
     '  </article>',
@@ -3074,5 +3029,5 @@ module.exports = {
   getSeoContentPublicationPlan,
   getSeoContentPublicPaths,
   getSeoContentSitemapEntries,
-  renderSeoParagraph,
+  renderSeoParagraph: (paragraph) => renderSeoParagraph(paragraph, escapeHtml),
 };

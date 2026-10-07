@@ -23,8 +23,30 @@ function buildSeoImageObject(imageUrl, image) {
   };
 }
 
+function getSeoArticleImages(item, hero = item?.image) {
+  return [hero, item?.secondaryImage, ...(item?.sections || []).map(section => section.image)]
+    .filter(image => image?.src);
+}
+
+function renderSeoImageResponsiveAttributes(image, escapeHtml) {
+  if (!image?.srcset) return '';
+  return ` srcset="${escapeHtml(image.srcset)}" sizes="${escapeHtml(image.sizes || '100vw')}"`;
+}
+
+function renderSeoSupportImage(image, escapeHtml) {
+  if (!image?.src) return '';
+  const dimensions = Number(image.width) > 0 && Number(image.height) > 0
+    ? ` width="${Number(image.width)}" height="${Number(image.height)}"` : '';
+  return [
+    '    <figure class="artikel-support-image">',
+    `      <img src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt)}"${dimensions}${renderSeoImageResponsiveAttributes(image, escapeHtml)} loading="lazy" decoding="async" fetchpriority="low">`,
+    image.caption ? `      <figcaption>${escapeHtml(image.caption)}</figcaption>` : '',
+    '    </figure>',
+  ].filter(Boolean).join('\n');
+}
+
 module.exports = {
   buildSeoImageObject,
   buildSeoImagePreviewMeta,
-  getSeoImageSitemapEntries,
+  getSeoImageSitemapEntries, getSeoArticleImages, renderSeoImageResponsiveAttributes, renderSeoSupportImage,
 };

@@ -9,6 +9,7 @@ const {
   getSeoContentPathForItem,
 } = require('./seo-content');
 const { sectionId } = require('./seo-content-reading-layout');
+const { renderSeoImageResponsiveAttributes } = require('./seo-content-image-search');
 const fs = require('node:fs');
 const path = require('node:path');
 const articleTemplate = fs.readFileSync(path.join(__dirname, '../../assets/articles/article.html'), 'utf8');
@@ -131,7 +132,7 @@ function renderArticlePreview({ item, items, template, header, category, origina
       '<span class="meta-dot" aria-hidden="true">·</span><span>' + escapeHtml(item.readTime) + ' lezen</span>',
     ARTICLE_SUMMARY: escapeHtml(item.summary),
     ARTICLE_INDEX: articleIndex(item),
-    ARTICLE_IMAGE: '<img src="' + escapeHtml(image.src) + '" alt="' + escapeHtml(image.alt) + '"' +
+    ARTICLE_IMAGE: '<img src="' + escapeHtml(image.src) + '" alt="' + escapeHtml(image.alt) + '"' + renderSeoImageResponsiveAttributes(image, escapeHtml) +
       ' width="' + Number(image.width || 1672) + '" height="' + Number(image.height || 941) + '"' +
       ' loading="eager" decoding="async" fetchpriority="high">',
     ARTICLE_BODY: body,

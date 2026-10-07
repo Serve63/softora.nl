@@ -109,3 +109,27 @@ test('een nieuw beeld dat recente Softora-assets kopieert wordt geblokkeerd', as
   assert.equal(report.status, 'blocked');
   assert.ok(report.issues.some((entry) => entry.type === 'recent-visual-similarity'));
 });
+
+test('four-image articles validate every image role, original diagram provenance and dimensions', () => {
+  const item = SEO_CONTENT_ITEMS.find((entry) => entry.slug === 'website-snelheid-verbeteren');
+  assert.equal(item.visualQualityVersion, 3);
+  assert.deepEqual(auditVisualBriefs({ items: [item] }), []);
+  const missingFourth = { ...item, sections: item.sections.map((section) => section.image?.src.includes('testen-en-controleren') ? { ...section, image: undefined } : section) };
+  assert.ok(auditVisualBriefs({ items: [missingFourth] }).some((entry) => entry.type === 'wrong-visual-count'));
+  const badBrief = { ...item, visualBrief: { ...item.visualBrief, supports: item.visualBrief.supports.map((brief, index) => index === 2 ? { ...brief, role: 'representative', sourceType: 'unknown', textDensity: 'dense', visualType: 'unknown' } : brief) } };
+  const types = auditVisualBriefs({ items: [badBrief] }).map((entry) => entry.type);
+  for (const type of ['invalid-visual-roles', 'missing-ai-source-type', 'invalid-support-text-density', 'invalid-support-visual-type', 'visual-source-mismatch']) assert.ok(types.includes(type), type);
+  const smallFourth = { ...item, sections: item.sections.map((section) => section.image?.src.includes('testen-en-controleren') ? { ...section, image: { ...section.image, width: 100, height: 100 } } : section) };
+  const smallTypes = auditVisualBriefs({ items: [smallFourth] }).map((entry) => entry.type);
+  assert.ok(smallTypes.includes('image-too-small'));
+  assert.ok(smallTypes.includes('non-landscape-preview-ratio'));
+});
+
+test('a copied fourth section image is rejected by the existing similarity threshold', async () => {
+  const item = SEO_CONTENT_ITEMS.find((entry) => entry.slug === 'website-snelheid-verbeteren');
+  const copied = { ...item, slug: 'fourth-image-copy', sections: item.sections.map((section) => section.image?.src.includes('testen-en-controleren') ? { ...section, image: { ...section.image, src: '/assets/seo-content/chatbot-kosten-scopevergelijking-softora.jpg' } } : section) };
+  const report = await buildVisualQualityReport({ items: [...SEO_CONTENT_ITEMS, copied], repoRoot });
+  assert.equal(report.status, 'blocked');
+  assert.ok(report.issues.some((entry) => entry.type === 'recent-visual-similarity' && (entry.pair.left.src === '/assets/seo-content/chatbot-kosten-scopevergelijking-softora.jpg' || entry.pair.right.src === '/assets/seo-content/chatbot-kosten-scopevergelijking-softora.jpg')));
+  assert.equal(report.similarityThreshold, 0.85);
+});

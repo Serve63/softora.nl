@@ -1,3 +1,5 @@
+const { renderSeoSupportImage } = require('./seo-content-image-search');
+
 function sectionId(section, index) {
   const slug = String(section.heading || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -46,4 +48,51 @@ function getBackLabelForCollection(collection) {
   return ['vergelijkingen', 'branches', 'regio'].includes(collection.key) ? collection.key : 'overzicht';
 }
 
-module.exports = { getBackLabelForCollection, renderContentNavigation, renderReadingNavigation, sectionId };
+function renderSeoParagraph(paragraph, escapeHtml) {
+  if (!paragraph || typeof paragraph !== 'object' || Array.isArray(paragraph)) {
+    return escapeHtml(paragraph);
+  }
+  const text = String(paragraph.text || '');
+  const links = Array.isArray(paragraph.links) ? paragraph.links : [];
+  if (!links.length) return escapeHtml(text);
+  const matches = [];
+  for (const link of links) {
+    const anchor = String(link && link.anchor || '').trim();
+    const href = String(link && link.href || '').trim();
+    const index = anchor ? text.indexOf(anchor) : -1;
+    if (index < 0 || !isSafeSeoContentLink(href, link.source === true)) continue;
+    matches.push({ anchor, href, index });
+  }
+  matches.sort((a, b) => a.index - b.index);
+  const output = [];
+  let cursor = 0;
+  for (const match of matches) {
+    if (match.index < cursor) continue;
+    output.push(escapeHtml(text.slice(cursor, match.index)));
+    output.push(`<a href="${escapeHtml(match.href)}">${escapeHtml(match.anchor)}</a>`);
+    cursor = match.index + match.anchor.length;
+  }
+  output.push(escapeHtml(text.slice(cursor)));
+  return output.join('');
+}
+
+function isSafeSeoContentLink(href, allowExternal) {
+  if (/^\/[a-z0-9][a-z0-9/-]*$/i.test(href)) return true;
+  if (!allowExternal) return false;
+  try {
+    const url = new URL(href);
+    return url.protocol === 'https:' && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+function renderArticleSections(item, escapeHtml) {
+  return item.sections.map((section, index) => [
+    `    <h2 id="${sectionId(section, index)}">${escapeHtml(section.heading)}</h2>`,
+    ...section.paragraphs.map(paragraph => `    <p>${renderSeoParagraph(paragraph, escapeHtml)}</p>`),
+    ...(section.image?.src ? [renderSeoSupportImage(section.image, escapeHtml)] : []),
+  ].join('\n'));
+}
+
+module.exports = { getBackLabelForCollection, renderContentNavigation, renderReadingNavigation, sectionId, renderArticleSections, renderSeoParagraph };
