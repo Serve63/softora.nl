@@ -36,7 +36,7 @@ const WEBSITE_MAINTENANCE_CONTENT_ITEM = Object.freeze({
   growthEventKind: 'new_url',
   growthEventAt: '2026-09-01',
   publishedAt: '2026-09-01',
-  updatedAt: '2026-09-01',
+  updatedAt: '2026-10-07',
   visualQualityVersion: 2,
   visualBrief: Object.freeze({
     hero: Object.freeze({
@@ -210,6 +210,12 @@ const WEBSITE_MAINTENANCE_CONTENT_ITEM = Object.freeze({
         'Maak één register met regels voor domein, DNS, hosting, runtime, CMS of framework, extensies, certificaten, formulieren, koppelingen, back-ups, monitoring, analytics, sitemap, redirects en belangrijke content. Niet iedere website gebruikt al deze onderdelen. Het register is juist bedoeld om vast te stellen wat werkelijk bestaat, wie toegang heeft en welk risico ontstaat wanneer een onderdeel geen eigenaar heeft.',
         'Een regel is pas bruikbaar wanneer de uitkomst controleerbaar is. “Back-up aanwezig” is zwakker dan opslaglocatie, versiedatum, bewaartermijn, versleuteling waar relevant, toegangsverantwoordelijke en datum van de laatste herstelproef. “Formulier getest” wordt invoer, verwachte ontvangst, foutvariant, alternatieve contactroute en zichtbare bevestiging. Sla geen wachtwoorden of geheime sleutels in het register op; noteer alleen eigenaar en veilige toegangsroute.',
         'Voeg een stopregel toe. Een update die de testomgeving breekt, een koppeling waarvan de eigenaar ontbreekt of een wijziging zonder goedgekeurde bron hoort niet automatisch door naar productie. Leg vast wie dan beslist, welk herstelpad wordt gebruikt en hoe de volgende poging wordt bewezen. Onderhoud is niet het blind uitvoeren van een checklist, maar gecontroleerd veranderen binnen menselijke grenzen.',
+        Object.freeze({
+          text: 'Wil je website snelheid verbeteren, leg dan eerst een nulmeting vast en controleer na iedere wijziging ook de aanvraagroute.',
+          links: Object.freeze([
+            Object.freeze({ anchor: 'website snelheid verbeteren', href: '/blog/website-snelheid-verbeteren', availableFrom: '2026-10-07' }),
+          ]),
+        }),
       ]),
     }),
     Object.freeze({

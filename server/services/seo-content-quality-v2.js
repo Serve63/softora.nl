@@ -25,6 +25,7 @@ const { AI_AUTOMATISERING_KOSTEN_CONTENT_ITEM } = require('./seo-content-ai-auto
 const { AI_AUTOMATISERING_OFFERTE_CONTENT_ITEM } = require('./seo-content-ai-automatisering-offerte');
 const { CHATBOT_ACCEPTATIE_CONTENT_ITEM } = require('./seo-content-chatbot-acceptatie');
 const { CRM_MIGRATIE_CONTENT_ITEM } = require('./seo-content-crm-migratie');
+const { WEBSITE_SNELHEID_CONTENT_ITEM } = require('./seo-content-website-snelheid');
 
 const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
@@ -54,6 +55,7 @@ const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   AI_AUTOMATISERING_OFFERTE_CONTENT_ITEM,
   CHATBOT_ACCEPTATIE_CONTENT_ITEM,
   CRM_MIGRATIE_CONTENT_ITEM,
+  WEBSITE_SNELHEID_CONTENT_ITEM,
 ]);
 
 module.exports = {

@@ -1920,7 +1920,7 @@ test('website-onderhoudsgids scheidt gepland beheer, incidenten en doorontwikkel
   assert.equal(item.qualityVersion, 2);
   assert.equal(item.visualQualityVersion, 2);
   assert.equal(item.publishedAt, '2026-09-01');
-  assert.equal(item.updatedAt, '2026-09-01');
+  assert.equal(item.updatedAt, '2026-10-07');
   assert.equal(item.growthEventKind, 'new_url');
   assert.equal(item.targetMoneyPage, '/website-laten-maken');
   assert.equal(item.sources.length, 3);

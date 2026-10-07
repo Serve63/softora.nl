@@ -9,9 +9,14 @@ const counts = (items) => items.reduce((result, item) => {
   return result;
 }, {});
 
-test('all canonical articles have a persisted author and an even editorial split', () => {
+test('canonical personal bylines remain fixed and explicit organization authors stay honest', () => {
   const items = SEO_CONTENT_ITEMS.filter((item) => ['blog', 'kennisbank'].includes(item.collection));
   for (const item of items) {
+    if (item.author.type === 'Organization') {
+      assert.deepEqual(item.author, { type: 'Organization', name: 'Softora', href: '/over-softora' });
+      assert.equal(ARTICLE_AUTHOR_ASSIGNMENTS[item.slug], undefined);
+      continue;
+    }
     assert.ok(ARTICLE_AUTHOR_ASSIGNMENTS[item.slug], item.slug + ': run node scripts/sync-seo-article-authors.js');
     assert.deepEqual(item.author, ARTICLE_AUTHORS[ARTICLE_AUTHOR_ASSIGNMENTS[item.slug]]);
   }
@@ -75,4 +80,22 @@ test('explicit supported authors count toward the split and invalid identity cha
   assert.throws(() => assignSeoArticleAuthors(source, { assignments: { fixed: 'martijn' } }), /wijkt af/);
   assert.throws(() => assignSeoArticleAuthors([article('same'), article('same')], { assignments: {} }), /dubbel/);
   assert.throws(() => assignSeoArticleAuthors([article('a')], { assignments: { a: 'unknown' } }), /Onbekende artikelauteur/);
+});
+
+test('new organization bylines stay explicit while legacy saved personal assignments remain immutable', () => {
+  const organization = { type: 'Organization', name: 'Softora', href: '/over-softora' };
+  const source = [
+    { ...article('legacy'), author: organization },
+    { ...article('organization'), author: organization },
+    article('next'),
+  ];
+  const saved = { legacy: 'serve' };
+  const result = assignSeoArticleAuthors(source, { assignments: saved });
+  assert.deepEqual(result.items[0].author, ARTICLE_AUTHORS.serve);
+  assert.equal(result.items[1], source[1]);
+  assert.equal(result.assignments.organization, undefined);
+  assert.equal(result.assignments.next, 'martijn');
+  assert.deepEqual(saved, { legacy: 'serve' });
+  assert.deepEqual(assignSeoArticleAuthors(result.items, { assignments: result.assignments }).assignments, result.assignments);
+  assert.throws(() => assignSeoArticleAuthors([{ ...article('invalid'), author: { type: 'Organization', name: ' ' } }], { assignments: {} }), /Organisatieauteur ontbreekt/);
 });

@@ -149,7 +149,7 @@ test('public seo sitemap exposes the indexable acquisition pages only', () => {
   for (const removedPath of [...Object.keys(RETIRED_PUBLIC_LANDINGS), ...EMPTY_LANDING_COLLECTIONS]) {
     assert.ok(!sitemap.includes(`<loc>https://www.softora.nl${removedPath}</loc>`), `${removedPath} must be absent`);
   }
-  assert.equal([...sitemap.matchAll(/<loc>https:\/\/www\.softora\.nl\/blog\/[^<]+<\/loc>/g)].length, 52);
+  assert.equal([...sitemap.matchAll(/<loc>https:\/\/www\.softora\.nl\/blog\/[^<]+<\/loc>/g)].length, 53);
   for (const excludedPath of ['/website', '/bedrijfssoftware', '/voicesoftware', '/chatbot']) {
     assert.equal(getIndexablePublicSeoPageByPath(excludedPath), null);
     assert.doesNotMatch(sitemap, new RegExp(`<loc>https://www\\.softora\\.nl${excludedPath}</loc>`));

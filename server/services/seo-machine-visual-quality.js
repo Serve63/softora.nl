@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const sharp = require('sharp');
+const { getSeoArticleImages } = require('./seo-content-image-search');
 
 const VISUAL_QUALITY_EFFECTIVE_DATE = '2026-08-05';
 const DEFAULT_RECENT_VISUAL_WINDOW = 6;
@@ -48,6 +49,11 @@ function requiresVisualQualityV2(item, effectiveDate = VISUAL_QUALITY_EFFECTIVE_
 }
 
 function getItemVisuals(item) {
+  if (Number(item?.visualQualityVersion) >= 3) {
+    return getSeoArticleImages(item).map((image, index) => ({
+      role: index === 0 ? 'hero' : index === 1 ? 'support' : `support-${index}`, image,
+    }));
+  }
   return [
     item?.image?.src ? { role: 'hero', image: item.image } : null,
     item?.secondaryImage?.src ? { role: 'support', image: item.secondaryImage } : null,
@@ -87,34 +93,39 @@ function auditVisualBriefs({
     const label = `/${item.collection}/${item.slug}`;
     const brief = item.visualBrief || {};
     const hero = brief.hero || {};
-    const support = brief.support || {};
+    const fourImages = Number(item.visualQualityVersion) >= 3;
+    const supports = fourImages ? (Array.isArray(brief.supports) ? brief.supports : []) : [brief.support || {}];
+    const expectedVisualCount = fourImages ? 4 : 2;
     const visuals = getItemVisuals(item);
 
     if (Number(item.visualQualityVersion) < 2) {
       issues.push(issue('missing-visual-quality-version', item, `${label} mist visualQualityVersion 2.`));
     }
-    if (visuals.length !== 2) {
-      issues.push(issue('wrong-visual-count', item, `${label} moet exact twee eigen beelden hebben.`));
+    if (visuals.length !== expectedVisualCount) {
+      issues.push(issue('wrong-visual-count', item, `${label} moet exact ${expectedVisualCount} eigen beelden hebben.`));
     }
-    if (hero.role !== 'representative' || support.role !== 'explanatory') {
+    if (hero.role !== 'representative' || supports.length !== expectedVisualCount - 1 || supports.some(support => support.role !== 'explanatory')) {
       issues.push(issue('invalid-visual-roles', item, `${label} mist een representatieve hero en verklarend supportbeeld.`));
     }
     if (!ALLOWED_HERO_VISUAL_TYPES.includes(hero.visualType)) {
       issues.push(issue('invalid-hero-visual-type', item, `${label} gebruikt geen toegestane hero-beeldvorm.`));
     }
-    if (!ALLOWED_SUPPORT_VISUAL_TYPES.includes(support.visualType)) {
+    if (!supports.length || supports.some(support => !ALLOWED_SUPPORT_VISUAL_TYPES.includes(support.visualType))) {
       issues.push(issue('invalid-support-visual-type', item, `${label} gebruikt geen toegestane support-beeldvorm.`));
     }
-    if (!hasVisualFamily(hero.visualFamily) || !hasVisualFamily(support.visualFamily)) {
+    if (!hasVisualFamily(hero.visualFamily) || !supports.length || supports.some(support => !hasVisualFamily(support.visualFamily))) {
       issues.push(issue('missing-visual-family', item, `${label} mist machineleesbare visuele families.`));
     }
-    if (hero.visualFamily && hero.visualFamily === support.visualFamily) {
+    const families = [hero.visualFamily, ...supports.map(support => support.visualFamily)].filter(Boolean);
+    if (new Set(families).size !== families.length) {
       issues.push(issue('same-visual-family', item, `${label} gebruikt voor beide beelden dezelfde visuele familie.`));
     }
-    if (hero.visualType && hero.visualType === support.visualType) {
+    const types = [hero.visualType, ...supports.map(support => support.visualType)].filter(Boolean);
+    if (new Set(types).size !== types.length) {
       issues.push(issue('same-visual-type', item, `${label} gebruikt voor beide beelden dezelfde beeldvorm.`));
     }
-    for (const [role, entry] of [['hero', hero], ['support', support]]) {
+    const briefEntries = [['hero', hero], ...supports.map((support, index) => [index ? `support-${index + 1}` : 'support', support])];
+    for (const [role, entry] of briefEntries) {
       if (!hasUsefulText(entry.composition, 30)) {
         issues.push(issue('weak-visual-composition', item, `${label} mist een concrete compositiebrief voor ${role}.`));
       }
@@ -124,18 +135,22 @@ function auditVisualBriefs({
       if (!hasUsefulText(entry.differenceFromRecent, 80)) {
         issues.push(issue('weak-recent-visual-difference', item, `${label} legt niet concreet uit hoe ${role} afwijkt van recente beelden.`));
       }
-      if (entry.sourceType !== 'trainedAlgorithmicMedia') {
+      const allowedSources = fourImages ? ['trainedAlgorithmicMedia', 'original_vector_diagram'] : ['trainedAlgorithmicMedia'];
+      if (!allowedSources.includes(entry.sourceType)) {
         issues.push(issue('missing-ai-source-type', item, `${label} mist de correcte AI-herkomstcode voor ${role}.`));
       }
     }
     if (!['none', 'minimal'].includes(hero.textDensity) || hero.previewSafe !== true) {
       issues.push(issue('weak-search-preview-hero', item, `${label} heeft geen tekstarm, preview-veilig hero-beeld.`));
     }
-    if (!['none', 'minimal', 'moderate'].includes(support.textDensity)) {
+    if (!supports.length || supports.some(support => !['none', 'minimal', 'moderate'].includes(support.textDensity))) {
       issues.push(issue('invalid-support-text-density', item, `${label} mist een begrensde tekstdichtheid voor het supportbeeld.`));
     }
 
-    for (const { role, image } of visuals) {
+    for (const [index, { role, image }] of visuals.entries()) {
+      if (fourImages && image.sourceType !== briefEntries[index]?.[1].sourceType) {
+        issues.push(issue('visual-source-mismatch', item, `${label} heeft geen overeenkomende herkomst voor ${role}.`));
+      }
       const width = Number(image.width);
       const height = Number(image.height);
       const ratio = width > 0 && height > 0 ? width / height : 0;
@@ -153,9 +168,10 @@ function auditVisualBriefs({
       recentItems.flatMap((recentItem) => [
         recentItem?.visualBrief?.hero?.visualFamily,
         recentItem?.visualBrief?.support?.visualFamily,
+        ...(recentItem?.visualBrief?.supports || []).map(support => support.visualFamily),
       ]).filter(Boolean)
     );
-    for (const family of [hero.visualFamily, support.visualFamily].filter(Boolean)) {
+    for (const family of families) {
       if (recentFamilies.has(family)) {
         issues.push(issue('repeated-recent-visual-family', item, `${label} herhaalt binnen ${recentWindow} publicaties de visuele familie ${family}.`, { family }));
       }

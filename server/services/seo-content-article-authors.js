@@ -22,6 +22,11 @@ function assignSeoArticleAuthors(items, { assignments = ARTICLE_AUTHOR_ASSIGNMEN
   for (const item of articles) {
     if (!item.slug || seen.has(item.slug)) throw new Error('Artikel-slug ontbreekt of is dubbel: ' + item.slug);
     seen.add(item.slug);
+    // Honor an explicit organization for new articles; retain all saved personal bylines.
+    if (item.author?.type === 'Organization' && !nextAssignments[item.slug]) {
+      if (!String(item.author.name || '').trim()) throw new Error('Organisatieauteur ontbreekt: ' + item.slug);
+      continue;
+    }
     const explicitId = authorIds.find((id) => ARTICLE_AUTHORS[id].name === item.author?.name);
     const savedId = nextAssignments[item.slug];
     if (savedId && !ARTICLE_AUTHORS[savedId]) throw new Error('Onbekende artikelauteur: ' + savedId);
@@ -45,7 +50,7 @@ function assignSeoArticleAuthors(items, { assignments = ARTICLE_AUTHOR_ASSIGNMEN
   }
   return {
     assignments: Object.freeze(nextAssignments),
-    items: items.map((item) => isArticle(item)
+    items: items.map((item) => isArticle(item) && nextAssignments[item.slug]
       ? Object.freeze({ ...item, author: ARTICLE_AUTHORS[nextAssignments[item.slug]] }) : item),
   };
 }

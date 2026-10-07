@@ -27,6 +27,7 @@ const paragraphs = (html) => DomUtils.getElementsByTagName('p', parseDocument(ht
 
 test('public overview and all 52 article routes serve the approved layout with their original content and SEO', async () => {
   assert.equal(articles.length, 52);
+  const currentArticles = publishedArticles();
   const response = await fetch(origin + '/blog');
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('x-robots-tag'), null);
@@ -35,10 +36,10 @@ test('public overview and all 52 article routes serve the approved layout with t
   assert.match(overview, /<a class="overview-back" href="\/toekomst" aria-label="Terug naar de keuzepagina">/);
   assert.ok(overview.indexOf('class="overview-back"') < overview.indexOf('id="articles-title"'), 'Return link must appear above the article heading');
   assert.doesNotMatch(overview, /noindex|Kennisbank|<footer|content-menu/);
-  assert.equal((overview.match(/class="article-card"/g) || []).length, 52);
-  assert.equal((overview.match(/class="article-card"[^>]* hidden>/g) || []).length, 44);
+  assert.equal((overview.match(/class="article-card"/g) || []).length, currentArticles.length);
+  assert.equal((overview.match(/class="article-card"[^>]* hidden>/g) || []).length, Math.max(0, currentArticles.length - 8));
   const list = graph(overview).find((node) => node['@type'] === 'ItemList');
-  assert.deepEqual(list.itemListElement.map((item) => item.url), articles.map((item) => 'https://www.softora.nl/blog/' + item.slug));
+  assert.deepEqual(list.itemListElement.map((item) => item.url), currentArticles.map((item) => 'https://www.softora.nl/blog/' + item.slug));
   const totals = {};
   for (const item of articles) {
     const result = await fetch(origin + '/blog/' + item.slug);
