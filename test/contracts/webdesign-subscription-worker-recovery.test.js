@@ -12,6 +12,7 @@ w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
 w.BASE = pathlib.Path(tempfile.mkdtemp())
 job = {'id': 'recovery-job-1234567890123456', 'claim': '11111111-1111-1111-1111-111111111111', 'prompt': 'fixture'}
 def forbidden(*args, **kwargs): raise AssertionError('Unexpected external action')
+w.reference_blank = lambda reference: False
 w.urlopen = forbidden
 w.subprocess.run = forbidden
 def state(slot=0): return json.loads(w.state_file(slot).read_text())
@@ -207,4 +208,44 @@ for name in ('design.png', 'design.jpg'):
  output.unlink()
 answer.unlink(); answer.symlink_to(folder / 'outside-answer')
 assert w.source_reference_blocked(folder) is False
+`));
+
+// No new image request and no endless preparation retry after a rejected source.
+test('an unusable screenshot is reported durably before generation and survives a report timeout', () => worker(`
+w.write_state({'phase': 'prepare', 'job': job})
+def rejected(job, folder, slot): raise w.SourceUnusable('Blank reference')
+w.generate = rejected
+w.call = lambda route, payload: (_ for _ in ()).throw(TimeoutError('Report timeout'))
+try: w.step()
+except TimeoutError: pass
+assert state()['phase'] == 'deliver' and state()['sourceUnusable'] is True
+calls = []
+w.generate = forbidden
+w.call = lambda route, payload: (calls.append(payload) or {'ok': True, 'done': True})
+assert w.step() is True
+assert calls[0]['errorKind'] == 'source-reference' and 'dataUrl' not in calls[0]
+assert state() == {}
+`));
+
+
+test('the native thumbnail check rejects blank or malformed images while allowing a light page with a colored header', () => worker(`
+import struct
+reference = w.BASE / 'reference.png'; reference.write_bytes(b'fixture')
+def bitmap(dark_rows):
+ header = bytearray(54); header[:2] = b'BM'
+ struct.pack_into('<I', header, 10, 54); struct.pack_into('<I', header, 14, 40)
+ struct.pack_into('<ii', header, 18, 100, 100); struct.pack_into('<HH', header, 26, 1, 24)
+ return bytes(header) + bytes([30, 60, 10]) * (100 * dark_rows) + bytes([255]) * (3 * 100 * (100-dark_rows))
+current = bitmap(0)
+def converted(args, **kwargs):
+ pathlib.Path(args[-1]).write_bytes(current)
+ return types.SimpleNamespace(returncode=0)
+w.subprocess.run = converted
+assert w.native_reference_blank(reference) is True
+current = bitmap(20)
+assert w.native_reference_blank(reference) is False
+current = b'invalid'
+try: w.native_reference_blank(reference)
+except w.SourceUnusable: pass
+else: raise AssertionError('Unreadable source must not be silently accepted')
 `));

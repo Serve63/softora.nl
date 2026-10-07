@@ -1175,7 +1175,7 @@ test('ai remote service rejects server redirects to private metadata urls', asyn
   assert.equal(calls.length, 1);
 });
 
-test('ai remote service rejects reader fallback source urls that point to private networks', async () => {
+test('ai remote service refuses an origin block without consulting a reader that points to a private network', async () => {
   const { service } = createService({
     assertWebsitePreviewUrlIsPublic: assertPublicPreviewTestUrl,
     fetchTextWithTimeout: async (url) => {
@@ -1213,7 +1213,7 @@ Sensitive metadata endpoint.`,
   });
 
   await assert.rejects(() => service.fetchWebsitePreviewScanFromUrl('https://softora.nl'), {
-    status: 400,
+    code: 'WEBDESIGN_WEBSITE_FETCH_FAILED', status: 502,
   });
 });
 
@@ -1373,7 +1373,7 @@ test('ai remote service retries website preview fetch with a compat profile afte
   assert.equal(result.scan.title, 'bol');
 });
 
-test('ai remote service falls back to reader markdown when direct html is a block page', async () => {
+test('ai remote service rejects a block page even if a reader could return successful cached content', async () => {
   const calls = [];
   const { service } = createService({
     fetchTextWithTimeout: async (url, options) => {
@@ -1419,15 +1419,10 @@ Kies uit miljoenen artikelen. Snel en veelal gratis verzonden!`,
     },
   });
 
-  const result = await service.fetchWebsitePreviewScanFromUrl('https://www.bol.com/nl/nl/');
-
-  assert.equal(calls.length, 3);
-  assert.equal(calls[2].url, 'https://r.jina.ai/https://www.bol.com/nl/nl/');
-  assert.equal(result.finalUrl, 'https://www.bol.com/nl/nl/');
-  assert.equal(result.scan.fetchSource, 'reader-fallback');
-  assert.equal(result.scan.title, 'De winkel van ons allemaal | bol');
-  assert.equal(result.scan.h1, 'bol');
-  assert.match(String(result.scan.bodyTextSample || ''), /Kies uit miljoenen artikelen/);
+  await assert.rejects(service.fetchWebsitePreviewScanFromUrl('https://www.bol.com/nl/nl/'),
+    { code: 'WEBDESIGN_WEBSITE_FETCH_FAILED', retryableWebsiteFetch: false });
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every(call => call.url === 'https://www.bol.com/nl/nl/'));
 });
 
 test('ai remote service generates website html via OpenAI and preserves cost metadata', async () => {

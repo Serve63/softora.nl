@@ -19,6 +19,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from kvk_website_liveness import check_website_status
 
 NOTE = "Robot v5 (dashboard): deterministisch gevonden contact"
 # Servé, 2026-10-04: the Robot replaces the Searchers; its unusable verdicts go to the Controleurs.
@@ -172,6 +173,7 @@ def import_find(db_path: Path, find: dict, timestamp: str | None = None) -> bool
     """Write one find in a single transaction; True when the company was updated."""
     timestamp = timestamp or datetime.now(timezone(timedelta(hours=2))).isoformat()
     kvk, website = find["kvk"], find["website"]
+    website_status = check_website_status(website)
     digest = hashlib.sha256(json.dumps(find, sort_keys=True).encode()).hexdigest()
     connection = sqlite3.connect(db_path, timeout=60)
     try:
@@ -186,7 +188,7 @@ def import_find(db_path: Path, find: dict, timestamp: str | None = None) -> bool
                usable_review_state='verified', usable_reviewed_at=?,
                usable_review_outcome='confirmed', updated_at=?
                WHERE kvk_nummer=? AND lead_status='unresearched'""",
-            (website, "found" if website else "no_website", find["email"], find["phone"],
+            (website, website_status, find["email"], find["phone"],
              timestamp, NOTE, timestamp, timestamp, kvk),
         )
         # One KVK number can have several establishment rows (hoofd- and nevenvestiging); like a
@@ -205,7 +207,7 @@ def import_find(db_path: Path, find: dict, timestamp: str | None = None) -> bool
                SELECT ?,'initial','searcher_robot','',?,?
                WHERE NOT EXISTS (SELECT 1 FROM contact_research_bucket_events b
                  WHERE b.kvk_nummer=? AND b.lane='initial' AND b.model_role='searcher_robot')""",
-            (kvk, "with_website" if website else "without_website", timestamp, kvk),
+            (kvk, _usable_bucket(website, website_status), timestamp, kvk),
         )
         cursor.execute(
             """INSERT INTO research_attribution(kvk_nummer,researcher,created_at)
@@ -261,6 +263,7 @@ def import_control_recovery(db_path: Path, find: dict, timestamp: str | None = N
     """The Robot Controleur found a usable contact set for a grade-1 unusable company: it becomes usable."""
     timestamp = timestamp or datetime.now(timezone(timedelta(hours=2))).isoformat()
     kvk, website = find["kvk"], find["website"]
+    website_status = check_website_status(website)
     digest = hashlib.sha256(json.dumps(find, sort_keys=True).encode()).hexdigest()
     connection = sqlite3.connect(db_path, timeout=60)
     try:
@@ -274,13 +277,13 @@ def import_control_recovery(db_path: Path, find: dict, timestamp: str | None = N
                usable_review_state='verified', usable_reviewed_at=?, usable_review_outcome='recovered_by_control',
                updated_at=?
                WHERE kvk_nummer=? AND lead_status='unusable' AND COALESCE(unusable_review_grade,1)=1""",
-            (website, "found" if website else "no_website", find["email"], find["phone"], timestamp,
+            (website, website_status, find["email"], find["phone"], timestamp,
              CONTROL_NOTE, timestamp, timestamp, timestamp, kvk),
         )
         if cursor.rowcount < 1:
             connection.rollback()
             return False
-        _control_events(cursor, kvk, "usable", 0, timestamp, digest, "with_website" if website else "without_website")
+        _control_events(cursor, kvk, "usable", 0, timestamp, digest, _usable_bucket(website, website_status))
         connection.commit()
         return True
     except Exception:
@@ -363,6 +366,7 @@ def import_approval_confirmed(db_path: Path, find: dict, timestamp: str | None =
     the contact set the check proved."""
     timestamp = timestamp or datetime.now(timezone(timedelta(hours=2))).isoformat()
     kvk, website = find["kvk"], find["website"]
+    website_status = check_website_status(website)
     digest = hashlib.sha256(json.dumps(find, sort_keys=True).encode()).hexdigest()
     connection = sqlite3.connect(db_path, timeout=60)
     try:
@@ -373,7 +377,7 @@ def import_approval_confirmed(db_path: Path, find: dict, timestamp: str | None =
             connection.rollback()
             return False
         old_bucket = _usable_bucket(rows[0][1], rows[0][2])
-        new_status = "found" if website else "no_website"
+        new_status = website_status
         cursor.execute(
             f"""UPDATE companies SET website=?, website_status=?, email=?, telefoonnummer=?,
                 usable_review_state='verified', usable_reviewed_at=?, usable_review_outcome='confirmed_by_control',

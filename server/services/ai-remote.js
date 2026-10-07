@@ -1201,23 +1201,8 @@ function createAiRemoteService(deps = {}) {
     const normalizedUrl = await assertWebsitePreviewUrlIsPublic(targetUrlRaw);
     const directFetch = await tryFetchWebsitePreviewDocument(normalizedUrl, 25000);
     if (!directFetch.ok) {
-      const readerFetch = await tryFetchWebsitePreviewViaReader(normalizedUrl, 25000);
-      if (readerFetch.ok) {
-        return {
-          normalizedUrl,
-          finalUrl: readerFetch.finalUrl,
-          scan: readerFetch.scan,
-        };
-      }
-      throw buildWebsitePreviewFetchError([
-        ...directFetch.attempts,
-        {
-          mode: 'reader-fallback',
-          status: Number(readerFetch.status || 0) || 0,
-          blocked: Boolean(readerFetch.blocked),
-          error: normalizeString(readerFetch.error || readerFetch.reason || ''),
-        },
-      ]);
+      // A reader/cache must never turn a failed origin or invalid certificate into a usable site.
+      throw buildWebsitePreviewFetchError(directFetch.attempts);
     }
 
     let response = directFetch.response;
@@ -1235,17 +1220,7 @@ function createAiRemoteService(deps = {}) {
           html = String(redirectedFetch.text || '');
           contentType = extractResponseHeader(response, 'content-type').toLowerCase();
         } else {
-          const readerFetch = await tryFetchWebsitePreviewViaReader(safeClientRedirectUrl, 25000);
-          if (readerFetch.ok) {
-            return {
-              normalizedUrl,
-              finalUrl: readerFetch.finalUrl,
-              scan: {
-                ...readerFetch.scan,
-                fetchSource: 'client-redirect-reader-fallback',
-              },
-            };
-          }
+          throw buildWebsitePreviewFetchError(redirectedFetch.attempts);
         }
       }
     }

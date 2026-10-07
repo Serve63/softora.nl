@@ -6,6 +6,7 @@ import tempfile
 import time
 import types
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
@@ -34,6 +35,9 @@ FIND = {'kvk': '11111111', 'phone': '073 123 4567', 'email': 'info@zonneveld.nl'
 
 class RobotControllerWritesTests(unittest.TestCase):
     def setUp(self):
+        gate = patch.object(robot_import, "check_website_status", side_effect=lambda website: "found" if website else "no_website")
+        self.website_gate = gate.start()
+        self.addCleanup(gate.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.db = Path(self.directory.name) / 'bedrijven.sqlite'
         with sqlite3.connect(self.db) as connection:
@@ -79,6 +83,9 @@ class RobotControllerWritesTests(unittest.TestCase):
 
 class RobotControllerApprovalTests(unittest.TestCase):
     def setUp(self):
+        gate = patch.object(robot_import, "check_website_status", side_effect=lambda website: "found" if website else "no_website")
+        self.website_gate = gate.start()
+        self.addCleanup(gate.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.db = Path(self.directory.name) / 'bedrijven.sqlite'
         with sqlite3.connect(self.db) as connection:
@@ -95,6 +102,14 @@ class RobotControllerApprovalTests(unittest.TestCase):
     def query(self, sql):
         with sqlite3.connect(self.db) as connection:
             return connection.execute(sql).fetchall()
+
+    def test_a_broken_website_moves_to_without_website_and_keeps_the_proven_contacts(self):
+        self.website_gate.side_effect = lambda website: "not_working"
+        self.assertTrue(robot_import.import_approval_confirmed(self.db, FIND))
+        self.assertEqual(self.query("SELECT website_status, email FROM companies WHERE kvk_nummer='11111111'"),
+                         [('not_working', FIND['email']), ('not_working', FIND['email'])])
+        self.assertEqual(self.query("SELECT from_bucket, to_bucket FROM contact_research_bucket_events"),
+                         [('with_website', 'without_website')])
 
     def test_a_confirmed_find_is_verified_on_every_row_without_changing_the_classification(self):
         self.assertTrue(robot_import.import_approval_confirmed(self.db, FIND, '2026-10-05T01:00:00+02:00'))

@@ -4,6 +4,8 @@ function httpRecoveryUrl(value, result) {
   const attempts = result?.attempts || [];
   // A server response (including a block page) is not a broken TLS connection.
   if (result?.ok || !attempts.length || attempts.some((attempt) => Number(attempt.status) !== 0)) return '';
+  if (attempts.some(attempt => /CERT|SSL|TLS|LEAF|ISSUER|ALTNAME|certificate|self.signed/i.test(
+    `${attempt.errorCode || ''} ${attempt.error || ''}`))) return '';
   try {
     const url = new URL(value);
     // Only retrieve public website documents; never downgrade credentials, query
@@ -47,7 +49,7 @@ function buildWebsitePreviewFetchError(attempts = []) {
     message = 'Het websiteadres is niet te vinden in DNS. Controleer het domein van dit bedrijf.';
   } else if (tlsFailure) {
     code = 'WEBDESIGN_WEBSITE_TLS_FAILED';
-    message = 'De beveiligde verbinding met deze website werkt niet; ook via HTTP is geen bruikbare website gevonden.';
+    message = 'De beveiligde verbinding met deze website werkt niet; er is geen webdesign gemaakt.';
   } else if (status === 404 || status === 410) {
     message = `De opgegeven websitepagina bestaat niet meer of is niet beschikbaar (${status}).`;
   } else if (status === 429) {

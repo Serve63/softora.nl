@@ -83,11 +83,12 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
       if (!begun.ok) return res.status(409).json({ ok: false, code: begun.reason === 'saving' ? 'WEBDESIGN_SAVING' : 'WEBDESIGN_STOPPED', error: 'Opdracht is gestopt of wordt al opgeslagen.' });
       if (begun.done) return res.json({ ok: true, done: true });
       if (body.error) {
-        await repository.finish(body.jobId, body.claim, body.errorKind === 'subscription-limit'
+        const finished = await repository.finish(body.jobId, body.claim, body.errorKind === 'subscription-limit'
           ? 'Je abonnementlimiet is bereikt. De wachtrij pauzeert en controleert later opnieuw; er wordt geen API gebruikt.'
           : body.errorKind === 'source-reference'
-            ? 'De homepage-screenshot is geblokkeerd of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.'
+            ? 'De homepage-screenshot is geblokkeerd, leeg of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.'
           : 'Codex kon het ontwerp niet maken via je abonnement. Controleer Codex op je Mac en probeer opnieuw.');
+        if (!finished.ok) return res.status(409).json({ ok: false, error: 'Afsluiting van de geweigerde opdracht niet bevestigd.' });
         return res.json({ ok: true, done: true });
       }
       const dataUrl = String(body.dataUrl || '');
