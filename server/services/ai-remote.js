@@ -382,7 +382,7 @@ function createAiRemoteService(deps = {}) {
     const featureGate = /^(?:please )?enable (?:javascript|cookies)(?: and (?:javascript|cookies))?(?: to (?:continue|proceed))?[.!]?$/i;
     const headings = String(textRaw).match(/<(?:title|h[12])\b[^>]*>[^<]*<\/(?:title|h[12])>|^Title:[^\n]+/gim) || [];
     if (headings.some((heading) => featureGate.test(normalizeWebsitePreviewText(heading).replace(/^title:\s*/, ''))) ||
-      featureGate.test(text) || (text.length < 600 && /^(?:please )?enable (?:javascript(?: and cookies)?|cookies) to (?:continue|proceed)\b/.test(text))) return true;
+      featureGate.test(text) || (text.length < 600 && /\benable (?:javascript(?: and cookies)?|cookies)(?: in your browser)? to (?:continue|proceed|run (?:this|the) app|view (?:this|the) (?:website|page))\b/.test(text))) return true;
     const hardSignals = [
       'verify you are human', 'unusual traffic', 'access denied',
       'temporarily blocked', 'request blocked', 'forbidden',

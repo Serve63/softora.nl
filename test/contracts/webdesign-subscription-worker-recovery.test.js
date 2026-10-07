@@ -162,3 +162,49 @@ try: w.step()
 except RuntimeError: pass
 assert state()['phase'] == 'prepare'
 `));
+
+test('blocked source references keep their typed report across generation recovery and report retry without regenerating', () => worker(`
+folder = w.BASE / job['id']; folder.mkdir()
+answer = {'status': 'blocked', 'generated_images': 0, 'reason': 'De referentie toont uitsluitend een Cloudflare-blokkade, geen klantwebsite.'}
+(folder / 'answer.json').write_text(json.dumps(answer))
+for phase in ('prepare', 'generating'):
+ w.write_state({'phase': phase, 'job': job})
+ reports, generated = [], []
+ def no_image(job, folder, slot):
+  generated.append(True)
+  w.write_state({'phase': 'generating', 'job': job}, slot)
+  raise RuntimeError('No output')
+ w.generate = no_image if phase == 'prepare' else forbidden
+ w.generation_running = lambda folder: False
+ def offline(route, payload):
+  assert route == '/report'
+  reports.append(payload); raise TimeoutError('response lost')
+ w.call = offline
+ try: w.step()
+ except TimeoutError: pass
+ assert state()['phase'] == 'deliver'
+ assert reports[-1]['errorKind'] == 'source-reference' and 'dataUrl' not in reports[-1]
+ assert 'Cloudflare' not in reports[-1]['error']
+ w.generate = forbidden
+ w.call = lambda route, payload: (reports.append(payload) or {'ok': True, 'done': True})
+ w.step()
+ assert state() == {} and reports[0] == reports[1]
+ assert len(generated) == (1 if phase == 'prepare' else 0)
+`));
+
+test('source reference classification requires bounded explicit zero-generation evidence and no image', () => worker(`
+folder = w.BASE / job['id']; folder.mkdir()
+answer = folder / 'answer.json'
+valid = {'status': 'blocked', 'generated_images': 0, 'reason': 'Het screenshot bevat een onleesbaar bronbeeld.'}
+for invalid in ({}, [], dict(valid, status='error'), dict(valid, generated_images=1), dict(valid, generated_images=False), dict(valid, reason='Cloudflare'), dict(valid, reason='referentie mist'), dict(valid, reason='x'*4001)):
+ answer.write_text(json.dumps(invalid)); assert w.source_reference_blocked(folder) is False
+answer.write_text('{broken'); assert w.source_reference_blocked(folder) is False
+answer.write_text('x'*32769); assert w.source_reference_blocked(folder) is False
+answer.write_text(json.dumps(valid)); assert w.source_reference_blocked(folder) is True
+for name in ('design.png', 'design.jpg'):
+ output = folder / name; output.write_bytes(b'existing')
+ assert w.source_reference_blocked(folder) is False
+ output.unlink()
+answer.unlink(); answer.symlink_to(folder / 'outside-answer')
+assert w.source_reference_blocked(folder) is False
+`));

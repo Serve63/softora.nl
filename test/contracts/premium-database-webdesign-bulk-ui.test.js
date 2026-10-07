@@ -407,6 +407,29 @@ test('an older overlapping poll cannot restore success counts after a newer corr
   assert.match(parts.rest.textContent, /^0 gemaakt/);
 });
 
+test('an older empty restore cannot hide progress confirmed by a newer poll', async () => {
+  const timers = [];
+  let lists = 0, releaseOlderList;
+  const olderList = new Promise(resolve => { releaseOlderList = resolve; });
+  const batch = { id: 'restore-race', status: 'running', total: 50, made: 1, failed: 3 };
+  const { context, document } = createHarness(async url => {
+    if (String(url).endsWith('/run')) return new Promise(() => {});
+    if (String(url).endsWith('/restore-race')) return { ok: true, json: async () => ({ batch }) };
+    if (++lists === 2) { await olderList; return { ok: true, json: async () => ({ batches: [] }) }; }
+    return { ok: true, json: async () => ({ batches: [batch] }) };
+  }, { setTimeout(callback, delay) { const timer = { callback, delay }; timers.push(timer); return timer; } });
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+  await controller.loadLatestBatch();
+  const restoring = controller.loadLatestBatch();
+  timers.find(timer => timer.delay === 0).callback();
+  await new Promise(resolve => setImmediate(resolve));
+  releaseOlderList();
+  await restoring;
+  const node = document.getElementById('webdesignBulkStatus');
+  assert.equal(node.hidden, false);
+  assert.match(node.__softoraBulkParts.rest.textContent, /^1 gemaakt/);
+});
+
 test('a hanging progress request times out and a later poll resumes successfully', async () => {
   const timers = [];
   let reads = 0;

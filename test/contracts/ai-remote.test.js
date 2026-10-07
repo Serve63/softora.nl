@@ -1128,6 +1128,8 @@ test('website scan still rejects cookie/JavaScript gate documents and reader gat
   for (const text of [
     '<title>Enable cookies</title><p>Please enable cookies before continuing.</p>',
     '<h1>Please enable JavaScript and cookies to continue</h1>',
+    '<title>Bedrijf</title><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div>',
+    '<title>Bedrijf</title><p>Please enable JavaScript to view this website.</p>',
     'Enable cookies',
     'Please enable cookies to continue. Check your browser settings.',
     'Title: Enable JavaScript\nURL Source: https://bedrijf.test/\nMarkdown Content:\nPlease enable JavaScript.',

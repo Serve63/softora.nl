@@ -200,6 +200,7 @@ test('premium database webdesign job routes expose persistent bulk endpoints', (
     ['POST', '/api/premium-database/webdesign-photo-jobs'],
     ['GET', '/api/premium-database/webdesign-photo-jobs'],
     ['GET', '/api/premium-database/webdesign-photo-jobs/:jobId'],
+    ['POST', '/api/premium-database/webdesign-photo-source-selection'],
     ['POST', '/api/premium-database/webdesign-photo-batches'],
     ['GET', '/api/premium-database/webdesign-photo-batches'],
     ['POST', '/api/premium-database/webdesign-photo-batches/run'],
@@ -209,6 +210,20 @@ test('premium database webdesign job routes expose persistent bulk endpoints', (
     ['POST', '/api/premium-database/webdesign-photo-batches/:batchId/cancel'],
     ['GET', '/api/premium-database/webdesign-photo-batches/:batchId'],
   ]);
+});
+
+test('webdesign source selection requires premium access before reading job history', async () => {
+  let handlers;
+  let reads = 0;
+  const app = { get() {}, post(pathname, ...value) { if (pathname === '/api/premium-database/webdesign-photo-source-selection') handlers = value; } };
+  registerPremiumDatabaseWebdesignJobRoutes(app, {
+    coordinator: { selectBatchSourcesResponse: (_req, res) => { reads++; return res.status(200).json({ ok: true }); } },
+    requirePremiumApiAccess: (req, res, next) => req.premium ? next() : res.status(403).json({ ok: false }),
+  });
+  assert.equal((await callRouteHandlers(handlers, { premium: false })).statusCode, 403);
+  assert.equal(reads, 0);
+  assert.equal((await callRouteHandlers(handlers, { premium: true })).statusCode, 200);
+  assert.equal(reads, 1);
 });
 
 test('mail stock status requires admin access and denies access when no admin gate is wired', async () => {

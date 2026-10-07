@@ -15,6 +15,9 @@ function sourceHold(row) {
   if (row.status !== 'error') return null;
   const message = String(row.error || '');
   const code = String(row.preparationCode || '');
+  if (/^De homepage-screenshot is geblokkeerd of onleesbaar\./.test(message)) {
+    return { duration: TEMPORARY_MS, reason: 'Het homepage-bronbeeld was geblokkeerd of onleesbaar.' };
+  }
   if (row.rejected === true || /WEBDESIGN_(?:PLACEHOLDER|PLATFORM)_WEBSITE/.test(code) ||
       /website lijkt in onderhoud|niet de eigen website van het bedrijf/i.test(message)) {
     return { duration: DAY_MS, reason: 'Geen bruikbare eigen bedrijfswebsite: onderhoud, geparkeerd of een platformpagina.' };

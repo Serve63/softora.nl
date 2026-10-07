@@ -58,8 +58,7 @@
         const cancelledBatchIds = new Set();
         const dismissedBatchIds = new Set();
         const uploadTriggeredBatchIds = new Set();
-        const latestBatchRequestSequence = new Map();
-        let requestSequence = 0;
+        let requestSequence = 0, latestSnapshotSequence = 0;
         let uploadKickRunning = false, uploadKickPending = false;
         ensureStyles();
 
@@ -349,12 +348,12 @@
         function handleBatch(batch, phase, options) {
             if (!batch || !batch.id) return;
             const batchId = normalizeString(batch.id);
-            const sequence = Number(options && options.requestSequence) || 0;
-            if (sequence && sequence < (latestBatchRequestSequence.get(batchId) || 0)) {
+            const sequence = Number(options && options.requestSequence) || ++requestSequence;
+            if (sequence < latestSnapshotSequence) {
                 schedulePoll(BULK_POLL_INTERVAL_MS);
                 return;
             }
-            if (sequence) latestBatchRequestSequence.set(batchId, sequence);
+            latestSnapshotSequence = sequence;
             // Server corrections may remove invalid results; success counts are not monotonic.
             const made = Math.max(0, Number(batch.made != null ? batch.made : batch.done) || 0);
             batch = Object.assign({}, batch, { made: made, done: made });
@@ -422,6 +421,7 @@
             pollInFlight = true;
             try {
                 const { response, payload, requestSequence } = await requestJson(BATCH_ENDPOINT + "/" + encodeURIComponent(id), { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
+                if (requestSequence < latestSnapshotSequence) { schedulePoll(BULK_POLL_INTERVAL_MS); return; }
                 if (response.status === 404) {
                     if (id === activeBatchId) activeBatchId = "";
                     scheduleRestoreRetry();
@@ -494,6 +494,8 @@
                 const { response, payload, requestSequence } = await requestJson(BATCH_ENDPOINT, { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
                 const batches = Array.isArray(payload && payload.batches) ? payload.batches : [];
                 if (!response.ok) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk laden is mislukt.");
+                if (requestSequence < latestSnapshotSequence) return null;
+                latestSnapshotSequence = requestSequence;
                 if (!batches.length) {
                     hideStatus();
                     return null;

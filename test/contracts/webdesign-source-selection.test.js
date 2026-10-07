@@ -27,6 +27,7 @@ test('source failures have bounded holds while image/provider failures remain el
   assert.equal(selected([rejected]).eligible, false);
   assert.equal(selected([rejected], target, now + 86400000).eligible, true);
   assert.equal(selected([row({ preparationPhase: 'ready', error: 'Upload mislukt (403).' })]).eligible, true);
+  assert.equal(selected([row({ preparationPhase: 'ready', error: 'De homepage-screenshot is geblokkeerd of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.' })]).retryAt, now - 60000 + 30 * 60000);
   assert.equal(selected([row({ preparationPhase: '', error: 'De beeldgenerator gaf fout 422.' })]).eligible, true);
   assert.equal(selected([row({ error: 'Websiteanalyse mislukt: onbekende fout' })]).eligible, true);
 });
