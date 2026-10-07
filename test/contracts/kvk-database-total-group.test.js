@@ -43,7 +43,7 @@ test('kvk totaalgroep geeft elke kaart dezelfde paarse rand als de groene kaarte
   );
   assert.match(
     readPage(),
-    /kvk-database-metrics\.css\?v=20260917-control-orange/
+    /kvk-database-metrics\.css\?v=20261007-smooth/
   );
 });
 

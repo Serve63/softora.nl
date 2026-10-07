@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  CANONICAL_CATEGORIES,
   createController,
   fetchCanonicalDirectoryCounts,
   getAvailableWithWebsiteCount,
@@ -45,7 +46,7 @@ test('with-website snapshot fallback uses the reported subtotal when the partiti
   }), 7);
 });
 
-test('canonical directory counts are read from the same exact category endpoints as the open buttons', async () => {
+test('canonical directory counts use one exact summary of the safe category selection', async () => {
   const totals = {
     behandeld: 46_227,
     'bruikbaar-verklaard': 20_783,
@@ -58,12 +59,11 @@ test('canonical directory counts are read from the same exact category endpoints
   const requested = [];
   const counts = await fetchCanonicalDirectoryCounts(async (url, options) => {
     const parsed = new URL(url, 'https://softora.nl');
-    const category = parsed.searchParams.get('categorie');
-    requested.push([category, parsed.searchParams.get('limit'), options.credentials]);
+    requested.push([parsed.pathname, options.credentials]);
     return {
       ok: true,
       async json() {
-        return { ok: true, total: totals[category], total_is_exact: true };
+        return { ok: true, counts: Object.fromEntries(Object.entries(CANONICAL_CATEGORIES).map(([key, category]) => [key, totals[category]])), total_is_exact: true };
       },
     };
   });
@@ -77,8 +77,8 @@ test('canonical directory counts are read from the same exact category endpoints
     withWebsite: 13_743,
     withoutWebsite: 310,
   });
-  assert.equal(requested.length, 7);
-  assert.ok(requested.every(([, limit, credentials]) => limit === '1' && credentials === 'same-origin'));
+  assert.equal(requested.length, 1);
+  assert.deepEqual(requested, [['/api/kvk-database/company-directory/counts', 'same-origin']]);
 });
 
 test('dashboard replaces stale snapshot stock totals with canonical directory totals while keeping last-60 activity', async () => {
@@ -127,10 +127,9 @@ test('dashboard replaces stale snapshot stock totals with canonical directory to
     getSnapshot: () => snapshot,
     now: () => Date.parse('2026-09-15T22:44:17+02:00'),
     fetchImpl: async (url) => {
-      const category = new URL(url, 'https://softora.nl').searchParams.get('categorie');
       return {
         ok: true,
-        async json() { return { ok: true, total: totals[category], total_is_exact: true }; },
+        async json() { return { ok: true, counts: Object.fromEntries(Object.entries(CANONICAL_CATEGORIES).map(([key, category]) => [key, totals[category]])), total_is_exact: true }; },
       };
     },
   });

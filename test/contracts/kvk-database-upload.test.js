@@ -9,7 +9,7 @@ function res() { return {statusCode:200,status(code){this.statusCode=code;return
 function fixture({rows=[],receipt=null,fail=false,refreshFail=false}={}) {
  const calls=[]; let invalidated=0;
  const db={from(table){ if(table==='softora_kvk_upload_receipts') return {select:()=>({eq:()=>({maybeSingle:async()=>({data:receipt})})})};
- let after=0; const q={select(){return q;},neq(){return q;},gt(_key,value){after=value;return q;},order(){return q;},limit:async()=>({data:rows.filter(row=>row.source_company_id>after),error:fail?{}:null})}; return q;},rpc:async(name,args)=>{calls.push({name,args});return {data:{count:args.p_dry_run?args.p_candidates.length:args.p_limit,sourceIds:args.p_candidates.map(row=>row.source_company_id),destination:'available'}};}};
+ let after=0; const q={select(){return q;},neq(){return q;},gt(_key,value){after=value;return q;},order(){return q;},limit:async()=>({data:rows.filter(row=>row.source_company_id>after),error:fail?{}:null})}; return q;},rpc:async(name,args)=>{if(name==='softora_kvk_unused_inventory_rows') return {data:rows,error:fail?{}:null};calls.push({name,args});return {data:{count:args.p_dry_run?args.p_candidates.length:args.p_limit,sourceIds:args.p_candidates.map(row=>row.source_company_id),destination:'available'}};}};
  const service=createKvkDatabaseUploadService({getSupabaseClient:()=>db,getUiStateValues:async()=>({values:{}}),refreshDestination:()=>{invalidated++;if(refreshFail)throw new Error("Snapshot temporarily unavailable");},logger:{warn(){}}});
  return {service,calls,get invalidated(){return invalidated;}};
 }

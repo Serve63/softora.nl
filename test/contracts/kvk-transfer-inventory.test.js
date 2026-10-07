@@ -31,6 +31,7 @@ test('real transfer transaction shares exact stock with listings and atomically 
     await db.exec(migration('20260924132100_kvk_upload_available.sql'));
     const sql = migration('20261007203220_kvk_upload_shared_inventory.sql');
     await db.exec(sql); await db.exec(sql);
+    await db.exec(migration('20261007215800_kvk_inventory_single_read.sql'));
     const rows = Array.from({ length: 10 }, (_, index) => ({ source_company_id: index + 1,
       kvk_nummer: String(10000001 + index), bedrijfsnaam: `Synthetic ${index + 1}`, telefoonnummer: `123${index + 1}`,
       email: `lead${index + 1}@example.test`, website: `site${index + 1}.test`, website_status: 'found', lead_status: 'usable',
@@ -60,7 +61,11 @@ test('real transfer transaction shares exact stock with listings and atomically 
         pageReads++;
         return { data: (await db.query(`select ${columns} from softora_kvk_unused_company_directory where source_company_id>$1 order by source_company_id limit 3`, [after])).rows };
       } }; return q;
-    }, async rpc(_name, args) {
+    }, async rpc(name, args) {
+      if (name === 'softora_kvk_unused_inventory_rows') {
+        pageReads++;
+        return { data: (await db.query('select softora_kvk_unused_inventory_rows() as rows')).rows[0].rows };
+      }
       try { return { data: (await db.query('select softora_kvk_upload_available_counted($1::uuid,$2,$3,$4::jsonb,$5) as result',
         [args.p_request_id, args.p_mode, args.p_dry_run, JSON.stringify(args.p_candidates), args.p_limit])).rows[0].result }; }
       catch (error) { return { error }; }
@@ -74,7 +79,7 @@ test('real transfer transaction shares exact stock with listings and atomically 
     assert.equal(preview.statusCode, 200);
     assert.equal(preview.body.count, 3); assert.equal(preview.body.sourceCount, 9); assert.equal(preview.body.excludedCount, 6);
     assert.deepEqual(preview.body.exclusions, { previouslyContacted: 2, existingCustomer: 1, invalid: 1, duplicateIdentity: 1, duplicateEmail: 1 });
-    assert.equal(pageReads, 5, 'short nonempty Data API pages must not truncate the source');
+    assert.equal(pageReads, 1, 'one SQL snapshot must contain the entire source');
     assert.equal((await db.query('select count(*)::int n from softora_kvk_upload_receipts')).rows[0].n, 0);
     const directory = createKvkCompanyDirectoryService({ readTransferInventory: upload.readInventory });
     const list = await directory.fetchDirectoryRows({ category: 'met-website', limit: 1 });
@@ -83,7 +88,7 @@ test('real transfer transaction shares exact stock with listings and atomically 
     assert.equal((await directory.fetchDirectoryCount({ category: 'bruikbaar' })).count, 4);
     assert.equal((await directory.fetchDirectoryCount({ category: 'met-website', query: 'synthetic 10' })).count, 1);
     assert.deepEqual((await directory.fetchDirectoryRows({ category: 'met-website', cursor: 9 })).rows.map(row => Number(row.source_company_id)), [10]);
-    assert.equal(pageReads, 5, 'counts and lists reuse one verified read');
+    assert.equal(pageReads, 1, 'counts and lists reuse one verified read');
     const shortage = response(); await upload.upload({ body: { mode: 'with-website', requestId, count: 4 } }, shortage);
     assert.equal(shortage.statusCode, 409);
     assert.equal((await db.query('select count(*)::int n from softora_customers')).rows[0].n, 2);
@@ -107,15 +112,19 @@ test('real transfer transaction shares exact stock with listings and atomically 
     for (const role of ['anon', 'authenticated']) {
       await db.exec(`set role ${role}`);
       await assert.rejects(() => db.query("select softora_kvk_upload_available_counted(null,'with-website',true,'[]',null)"), /permission denied/);
+      await assert.rejects(() => db.query('select softora_kvk_unused_inventory_rows()'), /permission denied/);
       await db.exec('reset role');
     }
+    await db.exec('set role service_role');
+    assert.ok(Array.isArray((await db.query('select softora_kvk_unused_inventory_rows() rows')).rows[0].rows));
+    await db.exec('reset role');
   } finally { await db.close(); }
 });
 
 test('inventory refuses corrupt guards and mismatched SQL row IDs without a raw fallback', async () => {
   let rpcCalls = 0;
   const db = { from() { const q = { select() { return q; }, gt() { return q; }, order() { return q; }, async limit() { return { data: [] }; } }; return q; },
-    async rpc() { rpcCalls++; return { data: { count: 1, sourceIds: [2] } }; } };
+    async rpc(name) { rpcCalls++; return { data: name === 'softora_kvk_unused_inventory_rows' ? [] : { count: 1, sourceIds: [2] } }; } };
   for (const raw of ['{invalid', { entries: {} }, []]) {
     const stock = createKvkTransferInventory({ getClient: () => db, getUiStateValues: async () => ({ values: { softora_coldmail_send_guard_v1: raw } }) });
     await assert.rejects(() => stock.read());

@@ -421,6 +421,32 @@ function createKvkCompanyDirectoryService(deps = {}) {
     }
   }
 
+  async function sendGetCountsResponse(_req, res) {
+    res.setHeader('Cache-Control', 'private, no-store');
+    const categories = { treated: 'behandeld', successfulFound: 'bruikbaar-verklaard',
+      declaredUnusable: 'onbruikbaar-verklaard', controlRoom: 'controlekamer' };
+    const countReader = deps.fetchDirectoryCount || fetchDirectoryCount;
+    const metaReader = deps.fetchDirectoryMeta || fetchDirectoryMeta;
+    try {
+      const [stock, meta, counted] = await Promise.all([
+        deps.readTransferInventory(), metaReader(),
+        Promise.all(Object.entries(categories).map(async ([key, category]) => [key, await countReader({ category })])),
+      ]);
+      if (!meta.ok || meta.row?.completed !== true || !Number.isSafeInteger(stock.count) || stock.count < 0 ||
+        !Array.isArray(stock.withoutWebsiteRows) ||
+        counted.some(([, result]) => !result.ok || !Number.isSafeInteger(result.count) || result.count < 0)) {
+        throw new Error('Actuele bedrijfstellingen zijn tijdelijk niet beschikbaar.');
+      }
+      const counts = Object.fromEntries(counted.map(([key, result]) => [key, result.count]));
+      counts.withWebsite = stock.count;
+      counts.withoutWebsite = stock.withoutWebsiteRows.length;
+      counts.usable = counts.withWebsite + counts.withoutWebsite;
+      return res.status(200).json({ ok: true, counts, total_is_exact: true, source: 'supabase' });
+    } catch {
+      return res.status(503).json({ ok: false, error: 'Actuele bedrijfstellingen zijn tijdelijk niet beschikbaar.' });
+    }
+  }
+
   async function sendGetDirectoryResponse(req, res) {
     const query = normalizedField(req?.query?.q, 120);
     const category = normalizeCategory(req?.query?.categorie);
@@ -599,6 +625,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
     normalizedSearchValue,
     searchTerms,
     sendGetDirectoryResponse,
+    sendGetCountsResponse,
     sendPostDirectorySyncResponse,
   };
 }
