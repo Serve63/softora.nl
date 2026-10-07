@@ -212,7 +212,7 @@ test('source-reference worker failures save only a fixed explanation and never a
     await service.complete({ body: { jobId: 'job-1234567890123456', claim, errorKind, error: 'ARBITRARY MODEL OUTPUT' } }, response);
     assert.equal(response.body.done, true);
   }
-  assert.equal(messages[0], 'De homepage-screenshot is geblokkeerd of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.');
+  assert.equal(messages[0], 'De homepage-screenshot is geblokkeerd, leeg of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.');
   assert.match(messages[1], /Codex kon het ontwerp niet maken/);
   assert.ok(messages.every(message => !message.includes('ARBITRARY') && !message.includes('untrusted-model-text')));
 });
@@ -403,4 +403,16 @@ test('the colour lock survives storage and only the claimed running subscription
   assert.match(sql, /subscriptionClaim' = p_claim/);
   assert.match(sql, /security invoker set search_path = ''/i);
   assert.match(sql, /from public, anon, authenticated/i);
+});
+
+
+test('a source rejection is not acknowledged until the database confirms its terminal state', async () => {
+  const service = createWebdesignSubscriptionService({ repository: {
+    begin: async () => ({ ok: true, job: {} }), finish: async () => ({ ok: false }),
+  }, coordinator: { saveSubscriptionPhoto: () => assert.fail('A rejected source must never save an image') } });
+  const response = res();
+  await service.complete({ body: { jobId: 'job-1234567890123456', claim, error: 'source', errorKind: 'source-reference' } }, response);
+  assert.equal(response.statusCode, 409);
+  assert.equal(response.body.ok, false);
+  assert.ok(!response.body.done);
 });

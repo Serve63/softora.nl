@@ -65,9 +65,9 @@ for (const fixture of fixtures) {
       const { coordinator, requests } = pipelineFor(fixture, mode);
       await assert.rejects(coordinator.runWebsitePreviewGeneratePipeline(website,
         buildWebdesignPipelineOptions({ source: 'premium-database', company: 'Voorbeeldbedrijf' })),
-      { code: 'WEBDESIGN_PLACEHOLDER_WEBSITE', status: 422 });
+      mode === 'reader' ? { code: 'WEBDESIGN_WEBSITE_FETCH_FAILED', status: 502 } : { code: 'WEBDESIGN_PLACEHOLDER_WEBSITE', status: 422 });
       if (mode === 'http') assert.ok(requests.some(url => url === 'http://voorbeeld.test/'));
-      if (mode === 'reader') assert.ok(requests.some(url => url.startsWith('https://r.jina.ai/')));
+      if (mode === 'reader') assert.ok(requests.every(url => !url.startsWith('https://r.jina.ai/')));
     });
   }
 }

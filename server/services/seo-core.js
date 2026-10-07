@@ -540,6 +540,7 @@ function createSeoCore(deps = {}) {
       layoutHints,
       referenceImageUrls,
       imageCount: images.length,
+      visibleTextLength: bodyTextSample.length,
       bodyTextSample,
     };
   }
