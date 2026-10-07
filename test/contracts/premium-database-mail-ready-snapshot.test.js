@@ -218,7 +218,7 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
   assert.equal(calls.includes('customers-snapshot'), true);
   assert.equal(calls.includes('photo-flags'), true);
   assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].bypassReadCache, true);
-  assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].maxRows, 25000);
+  assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].maxRows, 100000);
   assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].pageSize, 250);
   assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].timeoutMs, 12000);
   assert.equal(calls.find((call) => Array.isArray(call) && call[0] === 'customers-snapshot-options')[1].bypassReadFailureCooldown, true);
@@ -399,7 +399,7 @@ test('premium database archive serves every category in one bounded compressed r
   assert.ok(Number(response.headers['Content-Length']) <= MAX_ARCHIVE_BYTES);
   assert.match(response.headers['Server-Timing'], /snapshot;dur=\d+, encode;dur=\d+/);
   const payload = JSON.parse(gunzipSync(response.body).toString('utf8'));
-  assert.equal(payload.limit, 25000);
+  assert.equal(payload.limit, 100000);
   assert.equal(payload.availableTotal, 5001);
   assert.equal(payload.availableCustomers.length, 5001);
   assert.equal(payload.availableCustomers.some((row) => row.id === 'available-5000'), true);
@@ -994,8 +994,8 @@ test('premium database mail-ready snapshot persists compact full and bootstrap c
   assert.deepEqual(JSON.parse(bootstrapWrite[2][MAIL_READY_BOOTSTRAP_CACHE_KEY]).foundCustomerIds, ['ready-1', 'ready-2']);
 });
 
-test('premium database mail-ready snapshot persists the complete current-scale design inventory', async () => {
-  const customers = Array.from({ length: 13957 }, (_, index) => {
+test('premium database mail-ready snapshot persists the complete bulk-import scale design inventory', async () => {
+  const customers = Array.from({ length: 32810 }, (_, index) => {
     const digest = createHash('sha256').update(`mail-ready-cache-${index}`).digest('hex');
     return {
       customer_id: `instantly_queue_${digest.slice(0, 24)}`,
@@ -1015,16 +1015,16 @@ test('premium database mail-ready snapshot persists the complete current-scale d
   const payload = await service.buildMailReadySnapshot({ limit: 1 });
 
   assert.equal(payload.total, 0);
-  assert.equal(payload.availableTotal, 13957);
+  assert.equal(payload.availableTotal, 32810);
   const fullWrite = calls.find((call) => Array.isArray(call) && call[0] === 'ui-state-write' && call[1] === MAIL_READY_SNAPSHOT_CACHE_SCOPE);
   assert.ok(fullWrite);
   const serialized = fullWrite[2][MAIL_READY_SNAPSHOT_CACHE_KEY];
-  assert.ok(serialized.length > 950000);
+  assert.ok(serialized.length > 2000000);
   const parseStartedAt = Date.now();
   const restored = parseMailReadySnapshotCacheValue(serialized);
   assert.ok(Date.now() - parseStartedAt < 2000, 'stored current-scale snapshot hydrates without another distance sort');
-  assert.equal(restored.availableTotal, 13957);
-  assert.equal(restored.availableCustomers.length, 13957);
+  assert.equal(restored.availableTotal, 32810);
+  assert.equal(restored.availableCustomers.length, 32810);
 });
 
 test('premium database mail-ready snapshot waits for the central refresh after its memory cache expires', async () => {

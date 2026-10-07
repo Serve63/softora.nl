@@ -1,4 +1,5 @@
 const { readGuardSetWithRetry } = require('./outbound-guard-key-reader');
+const { MAX_DATABASE_CUSTOMERS: MAX_OFFSET } = require('../config/premium-database-limits');
 const { isKvkTransferRow } = require('./kvk-transfer-identity');
 const { sortCustomersByDistance, getCustomerLocationFields } = require('../../assets/premium-database-distance');
 const { normalizeContactStatus } = require('./customer-lifecycle');
@@ -22,7 +23,6 @@ const COLDMAIL_SEND_GUARD_SCOPE = 'premium_coldmail_send_guard';
 const COLDMAIL_SEND_GUARD_KEY = 'softora_coldmail_send_guard_v1';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 4500;
-const MAX_OFFSET = 25000;
 const SNAPSHOT_STORAGE_MAX_ROWS = MAX_OFFSET;
 const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
 const SNAPSHOT_CACHE_VALUE_MAX_LENGTH = 4_000_000;
@@ -500,7 +500,7 @@ function createPremiumDatabaseMailReadySnapshotService(deps = {}) {
   async function readCustomerRows() {
     if (dataOpsStore && typeof dataOpsStore.listCustomerSnapshotRows === 'function') {
       return dataOpsStore.listCustomerSnapshotRows({
-        maxRows: 25000,
+        maxRows: SNAPSHOT_STORAGE_MAX_ROWS,
         pageSize: SNAPSHOT_CUSTOMER_PAGE_SIZE,
         timeoutMs: SNAPSHOT_CUSTOMER_PAGE_TIMEOUT_MS,
         bypassReadCache: true,

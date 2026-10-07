@@ -1,4 +1,5 @@
 const { createTableVersionRepository } = require('../repositories/table-versions');
+const { MAX_DATABASE_CUSTOMERS } = require('../config/premium-database-limits');
 
 const CUSTOMER_COLUMNS = 'customer_id,company,email,database_status,lifecycle_status,payload,updated_at';
 const UNIQUE_CUSTOMER_EMAIL_LOOKUP_MAX_VALUES = 200;
@@ -119,7 +120,7 @@ function createDataOpsCustomerLookups(deps = {}) {
 
   async function listCustomersPage(options = {}) {
     const metaOnly = options.metaOnly === true;
-    const offset = Math.max(0, Math.min(25000, Number.parseInt(String(options.offset || 0), 10) || 0));
+    const offset = Math.max(0, Math.min(MAX_DATABASE_CUSTOMERS, Number.parseInt(String(options.offset || 0), 10) || 0));
     const limit = Math.max(1, Math.min(1000, Number.parseInt(String(options.limit || 750), 10) || 750));
     const includeExactCount = metaOnly || offset === 0;
     const result = await run(`list-customers-page-${metaOnly ? 'meta' : `${offset}-${offset + limit - 1}`}`, (client) => {
@@ -162,7 +163,7 @@ function createDataOpsCustomerLookups(deps = {}) {
   async function listCustomersArchiveChunk(options = {}) {
     const offset = Number(options.offset);
     const limit = Number(options.limit);
-    if (!Number.isInteger(offset) || offset < 0 || offset > 25000
+    if (!Number.isInteger(offset) || offset < 0 || offset > MAX_DATABASE_CUSTOMERS
       || !Number.isInteger(limit) || limit < 1 || limit > 5000) return null;
     const result = await run(`list-customers-archive-chunk-${offset}`, (client) => client
       .rpc('softora_customer_archive_chunk', { p_offset: offset, p_limit: limit }), {

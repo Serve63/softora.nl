@@ -2311,8 +2311,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20260924-readmodel-version/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20260924-readmodel/);
+  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20261007-bulk-capacity/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20261007-bulk-capacity/);
   assert.match(pageSource, /assets\/premium-database-current-campaign-media\.js\?v=20260924-targeted-visibility/);
   assert.match(pageSource, /currentCampaignMediaController\.refresh\(\)/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(options = \{\}\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(/);

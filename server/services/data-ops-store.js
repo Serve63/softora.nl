@@ -16,6 +16,7 @@ const {
 const { chooseStrongerContactStatus, getContactStatusPriority, normalizeContactStatus } = require('./customer-lifecycle');
 const { getIdentityKeyRows } = require('./outbound-recipient-guard-store');
 const { createDataOpsCustomerLookups } = require('./data-ops-customer-lookups');
+const { createCustomerSnapshotRowsRepository } = require('../repositories/customer-snapshot-rows');
 const { createMailboxHistoricalOutboundRepository } = require('../repositories/mailbox-historical-outbound');
 const { filterDesignPhotoRowsForServing } = require('./design-photo-generation-policy');
 const { isCustomerConfirmedSent } = require('./instantly-campaign-replacement');
@@ -1074,26 +1075,9 @@ function createSoftoraDataOpsStore(deps = {}) {
     });
   }
 
-  async function listCustomerSnapshotRows(options = {}) {
-    return cachedRead('customers-snapshot', async () => {
-      const result = await collectPagedRows('list-customers-snapshot', (client) =>
-        client
-          .from(TABLES.customers)
-          .select('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at')
-          .is('deleted_at', null)
-          .order('updated_at', { ascending: false }),
-      { maxRows: 25000, pageSize: options.pageSize,
-        timeoutMs: Math.max(dataOpsReadQueryTimeoutMs, Math.min(30_000, Number(options.timeoutMs) || dataOpsReadQueryTimeoutMs)),
-        bypassReadFailureCooldown: options.bypassReadFailureCooldown,
-        suppressReadFailureCooldown: options.suppressReadFailureCooldown,
-        suppressTransientReadFailureLog: options.suppressTransientReadFailureLog,
-      });
-      return result.ok ? result.data || [] : null;
-    }, {
-      bypassReadCache: options.bypassReadCache,
-      suppressStaleReadCacheLog: options.suppressStaleReadCacheLog,
-    });
-  }
+  const { listCustomerSnapshotRows } = createCustomerSnapshotRowsRepository({
+    run, cachedRead, tableName: TABLES.customers, readQueryTimeoutMs: dataOpsReadQueryTimeoutMs,
+  });
 
   const { listMailboxMessages } = createMailboxStatsMessagesRepository({
     cachedRead, run, TABLES, normalizeString, dataOpsReadQueryTimeoutMs,
