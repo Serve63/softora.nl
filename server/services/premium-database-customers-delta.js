@@ -2,6 +2,7 @@
 // browser keeps the last verified archive and merges this delta, so a normal
 // opening reads a few rows instead of the full 20k-row archive.
 const { buildReadModelVersion, readRequestedReadModelVersion } = require('./readmodel-version-response');
+const { MAX_DATABASE_CUSTOMERS: MAX_CUSTOMERS } = require('../config/premium-database-limits');
 
 const DELTA_LIMIT = 5000;
 const CUSTOMERS_TABLE = 'softora_customers';
@@ -10,7 +11,6 @@ const CUSTOMERS_TABLE = 'softora_customers';
 const CURSOR_OVERLAP_MS = 10 * 60 * 1000;
 const MAX_CURSOR_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_CURSOR_SKEW_MS = 5 * 60 * 1000;
-const MAX_CUSTOMERS = 25000;
 const READ_OPTIONS = Object.freeze({
   bypassReadFailureCooldown: true,
   suppressReadFailureCooldown: true,

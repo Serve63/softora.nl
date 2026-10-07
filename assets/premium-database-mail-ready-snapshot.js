@@ -5,7 +5,7 @@
     const ARCHIVE_ENDPOINT = ENDPOINT + "/archive";
     const PAGE_LIMIT = 4500;
     const BOOTSTRAP_ROW_LIMIT = 100;
-    const MAX_SNAPSHOT_ROWS = 25000;
+    const MAX_SNAPSHOT_ROWS = 100000;
     const FIRST_PAGE_TIMEOUT_MS = 90000;
     const ARCHIVE_TIMEOUT_MS = 30000;
     const NEXT_PAGE_TIMEOUT_MS = 90000;
