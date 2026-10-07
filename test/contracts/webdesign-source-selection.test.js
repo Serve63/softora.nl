@@ -1,9 +1,15 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
+const browserWindow = {};
+const previousWindow = global.window;
+try {
+  global.window = browserWindow;
+  require('../../assets/premium-database-webdesign-source-selection.js');
+} finally {
+  if (previousWindow === undefined) delete global.window;
+  else global.window = previousWindow;
+}
 const { selectWebdesignSources, createWebdesignSourceSelectionResponse } = require('../../server/services/webdesign-source-selection');
 const { createWebdesignSourceHistoryRepository } = require('../../server/repositories/webdesign-source-history');
 const now = Date.parse('2026-10-07T12:00:00Z');
@@ -81,9 +87,7 @@ test('repository paginates compact owner-scoped history and never accepts a part
 });
 
 function browserSelection(customers, requestJson) {
-  const window = {};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets/premium-database-webdesign-source-selection.js'), 'utf8'), { window });
-  return window.SoftoraDatabaseWebdesignSourceSelection.createController({ getSortedCustomers: (items) => items,
+  return browserWindow.SoftoraDatabaseWebdesignSourceSelection.createController({ getSortedCustomers: (items) => items,
     getFilteredCustomers: () => customers, isWebdesignPhotoEligible: () => true, sourceFilter: {},
     resolveCustomerWebsiteUrl: (customer) => customer.website, requestJson });
 }

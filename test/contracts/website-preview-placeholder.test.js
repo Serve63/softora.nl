@@ -66,7 +66,7 @@ for (const fixture of fixtures) {
       await assert.rejects(coordinator.runWebsitePreviewGeneratePipeline(website,
         buildWebdesignPipelineOptions({ source: 'premium-database', company: 'Voorbeeldbedrijf' })),
       { code: 'WEBDESIGN_PLACEHOLDER_WEBSITE', status: 422 });
-      if (mode === 'http') assert.ok(requests.includes('http://voorbeeld.test/'));
+      if (mode === 'http') assert.ok(requests.some(url => url === 'http://voorbeeld.test/'));
       if (mode === 'reader') assert.ok(requests.some(url => url.startsWith('https://r.jina.ai/')));
     });
   }
