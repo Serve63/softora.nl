@@ -28,9 +28,9 @@ const INTERNE_LINKSTRUCTUUR_CONTENT_ITEM = Object.freeze({
     }),
   ]),
   growthEventKind: 'other_growth_action',
-  growthEventAt: '2026-09-23',
+  growthEventAt: '2026-10-07',
   publishedAt: '2026-06-01',
-  updatedAt: '2026-09-23',
+  updatedAt: '2026-10-07',
   summary:
     'Een interne linkstructuur is het netwerk van klikbare routes tussen pagina’s op dezelfde website. Een goede structuur koppelt iedere belangrijke pagina aan een duidelijke rol, relevante context en een logische volgende stap.',
   sections: Object.freeze([
@@ -67,7 +67,7 @@ const INTERNE_LINKSTRUCTUUR_CONTENT_ITEM = Object.freeze({
           links: Object.freeze([
             Object.freeze({
               anchor: 'CRM op maat',
-              href: '/crm-systeem-op-maat',
+              href: '/bedrijfssoftware-op-maat',
             }),
           ]),
         }),
@@ -83,7 +83,8 @@ const INTERNE_LINKSTRUCTUUR_CONTENT_ITEM = Object.freeze({
           links: Object.freeze([
             Object.freeze({
               anchor: 'AI-automatisering voor een controleerbare workflow',
-              href: '/ai-automatisering',
+              href: '/blog/ai-processen-automatiseren-zonder-controle-verliezen',
+              availableFrom: '2026-06-09',
             }),
           ]),
         }),
@@ -134,7 +135,7 @@ const INTERNE_LINKSTRUCTUUR_CONTENT_ITEM = Object.freeze({
           links: Object.freeze([
             Object.freeze({
               anchor: 'website-migratie',
-              href: '/kennisbank/website-migratie-zonder-seo-verlies',
+              href: '/blog/website-migratie-zonder-seo-verlies',
               availableFrom: '2026-08-26',
             }),
           ]),
@@ -146,8 +147,8 @@ const INTERNE_LINKSTRUCTUUR_CONTENT_ITEM = Object.freeze({
   relatedLinks: Object.freeze([
     Object.freeze({ label: 'Website laten maken', href: '/website-laten-maken' }),
     Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
-    Object.freeze({ label: 'CRM systeem op maat', href: '/crm-systeem-op-maat' }),
-    Object.freeze({ label: 'AI automatisering', href: '/ai-automatisering' }),
+    Object.freeze({ label: 'Wat is een CRM systeem?', href: '/blog/wat-is-een-crm-systeem' }),
+    Object.freeze({ label: 'AI automatisering met controle', href: '/blog/ai-processen-automatiseren-zonder-controle-verliezen', availableFrom: '2026-06-09' }),
     Object.freeze({ label: 'MKB website pagina’s', href: '/blog/website-laten-maken-mkb-paginas' }),
   ]),
 });
