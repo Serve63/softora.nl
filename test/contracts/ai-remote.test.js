@@ -1085,7 +1085,7 @@ test('website scan still refuses an actual temporary access block', async () => 
       headers: { get: () => 'text/html; charset=utf-8' } },
     text: '<html><head><title>Access denied</title></head><body>Je toegang is tijdelijk geblokkeerd vanwege mogelijk misbruik vanaf dit IP adres.</body></html>' }),
   });
-  await assert.rejects(() => service.fetchWebsitePreviewScanFromUrl('https://marketing.test'), /blokkeert geautomatiseerde serververzoeken/);
+  await assert.rejects(() => service.fetchWebsitePreviewScanFromUrl('https://marketing.test'), /toegangscontrole of blokkeerpagina/);
 });
 
 test('website scan accepts ordinary reCAPTCHA footer and cookie preferences', async () => {
@@ -1102,12 +1102,49 @@ test('website scan accepts ordinary reCAPTCHA footer and cookie preferences', as
   }
 });
 
+test('website scan keeps Portus cookie controls and ordinary IP/privacy notices out of bot detection', async () => {
+  for (const notice of [
+    'Copyright © Portus B.V. - Algemene voorwaarden - Enable cookies',
+    'Wij verwerken uw IP adres volgens ons privacybeleid. We use your IP address for analytics.',
+    'Enable JavaScript for the optional product video.',
+  ]) {
+    let calls = 0;
+    const { service } = createService({
+      extractWebsitePreviewScanFromHtml: (html, sourceUrl) => ({ title: 'Home | Portus', bodyTextSample: html, sourceUrl }),
+      fetchTextWithTimeout: async (url) => {
+        calls++;
+        return { response: { ok: true, status: 200, url, headers: { get: () => 'text/html' } },
+          text: '<title>Home | Portus</title><h1>Hekwerk en poorten</h1><p>Ons assortiment: staafmatten, spijlenhekwerk en draaipoorten.</p><footer>' + notice + '</footer>' };
+      },
+    });
+    const result = await service.fetchWebsitePreviewScanFromUrl('https://www.portusbv.nl/');
+    assert.equal(calls, 1, 'a normal cookie control must not trigger fallback');
+    assert.equal(result.scan.title, 'Home | Portus');
+    assert.match(result.scan.bodyTextSample, /Hekwerk en poorten/);
+  }
+});
+
+test('website scan still rejects cookie/JavaScript gate documents and reader gate headings', async () => {
+  for (const text of [
+    '<title>Enable cookies</title><p>Please enable cookies before continuing.</p>',
+    '<h1>Please enable JavaScript and cookies to continue</h1>',
+    'Enable cookies',
+    'Please enable cookies to continue. Check your browser settings.',
+    'Title: Enable JavaScript\nURL Source: https://bedrijf.test/\nMarkdown Content:\nPlease enable JavaScript.',
+  ]) {
+    const { service } = createService({ fetchTextWithTimeout: async (url) => ({
+      response: { ok: true, status: 200, url, headers: { get: () => 'text/html' } }, text,
+    }) });
+    await assert.rejects(service.fetchWebsitePreviewScanFromUrl('https://bedrijf.test/'), /toegangscontrole of blokkeerpagina/);
+  }
+});
+
 test('website scan still refuses an actual captcha challenge', async () => {
   const { service } = createService({ fetchTextWithTimeout: async (url) => ({
     response: { ok: true, status: 200, url, headers: { get: () => 'text/html' } },
     text: '<html><body>Verify you are human. Complete the CAPTCHA.</body></html>',
   }) });
-  await assert.rejects(service.fetchWebsitePreviewScanFromUrl('https://bedrijf.test'), /blokkeert geautomatiseerde serververzoeken/);
+  await assert.rejects(service.fetchWebsitePreviewScanFromUrl('https://bedrijf.test'), /toegangscontrole of blokkeerpagina/);
 });
 
 test('ai remote service rejects server redirects to private metadata urls', async () => {

@@ -1,9 +1,9 @@
+const { createWebdesignSourceHistoryRepository } = require('../repositories/webdesign-source-history');
 const { createWebdesignJobStartRepository } = require('../repositories/webdesign-job-start');
 const { readOutboundGuardKeys } = require('./outbound-guard-key-reader');
 const { createMailboxStatsMessagesRepository } = require('../repositories/mailbox-stats-messages');
 const { createHash } = require('crypto');
 const { normalizeWebdesignJobRow, buildWebdesignJobPayload } = require('./webdesign-job-payload');
-
 const {
   buildCustomerIdentityKey,
   extensionForMimeType,
@@ -2317,11 +2317,11 @@ function createSoftoraDataOpsStore(deps = {}) {
     return rows;
   }
 
-  return { ...createWebdesignOwnerRotationRepository({ run, getWriteOperationOptions, normalizeString }),
+  return { ...createWebdesignSourceHistoryRepository({ run, TABLES, getWebdesignStatusReadOptions, createWebdesignJobStatusReadError }),
+    ...createWebdesignOwnerRotationRepository({ run, getWriteOperationOptions, normalizeString }),
     ...createWebdesignJobStartRepository({ run, TABLES, normalizeString, getWebdesignStatusReadOptions,
       createWebdesignJobStatusReadError, isRegularWebdesignJobRow, normalizeWebdesignJobRow,
-      buildWebdesignJobRow, getWriteOperationOptions, getWebdesignJob, forgetReads }),
-    getDataOpsCounts,
+      buildWebdesignJobRow, getWriteOperationOptions, getWebdesignJob, forgetReads }), getDataOpsCounts,
     getWebdesignBatch,
     getWebdesignJob,
     listRunnableWebdesignBatches,

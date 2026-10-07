@@ -15,6 +15,13 @@ const WEAK_PLACEHOLDER_PATTERNS = [
   /\bplease stand by while configuration is in progress\b/i,
 ];
 const SHORT_PAGE_TEXT_LENGTH = 400;
+// Hosting placeholders can contain a long multilingual notice or a full provider menu.
+// Match their complete page heading, not provider names or quoted notices in real content.
+const PLACEHOLDER_HEADING_PATTERNS = [
+  /^(?:STRATO\s*[-–—|:]\s*)?(?:domain (?:reserved|parked)|(?:reserved|parked) domain)[.!]?$/i,
+  /^(?:domein|domeinnaam) (?:gereserveerd|geparkeerd)(?:\s*[-–—|:]\s*Mijndomein(?:\.nl)?)?[.!]?$/i,
+  /^deze (?:website|site) is (?:op dit moment |momenteel |tijdelijk )?niet bereikbaar[.!]?$/i,
+];
 
 function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -26,10 +33,12 @@ function findSignal(patterns, text) {
 }
 
 function detectPlaceholderWebsiteScan(scan = {}) {
-  const heading = [scan.title, scan.h1].map(normalizeText).filter(Boolean).join(' | ');
+  const headings = [scan.title, scan.h1].map(normalizeText).filter(Boolean);
+  const heading = headings.join(' | ');
   const body = normalizeText(scan.bodyTextSample);
   const all = [heading, normalizeText(scan.metaDescription), body].filter(Boolean).join(' | ');
-  const signal = findSignal(STRONG_PLACEHOLDER_PATTERNS, all) ||
+  const signal = headings.map((text) => findSignal(PLACEHOLDER_HEADING_PATTERNS, text)).find(Boolean) ||
+    findSignal(STRONG_PLACEHOLDER_PATTERNS, all) ||
     findSignal(WEAK_PLACEHOLDER_PATTERNS, body.length < SHORT_PAGE_TEXT_LENGTH ? all : heading);
   return { placeholder: Boolean(signal), signal };
 }

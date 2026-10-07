@@ -353,21 +353,58 @@ test('webdesign bulk close button stays visible for a completed restored batch',
   assert.equal(fetchCalls.some((url) => url.endsWith('/batch-done/cancel')), false);
 });
 
-test('bulk progress distinguishes processed from successful and never regresses on an older response', async () => {
+test('bulk progress accepts authoritative success corrections and refreshes removed photos', async () => {
   let made = 2;
+  let photoRefreshes = 0;
+  const timers = [];
   const { context, document } = createHarness(async (url) => {
     if (String(url).endsWith('/run')) return { ok: true, json: async () => ({ ok: true }) };
     return { ok: true, json: async () => ({ batches: [{ id: 'counts-50', status: 'running', total: 50, made, failed: 3, running: 1 }] }) };
-  });
-  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+  }, { setTimeout(callback, delay) { timers.push({ callback, delay }); return timers.length; } });
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({ refreshPhotos: () => photoRefreshes++, refreshDelayMs: 100 });
   await controller.loadLatestBatch();
   const parts = document.getElementById('webdesignBulkStatus').__softoraBulkParts;
   assert.equal(parts.num.textContent, '5 / 50 verwerkt');
   assert.equal(parts.rest.textContent, '2 gemaakt · 3 mislukt · 45 resterend · 1 bezig');
+  timers.find(timer => timer.delay === 100).callback();
+  timers.length = 0;
+  made = 0;
+  await controller.loadLatestBatch();
+  assert.equal(parts.num.textContent, '3 / 50 verwerkt');
+  assert.match(parts.rest.textContent, /^0 gemaakt/);
+  timers.find(timer => timer.delay === 100).callback();
+  assert.equal(photoRefreshes, 2, 'a downward correction must refresh the photo list too');
   made = 1;
   await controller.loadLatestBatch();
-  assert.equal(parts.num.textContent, '5 / 50 verwerkt');
-  assert.match(parts.rest.textContent, /^2 gemaakt/);
+  assert.equal(parts.num.textContent, '4 / 50 verwerkt');
+  assert.match(parts.rest.textContent, /^1 gemaakt/);
+});
+
+test('an older overlapping poll cannot restore success counts after a newer correction', async () => {
+  const timers = [];
+  let made = 3, releaseOlderPoll;
+  const olderPoll = new Promise(resolve => { releaseOlderPoll = resolve; });
+  const snapshot = value => ({ id: 'corrected', status: 'running', total: 50, made: value, failed: 3 });
+  const { context, document } = createHarness(async url => {
+    if (String(url).endsWith('/run')) return new Promise(() => {});
+    if (String(url).endsWith('/corrected')) {
+      await olderPoll;
+      return { ok: true, json: async () => ({ batch: snapshot(3) }) };
+    }
+    return { ok: true, json: async () => ({ batches: [snapshot(made)] }) };
+  }, { setTimeout(callback, delay) { const timer = { callback, delay }; timers.push(timer); return timer; } });
+  const controller = context.SoftoraDatabaseWebdesignBulk.createController({});
+  await controller.loadLatestBatch();
+  timers.find(timer => timer.delay === 0).callback();
+  await new Promise(resolve => setImmediate(resolve));
+  made = 0;
+  await controller.loadLatestBatch();
+  const parts = document.getElementById('webdesignBulkStatus').__softoraBulkParts;
+  assert.match(parts.rest.textContent, /^0 gemaakt/);
+  releaseOlderPoll();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(parts.num.textContent, '3 / 50 verwerkt');
+  assert.match(parts.rest.textContent, /^0 gemaakt/);
 });
 
 test('a hanging progress request times out and a later poll resumes successfully', async () => {

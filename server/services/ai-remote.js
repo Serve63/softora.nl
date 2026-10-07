@@ -377,25 +377,19 @@ function createAiRemoteService(deps = {}) {
     const text = normalizeWebsitePreviewText(textRaw);
     if (!text) return false;
 
+    // Cookie controls and privacy notices are ordinary page content (e.g. Portus).
+    // Treat feature requirements as a wall only when they describe the page itself.
+    const featureGate = /^(?:please )?enable (?:javascript|cookies)(?: and (?:javascript|cookies))?(?: to (?:continue|proceed))?[.!]?$/i;
+    const headings = String(textRaw).match(/<(?:title|h[12])\b[^>]*>[^<]*<\/(?:title|h[12])>|^Title:[^\n]+/gim) || [];
+    if (headings.some((heading) => featureGate.test(normalizeWebsitePreviewText(heading).replace(/^title:\s*/, ''))) ||
+      featureGate.test(text) || (text.length < 600 && /^(?:please )?enable (?:javascript(?: and cookies)?|cookies) to (?:continue|proceed)\b/.test(text))) return true;
     const hardSignals = [
-      'verify you are human',
-      'unusual traffic',
-      'access denied',
-      'enable javascript',
-      'enable cookies',
-      'temporarily blocked',
-      'request blocked',
-      'forbidden',
-      'detected unusual activity',
-      'automatische scripts',
-      'toegang is tijdelijk geblokkeerd',
-      'ip adres',
-      'ip address',
+      'verify you are human', 'unusual traffic', 'access denied',
+      'temporarily blocked', 'request blocked', 'forbidden',
+      'detected unusual activity', 'automatische scripts', 'toegang is tijdelijk geblokkeerd',
       'complete the captcha', 'solve the captcha', 'captcha verification required',
     ];
-    if (hardSignals.some((signal) => text.includes(signal))) {
-      return true;
-    }
+    if (hardSignals.some((signal) => text.includes(signal))) return true;
 
     const blockWords = ['blocked', 'geblokkeerd', 'forbidden', 'denied'];
     const securityWords = ['ip adres', 'ip address', 'captcha', 'bot', 'misbruik', 'automation'];
