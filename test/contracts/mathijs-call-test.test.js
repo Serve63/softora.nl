@@ -1,12 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
-const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 const net = require('node:net');
 const { EventEmitter, once } = require('node:events');
-const { createRequire } = require('node:module');
+const Module = require('node:module');
+const http = require('node:http');
 const WebSocket = require('ws');
 const { createMathijsCallTestGate, MAX_CALL_MS } = require('../../twilio-media-bridge/mathijs-call-test');
 const token = 'a'.repeat(64);
@@ -76,10 +75,13 @@ async function unusedPort() {
 test('isolated media test uses Iapetus and Mathijs 3.8, stops on usage and leaves ordinary calls ambient-only', { timeout: 10000 }, async t => {
   const port = await unusedPort();
   const providers = [];
+  let server; let wss;
   class OfflineGemini extends EventEmitter {
     static OPEN = WebSocket.OPEN;
     static CONNECTING = WebSocket.CONNECTING;
-    static Server = WebSocket.Server;
+    static Server = class extends WebSocket.Server {
+      constructor(options) { super(options); wss = this; }
+    };
     constructor() {
       super(); this.readyState = WebSocket.CONNECTING; this.sent = []; providers.push(this);
       setImmediate(() => { if (this.readyState === WebSocket.CONNECTING) { this.readyState = WebSocket.OPEN; this.emit('open'); } });
@@ -91,21 +93,33 @@ test('isolated media test uses Iapetus and Mathijs 3.8, stops on usage and leave
     close() { this.readyState = WebSocket.CLOSED; this.emit('close', 1000, Buffer.from('offline')); }
   }
   const filename = path.resolve(__dirname, '../../twilio-media-bridge/server.js');
-  const bridgeRequire = createRequire(filename);
-  const sandbox = {
-    require: name => name === 'ws' ? OfflineGemini : bridgeRequire(name),
-    module: { exports: {} }, Buffer, URL, setTimeout, clearTimeout, setInterval, clearInterval,
-    console: { log() {}, warn() {}, error() {} },
-    process: { env: {
-      PORT: String(port), NODE_ENV: 'production', GEMINI_API_KEY: 'offline-provider-stub', GEMINI_VOICE: 'Iapetus',
-      AMBIENT_ONLY_MODE: 'true', BRIDGE_MEDIA_TOKEN: 'local-media-token',
-      AMBIENT_ASSET_PATH: path.resolve(__dirname, '../../twilio-media-bridge/assets/callcenter-dnlburnett-335711-8k.raw'),
-      MATHIJS_CALL_TEST_ENABLED: 'true', MATHIJS_CALL_TEST_TOKEN_SHA256: digest,
-      MATHIJS_CALL_TEST_EXPIRES_AT: new Date(Date.now() + 60000).toISOString(), MATHIJS_CALL_TEST_TO: '+31612345678',
-    } },
+  const originalLoad = Module._load;
+  const originalEnv = process.env;
+  const originalCache = require.cache[filename];
+  process.env = {
+    PORT: String(port), NODE_ENV: 'production', GEMINI_API_KEY: 'offline-provider-stub', GEMINI_VOICE: 'Iapetus',
+    AMBIENT_ONLY_MODE: 'true', BRIDGE_MEDIA_TOKEN: 'local-media-token',
+    AMBIENT_ASSET_PATH: path.resolve(__dirname, '../../twilio-media-bridge/assets/callcenter-dnlburnett-335711-8k.raw'),
+    MATHIJS_CALL_TEST_ENABLED: 'true', MATHIJS_CALL_TEST_TOKEN_SHA256: digest,
+    MATHIJS_CALL_TEST_EXPIRES_AT: new Date(Date.now() + 60000).toISOString(), MATHIJS_CALL_TEST_TO: '+31612345678',
   };
-  vm.runInNewContext(fs.readFileSync(filename, 'utf8') + '\nmodule.exports = { server, wss };', sandbox, { filename });
-  const { server, wss } = sandbox.module.exports;
+  Module._load = function(request, parent, isMain) {
+    if (parent?.filename === filename) {
+      if (request === 'dotenv') return { config() {} };
+      if (request === 'ws') return OfflineGemini;
+      if (request === 'http') return { ...http, createServer(...args) { server = http.createServer(...args); return server; } };
+    }
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  try {
+    delete require.cache[filename];
+    require(filename);
+  } finally {
+    Module._load = originalLoad;
+    process.env = originalEnv;
+    delete require.cache[filename];
+    if (originalCache) require.cache[filename] = originalCache;
+  }
   const clients = [];
   t.after(async () => {
     for (const client of clients) client.terminate();
