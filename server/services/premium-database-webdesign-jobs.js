@@ -1,3 +1,4 @@
+const { createWebdesignSourceSelectionResponse } = require('./webdesign-source-selection');
 const { isSubscriptionJob, isExpiredWebdesignJob, refreshWebdesignMailReady, startManualWebdesignBatchResponse } = require('./webdesign-subscription');
 const { deliverWebdesignImage, createWebdesignDeliveryInterruptedError } = require('./premium-database-webdesign-delivery');
 const { isOpenAiSafetyBlockedError } = require('./openai-image-errors');
@@ -5,8 +6,7 @@ const { randomUUID } = require('crypto');
 const { runPremiumDatabaseWebdesignBatchWorker, sendBatchWorkerResponse, sendMailStockStatusResponse, resolveWorkerConcurrency, resolveWorkerJobLimit } = require('./premium-database-webdesign-batch-worker');
 const { buildWebdesignGenerationProvenance, normalizeWebdesignVariant } = require('./design-photo-generation-policy');
 const { createWebdesignJobStarter } = require('./webdesign-job-start');
-const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8';
-const DEVICE_MOCKUP_FILE_VERSION = 'v8';
+const DEVICE_MOCKUP_RENDERER = 'softora-server-device-v8', DEVICE_MOCKUP_FILE_VERSION = 'v8';
 const SUSPECT_DEVICE_MOCKUP_RENDERERS = new Set([
   'softora-browser-device-v6',
   'softora-server-device-v6',
@@ -2450,7 +2450,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
   }
 
   return {
-    appendBatchChunkResponse,
+    selectBatchSourcesResponse: createWebdesignSourceSelectionResponse({ ownerKeyFromReq, dataOpsStore, now }), appendBatchChunkResponse,
     cancelBatchResponse,
     commitBatchResponse,
     getBatchResponse,

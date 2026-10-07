@@ -201,6 +201,22 @@ test('subscription failure and a cancelled job never save an image or call the p
   assert.equal(stopped.statusCode, 409); assert.equal(stopped.body.code, 'WEBDESIGN_STOPPED');
 });
 
+test('source-reference worker failures save only a fixed explanation and never arbitrary model text or an image', async () => {
+  const messages = [];
+  const service = createWebdesignSubscriptionService({ repository: {
+    begin: async () => ({ ok: true, job: {} }),
+    finish: async (_id, _claim, message) => { messages.push(message); return { ok: true }; },
+  }, coordinator: { saveSubscriptionPhoto: () => assert.fail('No image may be saved') } });
+  for (const errorKind of ['source-reference', 'untrusted-model-text']) {
+    const response = res();
+    await service.complete({ body: { jobId: 'job-1234567890123456', claim, errorKind, error: 'ARBITRARY MODEL OUTPUT' } }, response);
+    assert.equal(response.body.done, true);
+  }
+  assert.equal(messages[0], 'De homepage-screenshot is geblokkeerd of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.');
+  assert.match(messages[1], /Codex kon het ontwerp niet maken/);
+  assert.ok(messages.every(message => !message.includes('ARBITRARY') && !message.includes('untrusted-model-text')));
+});
+
 test('SQL claims atomically and restricts the image lane to service-role execution', () => {
   const sql = fs.readFileSync(path.join(__dirname, '../../supabase/migrations/20261003010627_manual_webdesign_subscription.sql'), 'utf8');
   assert.match(sql, /for update skip locked/i);

@@ -37,6 +37,9 @@ function registerPremiumDatabaseWebdesignJobRoutes(app, deps = {}) {
   app.get('/api/premium-database/webdesign-photo-jobs/:jobId', (req, res) =>
     coordinator.getJobResponse(req, res)
   );
+  app.post('/api/premium-database/webdesign-photo-source-selection', requirePremiumApiAccess, (req, res) =>
+    coordinator.selectBatchSourcesResponse(req, res)
+  );
   app.post('/api/premium-database/webdesign-photo-batches', (req, res) =>
     coordinator.startBatchResponse(req, res)
   );

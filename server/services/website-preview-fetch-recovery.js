@@ -32,16 +32,35 @@ function createWebsitePreviewDocumentFetcher({ fetchDocument, assertPublic }) {
 }
 
 function buildWebsitePreviewFetchError(attempts = []) {
-  const lastAttemptWithStatus = [...attempts].reverse()
-    .find((attempt) => Number.isFinite(attempt?.status) && attempt.status > 0);
-  const status = lastAttemptWithStatus ? lastAttemptWithStatus.status : 502;
-  const blocked = attempts.some((attempt) => attempt?.blocked || [401, 403, 406, 409, 429, 451].includes(Number(attempt?.status || 0)));
-  const error = new Error(blocked
-    ? `Kon deze website niet ophalen (${status}). Deze site blokkeert geautomatiseerde serververzoeken.`
-    : `Kon deze website niet ophalen (${status}).`);
-  error.status = status >= 400 && status < 600 ? status : 502;
-  // A reader's 422 can mask the origin's temporary timeout or 5xx response.
   const originAttempts = attempts.filter((attempt) => attempt.mode !== 'reader-fallback');
+  const originResponse = [...originAttempts].reverse().find((attempt) => Number(attempt.status) >= 400);
+  const fallbackResponse = [...attempts].reverse().find((attempt) => Number(attempt.status) >= 400);
+  const status = Number((originResponse || fallbackResponse)?.status) || 502;
+  const transportOnly = originAttempts.length > 0 && originAttempts.every((attempt) => Number(attempt.status) === 0);
+  const dnsMissing = transportOnly && originAttempts.every((attempt) => /^(ENOTFOUND|EAI_NONAME)$/.test(attempt.errorCode || ''));
+  const tlsFailure = transportOnly && originAttempts.some((attempt) => /CERT_|^ERR_TLS_|SELF_SIGNED|UNABLE_TO_VERIFY/.test(attempt.errorCode || ''));
+  const blocked = originAttempts.some((attempt) => attempt.blocked);
+  let code = 'WEBDESIGN_WEBSITE_FETCH_FAILED';
+  let message = `Kon deze website niet ophalen (${status}).`;
+  if (dnsMissing) {
+    code = 'WEBDESIGN_WEBSITE_DNS_MISSING';
+    message = 'Het websiteadres is niet te vinden in DNS. Controleer het domein van dit bedrijf.';
+  } else if (tlsFailure) {
+    code = 'WEBDESIGN_WEBSITE_TLS_FAILED';
+    message = 'De beveiligde verbinding met deze website werkt niet; ook via HTTP is geen bruikbare website gevonden.';
+  } else if (status === 404 || status === 410) {
+    message = `De opgegeven websitepagina bestaat niet meer of is niet beschikbaar (${status}).`;
+  } else if (status === 429) {
+    message = 'De website staat tijdelijk geen extra verzoeken toe (429).';
+  } else if ([408, 504, 522, 524].includes(status)) {
+    message = `De website reageert niet op tijd (${status}).`;
+  } else if (status === 401 || status === 403 || status === 451) {
+    message = `De website weigert toegang (${status}); de bedrijfsinhoud kon niet worden gelezen.`;
+  } else if (blocked) {
+    message = 'De website toont een toegangscontrole of blokkeerpagina; de bedrijfsinhoud kon niet worden gelezen.';
+  }
+  const error = Object.assign(new Error(message), { status, code });
+  // A reader's 422 can mask the origin's temporary timeout or 5xx response.
   error.retryableWebsiteFetch = originAttempts.length > 0 && originAttempts.every((attempt) => {
     const status = Number(attempt.status);
     if (status === 429) return true;

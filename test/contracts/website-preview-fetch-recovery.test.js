@@ -148,7 +148,7 @@ test('failed HTTP recovery preserves both origins for diagnostic/retry classific
 for (const status of [408, 425, 429, 500, 503, 504]) {
   test(`reader 422 does not erase temporary origin failure ${status}`, () => {
     const error = buildWebsitePreviewFetchError([{ mode: 'browser-desktop', status }, { mode: 'reader-fallback', status: 422 }]);
-    assert.equal(error.status, 422);
+    assert.equal(error.status, status, 'show the origin error instead of the reader error');
     assert.equal(error.retryableWebsiteFetch, true);
   });
 }
@@ -204,4 +204,41 @@ for (const content of [
   const { generationScan } = await coordinator.prepareWebsitePreviewImage(website, pipelineOptions());
   assert.equal(generationScan.sourceUrl, website);
   assert.equal(generationScan.requireReferenceImages, true);
+});
+
+
+test('unavailable DNS names explain the domain failure rather than a reader 422', () => {
+  const error = buildWebsitePreviewFetchError([
+    { mode: 'browser-desktop', status: 0, errorCode: 'ENOTFOUND' },
+    { mode: 'softora-compat', status: 0, errorCode: 'EAI_NONAME' },
+    { mode: 'reader-fallback', status: 422 },
+  ]);
+  assert.equal(error.code, 'WEBDESIGN_WEBSITE_DNS_MISSING');
+  assert.match(error.message, /niet te vinden in DNS/);
+  assert.doesNotMatch(error.message, /422/);
+  assert.equal(error.retryableWebsiteFetch, false);
+});
+
+test('a hosting suspension retains original 403 when the reader returns a 200 block page', () => {
+  const error = buildWebsitePreviewFetchError([
+    { mode: 'browser-desktop', status: 403, blocked: true },
+    { mode: 'softora-compat', status: 403, blocked: true },
+    { mode: 'reader-fallback', status: 200, blocked: true },
+  ]);
+  assert.equal(error.status, 403);
+  assert.match(error.message, /weigert toegang \(403\)/);
+  assert.doesNotMatch(error.message, /200|geautomatiseerde/);
+  assert.equal(error.retryableWebsiteFetch, false);
+});
+
+test('failed certificates and missing pages keep their actual source cause', () => {
+  const tls = buildWebsitePreviewFetchError([{ mode: 'browser-desktop', status: 0,
+    errorCode: 'CERT_HAS_EXPIRED' }, { mode: 'reader-fallback', status: 422 }]);
+  assert.equal(tls.code, 'WEBDESIGN_WEBSITE_TLS_FAILED');
+  assert.match(tls.message, /beveiligde verbinding/);
+  assert.equal(tls.retryableWebsiteFetch, false);
+  const missing = buildWebsitePreviewFetchError([{ mode: 'browser-desktop', status: 404 },
+    { mode: 'reader-fallback', status: 422 }]);
+  assert.equal(missing.status, 404);
+  assert.match(missing.message, /404/);
 });

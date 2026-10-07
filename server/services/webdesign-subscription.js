@@ -85,6 +85,8 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
       if (body.error) {
         await repository.finish(body.jobId, body.claim, body.errorKind === 'subscription-limit'
           ? 'Je abonnementlimiet is bereikt. De wachtrij pauzeert en controleert later opnieuw; er wordt geen API gebruikt.'
+          : body.errorKind === 'source-reference'
+            ? 'De homepage-screenshot is geblokkeerd of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.'
           : 'Codex kon het ontwerp niet maken via je abonnement. Controleer Codex op je Mac en probeer opnieuw.');
         return res.json({ ok: true, done: true });
       }

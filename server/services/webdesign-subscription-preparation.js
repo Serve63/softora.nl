@@ -54,7 +54,9 @@ async function prepareSubscriptionClaim(job, { repository, aiToolsCoordinator, l
   } catch (error) {
     const retry = error.retryableWebsiteFetch === true && begun.preparation.attempts < 3;
     const saved = await repository.savePreparation(job.id, job.subscriptionClaim, begun.preparation,
-      { phase: retry ? 'retry' : 'failed', error: String(error.message).slice(0, 500), retryAt: retry ? now() + 15000 : 0 });
+      { phase: retry ? 'retry' : 'failed', error: String(error.message).slice(0, 500),
+        errorCode: String(error.code || '').slice(0, 100), retryableWebsiteFetch: error.retryableWebsiteFetch === true,
+        retryAt: retry ? now() + 15000 : 0 });
     if (saved.stopped) return { ok: true, job: null };
     if (!saved.ok || retry) return { ok: true, job: null, waiting: true };
     return fail(error);

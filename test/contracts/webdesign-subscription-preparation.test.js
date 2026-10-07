@@ -110,6 +110,18 @@ test('preparation deadline releases the poll and ignores late scan output', asyn
   assert.equal(f.finished.length, 0);
 });
 
+test('source failure classification survives persistence for later bulk eligibility checks', async () => {
+  const f = fixture({ prepare: () => { throw Object.assign(new Error('DNS adres niet gevonden'), {
+    code: 'WEBDESIGN_WEBSITE_DNS_MISSING', retryableWebsiteFetch: false,
+  }); } });
+  await assert.rejects(f.poll(), /DNS adres niet gevonden/);
+  const saved = f.row().payload.subscriptionPreparation;
+  assert.equal(saved.phase, 'failed');
+  assert.equal(saved.errorCode, 'WEBDESIGN_WEBSITE_DNS_MISSING');
+  assert.equal(saved.retryableWebsiteFetch, false);
+  assert.equal(f.row().status, 'error');
+});
+
 test('cancellation during preparation rejects its late response without overwriting job state', async () => {
   const pending = deferred(), started = deferred();
   const f = fixture({ prepare: () => { started.resolve(); return pending.promise; } });

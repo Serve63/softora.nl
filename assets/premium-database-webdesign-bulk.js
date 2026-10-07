@@ -58,7 +58,7 @@
         const cancelledBatchIds = new Set();
         const dismissedBatchIds = new Set();
         const uploadTriggeredBatchIds = new Set();
-        const observedMade = new Map();
+        let requestSequence = 0, latestSnapshotSequence = 0;
         let uploadKickRunning = false, uploadKickPending = false;
         ensureStyles();
 
@@ -284,7 +284,7 @@
 
         function queuePhotoRefresh(batch) {
             const made = Math.max(0, Number(batch && (batch.made || batch.done)) || 0);
-            if (made <= latestMade) return;
+            if (made === latestMade) return;
             latestMade = made;
             if (refreshQueued || typeof global.setTimeout !== "function") return;
             refreshQueued = true;
@@ -348,8 +348,14 @@
         function handleBatch(batch, phase, options) {
             if (!batch || !batch.id) return;
             const batchId = normalizeString(batch.id);
-            const made = Math.max(observedMade.get(batchId) || 0, Number(batch.made || batch.done) || 0);
-            observedMade.set(batchId, made);
+            const sequence = Number(options && options.requestSequence) || ++requestSequence;
+            if (sequence < latestSnapshotSequence) {
+                schedulePoll(BULK_POLL_INTERVAL_MS);
+                return;
+            }
+            latestSnapshotSequence = sequence;
+            // Server corrections may remove invalid results; success counts are not monotonic.
+            const made = Math.max(0, Number(batch.made != null ? batch.made : batch.done) || 0);
             batch = Object.assign({}, batch, { made: made, done: made });
             const status = normalizeString(batch.status).toLowerCase();
             if (isTerminalBatchStatus(status) && status !== "cancelled") kickInstantlyUpload(batch);
@@ -388,6 +394,7 @@
 
         async function readJson(response) { return response.json().catch(function () { return {}; }); }
         async function requestJson(url, options) {
+            const sequence = ++requestSequence;
             const abort = typeof global.AbortController === "function" ? new global.AbortController() : null;
             let timer;
             const timeout = new Promise(function (_resolve, reject) {
@@ -398,7 +405,7 @@
             });
             try {
                 return await Promise.race([Promise.resolve(fetch(url, Object.assign({}, options, abort ? { signal: abort.signal } : {}))).then(async function (response) {
-                    return { response: response, payload: await readJson(response) };
+                    return { response: response, payload: await readJson(response), requestSequence: sequence };
                 }), timeout]);
             } finally {
                 if (timer && typeof global.clearTimeout === "function") global.clearTimeout(timer);
@@ -413,14 +420,15 @@
             }
             pollInFlight = true;
             try {
-                const { response, payload } = await requestJson(BATCH_ENDPOINT + "/" + encodeURIComponent(id), { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
+                const { response, payload, requestSequence } = await requestJson(BATCH_ENDPOINT + "/" + encodeURIComponent(id), { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
+                if (requestSequence < latestSnapshotSequence) { schedulePoll(BULK_POLL_INTERVAL_MS); return; }
                 if (response.status === 404) {
                     if (id === activeBatchId) activeBatchId = "";
                     scheduleRestoreRetry();
                     return;
                 }
                 if (!response.ok || !payload || !payload.batch) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk laden is mislukt.");
-                handleBatch(payload.batch, "running");
+                handleBatch(payload.batch, "running", { requestSequence: requestSequence });
             } catch (error) {
                 schedulePoll(BULK_POLL_INTERVAL_MS * 2);
             } finally {
@@ -483,9 +491,11 @@
             if (restoreInFlight) return null;
             restoreInFlight = true;
             try {
-                const { response, payload } = await requestJson(BATCH_ENDPOINT, { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
+                const { response, payload, requestSequence } = await requestJson(BATCH_ENDPOINT, { method: "GET", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } });
                 const batches = Array.isArray(payload && payload.batches) ? payload.batches : [];
                 if (!response.ok) throw new Error(normalizeString(payload && (payload.detail || payload.error)) || "Webdesign-bulk laden is mislukt.");
+                if (requestSequence < latestSnapshotSequence) return null;
+                latestSnapshotSequence = requestSequence;
                 if (!batches.length) {
                     hideStatus();
                     return null;
@@ -495,8 +505,7 @@
                     hideStatus();
                     return null;
                 }
-                latestMade = Math.max(0, Number(batch.made || batch.done) || 0);
-                handleBatch(batch, batch.status === "queued" ? "uploading" : "running", { immediate: true });
+                handleBatch(batch, batch.status === "queued" ? "uploading" : "running", { immediate: true, requestSequence: requestSequence });
                 return batch;
             } catch (error) {
                 scheduleRestoreRetry();

@@ -2911,8 +2911,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /async function generateWebsitePhotoData\(customer\)/);
   assert.match(pageSource, /const webdesignPhotoSourceSelection = window\.SoftoraDatabaseWebdesignSourceSelection\.createController\(/);
   assert.doesNotMatch(pageSource, /getSourceCounts: webdesignPhotoSourceSelection\.getSourceCounts/);
-  assert.match(pageSource, /webdesignPhotoSourceSelection\.getTargets\(limit, source\)/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-source-selection\.js\?v=20260917-source/);
+  assert.match(pageSource, /await webdesignPhotoSourceSelection\.getTargetsForBatch\(limit, source\)/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-source-selection\.js\?v=20261007-source-retry/);
   assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(
@@ -3079,7 +3079,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /void webdesignActionController\.generateForCustomer\(state\.photoTargetId\);/);
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20261003-resilient/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20261007-source-retry/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);

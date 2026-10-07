@@ -59,6 +59,26 @@ def subscription_limit(folder):
                 return True
     return False
 
+def source_reference_blocked(folder):
+    answer = folder / 'answer.json'
+    if any((folder / name).exists() for name in ('design.png', 'design.jpg')) or answer.is_symlink():
+        return False
+    try:
+        with answer.open() as stream:
+            raw = stream.read(32769)
+        if len(raw) > 32768:
+            return False
+        result = json.loads(raw)
+    except (OSError, ValueError):
+        return False
+    if not isinstance(result, dict) or result.get('status') != 'blocked' or type(result.get('generated_images')) is not int or result['generated_images'] != 0:
+        return False
+    reason = result.get('reason')
+    if not isinstance(reason, str) or len(reason) > 4000:
+        return False
+    reason = reason.lower()
+    return any(word in reason for word in ('screenshot', 'referentie', 'bronbeeld')) and any(word in reason for word in ('cloudflare', 'blokkade', 'onleesbaar'))
+
 def subscription_paused():
     for peer in range(2):
         try:
@@ -231,6 +251,8 @@ def step(slot=0):
         payload['error'] = 'Codex-generatie onderbroken of niet beschikbaar.'
         if state.get('limit'):
             payload['errorKind'] = 'subscription-limit'
+        elif source_reference_blocked(folder):
+            payload['errorKind'] = 'source-reference'
     else:
         payload['dataUrl'] = 'data:image/jpeg;base64,' + base64.b64encode((folder / 'design.jpg').read_bytes()).decode()
     delivered = call('/report', payload)
