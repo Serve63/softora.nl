@@ -4,7 +4,7 @@
     module.exports = api;
     return;
   }
-  api.start({
+  globalScope.SoftoraKvkRecentResearch = api.start({
     document: globalScope.document,
     window: globalScope.window || globalScope,
     getSnapshot() {
@@ -135,10 +135,12 @@
 
     let renderedHead = null;
     let renderedBody = null;
+    let liveRendered = false;
 
     function render() {
       if (!head || !body) return;
       const snapshot = getSnapshot();
+      if (!Array.isArray(snapshot?.latestTreated)) return;
       const activities = Array.isArray(snapshot?.latestTreated)
         ? snapshot.latestTreated.slice(0, 10)
         : [];
@@ -152,9 +154,10 @@
       // Rewriting unchanged rows every second would clear any text the user is selecting.
       if (headHtml !== renderedHead) head.innerHTML = renderedHead = headHtml;
       if (bodyHtml !== renderedBody) body.innerHTML = renderedBody = bodyHtml;
+      liveRendered = true;
     }
 
-    return { render };
+    return { render, hasLiveSnapshot: () => liveRendered };
   }
 
   function start(deps = {}) {

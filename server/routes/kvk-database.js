@@ -47,6 +47,12 @@ function registerKvkDatabaseRoutes(app, deps = {}) {
       : res.status(503).json({ ok: false, error: 'KVK locatiestatistieken zijn tijdelijk niet beschikbaar.' })
   );
 
+  app.get('/api/kvk-database/company-directory/counts', requirePremiumAdminApiAccess, (req, res) =>
+    directoryCoordinator && typeof directoryCoordinator.sendGetCountsResponse === 'function'
+      ? directoryCoordinator.sendGetCountsResponse(req, res)
+      : res.status(503).json({ ok: false, error: 'Actuele bedrijfstellingen zijn tijdelijk niet beschikbaar.' })
+  );
+
   app.get('/api/kvk-database/company-directory', requirePremiumAdminApiAccess, (req, res) =>
     directoryCoordinator && typeof directoryCoordinator.sendGetDirectoryResponse === 'function'
       ? directoryCoordinator.sendGetDirectoryResponse(req, res)

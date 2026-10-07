@@ -4,7 +4,7 @@
     module.exports = api;
     return;
   }
-  api.start({
+  globalScope.SoftoraKvkMetrics = api.start({
     document: globalScope.document,
     window: globalScope.window || globalScope,
     getSnapshot() {
@@ -22,6 +22,8 @@
   const numberFormat = new Intl.NumberFormat('nl-NL');
   const DIRECTORY_API_URL = '/api/kvk-database/company-directory';
   const CANONICAL_REFRESH_INTERVAL_MS = 30_000;
+  const REMEMBERED_COUNTS_KEY = 'kvk-database:canonical-counts:v2';
+  const REMEMBERED_COUNTS_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
   const CANONICAL_CATEGORIES = Object.freeze({
     treated: 'behandeld',
     successfulFound: 'bruikbaar-verklaard',
@@ -79,6 +81,7 @@
   }
 
   function nonNegativeCount(value) {
+    if (value === null || value === undefined) return null;
     const count = Number(value);
     return Number.isFinite(count) && count >= 0 ? count : null;
   }
@@ -103,25 +106,38 @@
 
   async function fetchCanonicalDirectoryCounts(fetchImpl) {
     if (typeof fetchImpl !== 'function') throw new Error('Canonical directory fetch is unavailable.');
-    const entries = await Promise.all(Object.entries(CANONICAL_CATEGORIES).map(async ([key, category]) => {
-      const params = new URLSearchParams({
-        categorie: category,
-        limit: '1',
-        after: '0',
-      });
-      const response = await fetchImpl(`${DIRECTORY_API_URL}?${params.toString()}`, {
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 20_000);
+    timer.unref?.();
+    try {
+      const response = await fetchImpl(`${DIRECTORY_API_URL}/counts`, {
         cache: 'no-store',
         credentials: 'same-origin',
+        signal: abort.signal,
       });
-      if (!response?.ok) throw new Error(`Canonical directory count failed for ${category}.`);
+      if (!response?.ok) throw new Error('Canonical directory counts failed.');
       const payload = await response.json();
-      const count = nonNegativeCount(payload?.total);
-      if (!payload?.ok || payload?.total_is_exact !== true || count === null) {
-        throw new Error(`Canonical directory count is not exact for ${category}.`);
+      const counts = verifiedCounts(payload?.counts);
+      if (!payload?.ok || payload?.total_is_exact !== true || !counts) {
+        throw new Error('Canonical directory counts are not exact.');
       }
-      return [key, count];
-    }));
-    return Object.fromEntries(entries);
+      return counts;
+    } finally { clearTimeout(timer); }
+  }
+
+  function verifiedCounts(value) {
+    if (!value || typeof value !== 'object') return null;
+    const counts = {};
+    for (const key of Object.keys(CANONICAL_CATEGORIES)) {
+      if (!Number.isSafeInteger(value[key]) || value[key] < 0) return null;
+      counts[key] = value[key];
+    }
+    return counts.usable === counts.withWebsite + counts.withoutWebsite ? counts : null;
+  }
+
+  function readRememberedCounts(store) {
+    try { return verifiedCounts(store?.readLastKnown?.(REMEMBERED_COUNTS_KEY, REMEMBERED_COUNTS_MAX_AGE_MS)); }
+    catch { return null; }
   }
 
   function mergeGradeActivity(...activities) {
@@ -191,9 +207,42 @@
       : typeof windowRef.fetch === 'function'
         ? windowRef.fetch.bind(windowRef)
         : null;
-    let canonicalCounts = null;
+    const store = deps.store || windowRef.SoftoraReadModelStore;
+    let canonicalCounts = readRememberedCounts(store);
+    let canonicalCountsLive = false;
+    let canonicalRefreshFailed = false;
     let canonicalRefreshPromise = null;
     let transferInventoryRevision = 0;
+    const status = documentRef.getElementById('kvk-metrics-status');
+    const rememberedActions = ['kvk-upload-open', 'kvk-api-workers-open',
+      'companies-usable-open', 'companies-with-website-open', 'companies-without-website-open'];
+    function markRememberedReadOnly() {
+      for (const id of rememberedActions) {
+        const button = documentRef.getElementById(id);
+        if (!button) continue;
+        if (canonicalCounts && !canonicalCountsLive) {
+          if (button.getAttribute?.('data-kvk-counts-readonly') !== 'true' && !button.disabled) {
+            button.setAttribute?.('data-kvk-counts-readonly', 'true');
+          }
+          button.disabled = true;
+        } else if (button.getAttribute?.('data-kvk-counts-readonly') === 'true') {
+          button.disabled = false;
+          button.removeAttribute?.('data-kvk-counts-readonly');
+        }
+      }
+    }
+    function rememberVerifiedCounts() {
+      if (!verifiedCounts(canonicalCounts)) return;
+      try { store?.rememberLastKnown?.(REMEMBERED_COUNTS_KEY, canonicalCounts); } catch { /* Storage is optional. */ }
+    }
+    function renderLoadStatus() {
+      if (!status) return;
+      const failed = canonicalRefreshFailed || windowRef.SoftoraKvkDashboard?.hasSnapshotFailure?.();
+      status.hidden = !failed;
+      if (failed) status.textContent = canonicalCounts || documentRef.documentElement?.hasAttribute?.('data-softora-screen-snapshot')
+        ? 'Actuele gegevens tijdelijk niet beschikbaar. De laatst bevestigde gegevens blijven zichtbaar.'
+        : 'Actuele gegevens tijdelijk niet beschikbaar. We proberen het opnieuw.';
+    }
     const elements = {
       treatedTotal: documentRef.getElementById('companies-treated'),
       usableTotal: documentRef.getElementById('companies-usable'),
@@ -219,7 +268,7 @@
       const canonical = nonNegativeCount(canonicalCounts?.[key]);
       if (canonical !== null) return canonical;
       // Robot snapshots contain research rows before transfer deduplication.
-      if (fetchImpl && ['withWebsite', 'usable'].includes(key)) return null;
+      if (fetchImpl && ['withWebsite', 'withoutWebsite', 'usable'].includes(key)) return null;
       const fallbackCount = nonNegativeCount(fallback);
       return fallbackCount ?? 0;
     }
@@ -234,8 +283,12 @@
     }
 
     function renderMetrics() {
+      markRememberedReadOnly();
+      renderLoadStatus();
       const snapshot = getSnapshot();
-      if (!snapshot?.state && !canonicalCounts && !fetchImpl) return;
+      // A restored screen already contains verified values; an empty bootstrap
+      // must not replace them before either live read has answered.
+      if (!snapshot?.state && !canonicalCounts) return;
       const scraperState = snapshot?.state || {};
       const last60 = getLast60Minutes(snapshot, now());
       const unusableGrades = scraperState.unusable_grades || {};
@@ -285,6 +338,7 @@
           countOrFallback('controlRoom', scraperState.control_room),
         );
       }
+      if (!snapshot?.state) return;
       renderLast60Delta(elements.successfulFoundLast60, last60.declared_usable);
       renderLast60Delta(elements.declaredUnusableLast60, last60.declared_unusable);
       renderControlRoomLast60(elements.controlRoomLast60, last60.control_room_activity);
@@ -322,10 +376,17 @@
           if (current !== transferInventoryRevision) {
             for (const key of ['withWebsite', 'withoutWebsite', 'usable']) canonicalCounts[key] = verified[key];
           }
+          canonicalCountsLive = true;
+          canonicalRefreshFailed = false;
+          rememberVerifiedCounts();
           renderMetrics();
           return true;
         })
-        .catch(() => false)
+        .catch(() => {
+          canonicalRefreshFailed = true;
+          renderLoadStatus();
+          return false;
+        })
         .finally(() => {
           canonicalRefreshPromise = null;
         });
@@ -336,12 +397,14 @@
       renderMetrics,
       refreshCanonicalCounts,
       getCanonicalCounts: () => canonicalCounts && { ...canonicalCounts },
+      hasLiveCanonicalCounts: () => canonicalCountsLive,
       applyTransferInventory(data) {
         const withWebsite = nonNegativeCount(data?.count);
         const withoutWebsite = nonNegativeCount(data?.withoutWebsiteCount);
-        if (withWebsite === null || withoutWebsite === null) return;
+        if (!Number.isSafeInteger(withWebsite) || withWebsite < 0 || !Number.isSafeInteger(withoutWebsite) || withoutWebsite < 0) return;
         transferInventoryRevision++;
         canonicalCounts = { ...canonicalCounts, withWebsite, withoutWebsite, usable: withWebsite + withoutWebsite };
+        rememberVerifiedCounts();
         renderMetrics();
       },
     };
@@ -367,7 +430,7 @@
     }
     // Wait while the user selects text, so a re-render never clears the selection.
     deps.window.setInterval(() => { if (!deps.window.SoftoraKvkSelectionPause?.isSelecting()) controller.renderMetrics(); }, 1000);
-    deps.window.setInterval(() => { void controller.refreshCanonicalCounts(); }, CANONICAL_REFRESH_INTERVAL_MS);
+    deps.window.setInterval(() => { if (!deps.document.hidden) void controller.refreshCanonicalCounts(); }, CANONICAL_REFRESH_INTERVAL_MS);
     deps.window.addEventListener('focus', () => {
       controller.renderMetrics();
       void controller.refreshCanonicalCounts();
@@ -389,6 +452,8 @@
     getLast60Minutes,
     renderLast60Delta,
     renderUnusableGradeLast60,
+    readRememberedCounts,
+    REMEMBERED_COUNTS_KEY,
     start,
   };
 });

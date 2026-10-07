@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="/assets/softora-touch-icon.png?v=20260615a">
   <link rel="stylesheet" href="/assets/kvk-database.css?v=20260617c">
   <link rel="stylesheet" href="/assets/kvk-database-frame.css?v=20260824a">
-  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20260917-control-orange">
+  <link rel="stylesheet" href="/assets/kvk-database-metrics.css?v=20261007-smooth">
   <link rel="stylesheet" href="/assets/kvk-database-control.css?v=20260804b">
   <link rel="stylesheet" href="/assets/kvk-database-total-found.css?v=20261003-overview-style">
   <link rel="stylesheet" href="/assets/kvk-database-planning.css?v=20260909c">
@@ -40,6 +40,7 @@
       </div>
     </header>
 
+    <p id="kvk-metrics-status" class="kvk-load-status" role="status" hidden></p>
     <section class="inventory" aria-label="Ongebruikte voorraad">
       <div class="inventory-grid">
 <article class="stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced">
@@ -48,7 +49,7 @@
         </button>
         <div class="stat-main">
           <span>Klaar voor gebruik:</span>
-          <strong id="companies-usable">0</strong>
+          <strong id="companies-usable">—</strong>
         </div>
         <div class="stat-delta" id="companies-usable-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">60m</span></div>
       </article><article class="stat-card stat-card-usable stat-card-directory kvk-stat-card-enhanced">
@@ -57,7 +58,7 @@
         </button>
         <div class="stat-main">
           <span>Mét website</span>
-          <strong id="companies-with-website">0</strong>
+          <strong id="companies-with-website">—</strong>
         </div>
         <div class="stat-delta" id="companies-with-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">60m</span></div>
       </article><article class="stat-card stat-card-usable stat-card-without-website stat-card-directory kvk-stat-card-enhanced">
@@ -66,7 +67,7 @@
         </button>
         <div class="stat-main">
           <span>Zonder werkende website</span>
-          <strong id="companies-without-website">0</strong>
+          <strong id="companies-without-website">—</strong>
         </div>
         <div class="stat-delta" id="companies-without-website-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">60m</span></div>
       </article>
@@ -79,7 +80,7 @@
         </button>
         <div class="stat-main">
           <span>Gevonden in KvK</span>
-          <strong id="companies-total">0</strong>
+          <strong id="companies-total">—</strong>
         </div>
         <div class="stat-delta"><span class="stat-delta-label">Alles gevonden</span></div>
       </article><article class="stat-card stat-card-directory kvk-stat-card-enhanced">
@@ -88,7 +89,7 @@
         </button>
         <div class="stat-main">
           <span>Behandeld</span>
-          <strong id="companies-treated">0</strong>
+          <strong id="companies-treated">—</strong>
         </div>
         <div class="stat-delta" id="companies-treated-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">60m</span></div>
       </article><article class="stat-card stat-card-successful-found stat-card-decision stat-card-directory kvk-stat-card-enhanced">
@@ -97,7 +98,7 @@
         </button>
         <div class="stat-main">
           <span>Bruikbaar verklaard</span>
-          <strong id="companies-successful-found">0</strong>
+          <strong id="companies-successful-found">—</strong>
         </div>
         <div class="stat-delta" id="companies-successful-found-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">60m</span></div>
       </article><article class="stat-card stat-card-control-room stat-card-decision stat-card-directory kvk-stat-card-enhanced">
@@ -106,7 +107,7 @@
         </button>
         <div class="stat-main">
           <span>Controlekamer</span>
-          <strong id="companies-control-room">0</strong>
+          <strong id="companies-control-room">—</strong>
         </div>
         <div class="stat-delta stat-delta-flow" id="companies-control-room-last60"><span class="stat-delta-added" title="Binnengekomen in de Controlekamer">+—</span><span class="stat-delta-removed" title="Afgehandeld: bruikbaar of definitief onbruikbaar">−—</span><span class="stat-delta-label">60m</span></div>
       </article><article class="stat-card stat-card-declared-unusable stat-card-decision stat-card-directory kvk-stat-card-enhanced">
@@ -115,7 +116,7 @@
         </button>
         <div class="stat-main">
           <span>Onbruikbaar verklaard</span>
-          <strong id="companies-declared-unusable">0</strong>
+          <strong id="companies-declared-unusable">—</strong>
         </div>
         <div class="stat-delta" id="companies-declared-unusable-last60"><span class="stat-delta-number">+0</span><span class="stat-delta-label">60m</span></div>
       </article>
@@ -213,16 +214,19 @@
     <p id="kvk-api-workers-message" class="kvk-api-workers-dialog__message" role="status"></p>
   </dialog>
 
+  <!-- SOFTORA_PAGE_STATE_BOOTSTRAP -->
+  <script src="/assets/premium-screen-snapshot.js?v=20260927a"></script>
+  <script src="/assets/kvk-database-screen-snapshot.js?v=20261007-smooth"></script>
   <script id="kvkSnapshot" type="application/json">{}</script>
   <script src="/assets/kvk-database-selection-pause.js?v=20260927a"></script>
   <script src="/assets/kvk-database-worker-status.js?v=20260915b"></script>
   <script src="/assets/kvk-database-location-progress.js?v=20260909a"></script>
   <script src="/assets/kvk-database-planning-workers.js?v=20261004-robots"></script>
-  <script src="/assets/kvk-database.js?v=20260927-worker-labels"></script>
+  <script src="/assets/kvk-database.js?v=20261007-smooth"></script>
   <script src="/assets/kvk-database-fast-progress.js?v=20260927-copyable"></script>
   <script src="/assets/kvk-database-total-found.js?v=20261001-clean-results"></script>
-  <script src="/assets/kvk-database-metrics.js?v=20261007-transfer-inventory"></script>
-  <script src="/assets/kvk-database-luna-errors.js?v=20261004-robot-names"></script>
+  <script src="/assets/kvk-database-metrics.js?v=20261007-smooth"></script>
+  <script src="/assets/kvk-database-luna-errors.js?v=20261007-smooth"></script>
   <script src="/assets/kvk-database-control.js?v=20260923-location-count"></script>
   <script src="/assets/kvk-api-workers.js?v=20261004-robots"></script>
   <script src="/assets/kvk-database-upload.js?v=20261007-inventory"></script>
