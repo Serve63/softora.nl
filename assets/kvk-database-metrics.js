@@ -193,6 +193,7 @@
         : null;
     let canonicalCounts = null;
     let canonicalRefreshPromise = null;
+    let transferInventoryRevision = 0;
     const elements = {
       treatedTotal: documentRef.getElementById('companies-treated'),
       usableTotal: documentRef.getElementById('companies-usable'),
@@ -217,6 +218,8 @@
     function countOrFallback(key, fallback) {
       const canonical = nonNegativeCount(canonicalCounts?.[key]);
       if (canonical !== null) return canonical;
+      // Robot snapshots contain research rows before transfer deduplication.
+      if (fetchImpl && ['withWebsite', 'usable'].includes(key)) return null;
       const fallbackCount = nonNegativeCount(fallback);
       return fallbackCount ?? 0;
     }
@@ -226,13 +229,13 @@
     // renderer again forever and starve loading, painting and user input.
     function renderCount(element, value) {
       if (!element) return;
-      const text = numberFormat.format(value);
+      const text = value === null ? '—' : numberFormat.format(value);
       if (element.textContent !== text) element.textContent = text;
     }
 
     function renderMetrics() {
       const snapshot = getSnapshot();
-      if (!snapshot?.state && !canonicalCounts) return;
+      if (!snapshot?.state && !canonicalCounts && !fetchImpl) return;
       const scraperState = snapshot?.state || {};
       const last60 = getLast60Minutes(snapshot, now());
       const unusableGrades = scraperState.unusable_grades || {};
@@ -307,12 +310,18 @@
       );
     }
 
-    async function refreshCanonicalCounts() {
+    async function refreshCanonicalCounts({ fresh = false } = {}) {
       if (!fetchImpl) return false;
-      if (canonicalRefreshPromise) return canonicalRefreshPromise;
+      if (canonicalRefreshPromise) return fresh
+        ? canonicalRefreshPromise.then(() => refreshCanonicalCounts()) : canonicalRefreshPromise;
+      const current = transferInventoryRevision;
       canonicalRefreshPromise = fetchCanonicalDirectoryCounts(fetchImpl)
         .then((counts) => {
+          const verified = canonicalCounts;
           canonicalCounts = counts;
+          if (current !== transferInventoryRevision) {
+            for (const key of ['withWebsite', 'withoutWebsite', 'usable']) canonicalCounts[key] = verified[key];
+          }
           renderMetrics();
           return true;
         })
@@ -327,6 +336,14 @@
       renderMetrics,
       refreshCanonicalCounts,
       getCanonicalCounts: () => canonicalCounts && { ...canonicalCounts },
+      applyTransferInventory(data) {
+        const withWebsite = nonNegativeCount(data?.count);
+        const withoutWebsite = nonNegativeCount(data?.withoutWebsiteCount);
+        if (withWebsite === null || withoutWebsite === null) return;
+        transferInventoryRevision++;
+        canonicalCounts = { ...canonicalCounts, withWebsite, withoutWebsite, usable: withWebsite + withoutWebsite };
+        renderMetrics();
+      },
     };
   }
 
@@ -334,7 +351,8 @@
     const controller = createController(deps);
     controller.renderMetrics();
     void controller.refreshCanonicalCounts();
-    deps.window.addEventListener('kvk-upload-completed', () => { void controller.refreshCanonicalCounts(); });
+    deps.window.addEventListener('kvk-upload-completed', () => { void controller.refreshCanonicalCounts({ fresh: true }); });
+    deps.window.addEventListener('kvk-upload-inventory', event => controller.applyTransferInventory(event.detail));
     const treatedTotal = deps.document.getElementById('companies-treated');
     if (treatedTotal && typeof deps.window.MutationObserver === 'function') {
       const treatedObserver = new deps.window.MutationObserver(controller.renderMetrics);

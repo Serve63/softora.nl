@@ -7,6 +7,21 @@ const {
   renderLast60Delta,
 } = require('../../assets/kvk-database-metrics');
 
+test('opening an upload atomically replaces all inventory cards with the verified selection', () => {
+  const elements = Object.fromEntries(['companies-with-website', 'companies-without-website', 'companies-usable'].map(id => [id, createElement()]));
+  const controller = createController({ document: { getElementById: id => elements[id] || null },
+    fetchImpl: async () => { throw new Error('Count unavailable'); },
+    getSnapshot: () => ({ state: { usable: 13551, with_website: 13037, without_website: 514 } }) });
+  controller.renderMetrics();
+  assert.equal(elements['companies-with-website'].textContent, '—');
+  controller.applyTransferInventory({ count: 12845, withoutWebsiteCount: 514 });
+  assert.equal(elements['companies-with-website'].textContent, '12.845');
+  assert.equal(elements['companies-without-website'].textContent, '514');
+  assert.equal(elements['companies-usable'].textContent, '13.359');
+  controller.renderMetrics();
+  assert.equal(elements['companies-with-website'].textContent, '12.845');
+});
+
 test('individual events expire at the exact rolling hour and stale measurements show unknown', () => {
   const at = Date.parse('2026-10-03T12:00:00Z');
   const snapshot = { generatedAt: new Date(at).toISOString(), state: {

@@ -9,7 +9,7 @@ function res() { return {statusCode:200,status(code){this.statusCode=code;return
 function fixture({rows=[],receipt=null,fail=false,refreshFail=false}={}) {
  const calls=[]; let invalidated=0;
  const db={from(table){ if(table==='softora_kvk_upload_receipts') return {select:()=>({eq:()=>({maybeSingle:async()=>({data:receipt})})})};
- const q={select(){return q;},neq(){return q;},gt(){return q;},order(){return q;},limit:async()=>({data:rows,error:fail?{}:null})}; return q;},rpc:async(name,args)=>{calls.push({name,args});return {data:{count:args.p_candidates.length,destination:'available'}};}};
+ let after=0; const q={select(){return q;},neq(){return q;},gt(_key,value){after=value;return q;},order(){return q;},limit:async()=>({data:rows.filter(row=>row.source_company_id>after),error:fail?{}:null})}; return q;},rpc:async(name,args)=>{calls.push({name,args});return {data:{count:args.p_dry_run?args.p_candidates.length:args.p_limit,sourceIds:args.p_candidates.map(row=>row.source_company_id),destination:'available'}};}};
  const service=createKvkDatabaseUploadService({getSupabaseClient:()=>db,getUiStateValues:async()=>({values:{}}),refreshDestination:()=>{invalidated++;if(refreshFail)throw new Error("Snapshot temporarily unavailable");},logger:{warn(){}}});
  return {service,calls,get invalidated(){return invalidated;}};
 }
@@ -23,7 +23,7 @@ test('preview is read-only and derives candidates from the canonical source',asy
  const r=res();await f.service.preview({},r);assert.equal(r.body.count,1);assert.equal(f.calls[0].args.p_dry_run,true);assert.equal(f.calls[0].args.p_request_id,null);assert.ok(f.calls[0].args.p_candidates[0].guard_keys.includes('email:info@voorbeeld.nl'));
 });
 test('committed retry returns the receipt without selecting or uploading more companies',async()=>{
- const f=fixture({receipt:{result:{count:12,destination:'available'}}});const r=res();await f.service.upload({body:{mode:'with-website',requestId:id,count:1}},r);assert.equal(r.body.count,12);assert.equal(r.body.replayed,true);assert.equal(f.calls.length,0);assert.equal(f.invalidated,1);
+ const f=fixture({receipt:{result:{count:12,destination:'available'}}});const r=res();await f.service.upload({body:{mode:'with-website',requestId:id,count:12}},r);assert.equal(r.body.count,12);assert.equal(r.body.replayed,true);assert.equal(f.calls.length,0);assert.equal(f.invalidated,1);
 });
 test('unreadable source never falls back to uploading client data',async()=>{
  const f=fixture({fail:true});const r=res();await f.service.upload({body:{mode:'with-website',requestId:id,count:1,rows:[{email:'evil'}]}},r);assert.equal(r.statusCode,503);assert.equal(f.calls.length,0);
@@ -50,7 +50,7 @@ function uiFixture(respond) {
 }
 test('UI preserves request ID after uncertain failure and prevents duplicate in-flight clicks',async()=>{
  let resolvePost;
- const f=uiFixture(async(options,n)=>{if(!options.method)return {ok:true,json:async()=>({ok:true,count:3})};if(n===2)return new Promise(resolve=>{resolvePost=resolve;});return {ok:true,json:async()=>({ok:true,count:3})};});
+ const f=uiFixture(async(options,n)=>{if(!options.method)return {ok:true,json:async()=>({ok:true,count:3})};if(n===2)return new Promise(resolve=>{resolvePost=resolve;});return {ok:true,json:async()=>({ok:true,count:JSON.parse(options.body).count})};});
  await f.ui.open(); const first=f.ui.upload(); await Promise.resolve(); await f.ui.upload();assert.equal(f.requests.length,2);
  resolvePost({ok:false,json:async()=>({ok:false,error:'probeer opnieuw'})});await first;
  f.elements.get('kvk-upload-amount').value='999';await f.ui.upload();assert.equal(JSON.parse(f.requests[2].body).count,1);assert.equal(JSON.parse(f.requests[1].body).requestId,JSON.parse(f.requests[2].body).requestId);assert.equal(f.refreshed,1);assert.equal(f.elements.get('kvk-upload-result').hidden,false);
@@ -88,7 +88,7 @@ test('upload modal reuses worker design and has a typeable count without spinner
  assert.match(html,/id="kvk-upload-amount"[^>]*type="text"[^>]*inputmode="numeric"/);
 });
 test('UI sends the chosen count and rejects numbers above the available stock',async()=>{
- const f=uiFixture(async()=>({ok:true,json:async()=>({ok:true,count:12})}));
+ const f=uiFixture(async(options)=>({ok:true,json:async()=>({ok:true,count:options?.method?JSON.parse(options.body).count:12})}));
  await f.ui.open();f.elements.get('kvk-upload-amount').value='13';await f.ui.upload();assert.equal(f.requests.length,1);
  f.elements.get('kvk-upload-amount').value='5';await f.ui.upload();assert.equal(JSON.parse(f.requests[1].body).count,5);
 });
@@ -103,7 +103,7 @@ test('a committed upload stays successful when destination refresh fails, includ
 });
 test('UI confirms stored companies when the snapshot is pending and prevents another upload',async()=>{
  const f=uiFixture(async(options)=>({ok:true,json:async()=>({ok:true,count:10,snapshotReady:!options.method})}));
- await f.ui.open();await f.ui.upload();await f.ui.upload();
+ await f.ui.open();f.elements.get('kvk-upload-amount').value='10';await f.ui.upload();await f.ui.upload();
  assert.equal(f.requests.length,2);assert.match(f.elements.get('kvk-upload-message').textContent,/opgeslagen/);
  assert.equal(f.elements.get('kvk-upload-result').hidden,false);
 });

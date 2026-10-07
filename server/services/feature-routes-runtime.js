@@ -191,9 +191,14 @@ function registerFeatureRoutes(app, deps = {}) {
     }),
     identityJudge: createKvkRobotIdentityJudge({ getApiKey: () => (deps.env || process.env).OPENAI_API_KEY || '' }),
   });
+  const kvkUploadCoordinator = createKvkDatabaseUploadService({
+    getSupabaseClient: whoopHealth.getSupabaseClient, getUiStateValues: deps.getUiStateValues,
+    refreshDestination: () => premiumDatabaseMailReadySnapshotService.refreshAfterImport(),
+  });
   const kvkCompanyDirectoryCoordinator = createKvkCompanyDirectoryService({
     ...(kvkDatabaseSnapshot || {}),
     fallbackSyncToken: mailboxCronSecret,
+    readTransferInventory: kvkUploadCoordinator.readInventory,
   });
   const companyWebsiteVideoCoordinator = createCompanyWebsiteVideoCoordinator({
     dataOpsStore: deps.dataOpsStore,
@@ -345,7 +350,7 @@ function registerFeatureRoutes(app, deps = {}) {
   registerKvkDatabaseRoutes(app, {
     coordinator: kvkDatabaseSnapshotCoordinator,
     controlCoordinator: kvkDatabaseControlCoordinator,
-    uploadCoordinator: createKvkDatabaseUploadService({ getSupabaseClient: whoopHealth.getSupabaseClient, getUiStateValues: deps.getUiStateValues, refreshDestination: () => premiumDatabaseMailReadySnapshotService.refreshAfterImport() }),
+    uploadCoordinator: kvkUploadCoordinator,
     apiWorkersCoordinator: kvkApiWorkersCoordinator,
     directoryCoordinator: kvkCompanyDirectoryCoordinator,
     requirePremiumAdminApiAccess: premiumRouteRuntime?.requirePremiumAdminApiAccess,

@@ -136,7 +136,7 @@ test('dashboard replaces stale snapshot stock totals with canonical directory to
   });
 
   controller.renderMetrics();
-  assert.equal(withWebsiteTotal.textContent, '2.852');
+  assert.equal(withWebsiteTotal.textContent, '—');
 
   assert.equal(await controller.refreshCanonicalCounts(), true);
   assert.equal(treatedTotal.textContent, '46.227');
