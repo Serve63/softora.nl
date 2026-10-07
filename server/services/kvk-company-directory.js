@@ -264,6 +264,13 @@ function createKvkCompanyDirectoryService(deps = {}) {
     limit = DEFAULT_PAGE_SIZE,
     category = DIRECTORY_CATEGORIES.all,
   } = {}) {
+    if (typeof deps.readTransferInventory === 'function' && UNUSED_CATEGORIES.has(normalizeCategory(category))) {
+      try {
+        const rows = await transferableRows({ query, category });
+        return { ok: true, rows: rows.filter(row => Number(row.source_company_id) > cursor).slice(0, limit + 1)
+          .map(({ search_text, ...row }) => row) };
+      } catch (error) { return { ok: false, error: error.message }; }
+    }
     const client = directoryClient();
     if (!client) return { ok: false, error: 'Supabase is niet geconfigureerd.' };
     let request = client
@@ -293,6 +300,10 @@ function createKvkCompanyDirectoryService(deps = {}) {
     query = '',
     category = DIRECTORY_CATEGORIES.all,
   } = {}) {
+    if (typeof deps.readTransferInventory === 'function' && UNUSED_CATEGORIES.has(normalizeCategory(category))) {
+      try { return { ok: true, count: (await transferableRows({ query, category })).length }; }
+      catch (error) { return { ok: false, error: error.message }; }
+    }
     const client = directoryClient();
     if (!client) return { ok: false, error: 'Supabase is niet geconfigureerd.' };
     let request = client
@@ -331,6 +342,18 @@ function createKvkCompanyDirectoryService(deps = {}) {
     } catch (error) {
       return { ok: false, error: error?.message || String(error) };
     }
+  }
+
+  async function transferableRows({ query, category }) {
+    const stock = await deps.readTransferInventory();
+    const terms = searchTerms(query);
+    const rows = normalizeCategory(category) === 'bruikbaar'
+      ? [...stock.websiteRows, ...stock.withoutWebsiteRows]
+      : normalizeCategory(category) === 'zonder-werkende-website' ? stock.withoutWebsiteRows : stock.websiteRows;
+    return rows.filter(row => {
+      const text = normalizedSearchValue(row.search_text || Object.values(row).join(' '));
+      return terms.every(term => text.includes(term));
+    }).sort((a, b) => Number(a.source_company_id) - Number(b.source_company_id));
   }
 
   async function upsertDirectoryRows(rows) {
@@ -581,6 +604,7 @@ function createKvkCompanyDirectoryService(deps = {}) {
 }
 
 module.exports = {
+  DIRECTORY_SELECT_COLUMNS,
   DEFAULT_PAGE_SIZE,
   DIRECTORY_CATEGORIES,
   DIRECTORY_TABLE,
