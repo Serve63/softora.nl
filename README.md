@@ -132,6 +132,22 @@ De Google-key blijft uitsluitend als server-side Render-secret staan. Zonder key
 niet belklaar. Voer geen echte Google-sessie of beltest uit zonder afgesproken budget;
 code- en mocktests doen geen betaalde aanvragen.
 
+Een echte eenmalige beltest kan geïsoleerd draaien terwijl `AMBIENT_ONLY_MODE=true` blijft.
+De aparte websocketroute `/twilio-mathijs-test/<token>` is standaard uitgeschakeld.
+Na expliciete budgettoestemming stel je tijdelijk `MATHIJS_CALL_TEST_ENABLED=true`,
+`MATHIJS_CALL_TEST_TOKEN_SHA256` (de SHA-256 van een willekeurig token van 32 bytes),
+`MATHIJS_CALL_TEST_TO` (uitsluitend het goedgekeurde Nederlandse mobiele testnummer) en
+`MATHIJS_CALL_TEST_EXPIRES_AT` (ISO, hooguit 10 minuten vooruit) in. Bewaar het token alleen
+in tijdelijk procesgeheugen en geef het rechtstreeks aan Twilio voor precies één call.
+De route staat één verbinding per proces toe, dwingt Mathijs/Gemini 3.8 af en stopt uiterlijk
+na 90 seconden, zes antwoorden of de rapportage van 8.000 verwerkte tokens. Per antwoord
+zijn maximaal 256 outputtokens toegestaan. De Twilio-aanvraag moet daarnaast `TimeLimit=90`,
+`Timeout=20`, `Record=false` en na de media stream `<Hangup/>` gebruiken. Geef in de stream
+het exacte testnummer door als parameter `to`; een ontbrekende CallSid of afwijkend nummer
+sluit de sessie vóór Gemini-setup. Controleer actuele providerprijzen vóór het bellen.
+Deze limieten vervangen geen kostencontrole of nieuwe toestemming voor een tweede call.
+Zet de tijdelijke testinstellingen direct na de ene test uit; een restart is geen nieuw budget.
+
 Met een ingestelde Google-key vereisen alle debugroutes een `BRIDGE_DEBUG_TOKEN`, ook
 wanneer `NODE_ENV` niet is ingesteld. Een eenmalige stemtest kan via deze private toegang met
 `POST /debug/mathijs-voice-test`. Deze test is standaard uitgeschakeld. Alleen een expliciet

@@ -9,6 +9,7 @@ const { mulaw } = require('alawmulaw');
 const { createSpeechTurnState } = require('./audio-turn-state');
 const { MATHIJS_PROFILE, resolveAssistantConversation } = require('./assistant-profile');
 const { createMathijsVoiceTestGate, runMathijsVoiceTest } = require('./mathijs-voice-test');
+const { createMathijsCallTestGate } = require('./mathijs-call-test');
 const { createGeminiSessionSetupSender, resolveGeminiSessionModel } = require('./gemini-session');
 const {
   OUTPUT_FRAME_DURATION_MS,
@@ -95,6 +96,12 @@ const GEMINI_PLAYBACK_ACTIVE_WINDOW_MS = Math.max(
 );
 const AMBIENT_ENABLED = !/^(0|false|no)$/i.test(String(process.env.AMBIENT_ENABLED || 'true'));
 const AMBIENT_ONLY_MODE = /^(1|true|yes)$/i.test(String(process.env.AMBIENT_ONLY_MODE || 'false'));
+const mathijsCallTestGate = createMathijsCallTestGate({
+  enabled: process.env.MATHIJS_CALL_TEST_ENABLED,
+  tokenSha256: process.env.MATHIJS_CALL_TEST_TOKEN_SHA256,
+  expiresAt: process.env.MATHIJS_CALL_TEST_EXPIRES_AT,
+  to: process.env.MATHIJS_CALL_TEST_TO,
+});
 const AMBIENT_ASSET_PATH = String(process.env.AMBIENT_ASSET_PATH || '').trim();
 const AMBIENT_NOISE_LEVEL = Math.max(
   0,
@@ -465,25 +472,37 @@ app.get('/debug/recent-sessions', (req, res) => {
 
 server.on('upgrade', (request, socket, head) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
-  if (url.pathname !== '/twilio-media') {
-    socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-    socket.destroy();
-    return;
-  }
-  if (!isMediaRequestAuthorized(request, url)) {
-    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-    socket.destroy();
-    return;
+  let boundedCallSession = null;
+  if (url.pathname.startsWith('/twilio-mathijs-test/')) {
+    boundedCallSession = mathijsCallTestGate.claim(url.pathname.slice('/twilio-mathijs-test/'.length));
+    if (!boundedCallSession) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+  } else {
+    if (url.pathname !== '/twilio-media') {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    if (!isMediaRequestAuthorized(request, url)) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
   }
   try {
     socket.setNoDelay(true);
   } catch {}
   wss.handleUpgrade(request, socket, head, (ws) => {
-    wss.emit('connection', ws, request, url);
+    wss.emit('connection', ws, request, url, boundedCallSession);
   });
 });
 
-wss.on('connection', (twilioWs, _request, url) => {
+wss.on('connection', (twilioWs, _request, url, boundedCallSession = null) => {
+  const ambientOnlyMode = AMBIENT_ONLY_MODE && !boundedCallSession;
+  let disarmTestStop = () => {};
   const sessionSummary = {
     connectedAt: new Date().toISOString(),
     stack: String(url.searchParams.get('stack') || '').trim() || 'gemini_flash_3_1_live',
@@ -491,7 +510,7 @@ wss.on('connection', (twilioWs, _request, url) => {
     autoStart: GEMINI_AUTO_START,
     geminiReady: false,
     ambientEnabled: AMBIENT_LOOP.enabled,
-    ambientOnlyMode: AMBIENT_ONLY_MODE,
+    ambientOnlyMode,
     twilioMediaInCount: 0,
     geminiAudioOutCount: 0,
     ambientAudioOutCount: 0,
@@ -536,20 +555,21 @@ wss.on('connection', (twilioWs, _request, url) => {
     endSilenceMs: 420,
   });
 
-  if (!AMBIENT_ONLY_MODE && !GEMINI_API_KEY) {
+  if (!ambientOnlyMode && !GEMINI_API_KEY) {
     console.error('[Bridge] GEMINI_API_KEY/GOOGLE_API_KEY ontbreekt');
     twilioWs.close(1011, 'GEMINI_API_KEY ontbreekt');
     return;
   }
-  if (!AMBIENT_ONLY_MODE && GEMINI_SYSTEM_PROMPT_LOCKED && hasPromptOverrideHints(url.searchParams)) {
+  if (!ambientOnlyMode && GEMINI_SYSTEM_PROMPT_LOCKED && hasPromptOverrideHints(url.searchParams)) {
     console.warn('[Bridge] Prompt override hints in query gedetecteerd en genegeerd (prompt lock actief).');
   }
 
-  let stack = sessionSummary.stack;
+  let stack = boundedCallSession ? 'gemini_flash_3_8_live' : sessionSummary.stack;
   let conversation = resolveAssistantConversation({
+    profile: boundedCallSession ? MATHIJS_PROFILE : '',
     systemPrompt: SYSTEM_PROMPT, initialMessage: INITIAL_MESSAGE, autoStart: GEMINI_AUTO_START,
   });
-  const geminiWs = AMBIENT_ONLY_MODE
+  const geminiWs = ambientOnlyMode
     ? null
     : new WebSocket(buildGeminiWsUrl(), {
         perMessageDeflate: false,
@@ -557,7 +577,11 @@ wss.on('connection', (twilioWs, _request, url) => {
       });
   const sendGeminiSetup = createGeminiSessionSetupSender({
     configuredModel: GEMINI_MODEL,
-    buildPayload: (model) => buildGeminiSetupPayload(model, conversation.systemPrompt),
+    buildPayload: (model) => {
+      const payload = buildGeminiSetupPayload(model, conversation.systemPrompt);
+      if (boundedCallSession) payload.setup.generationConfig.maxOutputTokens = boundedCallSession.maxOutputTokens;
+      return payload;
+    },
     onSetup: (model) => { sessionSummary.model = model; },
   });
   const connectionStartedAtMs = Date.now();
@@ -695,6 +719,7 @@ wss.on('connection', (twilioWs, _request, url) => {
   function closeBoth(reason = 'unknown') {
     if (closed) return;
     closed = true;
+    disarmTestStop();
     stopOutboundFrameLoop();
     clearInputFlushTimer();
     callerSpeechState.reset();
@@ -728,6 +753,8 @@ wss.on('connection', (twilioWs, _request, url) => {
     } catch {}
   }
 
+  if (boundedCallSession) disarmTestStop = boundedCallSession.armStop(closeBoth);
+
   if (geminiWs) {
     geminiWs.on('open', () => {
       try {
@@ -760,6 +787,10 @@ wss.on('connection', (twilioWs, _request, url) => {
         }
         return;
       }
+
+      const testLimit = boundedCallSession?.observeUsage(msg);
+      if (testLimit) { closeBoth(testLimit); return; }
+      if (msg.error && boundedCallSession) { closeBoth('test-gemini-error'); return; }
 
       if (msg.error) {
         console.error('[Bridge] Gemini server error:', JSON.stringify(msg.error));
@@ -830,7 +861,11 @@ wss.on('connection', (twilioWs, _request, url) => {
           ''
       ).trim();
       const customParameters = extractStartCustomParameters(startPayload);
-      const requestedStack = String(
+      if (boundedCallSession && !boundedCallSession.matchesStart(startPayload, customParameters)) {
+        closeBoth('test-call-scope-mismatch');
+        return;
+      }
+      const requestedStack = boundedCallSession ? 'gemini_flash_3_8_live' : String(
         customParameters.stack ||
           customParameters.Stack ||
           url.searchParams.get('stack') ||
@@ -840,13 +875,14 @@ wss.on('connection', (twilioWs, _request, url) => {
         stack = requestedStack;
         sessionSummary.stack = requestedStack;
       }
+      if (boundedCallSession) customParameters.assistant = MATHIJS_PROFILE;
       conversation = resolveAssistantConversation({
         profile: customParameters.assistant,
         systemPrompt: SYSTEM_PROMPT, initialMessage: INITIAL_MESSAGE, autoStart: GEMINI_AUTO_START,
       });
       sessionSummary.assistant = conversation.profile;
       sessionSummary.autoStart = conversation.autoStart;
-      if (!AMBIENT_ONLY_MODE && conversation.profile !== MATHIJS_PROFILE &&
+      if (!ambientOnlyMode && conversation.profile !== MATHIJS_PROFILE &&
           GEMINI_REQUIRE_CUSTOM_PROMPT && !CUSTOM_SYSTEM_PROMPT) {
         closeBoth('GEMINI_SYSTEM_PROMPT ontbreekt');
         return;
@@ -874,7 +910,7 @@ wss.on('connection', (twilioWs, _request, url) => {
     }
     if (event !== 'media') return;
 
-    if (AMBIENT_ONLY_MODE || !geminiWs || !geminiReady || geminiWs.readyState !== WebSocket.OPEN) return;
+    if (ambientOnlyMode || !geminiWs || !geminiReady || geminiWs.readyState !== WebSocket.OPEN) return;
 
     const payload = String(msg.media?.payload || '');
     if (!payload) return;
@@ -945,7 +981,7 @@ wss.on('connection', (twilioWs, _request, url) => {
   });
 
   console.log(
-    `[Bridge] Connected stack=${stack} stream=${streamSid || '-'} model=${resolveGeminiSessionModel(stack, GEMINI_MODEL)} voice=${GEMINI_VOICE} ambient=${AMBIENT_LOOP.enabled} ambientOnly=${AMBIENT_ONLY_MODE}`
+    `[Bridge] Connected stack=${stack} stream=${streamSid || '-'} model=${resolveGeminiSessionModel(stack, GEMINI_MODEL)} voice=${GEMINI_VOICE} ambient=${AMBIENT_LOOP.enabled} ambientOnly=${ambientOnlyMode}`
   );
 });
 
