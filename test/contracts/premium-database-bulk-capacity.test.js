@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 const { gunzipSync } = require('node:zlib');
 const { PGlite } = require('@electric-sql/pglite');
 const { createSoftoraDataOpsStore } = require('../../server/services/data-ops-store');
@@ -10,17 +9,13 @@ const { createPremiumDatabaseCustomersArchiveResponder } = require('../../server
 const { createPremiumDatabaseMailReadySnapshotService, parseMailReadySnapshotCacheValue, MAIL_READY_SNAPSHOT_CACHE_SCOPE, MAIL_READY_SNAPSHOT_CACHE_KEY } = require('../../server/services/premium-database-mail-ready-snapshot');
 const { createCustomerSnapshotRowsRepository } = require('../../server/repositories/customer-snapshot-rows');
 const { MAX_DATABASE_CUSTOMERS } = require('../../server/config/premium-database-limits');
+const customerClient = require('../../assets/premium-database-customers-loader');
+const snapshotClient = require('../../assets/premium-database-mail-ready-snapshot');
 
 const quiet = { info() {}, warn() {}, error() {} };
 const migration = name => fs.readFileSync(path.join(__dirname, '../../supabase/migrations', name), 'utf8');
 const response = () => ({ headers: {}, setHeader(key, value) { this.headers[key] = value; },
   status(code) { this.statusCode = code; return this; }, end(body) { this.body = body; }, json(body) { this.body = body; } });
-function loadClient(file) {
-  const context = { window: {}, module: { exports: {} }, URL, console: quiet, setTimeout: () => 1, clearTimeout() {} };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets', file), 'utf8'), context);
-  return context.module.exports;
-}
-
 test('a complete 32810-company import survives SQL chunks, snapshot storage and browser pagination', async () => {
   const db = new PGlite();
   try {
@@ -66,7 +61,6 @@ test('a complete 32810-company import survives SQL chunks, snapshot storage and 
     const archive = JSON.parse(gunzipSync(archiveResponse.body));
     assert.equal(archive.customers.length, 32810);
     assert.equal(new Set(archive.customers.map(row => row.id)).size, 32810);
-    const customerClient = loadClient('premium-database-customers-loader.js');
     const loaded = await customerClient.load({ fetchJsonWithTimeout: async () => ({ ok: true, json: async () => archive }) });
     assert.equal(loaded.customers.length, 32810);
     assert.equal(customerClient.maxCustomers, MAX_DATABASE_CUSTOMERS);
@@ -90,7 +84,6 @@ test('a complete 32810-company import survives SQL chunks, snapshot storage and 
     assert.ok(durable.length < 4000000, 'complete compressed cache fits the existing storage bound');
     assert.equal((await snapshotService.buildMailReadySnapshot({ offset: 28000, limit: 2 })).availableCustomers.length, 2);
 
-    const snapshotClient = loadClient('premium-database-mail-ready-snapshot.js');
     const state = {}, requests = [];
     const published = await snapshotClient.load({ state, useSnapshotArchive: false, renderPage() {}, logger: quiet,
       fetchJsonWithTimeout: async url => {
