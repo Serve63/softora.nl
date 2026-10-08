@@ -170,6 +170,7 @@
         return Object.assign({}, customer, {
             websitePhoto: hasPhoto ? String(match.websitePhoto || customer.websitePhoto || "").trim() : "",
             websitePhotoName: String(match.websitePhotoName || customer.websitePhotoName || "").trim(),
+            websitePhotoCreatedAt: hasPhoto ? String(match.websitePhotoCreatedAt || "").trim() : "",
             websiteMockup: hasMockup ? String(match.websiteMockup || customer.websiteMockup || "").trim() : "",
             websiteMockupName: String(match.websiteMockupName || customer.websiteMockupName || "").trim(),
             signedUrlExpiresAt: String(match.signedUrlExpiresAt || customer.signedUrlExpiresAt || "").trim(),
@@ -296,7 +297,7 @@
     function getDisplayCount(state, currentCount) {
         const count = Math.max(0, Number(currentCount) || 0);
         if (state && state.canonicalInventoryReady === true) return count;
-        if (state && String(state.query || "").trim()) return count;
+        if (state && (String(state.query || "").trim() || (["beschikbaar", "benaderbaar", "instantly-ready"].includes(state.activeStatus) && state.designDate))) return count;
         if (!state) return count;
         if (state.canonicalCountReady === true && state.activeStatus === "benaderbaar" && Number.isFinite(Number(state.mailReadySnapshotTotal))) return Math.max(0, Number(state.mailReadySnapshotTotal));
         if (state.canonicalCountReady === true && state.activeStatus === "beschikbaar" && Number.isFinite(Number(state.availableSnapshotTotal))) return Math.max(0, Number(state.availableSnapshotTotal));
@@ -310,7 +311,7 @@
     }
 
     function getCanonicalResultCountText(state, currentCount) {
-        const canUseExactSnapshotCount = state && state.canonicalCountReady === true && !String(state.query || "").trim() && ["benaderbaar", "beschikbaar"].includes(state.activeStatus);
+        const canUseExactSnapshotCount = state && state.canonicalCountReady === true && !(String(state.query || "").trim() || (["beschikbaar", "benaderbaar", "instantly-ready"].includes(state.activeStatus) && state.designDate)) && ["benaderbaar", "beschikbaar"].includes(state.activeStatus);
         if (getCanonicalInventoryStatus(state) !== "ready" && !canUseExactSnapshotCount) return "-- resultaten";
         return getDisplayCount(state, currentCount).toLocaleString("nl-NL") + " resultaten";
     }

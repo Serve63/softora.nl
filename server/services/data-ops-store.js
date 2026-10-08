@@ -18,7 +18,7 @@ const { getIdentityKeyRows } = require('./outbound-recipient-guard-store');
 const { createDataOpsCustomerLookups } = require('./data-ops-customer-lookups');
 const { createCustomerSnapshotRowsRepository } = require('../repositories/customer-snapshot-rows');
 const { createMailboxHistoricalOutboundRepository } = require('../repositories/mailbox-historical-outbound');
-const { filterDesignPhotoRowsForServing } = require('./design-photo-generation-policy');
+const { getDesignPhotoCreatedAt } = require('./design-photo-created-at'); const { filterDesignPhotoRowsForServing } = require('./design-photo-generation-policy');
 const { isCustomerConfirmedSent } = require('./instantly-campaign-replacement');
 const { syncOutboundGuardRows } = require('./data-ops-outbound-guard-sync');
 const { createWebdesignOwnerRotationRepository } = require('../repositories/webdesign-owner-rotation');
@@ -1798,7 +1798,7 @@ function createSoftoraDataOpsStore(deps = {}) {
         fileName: normalizeString(row.file_name),
         websiteMockupName: normalizeString(mockupMeta && mockupMeta.fileName || legacyMeta.websiteMockupName),
         identityKey: normalizeString(row.identity_key),
-        legacyMeta,
+        legacyMeta, websitePhotoCreatedAt: getDesignPhotoCreatedAt(row),
         updatedAt: normalizeString(row.updated_at),
         signedUrlExpiresAt: new Date(currentTimeMs() + expiresInSeconds * 1000).toISOString(),
       });
@@ -1848,7 +1848,7 @@ function createSoftoraDataOpsStore(deps = {}) {
                 normalizeString(legacyMeta.websiteMockupStoragePath) ||
                 normalizeString(legacyMeta.websiteMockupPath)
             ),
-            updatedAt: normalizeString(row && row.updated_at),
+            updatedAt: normalizeString(row && row.updated_at), websitePhotoCreatedAt: getDesignPhotoCreatedAt(row),
           };
         });
     }, {

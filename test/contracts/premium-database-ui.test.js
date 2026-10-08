@@ -628,7 +628,7 @@ test('premium database page keeps customers fixed from Haaren nearby to far away
   assert.match(pageSource, /assets\/premium-database-sorted-lists\.js\?v=20260923a/);
   assert.ok(pageSource.indexOf('assets/premium-database-sorted-lists.js') < pageSource.indexOf('const databaseSortedLists = window.SoftoraDatabaseSortedLists.create'));
   assert.match(pageSource, /function sortCustomers\(list\) \{\s*return databaseSortedLists\.sort\(list\);\s*\}/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return databaseSortedLists\.sorted\(customers\);\s*\}/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return designDateController\.sort\(databaseSortedLists\.sorted\(customers\)\);\s*\}/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(state\.klanten\.concat\(\[customer\]\)\);/);
   assert.match(pageSource, /state\.klanten = sortCustomers\(mergeResult\.customers\);/);
   assert.match(pageSource, /const normalizedCustomers = sortCustomers\(customers\)\.filter/);
@@ -650,7 +650,7 @@ test('premium database has a compact company search without the old result count
   assert.doesNotMatch(pageSource, /database-search-row/);
   assert.match(pageSource, /function hasActiveDatabaseSearch\(\) \{[\s\S]*return Boolean\(normalizeSearchValue\(state\.query\)\);[\s\S]*\}/);
   assert.match(pageSource, /function matchesActiveDatabaseFilter\(customer\) \{[\s\S]*state\.mailReadySnapshotLoaded[\s\S]*isSnapshotMailReadyCustomer\(customer\)[\s\S]*state\.availableSnapshotLoaded[\s\S]*isSnapshotAvailableCustomer\(customer\)/);
-  assert.match(pageSource, /if \(!matchesActiveDatabaseFilter\(customer\)\) return false;/);
+  assert.match(pageSource, /if \(!matchesActiveDatabaseFilter\(customer\) \|\| !designDateController\.matches\(customer\)\) return false;/);
   assert.match(pageSource, /return getCustomerSearchHaystack\(customer\)\.indexOf\(query\) !== -1;/);
   assert.match(
     pageSource,
@@ -2312,7 +2312,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20261007-bulk-capacity/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20261007-bulk-capacity/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20261008-design-date/);
   assert.match(pageSource, /assets\/premium-database-current-campaign-media\.js\?v=20260924-targeted-visibility/);
   assert.match(pageSource, /currentCampaignMediaController\.refresh\(\)/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(options = \{\}\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(/);
@@ -2658,7 +2658,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /normalizeDatabaseStatus\(customer && customer\.status, customer\) !== "klant"/);
   assert.match(pageSource, /lastMailReadyHeaderCount: null/);
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20261008-design-date/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260925-v2-only/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
   assert.doesNotMatch(webdesignVariantPickerScriptSource, /v1-prompt-only|V1_VARIANT/);
@@ -2692,7 +2692,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const statusClassName = contextualStatus \? contextualStatus\.className : customer\.status;/);
   assert.match(pageSource, /"<td><div class=\\"s-wrap s-" \+ escapeHtml\(statusClassName\)/);
   assert.match(pageSource, /function renderWebsitePhotoDrop\(customer\)/);
-  assert.match(pageSource, /return webdesignActionController\.render\(customer\);/);
+  assert.match(pageSource, /return webdesignActionController\.render\(customer\) \+ \(buildCustomerWebdesignAssetState\(customer\)\.hasPhoto \? window\.SoftoraDatabaseDesignDate\.render\(customer\) : ""\);/);
   assert.match(pageSource, /window\.SoftoraDatabaseWebdesignAction\.createController\(\{/);
   assert.match(pageSource, /getAssetState: buildCustomerWebdesignAssetState/);
   assert.match(pageSource, /photoRestorePending: true, photoRestoreFailed: false/);
@@ -2920,11 +2920,11 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
     /targets\.slice\(0, Math\.min\(parsedLimit, targets\.length\)\)/
   );
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20261006-simple/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20261008-design-date/);
   assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
-  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20260914-provider/);
+  assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20261008-design-date/);
   assert.match(pageSource, /assets\/premium-database-webdesign-mockup\.js\?v=20260529d/);
   assert.match(pageSource, /assets\/premium-database-deep-search\.js\?v=20260521d/);
   assert.match(pageSource, /assets\/premium-database-contact-status\.js\?v=20260519a/);
@@ -3229,7 +3229,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.doesNotMatch(pageSource, /function applyPanelStatus\(\)/);
   assert.match(pageSource, /function addCustomerFromModal\(\)/);
   assert.match(pageSource, /<!-- SOFTORA_CUSTOMERS_BOOTSTRAP --><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script>/);
-  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260923-ready-sync"><\/script><script src="assets\/premium-database-boot\.js\?v=20260923-provider-readmodel"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260927a"><\/script><script src="assets\/premium-readmodel-store\.js\?v=20260924c"><\/script><script src="assets\/premium-readmodel-client\.js\?v=20260924a"><\/script><script src="assets\/premium-screen-snapshot\.js\?v=20260927a"><\/script><script src="assets\/premium-database-screen-snapshot\.js\?v=20260927a"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20261003-complete-count"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
+  assert.match(pageSource, /<script src="assets\/premium-database-import\.js\?v=20260923-ready-sync"><\/script><script src="assets\/premium-database-boot\.js\?v=20260923-provider-readmodel"><\/script><script src="assets\/premium-database-sent-register\.js\?v=20260927a"><\/script><script src="assets\/premium-readmodel-store\.js\?v=20260924c"><\/script><script src="assets\/premium-readmodel-client\.js\?v=20260924a"><\/script><script src="assets\/premium-screen-snapshot\.js\?v=20260927a"><\/script><script src="assets\/premium-database-screen-snapshot\.js\?v=20261008-design-date"><\/script><script src="assets\/premium-database-system-mail-count\.js\?v=20261003-complete-count"><\/script><script src="assets\/premium-database-autopilot-toggle\.js\?v=20260716a"><\/script><script src="assets\/softora-api-cost-ledger\.js\?v=20260428a"><\/script>/);
   assert.doesNotMatch(pageSource, /<script src="assets\/premium-database-deep-search-helpers\.js\?v=20260521b"><\/script><script src="assets\/premium-database-target-coords\.js\?v=20260522a"><\/script><script src="assets\/premium-database-deep-search\.js\?v=20260521d"><\/script>/);
   assert.match(pageSource, /assets\/premium-database-deep-search-loader\.js\?v=20260616a/);
   assert.match(pageSource, /assets\/premium-database-mass-research\.js\?v=20260629a/);
@@ -5334,7 +5334,7 @@ test('premium database page combines contact filters into one benaderd step', ()
   assert.match(pageSource, /outreachController\.renderMeta\(customer, showOutreachActionColumn && outreachController\.isTrackedOutreachCustomer\(customer\)\)/);
   assert.match(pageSource, /showSentActions \? outreachController\.renderActions\(customer, \{ hideMailButton: outreachController\.hasInstantlyOutreachSignal\(customer\) \}\)/);
   assert.match(pageSource, /"<td>" \+ \(showPhotoColumn \? renderWebsitePhotoDrop\(customer\) : ""\) \+ "<\/td><td class=\\"c-light days-cell\\">" \+ \(showSentActions \? outreachController\.renderDaysSinceSent\(customer\) : ""\) \+ "<\/td>"/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return databaseSortedLists\.sorted\(customers\);\s*\}/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return designDateController\.sort\(databaseSortedLists\.sorted\(customers\)\);\s*\}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(6\), table\.outreach-action-mode tbody td:nth-child\(6\) \{ width: 24%; text-align: center; \}/);
   assert.match(pageSource, /table\.outreach-action-mode thead th:nth-child\(8\), table\.outreach-action-mode tbody td:nth-child\(8\) \{ width: 5%; min-width: 56px; text-align: center; \}/);
   assert.match(webdesignActionSource, /\.outreach-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:6px;width:100%;max-width:320px;min-width:0;margin:0 auto/);
@@ -6855,7 +6855,7 @@ test('premium database sorteert bedrijven standaard op afstand vanaf Haaren', ()
   assert.match(pageSource, /assets\/premium-database-distance\.js\?v=20260923-cache/);
   assert.match(pageSource, /window\.SoftoraPremiumDatabaseDistance/);
   assert.match(pageSource, /sortKey: "distance"/);
-  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return databaseSortedLists\.sorted\(customers\);\s*\}/);
+  assert.match(pageSource, /function getSortedCustomers\(customers\) \{\s*return designDateController\.sort\(databaseSortedLists\.sorted\(customers\)\);\s*\}/);
   assert.match(sorterSource, /const OISTERWIJK_COORDS = \{ lat: 51\.5792, lng: 5\.1889 \};/);
   assert.match(sorterSource, /function resolveCustomerCoords\(customer\)/);
   assert.match(sorterSource, /function getDistanceKm\(customer\)/);

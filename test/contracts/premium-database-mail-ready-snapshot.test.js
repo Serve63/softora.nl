@@ -204,6 +204,7 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
     databaseStatus: 'prospect',
     verantwoordelijk: '',
     updatedAt: '2026-06-15T10:00:00.000Z',
+    websitePhotoCreatedAt: '',
     hasPhoto: true,
     hasMockup: true,
     websitePhotoAssetReady: true,
@@ -235,12 +236,13 @@ test('premium database mail-ready snapshot filters safely and returns a compact 
 test('an Instantly design from transferred inventory belongs to one category, never the Softora or available list', async () => {
   const { service } = createService({
     customers: [{ customer_id: 'instant-design', company: 'Instant Design', email: 'info@instant-design.nl', website: 'instant-design.nl', database_status: 'prospect', payload: { bronDatabase: 'Softora Bedrijven Scraper' } }],
-    photoFlags: [{ customerId: 'instant-design', hasPhoto: true, hasMockup: true, webdesignMailProvider: 'instantly' }],
+    photoFlags: [{ customerId: 'instant-design', hasPhoto: true, hasMockup: true, webdesignMailProvider: 'instantly', websitePhotoCreatedAt: '2026-10-08T12:34:56.000Z' }],
   });
   const snapshot = await service.buildMailReadySnapshot({ limit: 10 });
   assert.equal(snapshot.total, 0);
   assert.equal(snapshot.availableTotal, 0);
   assert.equal(snapshot.instantlyReadyTotal, 1);
+  assert.equal(snapshot.instantlyReadyCustomers[0].websitePhotoCreatedAt, '2026-10-08T12:34:56.000Z');
   assert.deepEqual(snapshot.instantlyReadyCustomers.map((customer) => customer.id), ['instant-design']);
   assert.equal(snapshot.instantlyReadyCustomers[0].mailReadySnapshot, false);
   assert.equal(snapshot.instantlyReadyCustomers[0].availableSnapshot, false);

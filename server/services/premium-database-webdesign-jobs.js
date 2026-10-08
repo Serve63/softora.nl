@@ -1106,7 +1106,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
             legacyMeta: {
               id: customer.id,
               identityKey,
-              ...buildWebdesignGenerationProvenance(job),
+              ...buildWebdesignGenerationProvenance(job), websitePhotoCreatedAt: checkedAt,
               websitePhotoName,
               websiteMockupName, webdesignMailProvider: customer.webdesignMailProvider,
               mockupRenderer: DEVICE_MOCKUP_RENDERER,
@@ -1173,7 +1173,7 @@ function createPremiumDatabaseWebdesignJobsCoordinator(deps = {}) {
       [customer.id]: {
         id: customer.id,
         identityKey,
-        ...buildWebdesignGenerationProvenance(job),
+        ...buildWebdesignGenerationProvenance(job), websitePhotoCreatedAt: checkedAt,
         photoKey: photoDataKey,
         chunkCount: chunks.length,
         mockupPhotoKey: mockupPhotoDataKey,
