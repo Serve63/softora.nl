@@ -21,6 +21,81 @@ ${script}
   assert.equal(result.status, 0, result.stderr || result.stdout);
 }
 
+test('an incomplete capture rejected before imagegen recovers once using the other provider', () => worker(`
+folder = w.BASE / job['id']; folder.mkdir()
+job['referenceUrls'] = ['https://image.thum.io/get/fixture', 'https://s0.wordpress.com/mshots/v1/fixture']
+captures, executions = [], []
+def capture(task, target):
+ captures.append(task['referenceUrls'])
+ reference = target / 'homepage-reference.png'; reference.write_bytes(b'fixture')
+ (target / 'reference-attempts.json').write_text(json.dumps([{'provider': 0, 'result': 'ready'}]))
+ return reference
+w.download_reference = capture
+w.codex_binary = lambda: '/fixture/codex'
+w.check_job_active = lambda task: None
+def execute(args, **kwargs):
+ if args[1:3] == ['login', 'status']:
+  return types.SimpleNamespace(returncode=0, stdout='ChatGPT', stderr='')
+ executions.append(args[args.index('-i') + 1])
+ if len(executions) == 1:
+  (folder / 'answer.json').write_text(json.dumps({'status': 'blocked', 'generated_images': 0, 'reason': 'bronbeeld onleesbaar: logo en inhoud ontbreken'}))
+ else:
+  (folder / 'design.png').write_bytes(b'generated-once')
+ kwargs['stdout'].write(json.dumps({'type': 'turn.completed'}) + '\\n')
+ return types.SimpleNamespace(returncode=0)
+w.subprocess.run = execute
+w.encode_result = lambda target: (target / 'design.jpg').write_bytes(b'encoded')
+w.generate(job, folder)
+assert len(executions) == 2 and captures == [job['referenceUrls'], job['referenceUrls'][1:]]
+assert executions[0] != executions[1]
+assert (folder / 'source-retry' / 'answer.json').exists()
+assert (folder / 'design.jpg').exists()
+assert w.alternate_reference(job, folder) is None
+`));
+
+test('source fallback stops on uncertainty, previous images, quota and a persisted retry', () => worker(`
+folder = w.BASE / job['id']; folder.mkdir()
+job['referenceUrls'] = ['https://image.thum.io/get/fixture', 'https://s0.wordpress.com/mshots/v1/fixture']
+(folder / 'homepage-reference.png').write_bytes(b'fixture')
+(folder / 'reference-attempts.json').write_text(json.dumps([{'provider': 0, 'result': 'ready'}]))
+(folder / 'answer.json').write_text(json.dumps({'status': 'blocked', 'generated_images': 0, 'reason': 'bronbeeld onleesbaar'}))
+w.download_reference = forbidden
+events = folder / 'codex-events.jsonl'
+for entries in [[], [{'type':'turn.started'}], [{'type':'error'}, {'type':'turn.completed'}],
+ [{'type':'item.completed','item':{'type':'image_generation'}}, {'type':'turn.completed'}],
+ [{'type':'item.completed','item':{'type':'command_execution','command':'generate image'}}, {'type':'turn.completed'}],
+ [{'type':'item.completed','item':{'type':'agent_message','text':'usage_limit_reached'}}, {'type':'turn.completed'}]]:
+ events.write_text('\\n'.join(json.dumps(entry) for entry in entries))
+ assert w.alternate_reference(job, folder) is None
+events.write_text(json.dumps({'type':'turn.completed'}))
+(folder / 'design.png').write_bytes(b'existing')
+assert w.alternate_reference(job, folder) is None
+(folder / 'design.png').unlink()
+(folder / 'source-retry').mkdir()
+assert w.alternate_reference(job, folder) is None
+`));
+
+test('a second source rejection never invokes a third model run', () => worker(`
+folder = w.BASE / job['id']; folder.mkdir()
+w.codex_binary = lambda: '/fixture/codex'
+w.check_job_active = lambda task: None
+w.download_reference = lambda task, target: target / 'reference.png'
+alternates, executions = [], []
+w.alternate_reference = lambda task, target: (alternates.append(True) or target / 'alternate.png')
+def execute(args, **kwargs):
+ if args[1:3] == ['login', 'status']:
+  return types.SimpleNamespace(returncode=0, stdout='ChatGPT', stderr='')
+ executions.append(True)
+ (folder / 'answer.json').write_text(json.dumps({'status': 'blocked', 'generated_images': 0, 'reason': 'bronbeeld onleesbaar'}))
+ return types.SimpleNamespace(returncode=0)
+w.subprocess.run = execute
+try: w.generate(job, folder)
+except RuntimeError: pass
+else: raise AssertionError('Two unusable captures must stop')
+assert len(executions) == 2 and len(alternates) == 1
+assert w.source_reference_blocked(folder)
+`));
+
 test('reference fallback rejects an image of an error page before trying the alternate provider', () => worker(`
 folder = w.BASE / job['id']; folder.mkdir()
 urls = ['https://image.thum.io/get/fixture', 'https://s0.wordpress.com/mshots/v1/fixture']
