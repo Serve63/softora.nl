@@ -29,12 +29,14 @@
                 detail.className = "status-banner is-visible";
                 detail.dataset.tone = "info";
                 const summary = global.document.createElement("summary");
-                summary.textContent = excluded.length + " bedrijven tijdelijk overgeslagen vanwege een eerdere websitefout. Bekijk redenen en herprobeertijden.";
+                summary.textContent = excluded.length + " bedrijven overgeslagen vanwege een eerdere bron- of ontwerpfout. Bekijk redenen en herstelvoorwaarden.";
                 detail.appendChild(summary);
                 const list = global.document.createElement("ul");
                 excluded.forEach(function (item) {
                     const line = global.document.createElement("li");
-                    line.textContent = item.company + ": " + item.reason + " Opnieuw in bulk vanaf " + new Date(item.retryAt).toLocaleString("nl-NL") + ". Een aangepast websiteadres kan direct opnieuw mee.";
+                    line.textContent = item.company + ": " + item.reason + (item.requiresSourceRecheck
+                        ? " Eerst de bron of ontwerpaanvraag controleren en zo nodig herstellen. Een succesvol gecontroleerd ontwerp geeft deze bron weer vrij."
+                        : " Opnieuw in bulk vanaf " + new Date(item.retryAt).toLocaleString("nl-NL") + ".") + " Een aangepast websiteadres kan direct opnieuw mee.";
                     list.appendChild(line);
                 });
                 detail.appendChild(list);

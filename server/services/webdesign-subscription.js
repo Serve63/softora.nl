@@ -87,6 +87,8 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
           ? 'Je abonnementlimiet is bereikt. De wachtrij pauzeert en controleert later opnieuw; er wordt geen API gebruikt.'
           : body.errorKind === 'source-reference'
             ? 'De homepage-screenshot is geblokkeerd, leeg of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.'
+          : body.errorKind === 'image-safety'
+            ? 'De beeldgenerator heeft dit ontwerp geweigerd via het veiligheidsfilter. Er is geen webdesign gemaakt of opgeslagen.'
           : 'Codex kon het ontwerp niet maken via je abonnement. Controleer Codex op je Mac en probeer opnieuw.');
         if (!finished.ok) return res.status(409).json({ ok: false, error: 'Afsluiting van de geweigerde opdracht niet bevestigd.' });
         return res.json({ ok: true, done: true });
