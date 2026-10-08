@@ -32,6 +32,12 @@ test('real transfer transaction shares exact stock with listings and atomically 
     const sql = migration('20261007203220_kvk_upload_shared_inventory.sql');
     await db.exec(sql); await db.exec(sql);
     await db.exec(migration('20261007215800_kvk_inventory_single_read.sql'));
+    const timeoutMigration = migration('20261008150122_kvk_bulk_upload_timeout.sql');
+    await db.exec(timeoutMigration); await db.exec(timeoutMigration);
+    const config = (await db.query("select proconfig, prosecdef from pg_proc where oid='softora_kvk_upload_available_counted(uuid,text,boolean,jsonb,integer)'::regprocedure")).rows[0];
+    assert.ok(config.proconfig.includes('statement_timeout=60s'));
+    assert.ok(config.proconfig.includes('search_path=public'));
+    assert.equal(config.prosecdef, false, 'bulk timeout must preserve invoker access');
     const rows = Array.from({ length: 10 }, (_, index) => ({ source_company_id: index + 1,
       kvk_nummer: String(10000001 + index), bedrijfsnaam: `Synthetic ${index + 1}`, telefoonnummer: `123${index + 1}`,
       email: `lead${index + 1}@example.test`, website: `site${index + 1}.test`, website_status: 'found', lead_status: 'usable',
@@ -117,6 +123,25 @@ test('real transfer transaction shares exact stock with listings and atomically 
     }
     await db.exec('set role service_role');
     assert.ok(Array.isArray((await db.query('select softora_kvk_unused_inventory_rows() rows')).rows[0].rows));
+    await db.exec('reset role');
+    // Exercise the reported batch size through the service and real transaction.
+    const bulkCount = 12844, bulkId = '811c1d6e-93cc-4ea4-b4bc-a5b54e7d2c84';
+    await db.exec(`insert into softora_kvk_company_directory
+      (source_company_id,kvk_nummer,bedrijfsnaam,telefoonnummer,email,website,website_status,lead_status)
+      select n, (20000000+n)::text, 'Bulk Example '||n, '123'||n,
+        'bulk'||n||'@example.test', 'bulk'||n||'.test', 'found', 'usable'
+      from generate_series(100, ${bulkCount + 99}) n`);
+    await db.exec('set role service_role');
+    const bulkPreview = response(); await upload.preview({}, bulkPreview);
+    assert.equal(bulkPreview.body.count, bulkCount);
+    const bulk = response(); await upload.upload({ body: { mode: 'with-website', requestId: bulkId, count: bulkCount } }, bulk);
+    assert.equal(bulk.statusCode, 200); assert.equal(bulk.body.count, bulkCount);
+    const bulkReplay = response(); await upload.upload({ body: { mode: 'with-website', requestId: bulkId, count: bulkCount } }, bulkReplay);
+    assert.equal(bulkReplay.body.replayed, true); assert.equal(bulkReplay.body.count, bulkCount);
+    assert.equal((await db.query("select count(*)::int n from softora_customers where payload->>'premiumTransferRunId'=$1", ['kvk-transfer-' + bulkId])).rows[0].n, bulkCount);
+    assert.equal((await db.query('select count(*)::int n from softora_kvk_company_directory where source_company_id>=100 and premium_database_transferred')).rows[0].n, bulkCount);
+    assert.equal((await db.query('select count(*)::int n from softora_kvk_upload_receipts where request_id=$1', [bulkId])).rows[0].n, 1);
+    assert.equal((await db.query('select count(*)::int n from softora_outbound_recipient_guards')).rows[0].n, 1);
     await db.exec('reset role');
   } finally { await db.close(); }
 });
