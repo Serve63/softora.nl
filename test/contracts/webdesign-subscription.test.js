@@ -239,6 +239,10 @@ w.BASE = pathlib.Path(tempfile.mkdtemp())
 w.codex_binary = lambda: '/fixture/codex'
 job = {'id': 'restart-job-1234567890123456', 'claim': '${claim}'}
 folder = w.BASE / job['id']; folder.mkdir(); (folder / 'design.jpg').write_bytes(b'image')
+w.Path.home = lambda: w.BASE
+native = w.BASE / '.codex/generated_images/restart-thread/native.png'; native.parent.mkdir(parents=True)
+native.write_bytes(b'native-png'); (folder / 'design.png').write_bytes(b'native-png')
+(folder / 'codex-events.jsonl').write_text(__import__('json').dumps({'type':'thread.started','thread_id':'restart-thread'}))
 w.write_state({'phase': 'generating', 'job': job})
 calls = []
 def forbidden(*a): raise AssertionError('Image generation must not repeat')
@@ -255,6 +259,7 @@ w.step()
 assert len(calls) == 2 and all(c[0] == '/report' for c in calls)
 assert all(c[1]['dataUrl'].startswith('data:image/jpeg;base64,') for c in calls)
 (folder / 'design.jpg').unlink()
+(folder / 'design.png').unlink(); native.unlink()
 w.write_state({'phase': 'generating', 'job': job}); w.step()
 assert calls[-1][1].get('error')
 env = w.subscription_environment()
@@ -275,6 +280,10 @@ w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
 w.BASE = pathlib.Path(tempfile.mkdtemp())
 job = {'id': 'png-restart-job-123456789012', 'claim': '${claim}'}
 folder = w.BASE / job['id']; folder.mkdir(); (folder / 'design.png').write_bytes(b'native-png')
+w.Path.home = lambda: w.BASE
+native = w.BASE / '.codex/generated_images/parallel-thread/native.png'; native.parent.mkdir(parents=True)
+native.write_bytes(b'native-png')
+(folder / 'codex-events.jsonl').write_text(json.dumps({'type':'thread.started','thread_id':'parallel-thread'}))
 w.write_state({'phase': 'generating', 'job': job})
 w.generate = lambda *args: (_ for _ in ()).throw(AssertionError('must not regenerate'))
 w.generation_running = lambda folder: True

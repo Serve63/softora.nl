@@ -545,7 +545,8 @@ def step(slot=0):
     payload = {'jobId': job['id'], 'claim': job['claim']}
     if not state.get('error'):
         try:
-            encode_result(folder)
+            restore_native_result(folder)
+            assert_output_identity(folder)
         except LocalCapacity:
             return
         except Exception:
