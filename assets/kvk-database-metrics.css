@@ -272,3 +272,5 @@
     background-size: 1px 100%;
   }
 }
+
+.kvk-load-status{position:fixed;bottom:12px;right:16px;z-index:20;max-width:calc(100% - 32px);font-size:12px;color:var(--ink);background:var(--card,#fff);padding:8px 12px;margin:0}.kvk-load-status[hidden]{display:none}

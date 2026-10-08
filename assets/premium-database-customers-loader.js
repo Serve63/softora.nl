@@ -5,7 +5,7 @@
     const ARCHIVE_ENDPOINT = ENDPOINT + "/archive";
     const PAGE_LIMIT = 1000;
     const PAGE_CONCURRENCY = 4;
-    const MAX_CUSTOMERS = 25000;
+    const MAX_CUSTOMERS = 100000;
     const REQUEST_TIMEOUT_MS = 12000;
     const TRANSIENT_RETRY_DELAY_MS = 250;
     const VALIDATOR_KEY = "premium-database-archive-validator:v1";

@@ -47,10 +47,10 @@ function harness(initialSnapshot = { state: { treated: 12, usable: 10, without_w
       requests += 1;
       assert.equal(options.cache, 'no-store');
       assert.equal(options.credentials, 'same-origin');
-      const category = new URL(url, 'https://example.test').searchParams.get('categorie');
+      assert.equal(new URL(url, 'https://example.test').pathname, '/api/kvk-database/company-directory/counts');
       return {
         ok: !failed,
-        json: async () => ({ ok: true, total_is_exact: true, total: counts[category] }),
+        json: async () => ({ ok: true, total_is_exact: true, counts: Object.fromEntries(Object.entries(CANONICAL_CATEGORIES).map(([key, category]) => [key, counts[category]])) }),
       };
     },
   };
@@ -86,7 +86,7 @@ test('canonical metrics and the two real observer paths converge without a feedb
   for (let i = 0; i < 20; i += 1) app.controller.renderMetrics();
   assert.equal(app.flush(), 0);
   assert.deepEqual(totalIds.map(id => app.elements[id].writes), writes);
-  assert.equal(app.getRequests(), Object.keys(CANONICAL_CATEGORIES).length);
+  assert.equal(app.getRequests(), 1);
 });
 
 test('core-renderer writes are corrected once, without restarting an observer loop', async () => {
@@ -113,13 +113,14 @@ test('canonical inventory renders even before the full planning snapshot arrives
   assert.equal(app.elements['companies-usable'].textContent, '100');
 });
 
-test('unavailable canonical counts preserve the snapshot fallback and remain retryable', async () => {
+test('unavailable canonical counts never call raw research rows transferable and remain retryable', async () => {
   const app = harness(undefined, true);
   assert.equal(await app.controller.refreshCanonicalCounts(), false);
   app.flush();
   app.elements['companies-with-website'].textContent = '4';
   app.flush();
-  assert.equal(app.elements['companies-with-website'].textContent, '9');
+  assert.equal(app.elements['companies-with-website'].textContent, '—');
+  assert.equal(app.elements['companies-usable'].textContent, '—');
   app.setFailed(false);
   assert.equal(await app.controller.refreshCanonicalCounts(), true);
   app.flush();
@@ -134,6 +135,6 @@ test('unavailable canonical counts preserve the snapshot fallback and remain ret
 
 test('the dashboard requests the repaired metrics asset with a fresh cache key', () => {
   const page = fs.readFileSync(path.join(__dirname, '../../premium-kvk-database.html'), 'utf8');
-  assert.match(page, /kvk-database-metrics\.js\?v=20260927-copyable/);
+  assert.match(page, /kvk-database-metrics\.js\?v=20261007-smooth/);
   assert.doesNotMatch(page, /kvk-database-metrics\.js\?v=20260910-flow/);
 });

@@ -66,7 +66,7 @@ test('bedrijfssoftware-uitleg begrenst een procesopdracht zonder automatische SE
   assert.match(html, /leidende bron/);
   assert.match(html, /zonder dezelfde werkopdracht dubbel aan te maken/);
   assert.match(html, /href="\/bedrijfssoftware-op-maat"/);
-  assert.match(html, /href="\/vergelijkingen\/maatwerk-software-vs-standaard-software"/);
+  assert.match(html, /href="\/blog\/maatwerk-software-offerte-beoordelen">een softwareofferte beoordelen<\/a>/);
   assert.doesNotMatch(html, /Voor zoekintentie uitleg|Welke content en interne links erbij horen|Hoe weet ik of de pagina goed genoeg is/);
   const support = buildSeoContentArticleHtml(getSeoContentItem('vergelijkingen', 'maatwerk-software-vs-standaard-software'));
   assert.match(support, /Leg eerst vast wie mag beslissen, welke registratie leidend is en wat er bij een fout gebeurt/);
@@ -636,7 +636,7 @@ test('softwareoffertegids geeft een toetsbare terugvraag en contextuele vervolgr
   const comparison = buildSeoContentArticleHtml(getSeoContentItem('vergelijkingen', 'maatwerk-software-vs-standaard-software'));
 
   assert.equal(item.publishedAt, '2026-07-17');
-  assert.equal(item.updatedAt, '2026-09-11');
+  assert.equal(item.updatedAt, '2026-10-08');
   assert.equal(item.growthEventKind, 'other_growth_action');
   assert.equal(item.growthEventAt, '2026-09-11');
   assert.equal(item.qualityVersion, 2);
@@ -657,10 +657,10 @@ test('softwareoffertegids geeft een toetsbare terugvraag en contextuele vervolgr
   assert.match(item.summary, /vergelijk een open post niet alsof die is inbegrepen/);
   assert.match(html, /proefmigratie met controle van aantallen en foutregels/);
   assert.match(html, /href="\/bedrijfssoftware-op-maat">bedrijfssoftware op maat laten uitwerken<\/a>/);
-  assert.match(html, /href="\/vergelijkingen\/maatwerk-software-vs-standaard-software">standaardsoftware, een hybride koppeling of maatwerk<\/a>/);
+  assert.match(html, /href="\/blog\/wat-is-bedrijfssoftware-op-maat">uitleg over bedrijfssoftware op maat<\/a>/);
   assert.match(comparison, /href="\/blog\/maatwerk-software-offerte-beoordelen">softwareoffertes op scope en acceptatie vergelijken<\/a>/);
   assert.ok(html.indexOf(item.summary) < html.indexOf('<figure class="artikel-img">'));
-  assert.match(html, /"dateModified":"2026-09-11"/);
+  assert.match(html, /"dateModified":"2026-10-08"/);
 });
 
 test('websiteoffertegids gebruikt precies twee eigen beelden en natuurlijke inkomende links', () => {

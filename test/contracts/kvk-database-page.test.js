@@ -183,7 +183,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.doesNotMatch(pageSource, /id="latest-treated-table-frame"/);
   assert.doesNotMatch(pageSource, /id="progress-bar"/);
   assert.doesNotMatch(pageSource, /id="progress-label"/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260927-worker-labels/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20261007-smooth/);
   assert.match(pageSource, /assets\/kvk-database-fast-progress\.js\?v=20260927-copyable/);
   const fastProgressSource = fs.readFileSync(path.join(repoRoot, 'assets/kvk-database-fast-progress.js'), 'utf8');
   assert.match(fastProgressSource, /\/api\/kvk-database\/snapshot\/progress/);
@@ -193,7 +193,7 @@ test('kvk database snapshot page contains the approved compact dashboard', () =>
   assert.match(pageSource, /assets\/kvk-database-planning\.css\?v=20260909c/);
   assert.doesNotMatch(pageSource, /assets\/kvk-database-planning\.js/);
   assert.match(pageSource, /assets\/kvk-database-total-found\.css\?v=20261003-overview-style/);
-  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20261004-robot-names/);
+  assert.match(pageSource, /assets\/kvk-database-luna-errors\.js\?v=20261007-smooth/);
   assert.match(pageSource, /assets\/kvk-database-control\.js\?v=20260923-location-count/);
   assert.match(pageSource, /assets\/kvk-database-control\.css\?v=20260804b/);
 });
@@ -559,8 +559,9 @@ test('kvk database page loads its protected live snapshot with an empty embedded
   assert.match(scriptSource, /async function loadRemoteSnapshot/);
   assert.match(scriptSource, /\/api\/kvk-database\/snapshot\?t=/);
   assert.match(scriptSource, /credentials:"same-origin"/);
-  assert.match(scriptSource, /await loadRemoteSnapshot\(\),bindEvents/);
-  assert.match(scriptSource, /await loadRemoteSnapshot\(\);const\[t,a\]=await Promise\.all/);
+  assert.doesNotMatch(scriptSource, /await loadRemoteSnapshot\(\),bindEvents/);
+  assert.match(scriptSource, /applyCollapsedPanels\(\),await refreshDashboard\(\)/);
+  assert.match(scriptSource, /const loaded=await loadRemoteSnapshot\(\);snapshotLoadFailed=!loaded;if\(!loaded&&!liveFullSnapshotRendered\)return;const\[t,a\]=await Promise\.all/);
 });
 
 test('kvk database refreshes live counters while the page stays open', () => {
@@ -597,9 +598,9 @@ test('kvk database keeps last-hour deltas in eight cards with controller decisio
   assert.doesNotMatch(pageSource, /<span>Grade [12]<\/span>/);
   assert.doesNotMatch(pageSource, /id="companies-unusable-grade-3"/);
   assert.doesNotMatch(metricsSource, /companies-unusable-grade-3/);
-  assert.match(pageSource, /assets\/kvk-database\.js\?v=20260927-worker-labels/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20260927-copyable/);
-  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20260917-control-orange/);
+  assert.match(pageSource, /assets\/kvk-database\.js\?v=20261007-smooth/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.js\?v=20261007-smooth/);
+  assert.match(pageSource, /assets\/kvk-database-metrics\.css\?v=20261007-smooth/);
   assert.match(pageSource, /id="companies-control-room-last60"><span class="stat-delta-added"[^>]*>\+—<\/span><span class="stat-delta-removed"[^>]*>−—<\/span>/);
   assert.match(metricsSource, /companies-successful-found/);
   assert.match(metricsSource, /declared_usable/);
@@ -763,7 +764,7 @@ test('KVK header shows the disabled mail upload action without a settings back l
   assert.match(workerStyles, /\.kvk-api-workers-dialog::backdrop\{background:transparent;backdrop-filter:none\}/);
   assert.match(pageSource, /kvk-api-workers\.css\?v=20260926-subscription/);
   assert.doesNotMatch(pageSource, /id="kvk-worker-status"/);
-  assert.match(pageSource, /id="companies-total">0<\/strong>\s*<\/div>\s*<div class="stat-delta"><span class="stat-delta-label">Alles gevonden<\/span>/);
+  assert.match(pageSource, /id="companies-total">—<\/strong>\s*<\/div>\s*<div class="stat-delta"><span class="stat-delta-label">Alles gevonden<\/span>/);
   assert.ok(pageSource.indexOf('/assets/kvk-database-worker-status.js') < pageSource.indexOf('/assets/kvk-database.js'));
 });
 

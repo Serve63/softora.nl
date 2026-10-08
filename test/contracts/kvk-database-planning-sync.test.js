@@ -35,7 +35,9 @@ function browser(initial = full(10), withFast = true) {
   const elements = new Map();
   const element = id => {
     if (!elements.has(id)) elements.set(id, {
-      textContent: id === 'kvkSnapshot' ? '{}' : '', innerHTML: '', value: '',
+      textContent: id === 'kvkSnapshot' ? '{}' : '', _html: '', htmlWrites: 0, value: '',
+      get innerHTML() { return this._html; },
+      set innerHTML(value) { this._html = value; this.htmlWrites++; },
       scrollTop: 0, clientHeight: 0, scrollHeight: 0,
       addEventListener() {}, setAttribute() {}, classList: { toggle() {} },
     });
@@ -45,6 +47,7 @@ function browser(initial = full(10), withFast = true) {
   let release;
   const gate = new Promise(resolve => { release = resolve; });
   let first = true;
+  let failed = false;
   const intervals = [];
   const requests = [];
   const context = vm.createContext({
@@ -59,7 +62,7 @@ function browser(initial = full(10), withFast = true) {
       requests.push({ url, options });
       if (url.startsWith('/api/kvk-database/snapshot?')) {
         if (first) { first = false; await gate; }
-        return { ok: true, json: async () => ({ snapshot: response }) };
+        return { ok: !failed, json: async () => ({ snapshot: response }) };
       }
       return { ok: false };
     },
@@ -70,6 +73,8 @@ function browser(initial = full(10), withFast = true) {
   if (withFast) vm.runInContext(fast, context, { filename: 'kvk-database-fast-progress.js' });
   return {
     element, requests, intervals,
+    setFailed(value) { failed = value; },
+    hasLiveSnapshot: () => context.SoftoraKvkDashboard.hasLiveSnapshot(),
     async start() { release(); await boot; },
     async refresh(snapshot) {
       response = snapshot;
@@ -213,9 +218,44 @@ test('a truly empty canonical planning stays empty rather than retaining fabrica
 
 test('both changed browser assets have fresh cache keys and preserve script ordering', () => {
   const page = fs.readFileSync(path.join(root, 'premium-kvk-database.html'), 'utf8');
-  const coreUrl = '/assets/kvk-database.js?v=20260927-worker-labels';
+  const coreUrl = '/assets/kvk-database.js?v=20261007-smooth';
   const fastUrl = '/assets/kvk-database-fast-progress.js?v=20260927-copyable';
   assert.ok(page.includes(coreUrl));
   assert.ok(page.includes(fastUrl));
   assert.ok(page.indexOf(coreUrl) < page.indexOf(fastUrl));
+});
+
+
+test('opening requests one full snapshot and identical planning never replaces DOM nodes', async () => {
+  const app = browser(full(10), false);
+  assert.equal(app.hasLiveSnapshot(), false);
+  await app.start();
+  assert.equal(app.hasLiveSnapshot(), true);
+  assert.equal(app.requests.filter(r => r.url.startsWith('/api/kvk-database/snapshot?')).length, 1);
+  const writes = app.element('location-list').htmlWrites;
+  await app.refresh(full(10));
+  assert.equal(app.element('location-list').htmlWrites, writes);
+  await app.refresh(full(20, 'TEST-CHANGED'));
+  assert.equal(app.element('location-list').htmlWrites, writes + 1);
+  assert.match(app.element('location-list').innerHTML, /TEST-CHANGED/);
+});
+
+test('failed full reads preserve restored planning even when progress arrives first', async () => {
+  const app = browser();
+  app.element('location-list').innerHTML = '<li class="location-item">PREVIOUS-PLANNING</li>';
+  const writes = app.element('location-list').htmlWrites;
+  app.merge(progress(20));
+  app.setFailed(true);
+  await app.start();
+  assert.equal(app.hasLiveSnapshot(), false);
+  assert.equal(app.element('location-list').htmlWrites, writes);
+  assert.match(app.element('location-list').innerHTML, /PREVIOUS-PLANNING/);
+  app.setFailed(false);
+  await app.refresh(full(30));
+  assert.equal(app.hasLiveSnapshot(), true);
+  assert.match(app.element('location-list').innerHTML, /TEST-1/);
+  const livePlanning = app.element('location-list').innerHTML;
+  app.setFailed(true);
+  await app.refresh(full(40, 'SHOULD-NOT-RENDER'));
+  assert.equal(app.element('location-list').innerHTML, livePlanning);
 });

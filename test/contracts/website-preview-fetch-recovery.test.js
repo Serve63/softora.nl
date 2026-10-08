@@ -10,7 +10,7 @@ const website = 'https://voorbeeld.test/';
 const httpWebsite = 'http://voorbeeld.test/';
 const connectionFailure = () => ({ ok: false, attempts: [
   { mode: 'browser-desktop', status: 0, error: 'fetch failed' },
-  { mode: 'softora-compat', status: 0, error: 'certificate expired' },
+  { mode: 'softora-compat', status: 0, error: 'connection reset' },
 ] });
 const publicUrl = (url) => assertWebsitePreviewUrlIsPublic(url, {
   lookup: async () => [{ address: '93.184.216.34', family: 4 }],
@@ -174,7 +174,7 @@ for (const [errorCode, errorName, retryable] of [
     throw error;
   });
   await assert.rejects(remote.fetchWebsitePreviewScanFromUrl(website), error => {
-    assert.equal(error.status, 422);
+    assert.equal(error.status, 502);
     assert.equal(error.retryableWebsiteFetch, retryable);
     return true;
   });

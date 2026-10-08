@@ -49,10 +49,9 @@ test('data ops store restores large premium database webdesign job queues', () =
   );
   assert.match(source, /function getWebdesignBatchTableStatus\(status\)[\s\S]*return normalized === 'cancelled' \? 'error' : normalized;/);
   assert.match(source, /status,\s*total: Math\.max/);
-  assert.match(
-    source,
-    /async function listCustomerSnapshotRows[\s\S]*\.select\('customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at'\)[\s\S]*maxRows: 25000/
-  );
+  assert.match(source, /createCustomerSnapshotRowsRepository\(\{[\s\S]*tableName: TABLES\.customers/);
+  assert.equal(require('../../server/repositories/customer-snapshot-rows').SNAPSHOT_COLUMNS,
+    'customer_id,identity_key,company,contact_name,phone,email,website,database_status,lifecycle_status,responsible,payload,updated_at');
   assert.match(
     source,
     /forgetReads\('customers', 'customers-snapshot', 'dashboard-customers', 'customers-by-email:\*', 'customers-by-id:\*'\)/
@@ -1191,7 +1190,7 @@ test('data ops customer deletes invalidate the compact mail-ready source cache',
         order() { return query; },
         range(from, to) {
           snapshotReads += 1;
-          return Promise.resolve({ data: customerRows.slice(from, to + 1), error: null });
+          return Promise.resolve({ data: customerRows.slice(from, to + 1), count: customerRows.length, error: null });
         },
         update() {
           return {
@@ -1238,7 +1237,7 @@ test('data ops customer snapshot honors bounded page size and timeout overrides'
         order() { return query; },
         range(from, to) {
           ranges.push([from, to]);
-          return Promise.resolve({ data: customerRows.slice(from, to + 1), error: null });
+          return Promise.resolve({ data: customerRows.slice(from, to + 1), count: customerRows.length, error: null });
         },
       };
       return query;

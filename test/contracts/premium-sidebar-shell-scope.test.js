@@ -296,9 +296,9 @@ test('premium database consistency assets stay outside the static sidebar', () =
   assert.ok(asideEnd > 0);
   assert.ok(source.indexOf('assets/premium-database-status-message.js?v=20260926') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260925-design-remove') > asideEnd);
-  assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20260924-readmodel-version') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20261007-bulk-capacity') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-table-helpers.js?v=20261001-email-guard') > asideEnd);
-  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20260924-readmodel') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20261007-bulk-capacity') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui') > asideEnd);
   assert.match(source, /assets\/premium-database-mail-ready-menu\.css\?v=20260914-provider/);
   assert.ok(source.indexOf('assets/premium-database-webdesign-variant-picker.js?v=20260925-v2-only') > asideEnd);
@@ -1447,7 +1447,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-boot\.js\?v=20260923-provider-readmodel/);
   assert.match(source, /premium-database-readiness\.js\?v=20261003-complete-count/);
   assert.match(source, /premium-database-system-mail-count\.js\?v=20261003-complete-count/);
-  assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20260924-readmodel/);
+  assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20261007-bulk-capacity/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
   assert.match(source, /premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
   assert.match(source, /premium-database-table-helpers\.js\?v=20261001-email-guard/);

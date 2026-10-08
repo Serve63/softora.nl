@@ -4,6 +4,7 @@ import tempfile
 import time
 import types
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
@@ -35,6 +36,9 @@ USABLE = {'kvk_nummer': '17218892', 'lead_status': 'usable', 'phone': '06-112187
 
 class RobotImportTests(unittest.TestCase):
     def setUp(self):
+        gate = patch.object(robot_import, "check_website_status", side_effect=lambda website: "found" if website else "no_website")
+        self.website_gate = gate.start()
+        self.addCleanup(gate.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.db = Path(self.directory.name) / 'bedrijven.sqlite'
         with sqlite3.connect(self.db) as connection:

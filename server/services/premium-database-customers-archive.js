@@ -1,6 +1,7 @@
 const { gzip } = require('node:zlib');
 const { promisify } = require('node:util');
 const { createHash } = require('node:crypto');
+const { MAX_DATABASE_CUSTOMERS: MAX_CUSTOMERS } = require('../config/premium-database-limits');
 
 const gzipAsync = promisify(gzip);
 const PAGE_LIMIT = 1000;
@@ -9,7 +10,6 @@ const PAGE_LIMIT = 1000;
 const CHUNK_LIMIT = 2000;
 const PAGE_CONCURRENCY = 4;
 const CHUNK_CONCURRENCY = 4;
-const MAX_CUSTOMERS = 25000;
 const MAX_ARCHIVE_BYTES = 3500000;
 const ARCHIVE_CACHE_CONTROL = 'private, no-cache, max-age=0, must-revalidate';
 
