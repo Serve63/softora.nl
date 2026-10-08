@@ -8,12 +8,12 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
-test('database source recheck notices load with the shared premium shell', () => {
+test('database source selection keeps its safety filter without a persistent banner', () => {
   const page = readRepoFile('premium-database.html');
   const selection = readRepoFile('assets/premium-database-webdesign-source-selection.js');
-  assert.match(page, /premium-database-webdesign-source-selection\.js\?v=20261008-source-recheck/);
-  assert.match(selection, /item\.requiresSourceRecheck/);
-  assert.match(selection, /succesvol gecontroleerd ontwerp geeft deze bron weer vrij/);
+  assert.match(page, /premium-database-webdesign-source-selection\.js\?v=20261008-quiet-source-selection/);
+  assert.match(selection, /if \(item\.eligible\) targets\.push/);
+  assert.doesNotMatch(selection, /webdesignSourceDeferrals|insertAdjacentElement/);
   assert.match(page, /data-static-sidebar="1"/);
 });
 
