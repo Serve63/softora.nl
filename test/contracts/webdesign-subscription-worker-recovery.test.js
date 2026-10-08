@@ -21,6 +21,36 @@ ${script}
   assert.equal(result.status, 0, result.stderr || result.stdout);
 }
 
+test('reference fallback rejects an image of an error page before trying the alternate provider', () => worker(`
+folder = w.BASE / job['id']; folder.mkdir()
+urls = ['https://image.thum.io/get/fixture', 'https://s0.wordpress.com/mshots/v1/fixture']
+job['referenceUrls'] = urls
+calls = []
+class Response:
+ def __init__(self, data): self.data = data
+ def __enter__(self): return self
+ def __exit__(self, *args): pass
+ def read(self, limit): return self.data
+def download(request, **kwargs):
+ calls.append(request.full_url)
+ return Response(b'\\x89PNG' + (b'blocked' if len(calls) == 1 else b'homepage'))
+w.urlopen = download
+w.reference_blank = lambda reference: b'blocked' in reference.read_bytes()
+reference = w.download_reference(job, folder)
+assert calls == urls and reference.read_bytes() == b'\\x89PNGhomepage'
+w.reference_blank = lambda reference: True
+calls.clear()
+try: w.download_reference(job, folder)
+except w.SourceUnusable: pass
+else: raise AssertionError('Two rejected reference images must stop before generation')
+assert calls == urls
+w.urlopen = lambda *args, **kwargs: (_ for _ in ()).throw(TimeoutError('offline'))
+try: w.download_reference(job, folder)
+except w.SourceUnusable: raise AssertionError('A provider outage must remain retryable')
+except RuntimeError: pass
+else: raise AssertionError('No reference may not start generation')
+`));
+
 test('claim and upload timeouts reuse their checkpoint without repeating generation', () => worker(`
 calls, generations = [], []
 def offline(route, payload):
@@ -191,6 +221,38 @@ for phase in ('prepare', 'generating'):
  w.step()
  assert state() == {} and reports[0] == reports[1]
  assert len(generated) == (1 if phase == 'prepare' else 0)
+`));
+
+test('native image safety failures survive recovery and report retry without another generation', () => worker(`
+folder = w.BASE / job['id']; folder.mkdir()
+events = folder / 'codex-events.jsonl'
+native = '2026-10-08T18:34:58.609873Z ERROR codex_core::tools::router: error=image generation failed: http 400 Bad Request: moderation_blocked'
+events.write_text(json.dumps({'type': 'item.completed', 'item': {'type': 'agent_message', 'text': native}}))
+assert w.image_safety_blocked(folder) is False
+events.write_text(native.replace('moderation_blocked', 'unknown_error'))
+assert w.image_safety_blocked(folder) is False
+events.write_text(native)
+assert w.image_safety_blocked(folder) is True
+for name in ('design.png', 'design.jpg'):
+ output = folder / name; output.write_bytes(b'existing')
+ assert w.image_safety_blocked(folder) is False
+ output.unlink()
+w.write_state({'phase': 'generating', 'job': job})
+w.generation_running = lambda folder: False
+w.generate = forbidden
+reports = []
+def offline(route, payload):
+ reports.append(payload); raise TimeoutError('report lost')
+w.call = offline
+try: w.step()
+except TimeoutError: pass
+assert state()['phase'] == 'deliver' and reports[0]['errorKind'] == 'image-safety'
+assert 'dataUrl' not in reports[0] and 'moderation_blocked' not in reports[0]['error']
+w.call = lambda route, payload: (reports.append(payload) or {'ok': True, 'done': True})
+w.step()
+assert reports[0] == reports[1] and state() == {}
+events.unlink(); events.symlink_to(folder / 'outside-events')
+assert w.image_safety_blocked(folder) is False
 `));
 
 test('source reference classification requires bounded explicit zero-generation evidence and no image', () => worker(`

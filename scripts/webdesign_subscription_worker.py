@@ -4,6 +4,7 @@ import base64
 import fcntl
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -122,6 +123,22 @@ def source_reference_blocked(folder):
     reason = reason.lower()
     return any(word in reason for word in ('screenshot', 'referentie', 'bronbeeld')) and any(word in reason for word in ('cloudflare', 'blokkade', 'onleesbaar'))
 
+def image_safety_blocked(folder):
+    if any((folder / name).exists() for name in ('design.png', 'design.jpg')):
+        return False
+    events = folder / 'codex-events.jsonl'
+    if events.is_symlink():
+        return False
+    try:
+        with events.open('rb') as stream:
+            stream.seek(max(0, events.stat().st_size - 65536))
+            lines = stream.read(65536).decode('utf-8', errors='replace').splitlines()
+    except OSError:
+        return False
+    # Require the native tool error code, never an arbitrary model explanation.
+    return any(re.match(r'^\d{4}-\d\d-\d\dT[\d:.]+Z ERROR codex_core::tools::router: error=image generation failed:.*\bmoderation_blocked\b', line)
+               for line in lines)
+
 def subscription_paused():
     for peer in range(2):
         try:
@@ -185,6 +202,7 @@ def subscription_environment():
     return result
 
 def download_reference(job, folder):
+    rejected_reference = False
     for url in job.get('referenceUrls', []):
         if not url.startswith(('https://image.thum.io/get/', 'https://s0.wordpress.com/mshots/v1/')):
             continue
@@ -192,12 +210,24 @@ def download_reference(job, folder):
             with urlopen(Request(url, headers={'User-Agent': 'Softora-Webdesign/1.0'}), timeout=90) as response:
                 data = response.read(6_000_001)
             if len(data) > 6_000_000 or not (data.startswith(b'\x89PNG') or data.startswith(b'\xff\xd8')):
+                rejected_reference = True
                 continue
             reference = folder / 'homepage-reference.png'
             reference.write_bytes(data)
+            # A valid image response can still contain a 403/loading page.
+            # Try the remaining reference provider before rejecting the source.
+            try:
+                if reference_blank(reference):
+                    rejected_reference = True
+                    continue
+            except SourceUnusable:
+                rejected_reference = True
+                continue
             return reference
         except Exception:
             continue
+    if rejected_reference:
+        raise SourceUnusable('Geen van de homepage-bronbeelden is bruikbaar.')
     raise RuntimeError('Geen bruikbaar homepage-bronbeeld beschikbaar.')
 
 def generate(job, folder, slot=0):
@@ -313,6 +343,8 @@ def step(slot=0):
             payload['errorKind'] = 'subscription-limit'
         elif state.get('sourceUnusable') or source_reference_blocked(folder):
             payload['errorKind'] = 'source-reference'
+        elif image_safety_blocked(folder):
+            payload['errorKind'] = 'image-safety'
     else:
         payload['dataUrl'] = 'data:image/jpeg;base64,' + base64.b64encode((folder / 'design.jpg').read_bytes()).decode()
     delivered = call('/report', payload)

@@ -19,9 +19,9 @@ const row = (patch = {}) => ({ customer_id: target.customerId, website_url: targ
   error: 'Websiteanalyse mislukt: Kon deze website niet ophalen (422).', ...patch });
 const selected = (history, input = target, time = now) => selectWebdesignSources([input], history, time)[0];
 
-test('source failures have bounded holds while image/provider failures remain eligible', () => {
+test('transient source failures have bounded holds while image/provider failures remain eligible', () => {
   for (const error of ['Websiteanalyse mislukt: Kon deze website niet ophalen (422).',
-    'Websiteanalyse mislukt: Er kon te weinig bruikbare inhoud uit deze website worden gelezen.',
+    'Websiteanalyse mislukt: Kon deze website niet ophalen (503).',
     'Websiteanalyse mislukt: Websiteanalyse duurde te lang.']) {
     assert.equal(selected([row({ error })]).retryAt, now - 60000 + 30 * 60000);
     assert.equal(selected([row({ error })], target, now + 30 * 60000).eligible, true);
@@ -31,11 +31,34 @@ test('source failures have bounded holds while image/provider failures remain el
   }
   const rejected = row({ rejected: true, preparationPhase: 'ready' });
   assert.equal(selected([rejected]).eligible, false);
-  assert.equal(selected([rejected], target, now + 86400000).eligible, true);
+  assert.equal(selected([rejected], target, now + 86400000).eligible, false);
   assert.equal(selected([row({ preparationPhase: 'ready', error: 'Upload mislukt (403).' })]).eligible, true);
-  assert.equal(selected([row({ preparationPhase: 'ready', error: 'De homepage-screenshot is geblokkeerd of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.' })]).retryAt, now - 60000 + 30 * 60000);
+  assert.equal(selected([row({ preparationPhase: 'ready', error: 'De homepage-screenshot is geblokkeerd of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.' })]).requiresSourceRecheck, true);
   assert.equal(selected([row({ preparationPhase: '', error: 'De beeldgenerator gaf fout 422.' })]).eligible, true);
   assert.equal(selected([row({ error: 'Websiteanalyse mislukt: onbekende fout' })]).eligible, true);
+});
+
+test('confirmed source failures stay excluded across later batches until corrected or successful', () => {
+  const failures = [
+    row({ preparationPhase: 'ready', error: 'De homepage-screenshot is geblokkeerd, leeg of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.' }),
+    row({ preparationCode: 'WEBDESIGN_EMPTY_WEBSITE', error: 'Websiteanalyse mislukt: Websitebron onbruikbaar: lege pagina of te weinig leesbare inhoud.' }),
+    row({ error: 'Websiteanalyse mislukt: Er kon te weinig bruikbare inhoud uit deze website worden gelezen.' }),
+    row({ preparationCode: 'WEBDESIGN_WEBSITE_DNS_MISSING' }),
+    row({ preparationCode: 'WEBDESIGN_WEBSITE_TLS_FAILED' }),
+    row({ error: 'Websiteanalyse mislukt: De website weigert toegang (403); de bedrijfsinhoud kon niet worden gelezen.' }),
+    row({ error: 'Websiteanalyse mislukt: De opgegeven websitepagina bestaat niet meer of is niet beschikbaar (404).' }),
+    row({ error: 'Websiteanalyse mislukt: De website toont een toegangscontrole of blokkeerpagina; de bedrijfsinhoud kon niet worden gelezen.' }),
+    row({ preparationPhase: 'ready', error: 'De beeldgenerator heeft dit ontwerp geweigerd via het veiligheidsfilter. Er is geen webdesign gemaakt of opgeslagen.' }),
+  ];
+  for (const failed of failures) {
+    const decision = selected([failed], target, now + 7 * 86400000);
+    assert.equal(decision.eligible, false);
+    assert.equal(decision.requiresSourceRecheck, true);
+    assert.ok(decision.reason && Number.isFinite(decision.retryAt));
+    assert.equal(selected([failed, row({ error: 'Codex kon het ontwerp niet maken.', preparationPhase: 'ready', finished_at: new Date(now).toISOString() })]).eligible, false);
+    assert.equal(selected([failed], { ...target, websiteUrl: 'https://corrected.test/' }).eligible, true);
+    assert.equal(selected([failed, row({ status: 'done', finished_at: new Date(now).toISOString() })]).eligible, true);
+  }
 });
 
 test('last completed success and a corrected website release the bulk source hold', () => {
@@ -58,7 +81,8 @@ test('selection endpoint authenticates, validates and stops on missing or partia
   };
   const store = { listWebdesignSourceHistory: async (owner, ids, since) => {
     calls++; assert.equal(owner, 'owner-contract'); assert.deepEqual(ids, [target.customerId]);
-    assert.equal(Date.parse(since), now - 86400000); return [row()];
+    assert.equal(since, undefined, 'confirmed source failures must not age out of the history query');
+    return [row({ preparationCode: 'WEBDESIGN_EMPTY_WEBSITE', finished_at: new Date(now - 7 * 86400000).toISOString() })];
   } };
   assert.equal((await request(store, undefined, '')).statusCode, 401);
   assert.equal((await request(store, { targets: Array(251).fill(target) })).statusCode, 400);
@@ -70,18 +94,19 @@ test('selection endpoint authenticates, validates and stops on missing or partia
 });
 
 test('repository paginates compact owner-scoped history and never accepts a partial result', async () => {
-  const scopes = [], ranges = [], columns = [];
+  const scopes = [], ranges = [], columns = [], timeFilters = [];
   const make = (fail) => createWebdesignSourceHistoryRepository({ TABLES: { webdesignJobs: 'jobs' },
     getWebdesignStatusReadOptions: () => ({}), createWebdesignJobStatusReadError: () => new Error('history unavailable'),
     run: async (_action, query) => {
       const builder = { select(value) { columns.push(value); return this; }, eq(...value) { scopes.push(value); return this; },
-        in() { return this; }, gte() { return this; }, order() { return this; }, range(...value) { ranges.push(value); return this; } };
+        in() { return this; }, gte(...value) { timeFilters.push(value); return this; }, order() { return this; }, range(...value) { ranges.push(value); return this; } };
       query({ from: () => builder });
       return ranges.length % 2 ? { ok: true, data: Array(500).fill(row()) } : (fail ? { ok: false } : { ok: true, data: [row()] });
     } });
   assert.equal((await make(false).listWebdesignSourceHistory('owner', ['id'], 'since')).length, 501);
   assert.deepEqual(ranges, [[0, 499], [500, 999]]);
   assert.deepEqual(scopes[0], ['owner_key', 'owner']);
+  assert.deepEqual(timeFilters, [], 'an old source rejection remains visible to later batches');
   assert.doesNotMatch(columns[0], /(?:^|,)payload(?:,|$)|preparation:payload/);
   await assert.rejects(make(true).listWebdesignSourceHistory('owner', ['id'], 'since'), /history unavailable/);
 });
