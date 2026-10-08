@@ -2031,6 +2031,73 @@ test('mailbox integration never activates from the separate outreach scheduler f
   assert.equal(service.isConfigured(), false);
 });
 
+test('Others inbox messages missed by the focused checkpoint are recovered for each exact owner', async () => {
+  for (const owner of ['serve', 'martijn']) {
+    const account = `${owner}-sender@example.com`;
+    const otherOwner = owner === 'serve' ? 'martijn' : 'serve';
+    let values = {
+      [`cursor_${owner}`]: 'old-focused-page',
+      [`min_timestamp_${owner}`]: '2026-07-25T11:50:00.000Z',
+      [`cursor_${otherOwner}`]: 'untouched-other-owner-page',
+    };
+    const store = createStore();
+    store.getSyncState = async () => ({ last_synced_at: '2026-07-25T12:00:00.000Z' });
+    const missed = incoming({
+      id: `others-${owner}`, eaccount: account, campaign_id: null,
+      thread_id: `others-thread-${owner}`, to_address_email_list: [account],
+      timestamp_created: '2026-07-25T10:00:00.000Z',
+      timestamp_email: '2026-07-25T10:00:00.000Z',
+    });
+    const queries = [];
+    const { service } = buildService({
+      store,
+      getUiStateValues: async () => ({ values }),
+      setUiStateValues: async (_scope, patch) => {
+        values = { ...values, ...patch };
+        return { ok: true };
+      },
+      fetchJsonWithTimeout: async (url) => {
+        const params = new URL(url).searchParams;
+        queries.push(Object.fromEntries(params));
+        const minimum = params.get('min_timestamp_created');
+        const items = params.get('mode') === 'emode_all' &&
+          (!minimum || minimum < missed.timestamp_created)
+          ? [missed, incoming({ id: 'wrong-owner', eaccount: `${otherOwner}-sender@example.com` })]
+          : [];
+        return { response: { ok: true, status: 200 }, data: { items } };
+      },
+    });
+
+    await service.syncOwner(owner);
+    assert.equal(queries[0].eaccount, account);
+    assert.equal(queries[0].starting_after, undefined);
+    assert.ok(queries[0].min_timestamp_created < missed.timestamp_created);
+    assert.ok(queries.every((query) => query.mode === 'emode_all'));
+    assert.deepEqual(store.rows.map((message) => message.providerMessageId), [`others-${owner}`]);
+    assert.equal(store.rows[0].providerOwner, owner);
+    assert.equal(values[`email_mode_${owner}`], 'emode_all');
+    assert.equal(values[`cursor_${otherOwner}`], 'untouched-other-owner-page');
+    assert.equal(values[`email_mode_${otherOwner}`], undefined);
+
+    queries.length = 0;
+    await service.syncOwner(owner);
+    assert.equal(queries[0].min_timestamp_created, '2026-07-25T11:50:00.000Z');
+    assert.equal(store.rows.length, 1);
+  }
+});
+
+test('failed Others recovery does not promote a focused cursor to a complete inbox checkpoint', async () => {
+  let values = { cursor_serve: 'focused-cursor', min_timestamp_serve: '2026-07-25T11:50:00.000Z' };
+  const { service } = buildService({
+    getUiStateValues: async () => ({ values }),
+    setUiStateValues: async (_scope, patch) => { values = { ...values, ...patch }; return { ok: true }; },
+    fetchJsonWithTimeout: async () => ({ response: { ok: false, status: 502 }, data: {} }),
+  });
+  await assert.rejects(service.syncOwner('serve'), { code: 'INSTANTLY_API_FAILED' });
+  assert.equal(values.email_mode_serve, undefined);
+  assert.equal(values.cursor_serve, 'focused-cursor');
+});
+
 test('bounded polling persists its cursor and resumes the next cycle without duplicate loss', async () => {
   let values = {};
   const listQueries = [];
@@ -2059,8 +2126,11 @@ test('bounded polling persists its cursor and resumes the next cycle without dup
   const first = await service.syncOwner('serve');
   assert.equal(first.partial, true);
   assert.equal(values.cursor_serve, 'cursor-page-two');
+  assert.equal(values.email_mode_serve, 'emode_all');
   await service.syncOwner('serve');
   assert.equal(listQueries[1].starting_after, 'cursor-page-two');
+  assert.equal(listQueries[1].min_timestamp_created, listQueries[0].min_timestamp_created);
+  assert.equal(listQueries[1].mode, 'emode_all');
   assert.equal(values.cursor_serve, '');
   assert.deepEqual(
     store.rows.map((message) => message.providerMessageId).sort(),

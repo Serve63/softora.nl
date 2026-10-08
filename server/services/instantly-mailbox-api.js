@@ -85,6 +85,7 @@ function createInstantlyMailboxApi({ config, assertConfigured, fetchJsonWithTime
       readStarts.push(time());
     }
     const url = new URL(`${config.apiBaseUrl}/${route}`);
+    if (method === 'GET' && route === 'emails') url.searchParams.set('mode', 'emode_all');
     Object.entries(query).forEach(([key, value]) => {
       if (value !== '' && value !== null && value !== undefined) url.searchParams.set(key, String(value));
     });
