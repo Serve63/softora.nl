@@ -136,3 +136,29 @@ test('Vercel functions carry the article templates and shared header required by
     assert.ok(config.functions[entry].includeFiles.includes('assets/entry/toekomst.html'), entry);
   }
 });
+
+
+test('software-uitleg en offertegids sturen contextueel naar passende uitleg met behouden publicatiedatums', async () => {
+  const cases = [
+    { slug: 'wat-is-bedrijfssoftware-op-maat', target: '/blog/maatwerk-software-offerte-beoordelen',
+      anchor: 'een softwareofferte beoordelen', publishedAt: '2026-05-19' },
+    { slug: 'maatwerk-software-offerte-beoordelen', target: '/blog/wat-is-bedrijfssoftware-op-maat',
+      anchor: 'uitleg over bedrijfssoftware op maat', publishedAt: '2026-07-17' },
+  ];
+  for (const entry of cases) {
+    const response = await fetch(origin + '/blog/' + entry.slug);
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    const prose = html.match(/<article class="article-prose"[^>]*>([\s\S]*?)<\/article>/)[1];
+    assert.ok(prose.includes('<a href="' + entry.target + '">' + entry.anchor + '</a>'));
+    assert.doesNotMatch(html, /href="\/vergelijkingen\/maatwerk-software-vs-standaard-software"/);
+    assert.match(prose, /href="\/bedrijfssoftware-op-maat"/);
+    assert.ok(html.includes('<link rel="canonical" href="https://www.softora.nl/blog/' + entry.slug + '">'));
+    const article = graph(html).find((node) => node['@type'] === 'Article');
+    assert.equal(article.datePublished, entry.publishedAt);
+    assert.equal(article.dateModified, '2026-10-08');
+    const target = await fetch(origin + entry.target);
+    assert.equal(target.status, 200);
+    assert.ok((await target.text()).includes('<link rel="canonical" href="https://www.softora.nl' + entry.target + '">'));
+  }
+});
