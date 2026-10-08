@@ -207,7 +207,7 @@ test('source-reference worker failures save only a fixed explanation and never a
     begin: async () => ({ ok: true, job: {} }),
     finish: async (_id, _claim, message) => { messages.push(message); return { ok: true }; },
   }, coordinator: { saveSubscriptionPhoto: () => assert.fail('No image may be saved') } });
-  for (const errorKind of ['source-reference', 'untrusted-model-text', 'image-safety']) {
+  for (const errorKind of ['source-reference', 'untrusted-model-text', 'image-safety', 'reference-fetch']) {
     const response = res();
     await service.complete({ body: { jobId: 'job-1234567890123456', claim, errorKind, error: 'ARBITRARY MODEL OUTPUT' } }, response);
     assert.equal(response.body.done, true);
@@ -215,6 +215,7 @@ test('source-reference worker failures save only a fixed explanation and never a
   assert.equal(messages[0], 'De homepage-screenshot is geblokkeerd, leeg of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.');
   assert.match(messages[1], /Codex kon het ontwerp niet maken/);
   assert.equal(messages[2], 'De beeldgenerator heeft dit ontwerp geweigerd via het veiligheidsfilter. Er is geen webdesign gemaakt of opgeslagen.');
+  assert.match(messages[3], /na drie pogingen.*technische ophaalfout; de bedrijfswebsite is niet afgekeurd/);
   assert.ok(messages.every(message => !message.includes('ARBITRARY') && !message.includes('untrusted-model-text')));
 });
 

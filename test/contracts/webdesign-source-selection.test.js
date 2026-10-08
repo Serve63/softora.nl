@@ -142,3 +142,12 @@ test('bulk selection stops for incomplete history and returns empty when every s
   await browserSelection(customers, async (items) => { sizes.push(items.length); return { targets: items.map((item) => ({ ...item, eligible: true })) }; }).getTargetsForBatch(null, 'all');
   assert.deepEqual(sizes, [250, 50]);
 });
+
+test('screenshot transport exhaustion has only a short cooldown, without condemning the business source', () => {
+  const failed = row({ preparationPhase: 'ready', error: 'De screenshotdiensten leverden na drie pogingen geen bruikbaar bronbeeld. Dit is een technische ophaalfout; de bedrijfswebsite is niet afgekeurd. Probeer later opnieuw.' });
+  const result = selected([failed]);
+  assert.equal(result.eligible, false);
+  assert.equal(result.retryAt, now - 60000 + 30 * 60000);
+  assert.equal(result.requiresSourceRecheck, undefined);
+  assert.equal(selected([failed], target, now + 30 * 60000).eligible, true);
+});
