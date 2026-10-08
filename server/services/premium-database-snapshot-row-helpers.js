@@ -26,6 +26,11 @@ function createSnapshotRowHelpers({ getRowId, getRowUpdatedAt, normalizeString }
       mailReady: normalizeIds(data.customers),
       available: normalizeIds(data.availableCustomers),
       instantlyReady: normalizeIds(data.instantlyReadyCustomers),
+      designDates: [data.customers, data.availableCustomers, data.instantlyReadyCustomers]
+        .flatMap((rows) => Array.isArray(rows) ? rows : [])
+        .filter((row) => normalizeString(row.websitePhotoCreatedAt))
+        .map((row) => [getRowId(row), normalizeString(row.websitePhotoCreatedAt)])
+        .sort((left, right) => left[0].localeCompare(right[0]) || left[1].localeCompare(right[1])),
       found: Array.from(new Set(
         (Array.isArray(data.foundCustomerIds) ? data.foundCustomerIds : [])
           .map(normalizeString)

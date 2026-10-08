@@ -9,7 +9,7 @@
     function hasMedia(customer) { return Boolean(text(customer && customer.websitePhoto) && text(customer && customer.websiteMockup)); }
     function needsMedia(customer, nowMs) {
         const expiry = Date.parse(text(customer && customer.signedUrlExpiresAt));
-        return !hasMedia(customer) || (Number.isFinite(expiry) && expiry <= nowMs + REFRESH_BEFORE_EXPIRY_MS);
+        return !text(customer && customer.websitePhotoCreatedAt) || !hasMedia(customer) || (Number.isFinite(expiry) && expiry <= nowMs + REFRESH_BEFORE_EXPIRY_MS);
     }
 
     function createController(options) {

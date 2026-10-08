@@ -21,6 +21,7 @@ function buildCustomers() {
       id: `c-${index}`, bedrijf: duplicateGroup, naam: duplicateGroup.startsWith('dup') ? 'Zelfde' : `Naam ${index}`,
       tel: duplicateGroup.startsWith('dup') ? '010' : String(index), instantly: index % 3 === 0,
       websitePhoto: hasOwnMedia ? `https://old/${index}.png` : '', websiteMockup: hasOwnMedia ? `https://old/${index}-m.png` : '',
+      websitePhotoCreatedAt: hasOwnMedia ? '2026-09-20T10:00:00.000Z' : '',
       webdesignMailProvider: index % 7 === 0 ? 'softora' : '',
     });
   }
@@ -62,4 +63,20 @@ test('campaign media updates only the customers the full merge would change, wit
   assert.ok(changed.includes('c-41') && changed.includes('c-82'), 'customers matching a received photo by identity key follow the full merge');
   assert.equal(targeted.after.find((customer) => customer.id === 'c-82').websitePhoto, 'https://new/3.png');
   assert.ok(changed.length < 20, `only affected customers get new objects (got ${changed.length})`);
+});
+
+test('existing campaign images refresh missing design dates and retain the returned timestamp', async () => {
+  const { needsMedia } = require('../../assets/premium-database-current-campaign-media');
+  const customer = { id: 'campaign-design', websitePhoto: 'https://media.test/design.png', websiteMockup: 'https://media.test/mockup.png', signedUrlExpiresAt: '2099-01-01T00:00:00Z' };
+  assert.equal(needsMedia(customer, Date.now()), true);
+  const date = '2026-10-08T10:34:00.000Z';
+  let applied;
+  const controller = createController({ state: { klanten: [customer] }, isCurrentCampaignCustomer: () => true,
+    mergeCustomersWithPhotos, buildCustomerIdentityKey: identityKey,
+    fetchJsonWithTimeout: async () => ({ ok: true, json: async () => ({ ok: true, media: [{ ...customer, customerId: customer.id, websitePhotoCreatedAt: date }] }) }),
+    applyCustomerList: (rows) => { applied = rows; },
+  });
+  assert.equal(await controller.refresh(), true);
+  assert.equal(applied[0].websitePhotoCreatedAt, date);
+  assert.equal(needsMedia(applied[0], Date.now()), false);
 });
