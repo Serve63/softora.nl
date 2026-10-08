@@ -20,6 +20,7 @@ const { resolveConversationActivity } = require('./mailbox-conversation-activity
 const { buildRecentSyncResult } = require('./instantly-mailbox-sync-cadence');
 const { createInstantlyMailboxApi } = require('./instantly-mailbox-api');
 const { acquireInstantlyMailboxSyncLock } = require('./instantly-mailbox-sync-lock');
+const { readSyncContinuation, buildSyncContinuationPatch } = require('./instantly-mailbox-sync-continuation');
 const { finalizeInstantlyAcceptedReply } = require('./mailbox-instantly-reply-acceptance');
 const DEFAULT_INITIAL_LOOKBACK_DAYS = 120;
 const DEFAULT_SYNC_OVERLAP_MINUTES = 10;
@@ -619,26 +620,20 @@ function createInstantlyMailboxService(deps = {}) {
     return `instantly-${owner}@softora.internal`;
   }
 
-  async function getContinuation(owner) {
+  async function getContinuation(owner, initialMinTimestamp) {
     try {
       const state = await getUiStateValues(INSTANTLY_MAILBOX_SYNC_SCOPE);
       const values = state && typeof state.values === 'object' ? state.values : {};
-      return {
-        cursor: normalizeText(values[`cursor_${owner}`]),
-        minTimestamp: normalizeText(values[`min_timestamp_${owner}`]),
-      };
+      return readSyncContinuation(values, owner, initialMinTimestamp);
     } catch (_) {
-      return { cursor: '', minTimestamp: '' };
+      return readSyncContinuation({}, owner, initialMinTimestamp);
     }
   }
 
   async function setContinuation(owner, continuation = {}) {
     await setUiStateValues(
       INSTANTLY_MAILBOX_SYNC_SCOPE,
-      {
-        [`cursor_${owner}`]: normalizeText(continuation.cursor),
-        [`min_timestamp_${owner}`]: normalizeText(continuation.minTimestamp),
-      },
+      buildSyncContinuationPatch(owner, continuation),
       {
         source: 'instantly-mailbox-sync',
         actor: 'Instantly mailbox',
@@ -699,7 +694,7 @@ function createInstantlyMailboxService(deps = {}) {
       const lastSyncedAt = Date.parse(normalizeText(state?.last_synced_at));
       const fallbackSince = now().getTime() - normalizedConfig.initialLookbackDays * 24 * 60 * 60 * 1000;
       const overlapMs = normalizedConfig.syncOverlapMinutes * 60 * 1000;
-      const continuation = await getContinuation(selectedOwner);
+      const continuation = await getContinuation(selectedOwner, new Date(fallbackSince).toISOString());
       const calculatedMinTimestamp = new Date(
         Math.max(fallbackSince, Number.isFinite(lastSyncedAt) ? lastSyncedAt - overlapMs : fallbackSince)
       ).toISOString();

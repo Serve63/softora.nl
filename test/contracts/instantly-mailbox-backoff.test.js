@@ -42,6 +42,21 @@ test('unavailable durable policy refuses provider reads without blocking sends',
   assert.equal(h.calls.length, 1);
 });
 
+test('email listing covers Others while preserving exact owner and thread filters', async () => {
+  const h = harness();
+  await h.api.request('emails', { query: { eaccount: 'serve@example.test', search: 'thread:exact' } });
+  await h.api.request('emails', { query: { eaccount: 'martijn@example.test', mode: 'emode_focused' } });
+  await h.api.request('emails/exact-message');
+  await h.api.request('emails/reply', { method: 'POST', body: { reply_to_uuid: 'exact-message' } });
+  const urls = h.calls.map(([url]) => new URL(url));
+  assert.equal(urls[0].searchParams.get('mode'), 'emode_all');
+  assert.equal(urls[0].searchParams.get('eaccount'), 'serve@example.test');
+  assert.equal(urls[0].searchParams.get('search'), 'thread:exact');
+  assert.equal(urls[1].searchParams.get('mode'), 'emode_focused');
+  assert.equal(urls[2].searchParams.has('mode'), false);
+  assert.equal(urls[3].searchParams.has('mode'), false);
+});
+
 test('429 Retry-After survives a new service instance and blocks both owners before another provider read', async () => {
   const first = harness({ response: { ok: false, status: 429, headers: { get: () => '120' } } });
   await assert.rejects(first.api.request('emails', { query: { eaccount: 'serve@example.test' } }), { retryAfterMs: 120_000, providerStatus: 429 });
