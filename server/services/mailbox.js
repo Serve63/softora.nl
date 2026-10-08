@@ -2040,7 +2040,7 @@ function createMailboxService(deps = {}) {
 
   async function accountsResponse(_req, res) {
     return res.status(200).json({
-      ok: true,
+      ok: true, timelineAccounts: mailboxDiscoveryService.getOwnerAccounts(),
       accounts: getAccounts().map((account) => ({
         email: account.email,
         name: account.name,

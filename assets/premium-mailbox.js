@@ -5,7 +5,7 @@ const MAILBOX_SENDER_SETTINGS_SCOPE = 'premium_coldmailing_settings', MAILBOX_SE
 const MAILBOX_PIN_SCOPE = 'premium_mailbox_preferences';
 const MAILBOX_PIN_KEY = 'softora_mailbox_pinned_account_v1';
 let activeMailboxAccount = MAILBOX_ACCOUNT_DEFAULT, pinnedMailboxAccount = '', mailboxAccountPreferenceIdentity = 'anonymous', mailboxPinPreferences = Object.create(null);
-let mailboxAccounts = [
+let mailboxTimelineAccounts = {}, mailboxAccounts = [
   { email: 'info@softora.nl', name: 'info@softora.nl', imapConfigured: false, smtpConfigured: false },
 ];
 const avatarColors = ['#9b2355','#1a5f8a','#16733c','#7b3f00','#4a1a6b','#b45a00','#2c6e49'];
@@ -814,6 +814,7 @@ async function loadMailboxAccounts() {
     });
     const data = await response.json().catch(() => ({}));
     if (response.ok && data?.ok && Array.isArray(data.accounts) && data.accounts.length) {
+      mailboxTimelineAccounts = data.timelineAccounts || {};
       mailboxAccounts = data.accounts
         .map((account) => Object.assign({}, account, { email: normalizeMailboxEmail(account.email) }))
         .filter((account) => account.email);
@@ -1083,7 +1084,7 @@ function bindMailboxActions() {
 }
 const mailboxAiRefresh = window.SoftoraMailboxAiRefresh?.create({ getMail: findMailById, getActiveId: () => activeMail, getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), openMail });
 bindMailboxActions(); window.SoftoraMailboxIndex?.bindImageRecovery({ getActiveMail: () => activeMail, getMail: findMailById, loadMessageBody: (id, loadOptions = {}) => openMail(id, { ...loadOptions, skipReadPersist: true }), openMail });
-mailboxDiscoveryController = window.SoftoraMailboxDiscovery?.create({ document, getSearchUrl: () => contactFormView ? '/api/mailbox/contact-form' : '/api/mailbox/search', fetch: (...args) => window.fetch(...args), getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), getMessageOwner: (mail) => window.SoftoraMailboxCampaignInbox.getMessageOwner(mail), getAccountEmails: getMailboxAccountEmails, getMessages: () => mails, setMessages: (value) => { mails = value; }, getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, getListElement: () => document.getElementById('mail-results-scroll'), normalizeMessage: (message) => normalizeMailboxApiMessage(message, { folder: 'outreach' }), renderList, openMail, resetDetail: resetDetailEmpty });
+mailboxDiscoveryController = window.SoftoraMailboxDiscovery?.create({ document, getSearchUrl: () => contactFormView ? '/api/mailbox/contact-form' : '/api/mailbox/search', fetch: (...args) => window.fetch(...args), getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), getMessageOwner: (mail) => window.SoftoraMailboxCampaignInbox.getMessageOwner(mail), getAccountEmails: () => window.SoftoraMailboxDiscovery.getTimelineAccountEmails(getMailboxAccountEmails(), mailboxTimelineAccounts), getMessages: () => mails, setMessages: (value) => { mails = value; }, getActiveMail: () => activeMail, setActiveMail: (value) => { activeMail = value; }, getListElement: () => document.getElementById('mail-results-scroll'), normalizeMessage: (message) => normalizeMailboxApiMessage(message, { folder: 'outreach' }), renderList, openMail, resetDetail: resetDetailEmpty });
 const mailboxFreshnessStore = window.SoftoraReadModelStore?.readLastKnown ? window.SoftoraReadModelStore : null, rememberedMailboxFreshness = { ...(mailboxFreshnessStore?.readLastKnown('mailbox-freshness', 36 * 60 * 60 * 1000) || {}) }; mailboxRefreshController = window.SoftoraMailboxRefresh?.create({ autoStart: false, initiallyChecking: true, rememberedFreshness: rememberedMailboxFreshness, onFreshness: (scopeKey, at) => { rememberedMailboxFreshness[scopeKey] = at; mailboxFreshnessStore?.rememberLastKnown('mailbox-freshness', rememberedMailboxFreshness); }, getAccount: () => activeMailboxAccount, getFolder: () => activeFolder, getOwner: () => window.SoftoraMailboxCampaignInbox.getOwner(), loadMessages: loadMailboxMessages, toast });
 let mailboxAccountsLoad = null, mailboxPrefetch = null;
 const mailboxCopyController = window.SoftoraMailboxCopy.create({ document, getMail: findMailById, getActiveId: () => activeMail, getScope: () => ({ folder: activeFolder, owner: window.SoftoraMailboxCampaignInbox.getOwner(), account: activeMailboxAccount }), getToken: () => mailboxOwnerView.getToken(), isTokenCurrent: isMailboxViewCurrent, getPending: (id) => mailboxDetailController?.getPending?.(id), getDiscovery: () => mailboxDiscoveryController, getIndex: () => window.SoftoraMailboxIndex, whenAccountsReady: () => mailboxAccountsLoad?.catch(() => {}), openMail, toast, normalizeBodyImages: normalizeMailboxBodyImages, normalizeOptOutUrl: normalizeMailboxOptOutUrl });

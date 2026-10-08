@@ -201,8 +201,8 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-message-presentation\.js\?v=20261006h/);
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
-  assert.match(page, /assets\/premium-mailbox\.js\?v=20261006f/);
-  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20261006c/);
+  assert.match(page, /assets\/premium-mailbox\.js\?v=20261007a/);
+  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20261007a/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20261006a/);
   assert.match(page, /assets\/premium-mailbox-read\.js\?v=20261006a/);
@@ -4746,7 +4746,7 @@ test('mailbox knipt een normale Van-regel zonder Outlook-headercluster niet af',
 });
 
 test('premium mailbox ververst owner-scoped, snel en met eerlijke provider-freshness', async () => {
-  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20261006f/);
+  assert.match(readPage(), /assets\/premium-mailbox\.js\?v=20261007a/);
   assert.match(readPage(), /assets\/premium-mailbox-quoted-thread\.js\?v=20261006h/);
   assert.match(readPage(), /assets\/premium-mailbox-campaign-inbox\.js\?v=20261006h/);
   assert.match(readPage(), /assets\/premium-mailbox-index\.js\?v=20261006d/);
@@ -4847,7 +4847,7 @@ test('premium mailbox uses an owner filter in the coldmail topbar', () => {
   assert.match(pageSource, /\.topbar-mailbox-switcher-label \{[\s\S]*font-size:\s*14px;[\s\S]*color:\s*var\(--text-dark\);[\s\S]*text-transform:\s*uppercase;/);
   assert.match(pageSource, /\.topbar-mailbox-menu \{[\s\S]*position:\s*absolute;[\s\S]*display:\s*none;/);
   assert.match(pageSource, /assets\/premium-mailbox-refresh\.js\?v=20260924a/);
-  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20261006f/);
+  assert.match(pageSource, /assets\/premium-mailbox\.js\?v=20261007a/);
   assert.match(readDisplayScript(), /global\.SoftoraMailboxDisplay =/);
   assert.match(indexSource, /window\.SoftoraMailboxIndex =/);
   assert.match(indexSource, /const MIN_BACKGROUND_SYNC_INTERVAL_MS = 5 \* 60 \* 1000;/);
@@ -10145,8 +10145,8 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
     'de vervolgknop hoort na de resultatenlijst te staan'
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
-  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20261006c/);
-  assert.match(pageSource, /premium-mailbox\.js\?v=20261006f/);
+  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20261007a/);
+  assert.match(pageSource, /premium-mailbox\.js\?v=20261007a/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);
   assert.match(discoverySource, /moreButton\.disabled = loading/);
@@ -12079,4 +12079,11 @@ test('cross-tab verwijdering van een andere mail heropent het actieve detail zon
     assert.equal((html.match(/class="detail-mail-contact-card"/g) || []).length, 1);
   }
   assert.equal(message.body, body);
+});
+
+test('timeline discovery consumes server provider identities while sender selection retains ordinary accounts', () => {
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  assert.match(source, /mailboxTimelineAccounts = data\.timelineAccounts \|\| \{\};/);
+  assert.match(source, /mailboxDiscoveryController = [^\n]*getAccountEmails: \(\) => window\.SoftoraMailboxDiscovery\.getTimelineAccountEmails\(getMailboxAccountEmails\(\), mailboxTimelineAccounts\),/);
+  assert.match(source, /function getMailboxAccounts\(\) \{\s*return getMailboxAccountEmails\(\);\s*\}/);
 });

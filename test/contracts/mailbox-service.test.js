@@ -293,6 +293,31 @@ test('mailbox service exposes configured softora mailbox accounts', async () => 
   );
 });
 
+test('accounts response shares authoritative timeline identities without exposing provider SMTP senders or secrets', async () => {
+  const identities = { serve: 'serve@websoftora.com', martijn: 'martijn@future-provider.example' };
+  const service = createMailboxService({
+    mailboxAccountsRaw: JSON.stringify([{ email: 'serve@softora.nl', smtpPass: 'smtp-private', imapPass: 'imap-private' }]),
+    instantlyMailboxService: {
+      getConfiguredAccounts(owner) {
+        return [{ email: identities[owner], owner, apiKey: 'provider-private', smtpPass: 'provider-smtp-private' }];
+      },
+    },
+  });
+  const response = createResponseRecorder();
+  await service.accountsResponse({}, response);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(Object.keys(response.body.timelineAccounts).sort(), ['martijn', 'serve']);
+  for (const owner of ['serve', 'martijn']) {
+    const accounts = response.body.timelineAccounts[owner];
+    assert.ok(accounts.includes(identities[owner]));
+    assert.ok(!accounts.includes(identities[owner === 'serve' ? 'martijn' : 'serve']));
+    assert.ok(accounts.every((email) => typeof email === 'string'));
+    assert.ok(!response.body.accounts.some((account) => account.email === identities[owner]));
+  }
+  assert.ok(response.body.accounts.some((account) => account.email === 'serve@softora.nl'));
+  assert.doesNotMatch(JSON.stringify(response.body), /smtp-private|imap-private|provider-private|provider-smtp-private/);
+});
+
 test('mailbox detail behoudt de virtuele Instantly-folder tot aan de providerindex', async () => {
   const lookups = [];
   const exactMessage = {

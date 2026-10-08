@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { parseDocument, DomUtils } = require('htmlparser2');
 const copyApi = require('../../assets/premium-mailbox-copy');
+const discoveryApi = require('../../assets/premium-mailbox-discovery');
+const campaignInbox = require('../../assets/premium-mailbox-campaign-inbox');
 
 // Adapt parsed HTML to the DOM reads used by the clipboard formatter, without
 // a browser dependency in CI. Browser verification also uses the real page.
@@ -85,6 +87,48 @@ function harness(overrides = {}) {
   };
   return { controller: copyApi.create(options), mail, state, options };
 }
+
+test('copy loads an Instantly conversation through the shared account manifest including both Van/Aan routes', async () => {
+  const h = harness();
+  const accounts = discoveryApi.getTimelineAccountEmails(['serve@softora.nl'], {
+    serve: ['serve@softora.nl', 'serve@websoftora.com'], martijn: ['martijn@softora.nl'],
+  });
+  Object.assign(h.mail, {
+    accountEmail: 'serve@websoftora.com', providerAccountEmail: 'serve@websoftora.com',
+    provider: 'instantly', providerOwner: 'serve', folder: 'inbox',
+    email: 'bart@kanteldrift.nl', to: 'serve@websoftora.com',
+    body: 'Bedankt voor het ontwerp!', contactTimelineLoaded: false,
+  });
+  const sent = { ...h.mail, id: 'instantly:sent', folder: 'sent',
+    email: 'serve@websoftora.com', to: 'bart@kanteldrift.nl', body: 'Ons eerste ontwerp 😊' };
+  const requests = [];
+  const discovery = discoveryApi.create({
+    document: { getElementById: () => null, querySelector: () => null },
+    getActiveMail: () => h.state.activeId, getAccountEmails: () => accounts,
+    getMessageOwner: campaignInbox.getMessageOwner,
+    fetch: async (url) => {
+      requests.push(new URL(url, 'https://softora.test'));
+      return { ok: true, json: async () => ({ ok: true, totalCount: 2, messages: [h.mail, sent] }) };
+    },
+  });
+  h.options.getDiscovery = () => discovery;
+  h.options.openMail = async (_id, settings) => {
+    h.state.opens.push(settings);
+    h.state.document = documentOf(html([h.mail, ...h.mail.threadMessages]
+      .map((message) => card(message.body, message.email, message.to)).join('')));
+  };
+  assert.equal(await h.controller.copy('root'), true);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].searchParams.get('owner'), 'serve');
+  assert.equal(requests[0].searchParams.get('contact'), 'bart@kanteldrift.nl');
+  assert.equal((h.state.copies[0].match(/Van:/g) || []).length, 2);
+  assert.match(h.state.copies[0], /Van: bart@kanteldrift\.nl\nAan: serve@websoftora\.com/);
+  assert.match(h.state.copies[0], /Van: serve@websoftora\.com\nAan: bart@kanteldrift\.nl/);
+  assert.match(h.state.copies[0], /Bedankt voor het ontwerp!/);
+  assert.match(h.state.copies[0], /Ons eerste ontwerp 😊/);
+  assert.deepEqual(h.state.toasts, ['Hele gesprek gekopieerd']);
+  assert.ok(h.state.opens.every((settings) => settings.skipReadPersist));
+});
 
 test('copy loads every history page and hydrates conversations longer than the normal 40-message batch', async () => {
   const batchSizes = [];
