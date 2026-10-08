@@ -3,6 +3,8 @@ const PUBLIC_PREVIEW_REVOKED_IDENTIFIERS = new Set([
   'portivio-technology-b-v',
   'kvk-30138458',
   'adriaan-van-dam-fotografie',
+  'kvk-16054105',
+  'max-de-winter',
 ]);
 
 function normalizeString(value) {
