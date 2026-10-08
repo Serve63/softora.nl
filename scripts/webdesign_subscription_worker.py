@@ -2,6 +2,7 @@
 """Manual webdesigns on this Mac, using native Codex subscription imagegen only."""
 import base64
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -52,6 +53,82 @@ class SourceUnusable(RuntimeError):
 class ReferenceUnavailable(SourceUnusable):
     """Screenshot providers did not deliver a usable image after bounded retries."""
     pass
+
+class LocalCapacity(RuntimeError):
+    pass
+
+def require_storage():
+    free = shutil.disk_usage(BASE).free
+    if free < 2 * 1024 ** 3:
+        raise LocalCapacity('Nieuwe ontwerpen wachten: minder dan 2 GiB schijfruimte vrij.')
+
+def bootstrap_failed(folder):
+    """A failed CLI start with no model items may retry once, never an uncertain tool run."""
+    if any((folder / name).exists() for name in ('design.png', 'design.jpg', 'answer.json', 'startup-retry')):
+        return False
+    try:
+        outcome = json.loads((folder / 'process-result.json').read_text())
+        if not outcome.get('returncode') or outcome.get('timeout'):
+            return False
+        lines = (folder / 'codex-events.jsonl').read_text().splitlines()
+        if not lines:
+            return False
+        for line in lines:
+            if re.match(r'^\d{4}-\d\d-\d\dT[\d:.]+Z ERROR codex_models_manager::manager: failed to refresh available models: request timed out$', line):
+                continue
+            event = json.loads(line)
+            if event.get('type') not in ('thread.started', 'turn.started'):
+                return False
+            thread = event.get('thread_id', '')
+            if thread and (not re.fullmatch(r'[a-zA-Z0-9-]+', thread)
+                           or (Path.home() / '.codex/generated_images' / thread).exists()):
+                return False
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+def remove_verified_working_copy(folder):
+    # Keep the native original and upload JPEG. Only reclaim a byte-identical PNG
+    # copy after the server confirms durable delivery; never clean pending work.
+    copy = folder / 'design.png'
+    events = folder / 'codex-events.jsonl'
+    if not copy.is_file() or copy.is_symlink() or not (folder / 'design.jpg').is_file() or not events.is_file():
+        return
+    native = Path.home() / '.codex/generated_images'
+    candidates = re.findall(re.escape(str(native)) + r'/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+\.png', events.read_text())
+    for raw in set(candidates):
+        original = Path(raw)
+        if original.is_file() and not original.is_symlink() and original.stat().st_size == copy.stat().st_size:
+            if hashlib.sha256(original.read_bytes()).digest() == hashlib.sha256(copy.read_bytes()).digest():
+                (folder / 'native-original.json').write_text(json.dumps({'path': raw, 'sha256': hashlib.sha256(copy.read_bytes()).hexdigest()}))
+                copy.unlink()
+                return
+
+def restore_native_result(folder):
+    if (folder / 'design.png').exists() or (folder / 'design.jpg').exists():
+        return
+    events = folder / 'codex-events.jsonl'
+    try:
+        # Use the CLI's thread identity, never a model-suggested path or a global
+        # "most recent image" search that can select another company's output.
+        first = json.loads(events.open().readline())
+        thread = first.get('thread_id', '')
+        if first.get('type') != 'thread.started' or not re.fullmatch(r'[a-zA-Z0-9-]+', thread):
+            return
+        directory = Path.home() / '.codex/generated_images' / thread
+        if directory.is_symlink():
+            return
+        candidates = [p for p in directory.glob('*.png') if p.is_file() and not p.is_symlink()]
+        if len(candidates) != 1:
+            return
+        data = candidates[0].read_bytes()
+        if not data.startswith(b'\x89PNG\r\n\x1a\n') or len(data) < 1024 or data[-8:-4] != b'IEND':
+            return
+        temporary = folder / 'native-recovery.png'
+        temporary.write_bytes(data)
+        temporary.replace(folder / 'design.png')
+    except (OSError, ValueError, TypeError):
+        return
 
 def reference_blank(reference):
     # Error, loading and security-check pages are almost entirely white; a design
@@ -164,6 +241,8 @@ def encode_result(folder):
     output, target = folder / 'design.png', folder / 'design.jpg'
     if target.is_file() and not target.is_symlink():
         return
+    require_storage()
+    restore_native_result(folder)
     if not output.is_file() or output.is_symlink():
         raise RuntimeError('Codex gaf geen afbeelding terug.')
     temporary = folder / 'design-upload.jpg'
@@ -291,6 +370,11 @@ def alternate_reference(job, folder):
 def generate(job, folder, slot=0):
     # Do not keep retrying reference downloads for a cancelled/expired job.
     check_job_active(job)
+    restore_native_result(folder)
+    if any((folder / name).is_file() for name in ('design.png', 'design.jpg')):
+        write_state({'phase': 'generating', 'job': job}, slot)
+        encode_result(folder)
+        return
     binary, env = codex_binary(), subscription_environment()
     status = subprocess.run([binary, 'login', 'status'], env=env, capture_output=True, text=True, timeout=30)
     if status.returncode or 'chatgpt' not in (status.stdout + status.stderr).lower():
@@ -309,6 +393,9 @@ def generate(job, folder, slot=0):
               'Save or copy the native generated raster to design.png in your working directory. If the built-in tool '
               'is unavailable or a usage limit is reached, stop. Do not substitute a rendered SVG/HTML or stock image. '
               'Return only JSON with status.\n\n'
+              'Never search the global generated_images directory or copy the most recent image from another task. '
+              'Use only the exact output returned by your own image_gen call. If saving fails, stop and report it; '
+              'the worker can recover your own native image without generating again.\n\n'
               'SOURCE CHECK FIRST: look at the attached homepage screenshot before generating. If it is not a real '
               'business homepage (a browser or server error page, "This site can\'t be reached", "Index of /", a default '
               'server page, a Cloudflare or other security verification, a parked or reserved domain, a maintenance, '
@@ -323,14 +410,20 @@ def generate(job, folder, slot=0):
               'white space around all text; the photography and layout should carry the design, not the headline size.\n\n'
               'Design instructions:\n' + job['prompt'])
     # Auth and reference downloads are reversible; checkpoint the model boundary only now.
+    require_storage()
     write_state({'phase': 'generating', 'job': job}, slot)
     for source_attempt in range(2):
         with (folder / 'codex-events.jsonl').open('w') as events:
-            result = subprocess.run([binary, 'exec', '--ignore-user-config', '--ephemeral', '--skip-git-repo-check',
-                '-s', 'workspace-write', '-C', str(folder), '-m', 'gpt-6.1-sol', '-c', 'model_reasoning_effort=low',
-                '-c', 'model_provider=openai', '-c', 'web_search=disabled', '-i', str(reference), '--json',
-                '-o', str(folder / 'answer.json'), '-'], input=prompt, env=env, text=True,
-                stdout=events, stderr=events, timeout=900)
+            try:
+                result = subprocess.run([binary, 'exec', '--ignore-user-config', '--ephemeral', '--skip-git-repo-check',
+                    '-s', 'workspace-write', '-C', str(folder), '-m', 'gpt-6.1-sol', '-c', 'model_reasoning_effort=low',
+                    '-c', 'model_provider=openai', '-c', 'web_search=disabled', '-i', str(reference), '--json',
+                    '-o', str(folder / 'answer.json'), '-'], input=prompt, env=env, text=True,
+                    stdout=events, stderr=events, timeout=900)
+            except subprocess.TimeoutExpired:
+                (folder / 'process-result.json').write_text(json.dumps({'timeout': True, 'finishedAt': time.time()}))
+                raise
+            (folder / 'process-result.json').write_text(json.dumps({'returncode': result.returncode, 'finishedAt': time.time()}))
         if source_attempt or result.returncode or (folder / 'design.png').exists():
             break
         replacement = alternate_reference(job, folder)
@@ -341,6 +434,7 @@ def generate(job, folder, slot=0):
             raise SubscriptionLimit('Abonnementlimiet bereikt.')
         (folder / 'answer.json').unlink()
         reference = replacement
+    restore_native_result(folder)
     if not (folder / 'design.png').is_file():
         if subscription_limit(folder):
             raise SubscriptionLimit('Abonnementlimiet bereikt.')
@@ -351,6 +445,10 @@ def step(slot=0):
     state_path = state_file(slot)
     save = lambda value: write_state(value, slot)
     state = json.loads(state_path.read_text()) if state_path.exists() else {}
+    if state.get('phase') not in ('generating', 'deliver'):
+        if state.get('phase') == 'prepare' and state.get('retryAt', 0) > time.time():
+            return
+        require_storage()
     # Quota pauses new image work; already generated results must still upload.
     if state.get('phase') not in ('generating', 'deliver') and subscription_paused():
         return
@@ -381,6 +479,20 @@ def step(slot=0):
             if recorded.get('phase') == 'prepare' and not isinstance(error, (JobStopped, SourceUnusable)):
                 # Network/auth preparation may retry without another image request.
                 raise
+            if recorded.get('phase') == 'generating':
+                try:
+                    require_storage()
+                except LocalCapacity:
+                    save({'phase': 'generating', 'job': job})
+                    return
+                restore_native_result(folder)
+            if bootstrap_failed(folder):
+                retry = folder / 'startup-retry'
+                retry.mkdir(mode=0o700)
+                for name in ('codex-events.jsonl', 'process-result.json'):
+                    shutil.copyfile(folder / name, retry / name)
+                save({'phase': 'prepare', 'job': job, 'retryAt': time.time() + 30})
+                return
             state['error'] = not (folder / 'design.png').is_file()
             if isinstance(error, ReferenceUnavailable):
                 state['referenceUnavailable'] = True
@@ -400,6 +512,8 @@ def step(slot=0):
         try:
             encode_result(folder)
             state['error'] = False
+        except LocalCapacity:
+            return  # Keep the generation checkpoint until its image can be saved.
         except Exception:
             state['error'] = True
             if subscription_limit(folder):
@@ -423,6 +537,11 @@ def step(slot=0):
     delivered = call('/report', payload)
     if not delivered.get('ok') or not delivered.get('done'):
         raise RuntimeError('Afbeelding wordt bewaard; opslag nog niet bevestigd.')
+    if not state.get('error') and not delivered.get('error'):
+        try:
+            remove_verified_working_copy(folder)
+        except OSError:
+            pass  # Cache cleanup must never turn a saved design into a failed job.
     save({'phase': 'cooldown', 'retryAt': time.time() + 600} if state.get('limit') else {})
     print('Webdesign verwerkt via abonnement:', job['id'], flush=True)
     return True
@@ -433,7 +552,8 @@ def worker_loop(slot):
         try:
             completed = step(slot)
         except Exception as error:
-            print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'Abonnementwerker wacht:', slot, type(error).__name__, flush=True)
+            print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'Abonnementwerker wacht:', slot,
+                  str(error) if isinstance(error, LocalCapacity) else type(error).__name__, flush=True)
         # Immediately claim the next job after delivering; idle slots back off.
         time.sleep(1 if completed else 15)
 
