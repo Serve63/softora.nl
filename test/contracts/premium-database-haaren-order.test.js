@@ -92,7 +92,8 @@ test('equal distances use deterministic company/id ties while retaining original
 test('every premium database filter sorts before visible-row pagination', () => {
   const state = { activeStatus: '' };
   const databaseSortedLists = sortedLists.create(distance.sortCustomersByDistance);
-  const sorted = isolatedFunction('premium-database.html', '        function getSortedCustomers(customers) {', '        function isDatabaseMediaDebugEnabled()', { state, databaseSortedLists });
+  const designDateController = { matches: () => true, sort: rows => require('../../assets/premium-database-design-date').sort(rows, '') };
+  const sorted = isolatedFunction('premium-database.html', '        function getSortedCustomers(customers) {', '        function isDatabaseMediaDebugEnabled()', { state, databaseSortedLists, designDateController });
   for (const status of ['beschikbaar', 'benaderbaar', 'instantly-ready', 'benaderd', 'instantly', 'verstuurd', 'klant']) {
     state.activeStatus = status;
     assert.deepEqual(ids(sorted([far, middle, near])), ['near', 'middle', 'far'], status);
@@ -107,12 +108,13 @@ test('filtered customers retain proven distance order without a second sort', ()
   const databaseSortedLists = sortedLists.create((rows) => { sortCalls += 1; return distance.sortCustomersByDistance(rows); });
   const state = { klanten: databaseSortedLists.sort([far, near, middle]), query: '' };
   sortCalls = 0;
+  const designDateController = { matches: () => true, sort: rows => require('../../assets/premium-database-design-date').sort(rows, '') };
   const filtered = isolatedFunction('premium-database.html', '        function getFilteredCustomers() {', '        function hasActiveDatabaseSearch()', {
-    state, databaseSortedLists, normalizeSearchValue: (value) => String(value || ''),
+    state, databaseSortedLists, designDateController, normalizeSearchValue: (value) => String(value || ''),
     matchesActiveDatabaseFilter: () => true, getCustomerSearchHaystack: () => '',
   });
   const sorted = isolatedFunction('premium-database.html', '        function getSortedCustomers(customers) {', '        function isDatabaseMediaDebugEnabled()', {
-    state, databaseSortedLists,
+    state, databaseSortedLists, designDateController,
   });
   const readyRows = filtered();
   assert.deepEqual(ids(readyRows), ['near', 'middle', 'far']);

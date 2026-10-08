@@ -1,0 +1,10 @@
+.design-date-filter { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; margin-left:auto; font-size:12px; }
+.design-date-filter[hidden], .design-date-filter [hidden] { display:none; }
+.design-date-filter label { font-weight:600; color:var(--text-primary,#202034); }
+.design-date-filter input, .design-date-filter select, .design-date-filter button { min-height:36px; border:1px solid #e4dfe2; border-radius:8px; background:#fff; color:var(--text-primary,#202034); padding:6px 10px; font:inherit; }
+.design-date-filter button { color:#982658; cursor:pointer; }
+.design-date-stamp { display:block; margin:5px auto 0; border:0; background:transparent; padding:3px; color:#982658; font:inherit; font-size:11px; white-space:nowrap; cursor:pointer; }
+.design-date-stamp:hover { text-decoration:underline; }
+.design-date-stamp:focus-visible, .design-date-filter :focus-visible { outline:2px solid #982658; outline-offset:2px; }
+.design-date-unknown { display:block; margin-top:5px; text-align:center; font-size:11px; color:#9296a6; }
+@media(max-width:800px) { .top:has(.design-date-filter) { flex-wrap:wrap; gap:12px; } .design-date-filter { width:100%; justify-content:flex-start; margin-left:0; } }
