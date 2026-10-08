@@ -2912,7 +2912,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /const webdesignPhotoSourceSelection = window\.SoftoraDatabaseWebdesignSourceSelection\.createController\(/);
   assert.doesNotMatch(pageSource, /getSourceCounts: webdesignPhotoSourceSelection\.getSourceCounts/);
   assert.match(pageSource, /await webdesignPhotoSourceSelection\.getTargetsForBatch\(limit, source\)/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-source-selection\.js\?v=20261008-source-recheck/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-source-selection\.js\?v=20261008-quiet-source-selection/);
   assert.match(webdesignActionScriptSource, /function getCustomerById\(customerId\)/);
   assert.match(webdesignActionScriptSource, /async function generateForCustomer\(customerId\)/);
   assert.match(

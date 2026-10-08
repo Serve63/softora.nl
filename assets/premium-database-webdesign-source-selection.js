@@ -18,31 +18,6 @@
                 return targets;
             }
 
-            function showDeferredSources(excluded) {
-                const banner = options.statusBanner;
-                if (!banner || !global.document) return;
-                let detail = global.document.getElementById("webdesignSourceDeferrals");
-                if (detail) detail.remove();
-                if (!excluded.length) return;
-                detail = global.document.createElement("details");
-                detail.id = "webdesignSourceDeferrals";
-                detail.className = "status-banner is-visible";
-                detail.dataset.tone = "info";
-                const summary = global.document.createElement("summary");
-                summary.textContent = excluded.length + " bedrijven overgeslagen vanwege een eerdere bron- of ontwerpfout. Bekijk redenen en herstelvoorwaarden.";
-                detail.appendChild(summary);
-                const list = global.document.createElement("ul");
-                excluded.forEach(function (item) {
-                    const line = global.document.createElement("li");
-                    line.textContent = item.company + ": " + item.reason + (item.requiresSourceRecheck
-                        ? " Eerst de bron of ontwerpaanvraag controleren en zo nodig herstellen. Een succesvol gecontroleerd ontwerp geeft deze bron weer vrij."
-                        : " Opnieuw in bulk vanaf " + new Date(item.retryAt).toLocaleString("nl-NL") + ".") + " Een aangepast websiteadres kan direct opnieuw mee.";
-                    list.appendChild(line);
-                });
-                detail.appendChild(list);
-                banner.insertAdjacentElement("afterend", detail);
-            }
-
             async function getTargetsForBatch(limit, source) {
                 const candidates = Array.isArray(limit) ? limit.filter(Boolean) : filterTargets(getEligibleTargets(), source);
                 const parsedLimit = Math.floor(Number(limit));
@@ -70,7 +45,6 @@
                         else excluded.push(Object.assign({}, item, { company: part[index].bedrijf || part[index].naam || part[index].id }));
                     });
                 }
-                showDeferredSources(excluded);
                 return { targets: targets, excluded: excluded };
             }
 
