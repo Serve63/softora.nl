@@ -69,3 +69,10 @@ test('canonical snapshots preserve the design date over later customer changes',
   const result = snapshot.mergeWithCanonicalSnapshots([{ id: 'demo', updatedAt: '2026-10-09', websitePhotoCreatedAt: '' }], [], [], [{ id: 'demo', hasPhoto: true, hasMockup: true, instantlyReadySnapshot: true, webdesignMailProvider: 'instantly', websitePhotoCreatedAt: date }]);
   assert.equal(result[0].websitePhotoCreatedAt, date);
 });
+test('cached screens distinguish date filters and time ordering from the default list', () => {
+  const { viewOf } = require('../../assets/premium-database-screen-snapshot');
+  const state = { activeStatus: 'instantly-ready', query: '', sortKey: 'distance', sortAsc: true, visibleLimit: 25 };
+  assert.notEqual(viewOf(state), viewOf({ ...state, designDate: '2026-10-08' }));
+  assert.notEqual(viewOf(state), viewOf({ ...state, designDateOrder: 'newest' }));
+  assert.notEqual(viewOf({ ...state, designDateOrder: 'newest' }), viewOf({ ...state, designDateOrder: 'oldest' }));
+});

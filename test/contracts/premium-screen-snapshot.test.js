@@ -202,7 +202,7 @@ test('Mailsysteem shows its snapshot instead of the loading row and replaces it 
   assert.match(page, /if \(canonicalInventoryStatus !== "ready"\) \{ if \(canonicalInventoryStatus !== "unavailable" && window\.SoftoraDatabaseScreenSnapshot\?\.isShowing\(\)\) return;/);
   assert.match(page, /function setDatabaseTableBodyHtml\(html\) \{ window\.SoftoraDatabaseScreenSnapshot\?\.release\(\);/);
   assert.match(page, /function renderPage\(\) \{ renderTable\(\); window\.SoftoraDatabaseScreenSnapshot\?\.capture\(state\);/);
-  const snapshotScript = page.indexOf('assets/premium-database-screen-snapshot.js?v=20260927a');
+  const snapshotScript = page.indexOf('assets/premium-database-screen-snapshot.js?v=20261008-design-date');
   assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260927a') < snapshotScript);
   assert.ok(snapshotScript < page.indexOf('const state = {'), 'the snapshot is available before the first render');
 
