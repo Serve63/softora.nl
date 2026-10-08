@@ -105,7 +105,7 @@ def remove_verified_working_copy(folder):
                 return
 
 def restore_native_result(folder):
-    if (folder / 'design.png').exists() or (folder / 'design.jpg').exists():
+    if (folder / 'design.png').exists():
         return
     events = folder / 'codex-events.jsonl'
     try:
@@ -129,6 +129,25 @@ def restore_native_result(folder):
         temporary.replace(folder / 'design.png')
     except (OSError, ValueError, TypeError):
         return
+
+def assert_output_identity(folder):
+    # A model may try a global image search after a failed native write. Never
+    # deliver another company's image even if its colors happen to match.
+    try:
+        first = json.loads((folder / 'codex-events.jsonl').open().readline())
+        thread = first.get('thread_id', '')
+        if first.get('type') != 'thread.started' or not re.fullmatch(r'[a-zA-Z0-9-]+', thread):
+            raise ValueError('Unknown native thread')
+        directory = Path.home() / '.codex/generated_images' / thread
+        if directory.is_symlink():
+            raise ValueError('Invalid native directory')
+        candidates = [p for p in directory.glob('*.png') if p.is_file() and not p.is_symlink()]
+        if len(candidates) != 1 or not (folder / 'design.png').is_file():
+            raise ValueError('No unique native output')
+        if hashlib.sha256(candidates[0].read_bytes()).digest() != hashlib.sha256((folder / 'design.png').read_bytes()).digest():
+            raise ValueError('Output belongs to another request')
+    except (OSError, ValueError, TypeError) as error:
+        raise RuntimeError('Afbeelding hoort niet aantoonbaar bij deze ontwerpaanvraag.') from error
 
 def reference_blank(reference):
     # Error, loading and security-check pages are almost entirely white; a design
@@ -239,6 +258,8 @@ def check_job_active(job):
 
 def encode_result(folder):
     output, target = folder / 'design.png', folder / 'design.jpg'
+    restore_native_result(folder)
+    assert_output_identity(folder)
     if target.is_file() and not target.is_symlink():
         return
     require_storage()
@@ -522,6 +543,14 @@ def step(slot=0):
         state['phase'] = 'deliver'
         save(state)
     payload = {'jobId': job['id'], 'claim': job['claim']}
+    if not state.get('error'):
+        try:
+            encode_result(folder)
+        except LocalCapacity:
+            return
+        except Exception:
+            state['error'] = True
+            save(state)
     if state.get('error'):
         payload['error'] = 'Codex-generatie onderbroken of niet beschikbaar.'
         if state.get('limit'):

@@ -12,6 +12,8 @@ w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
 w.BASE = pathlib.Path(tempfile.mkdtemp())
 real_storage_guard = w.require_storage
 w.require_storage = lambda: None
+real_identity_guard = w.assert_output_identity
+w.assert_output_identity = lambda folder: None
 job = {'id': 'recovery-job-1234567890123456', 'claim': '11111111-1111-1111-1111-111111111111', 'prompt': 'fixture'}
 def forbidden(*args, **kwargs): raise AssertionError('Unexpected external action')
 w.reference_blank = lambda reference: False
@@ -131,6 +133,19 @@ data=b'\\x89PNG\\r\\n\\x1a\\n'+b'x'*1100+b'\\0\\0\\0\\0IENDabcd'
 w.restore_native_result(folder);assert not (folder/'design.png').exists()
 (folder/'codex-events.jsonl').write_text(json.dumps({'type':'thread.started','thread_id':'another-thread'})+'\\n')
 w.restore_native_result(folder);assert not (folder/'design.png').exists()
+`));
+
+test('an image copied from another job is rejected even when its format and colors could pass', () => worker(`
+folder=w.BASE/job['id'];folder.mkdir()
+w.Path.home=lambda:w.BASE
+native=w.BASE/'.codex/generated_images/own-thread';native.mkdir(parents=True)
+(native/'image.png').write_bytes(b'own-result')
+(folder/'codex-events.jsonl').write_text(json.dumps({'type':'thread.started','thread_id':'own-thread'})+'\\n')
+(folder/'design.png').write_bytes(b'another-company')
+try:real_identity_guard(folder)
+except RuntimeError:pass
+else:raise AssertionError('Another company image must never upload')
+(folder/'design.png').write_bytes(b'own-result');real_identity_guard(folder)
 `));
 
 test('low storage during recovery preserves the generation checkpoint rather than reporting failure', () => worker(`
