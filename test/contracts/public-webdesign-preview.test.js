@@ -1204,6 +1204,14 @@ test('public webdesign preview keeps customer-requested revocations offline acro
     ['getPreviewPageResponse', { params: { companySlug: 'ander-bedrijf' }, query: { cid: 'kvk-30138458' } }],
     ['getPreviewAssetResponse', { params: { companySlug: 'ander-bedrijf', assetType: 'webdesign' }, query: { cid: 'kvk-98956612' } }],
     ['getConceptPageResponse', { params: { customerId: 'adriaan-van-dam-fotografie' }, query: {} }],
+    ['getConceptPageResponse', { params: { companySlug: 'max-de-winter' }, query: { cid: 'kvk-16054105', sender: 'martijn' } }],
+    ['getConceptPageResponse', { params: { companySlug: 'max-de-winter' }, query: {} }],
+    ['getPreviewPageResponse', { params: { customerId: 'kvk-16054105' }, query: {} }],
+    ['getConceptPageResponse', { params: { companySlug: 'ander-bedrijf' }, query: { customerId: 'kvk-16054105' } }],
+    ['getPreviewPageResponse', { params: { companySlug: 'ander-bedrijf' }, query: { id: 'kvk-16054105' } }],
+    ['getPreviewAssetResponse', { params: { companySlug: 'max-de-winter', assetType: 'webdesign' }, query: {} }],
+    ['getPreviewAssetResponse', { params: { customerId: 'kvk-16054105', assetType: 'mockup' }, query: {} }],
+    ['getPreviewAssetResponse', { params: { companySlug: 'ander-bedrijf', assetType: 'webdesign' }, query: { cid: ' KVK-16054105 ' } }],
   ];
 
   for (const [method, request] of requests) {
