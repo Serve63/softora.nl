@@ -33,32 +33,36 @@ test('design creation never comes from customer updates, storage repair or signi
   assert.equal(ui.parts(row('<script>')), null);
   assert.match(ui.render({}), /Aanmaakdatum onbekend/);
 });
-test('date click, picker, ordering and clear reset pagination and cooperate with list navigation', () => {
+test('only newest/oldest ordering is active and changes reset pagination', () => {
   const elements = new Map();
   function element(id) { if (!elements.has(id)) elements.set(id, { value: '', hidden: false, events: {}, addEventListener(name, handler) { this.events[name] = handler; } }); return elements.get(id); }
   let resets = 0, renders = 0;
-  const state = { activeStatus: 'instantly-ready' }, tbody = element('tbody');
-  const controller = ui.createController({ document: { getElementById: element }, state, tbody, resetVisibleLimit() { resets++; }, renderPage() { renders++; } });
+  const state = { activeStatus: 'instantly-ready', designDate: '2026-10-07' };
+  const controller = ui.createController({ document: { getElementById: element }, state, resetVisibleLimit() { resets++; }, renderPage() { renders++; } });
+  const early = row('2026-10-08T08:00:00Z'), late = row('2026-10-08T13:00:00Z'), unknown = {};
   controller.sync();
-  tbody.events.click({ target: { closest: () => ({ dataset: { designDay: '2026-10-08' } }) }, preventDefault() {}, stopPropagation() {} });
-  assert.equal(state.designDate, '2026-10-08');
+  assert.equal(state.designDate, '');
   assert.equal(state.designDateOrder, 'newest');
-  assert.equal(controller.matches(row('2026-10-07T10:00:00Z')), false);
-  element('designDateInput').value = '2026-10-07'; element('designDateInput').events.change();
-  assert.equal(controller.matches(row('2026-10-07T10:00:00Z')), true);
+  assert.equal(element('designDateOrder').value, 'newest');
+  assert.equal(controller.matches(unknown), true);
+  assert.deepEqual(controller.sort([early, unknown, late]), [late, early, unknown]);
+  element('designDateOrder').value = 'oldest'; element('designDateOrder').events.change();
+  assert.deepEqual(controller.sort([early, unknown, late]), [early, late, unknown]);
   state.activeStatus = 'instantly'; controller.sync();
   assert.equal(element('designDateFilter').hidden, true);
-  assert.equal(controller.matches({}), true);
+  const rows = [unknown, late, early];
+  assert.equal(controller.sort(rows), rows);
   state.activeStatus = 'benaderbaar'; controller.sync();
   assert.equal(element('designDateFilter').hidden, false);
-  element('designDateClear').events.click(); controller.sync();
-  assert.equal(state.designDate, ''); assert.equal(state.designDateOrder, '');
-  assert.equal(element('designDateClear').hidden, true);
-  assert.equal(resets, 3); assert.equal(renders, 3);
+  assert.deepEqual(controller.sort(rows), [early, late, unknown]);
+  assert.equal(resets, 1); assert.equal(renders, 1);
 });
-test('page integrates design filtering before pagination and renders clickable timestamps', () => {
+test('page offers exactly two sort options and timestamps cannot apply hidden date filters', () => {
   const html = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
-  assert.match(html, /!matchesActiveDatabaseFilter\(customer\) \|\| !designDateController.matches\(customer\)/);
+  const control = html.match(/<div class="design-date-filter"[^>]*>(.*?)<\/div>/)[1];
+  assert.deepEqual([...control.matchAll(/<option value="([^"]*)">([^<]*)<\/option>/g)].map(m => [m[1], m[2]]), [['newest', 'Nieuwste eerst'], ['oldest', 'Oudste eerst']]);
+  assert.doesNotMatch(control, /<input|<button|<label|Datum en tijd/);
+  assert.doesNotMatch(ui.render(row('2026-10-08T08:00:00Z')), /<button|data-design-day/);
   assert.match(html, /designDateController.sort\(databaseSortedLists.sorted\(customers\)\)/);
   assert.match(html, /SoftoraDatabaseDesignDate.render\(customer\)/);
   assert.ok(html.indexOf('const designDateController =') < html.indexOf('const customersCore ='));
