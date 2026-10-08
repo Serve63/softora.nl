@@ -1144,3 +1144,16 @@ test('new website upload is immediately rebuilt into Available rather than mail-
  assert.ok(data.availableCustomers.some(item=>item.id===row.customer_id && item.availableSnapshot===true));
  assert.ok(!data.customers.some(item=>item.id===row.customer_id));
 });
+
+
+test('snapshot versions invalidate browser copies when design timestamps arrive or change', () => {
+  const older = { id: 'same-design', websitePhotoCreatedAt: '2026-10-07T10:00:00.000Z' };
+  const newer = { ...older, websitePhotoCreatedAt: '2026-10-08T10:00:00.000Z' };
+  const bare = buildSnapshotVersion({ instantlyReadyCustomers: [{ id: older.id }] });
+  const dated = buildSnapshotVersion({ instantlyReadyCustomers: [older] });
+  assert.notEqual(bare, dated);
+  assert.notEqual(dated, buildSnapshotVersion({ instantlyReadyCustomers: [newer] }));
+  assert.equal(dated, buildSnapshotVersion({ instantlyReadyCustomers: [older], generatedAt: '2099-01-01T00:00:00Z' }));
+  const other = { id: 'another', websitePhotoCreatedAt: older.websitePhotoCreatedAt };
+  assert.equal(buildSnapshotVersion({ customers: [older, other] }), buildSnapshotVersion({ customers: [other, older] }));
+});
