@@ -552,8 +552,11 @@ def worker_loop(slot):
         try:
             completed = step(slot)
         except Exception as error:
-            print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'Abonnementwerker wacht:', slot,
-                  str(error) if isinstance(error, LocalCapacity) else type(error).__name__, flush=True)
+            try:
+                print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'Abonnementwerker wacht:', slot,
+                      str(error) if isinstance(error, LocalCapacity) else type(error).__name__, flush=True)
+            except OSError:
+                pass  # A full log disk must not silently kill this worker slot.
         # Immediately claim the next job after delivering; idle slots back off.
         time.sleep(1 if completed else 15)
 

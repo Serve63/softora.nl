@@ -44,6 +44,18 @@ w.step()
 assert state() == {} and reports[0]['dataUrl']
 `));
 
+test('a full log disk cannot kill a worker slot while it waits for storage recovery', () => worker(`
+w.step=lambda slot:(_ for _ in ()).throw(w.LocalCapacity('disk pressure'))
+w.print=lambda *args,**kwargs:(_ for _ in ()).throw(OSError(28,'No space left on device'))
+slept=[]
+def sleep(seconds):
+ slept.append(seconds);raise StopIteration('test loop complete')
+w.time.sleep=sleep
+try:w.worker_loop(0)
+except StopIteration:pass
+assert slept==[15]
+`));
+
 test('a failed bootstrap waits and retries once with the same claim, then reports persistent failure', () => worker(`
 w.write_state({'phase':'prepare','job':job})
 attempts=[]
