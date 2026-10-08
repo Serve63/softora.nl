@@ -243,6 +243,51 @@ def download_reference(job, folder):
                 return reference
     raise ReferenceUnavailable('Screenshotdiensten leverden na drie pogingen geen bruikbaar bronbeeld.')
 
+def alternate_reference(job, folder):
+    # Only a completed, explicit pre-generation source rejection may try another
+    # capture. Ordinary failures, quota errors and uncertain interruptions stop.
+    if not source_reference_blocked(folder) or subscription_limit(folder):
+        return None
+    events = folder / 'codex-events.jsonl'
+    try:
+        entries = [json.loads(line) for line in events.read_text().splitlines()]
+        if not entries or entries[-1].get('type') != 'turn.completed':
+            return None
+        for entry in entries:
+            if entry.get('type') not in ('thread.started', 'turn.started', 'item.started', 'item.completed', 'turn.completed'):
+                return None
+            item = entry.get('item', {})
+            if item and item.get('type') != 'agent_message':
+                skill_read = "/bin/zsh -lc 'cat " + str(Path.home() / '.codex/skills/.system/imagegen/SKILL.md') + "'"
+                if item.get('type') != 'command_execution' or item.get('command') != skill_read:
+                    return None
+            thread_id = entry.get('thread_id', '')
+            if thread_id and (not re.fullmatch(r'[a-zA-Z0-9-]+', thread_id)
+                              or (Path.home() / '.codex/generated_images' / thread_id).exists()):
+                return None
+        attempts = json.loads((folder / 'reference-attempts.json').read_text())
+        provider = next(entry['provider'] for entry in reversed(attempts) if entry.get('result') == 'ready')
+    except (OSError, ValueError, KeyError, StopIteration):
+        return None
+    urls = job.get('referenceUrls', [])
+    if not isinstance(provider, int) or not 0 <= provider < len(urls):
+        return None
+    alternatives = [url for url in urls if url != urls[provider]]
+    if not alternatives:
+        return None
+    retry = folder / 'source-retry'
+    # Persist before any second attempt; an interrupted worker never repeats it.
+    try:
+        retry.mkdir(mode=0o700)
+    except FileExistsError:
+        return None
+    for name in ('answer.json', 'codex-events.jsonl', 'reference-attempts.json', 'homepage-reference.png'):
+        shutil.copyfile(folder / name, retry / name)
+    check_job_active(job)
+    capture = retry / 'alternate'
+    capture.mkdir(mode=0o700)
+    return download_reference(dict(job, referenceUrls=alternatives), capture)
+
 def generate(job, folder, slot=0):
     # Do not keep retrying reference downloads for a cancelled/expired job.
     check_job_active(job)
@@ -279,12 +324,23 @@ def generate(job, folder, slot=0):
               'Design instructions:\n' + job['prompt'])
     # Auth and reference downloads are reversible; checkpoint the model boundary only now.
     write_state({'phase': 'generating', 'job': job}, slot)
-    with (folder / 'codex-events.jsonl').open('w') as events:
-        result = subprocess.run([binary, 'exec', '--ignore-user-config', '--ephemeral', '--skip-git-repo-check',
-            '-s', 'workspace-write', '-C', str(folder), '-m', 'gpt-6.1-sol', '-c', 'model_reasoning_effort=low',
-            '-c', 'model_provider=openai', '-c', 'web_search=disabled', '-i', str(reference), '--json',
-            '-o', str(folder / 'answer.json'), '-'], input=prompt, env=env, text=True,
-            stdout=events, stderr=events, timeout=900)
+    for source_attempt in range(2):
+        with (folder / 'codex-events.jsonl').open('w') as events:
+            result = subprocess.run([binary, 'exec', '--ignore-user-config', '--ephemeral', '--skip-git-repo-check',
+                '-s', 'workspace-write', '-C', str(folder), '-m', 'gpt-6.1-sol', '-c', 'model_reasoning_effort=low',
+                '-c', 'model_provider=openai', '-c', 'web_search=disabled', '-i', str(reference), '--json',
+                '-o', str(folder / 'answer.json'), '-'], input=prompt, env=env, text=True,
+                stdout=events, stderr=events, timeout=900)
+        if source_attempt or result.returncode or (folder / 'design.png').exists():
+            break
+        replacement = alternate_reference(job, folder)
+        if replacement is None:
+            break
+        check_job_active(job)
+        if subscription_paused():
+            raise SubscriptionLimit('Abonnementlimiet bereikt.')
+        (folder / 'answer.json').unlink()
+        reference = replacement
     if not (folder / 'design.png').is_file():
         if subscription_limit(folder):
             raise SubscriptionLimit('Abonnementlimiet bereikt.')
