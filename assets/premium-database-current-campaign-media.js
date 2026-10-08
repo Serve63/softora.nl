@@ -4,6 +4,7 @@
     const ENDPOINT = "/api/premium-database/current-campaign-media";
     const BATCH_SIZE = 50;
     const REFRESH_BEFORE_EXPIRY_MS = 5 * 60 * 1000;
+    const RETRY_DELAY_MS = 30 * 1000;
 
     function text(value) { return String(value || "").trim(); }
     function hasMedia(customer) { return Boolean(text(customer && customer.websitePhoto) && text(customer && customer.websiteMockup)); }
@@ -15,6 +16,7 @@
     function createController(options) {
         const state = options.state;
         let inFlight = null;
+        const retryAfter = new Map();
 
         function withExpiry(customer, photoMap) {
             const media = photoMap[text(customer && customer.id)];
@@ -58,9 +60,11 @@
 
         async function refresh() {
             if (inFlight) return inFlight;
-            const ids = Array.from(new Set((Array.isArray(state.klanten) ? state.klanten : [])
+            const nowMs = typeof options.now === "function" ? options.now() : Date.now();
+            const customers = typeof options.getCustomers === "function" ? options.getCustomers() : state.klanten;
+            const ids = Array.from(new Set((Array.isArray(customers) ? customers : [])
                 .filter(options.isCurrentCampaignCustomer)
-                .filter(function (customer) { return needsMedia(customer, Date.now()); })
+                .filter(function (customer) { return needsMedia(customer, nowMs) && (retryAfter.get(text(customer && customer.id)) || 0) <= nowMs; })
                 .map(function (customer) { return text(customer && customer.id); })
                 .filter(function (id) { return id && id.length <= 128 && /^[a-zA-Z0-9._:-]+$/.test(id); })));
             if (!ids.length) return false;
@@ -68,6 +72,8 @@
                 const photoMap = {};
                 for (let index = 0; index < ids.length; index += BATCH_SIZE) {
                     const batch = ids.slice(index, index + BATCH_SIZE);
+                    // Empty or partial responses must not trigger another request on every render.
+                    batch.forEach(function (id) { retryAfter.set(id, nowMs + RETRY_DELAY_MS); });
                     const response = await options.fetchJsonWithTimeout(ENDPOINT + "?ids=" + encodeURIComponent(batch.join(",")), { method: "GET", cache: "no-store" }, 20000);
                     if (!response.ok) throw new Error("Webdesigns laden mislukt (" + response.status + ")");
                     const payload = await response.json();
@@ -85,14 +91,27 @@
             })().catch(function (error) {
                 if (global.console && typeof global.console.warn === "function") global.console.warn("Campagnewebdesigns laden mislukt:", error);
                 return false;
-            }).finally(function () { inFlight = null; });
+            }).finally(function () {
+                inFlight = null;
+                if (typeof options.onSettled === "function") options.onSettled();
+            });
             return inFlight;
         }
 
         return { refresh: refresh };
     }
 
-    const api = { createController: createController, needsMedia: needsMedia };
+    function createVisibleController(options) {
+        return createController(Object.assign({}, options, {
+            getCustomers: function () { return options.getCustomers().slice(0, options.state.visibleLimit); },
+            isCurrentCampaignCustomer: function (customer) {
+                const asset = options.getAssetState(customer);
+                return options.shouldShowWebsitePhoto(customer) && (asset.hasPhoto || asset.hasMockup);
+            }
+        }));
+    }
+
+    const api = { createController: createController, createVisibleController: createVisibleController, needsMedia: needsMedia };
     global.SoftoraDatabaseCurrentCampaignMedia = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
