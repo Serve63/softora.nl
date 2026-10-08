@@ -16,6 +16,7 @@ test('database preview hydration stays scoped to visible rows behind the existin
   assert.match(media, /options\.getCustomers\(\)\.slice\(0, options\.state\.visibleLimit\)/);
   assert.match(media, /options\.applyCustomerList\(customers, forceRender, true\)/);
   assert.match(page, /premium-database-current-campaign-media\.js\?v=20261008-visible-previews-v2/);
+  assert.match(page, /premium-database-webdesign-action\.js\?v=20261008-lazy-loading/);
   assert.match(page, /if \(!state\.photoRestorePending\) void visibleDatabaseMediaController\.refresh\(\)/);
   assert.match(page, /onSettled: scheduleRenderPage/);
   assert.match(routes, /app\.get\('\/api\/premium-database\/current-campaign-media', requirePremiumApiAccess/);
@@ -1463,7 +1464,7 @@ test('database loading repair keeps its premium shell and serves matching design
   assert.match(source, /premium-database-system-mail-count\.js\?v=20261003-complete-count/);
   assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20261008-design-date/);
   assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20261008-design-date/);
-  assert.match(source, /premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
+  assert.match(source, /premium-database-webdesign-action\.js\?v=20261008-lazy-loading/);
   assert.match(source, /premium-database-table-helpers\.js\?v=20261001-email-guard/);
   assert.match(source, /const count = databaseTableHelpers\.getPhotoHeaderCount\(customers, \{ showPhotoColumn: showPhotoColumn, activeStatus: state\.activeStatus,/);
 });
