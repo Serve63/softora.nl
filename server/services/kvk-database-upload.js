@@ -52,6 +52,11 @@ function createKvkDatabaseUploadService({ getSupabaseClient, getUiStateValues, r
       });
       if (error?.code === 'P0002') return res.status(409).json({ ok: false, error: 'Er zijn minder bedrijven beschikbaar dan het gekozen aantal. Open het venster opnieuw en kies een lager aantal.' });
       if (error?.code === 'P0003') return res.status(409).json({ ok: false, error: 'Deze uploadcode hoort bij een ander aantal bedrijven.' });
+      if (error) {
+        const code = /^[A-Z0-9]{5}$/.test(error.code || '') ? error.code : 'unknown';
+        logger.warn?.('[KvkUpload][transaction]', { requestId, count: amount, code });
+        if (code === '57014') throw new Error('De database had te weinig tijd om de upload af te ronden. Probeer dezelfde overdracht opnieuw; bedrijven worden niet dubbel toegevoegd.');
+      }
       if (error || !data || typeof data.count !== 'number') throw new Error('Upload kon niet worden bevestigd. Probeer opnieuw; dezelfde upload wordt niet dubbel uitgevoerd.');
       inventory.invalidate();
       return finishCommittedUpload(res, data);

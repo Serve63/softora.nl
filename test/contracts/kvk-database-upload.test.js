@@ -113,3 +113,15 @@ test('both dialogs share the same minimum height and upload rows fill the larger
  assert.match(shared,/min-height:min\(340px,calc\(100vh - 28px\)\)/);
  assert.match(upload,/\.kvk-upload-dialog\[open\]\{display:flex;flex-direction:column\}/);
 });
+
+test('database timeouts retain retry semantics and log only the operation and error code', async () => {
+ const logs=[];
+ const db={from(){return {select:()=>({eq:()=>({maybeSingle:async()=>({data:null})})})};},
+   async rpc(name){return name==='softora_kvk_unused_inventory_rows' ? {data:[]} : {error:{code:'57014',message:'private database details'}};}};
+ const service=createKvkDatabaseUploadService({getSupabaseClient:()=>db,getUiStateValues:async()=>({values:{}}),logger:{warn:(...args)=>logs.push(args)}});
+ const r=res();await service.upload({body:{mode:'with-website',requestId:id,count:12844}},r);
+ assert.equal(r.statusCode,503);assert.equal(r.body.ok,false);
+ assert.match(r.body.error,/te weinig tijd/);assert.match(r.body.error,/dezelfde overdracht/);
+ assert.deepEqual(logs,[['[KvkUpload][transaction]',{requestId:id,count:12844,code:'57014'}]]);
+ assert.doesNotMatch(JSON.stringify(r.body)+JSON.stringify(logs),/private database details/);
+});
