@@ -183,7 +183,7 @@ const SOFTWARE_PROPOSAL_CONTENT_ITEM = Object.freeze({
       }
     }),
     publishedAt: '2026-07-17',
-    updatedAt: '2026-09-11',
+    updatedAt: '2026-10-08',
     growthEventKind: 'other_growth_action',
     growthEventAt: '2026-09-11',
     image: Object.freeze({
@@ -206,11 +206,11 @@ const SOFTWARE_PROPOSAL_CONTENT_ITEM = Object.freeze({
         heading: 'Maak eerst dezelfde scope vergelijkbaar',
         paragraphs: Object.freeze([
           Object.freeze({
-            text: 'Twee voorstellen zijn pas eerlijk te vergelijken wanneer ze hetzelfde probleem en dezelfde eerste versie beschrijven. Bepaal eerst per procesonderdeel of standaardsoftware, een hybride koppeling of maatwerk logisch is. Laat daarna per offerte benoemen welke gebruikers, processen, schermen, rollen, rapportages en koppelingen binnen de scope vallen. Controleer ook welke onderdelen expliciet buiten de prijs blijven. Een lage totaalprijs zegt weinig als migratie, testen of belangrijke integraties later apart worden berekend.',
+            text: 'Twee voorstellen zijn pas eerlijk te vergelijken wanneer ze hetzelfde probleem en dezelfde eerste versie beschrijven. Bepaal met de uitleg over bedrijfssoftware op maat eerst per procesonderdeel of standaardsoftware, een hybride koppeling of maatwerk logisch is. Laat daarna per offerte benoemen welke gebruikers, processen, schermen, rollen, rapportages en koppelingen binnen de scope vallen. Controleer ook welke onderdelen expliciet buiten de prijs blijven. Een lage totaalprijs zegt weinig als migratie, testen of belangrijke integraties later apart worden berekend.',
             links: Object.freeze([
               Object.freeze({
-                anchor: 'standaardsoftware, een hybride koppeling of maatwerk',
-                href: '/vergelijkingen/maatwerk-software-vs-standaard-software',
+                anchor: 'uitleg over bedrijfssoftware op maat',
+                href: '/blog/wat-is-bedrijfssoftware-op-maat',
               }),
             ]),
           }),
@@ -261,8 +261,7 @@ const SOFTWARE_PROPOSAL_CONTENT_ITEM = Object.freeze({
     ]),
     relatedLinks: Object.freeze([
       Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
-      Object.freeze({ label: 'Maatwerk software of standaard software', href: '/vergelijkingen/maatwerk-software-vs-standaard-software' }),
-      Object.freeze({ label: 'Wat is bedrijfssoftware op maat?', href: '/kennisbank/wat-is-bedrijfssoftware-op-maat' }),
+      Object.freeze({ label: 'Wat is bedrijfssoftware op maat?', href: '/blog/wat-is-bedrijfssoftware-op-maat' }),
       Object.freeze({ label: 'Diensten van Softora', href: '/diensten' }),
     ]),
   });

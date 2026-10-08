@@ -17,7 +17,7 @@ const BUSINESS_SOFTWARE_EXPLAINER = Object.freeze({
     Object.freeze({ title: 'Google Search Central: helpful, reliable, people-first content', url: 'https://developers.google.com/search/docs/fundamentals/creating-helpful-content', observedAt: '2026-09-25' }),
   ]),
   publishedAt: '2026-05-19',
-  updatedAt: '2026-09-25',
+  updatedAt: '2026-10-08',
   growthEventKind: 'substantial_refresh',
   growthEventAt: '2026-09-25',
   keywordEvidence: Object.freeze({
@@ -191,7 +191,7 @@ const BUSINESS_SOFTWARE_EXPLAINER = Object.freeze({
       heading: 'Wanneer is maatwerk niet de eerste stap?',
       paragraphs: Object.freeze([
         'Wanneer niemand het eens is over de eigenaar of de werkwijze, automatiseert nieuwe software vooral de onduidelijkheid. Leg eerst het proces vast. Controleer vervolgens of betere inrichting van een bestaand pakket of een eenvoudiger werkafspraak het probleem al oplost. Meer functies zijn geen bewijs dat eigen ontwikkeling nodig is.',
-        { text: 'Blijven er concrete regels of overdrachten over die de bestaande oplossing niet goed ondersteunt? Vergelijk dan standaardsoftware, een hybride route en maatwerk per onderdeel. Deze uitleg helpt je de taak te beschrijven; het aparte besliskader helpt daarna een oplossingsroute kiezen.', links: [{ anchor: 'standaardsoftware, een hybride route en maatwerk', href: '/vergelijkingen/maatwerk-software-vs-standaard-software' }] },
+        { text: 'Blijven er concrete regels of overdrachten over die de bestaande oplossing niet goed ondersteunt? Vergelijk dan standaardsoftware, een hybride route en maatwerk per onderdeel. Deze uitleg helpt je de taak te beschrijven. Ga je een softwareofferte beoordelen, controleer dan of de scope, aannames en acceptatiecriteria in het voorstel duidelijk zijn.', links: [{ anchor: 'een softwareofferte beoordelen', href: '/blog/maatwerk-software-offerte-beoordelen', availableFrom: '2026-07-17' }] },
       ]),
     }),
     Object.freeze({
@@ -214,7 +214,6 @@ const BUSINESS_SOFTWARE_EXPLAINER = Object.freeze({
     Object.freeze({ label: 'Bedrijfssoftware op maat', href: '/bedrijfssoftware-op-maat' }),
     Object.freeze({ label: 'Maatwerk platform', href: '/maatwerk-platform' }),
     Object.freeze({ label: 'AI automatisering voor het MKB', href: '/blog/ai-automatisering-mkb-waar-beginnen' }),
-    Object.freeze({ label: 'Standaard, hybride of maatwerk kiezen', href: '/vergelijkingen/maatwerk-software-vs-standaard-software', availableFrom: '2026-05-24' }),
     Object.freeze({ label: 'Softwareoffertes beoordelen', href: '/blog/maatwerk-software-offerte-beoordelen', availableFrom: '2026-07-17' }),
   ]),
 });
