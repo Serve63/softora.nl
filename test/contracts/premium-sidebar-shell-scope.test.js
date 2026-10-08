@@ -14,6 +14,8 @@ test('database preview hydration stays scoped to visible rows behind the existin
   const routes = readRepoFile('server/routes/premium-database-import.js');
   assert.match(page, /getCustomers: function \(\) \{ return getSortedCustomers\(getFilteredCustomers\(\)\); \}/);
   assert.match(media, /options\.getCustomers\(\)\.slice\(0, options\.state\.visibleLimit\)/);
+  assert.match(media, /options\.applyCustomerList\(customers, forceRender, true\)/);
+  assert.match(page, /premium-database-current-campaign-media\.js\?v=20261008-visible-previews-v2/);
   assert.match(page, /if \(!state\.photoRestorePending\) void visibleDatabaseMediaController\.refresh\(\)/);
   assert.match(page, /onSettled: scheduleRenderPage/);
   assert.match(routes, /app\.get\('\/api\/premium-database\/current-campaign-media', requirePremiumApiAccess/);

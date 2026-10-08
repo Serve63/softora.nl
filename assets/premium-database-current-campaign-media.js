@@ -104,6 +104,9 @@
     function createVisibleController(options) {
         return createController(Object.assign({}, options, {
             getCustomers: function () { return options.getCustomers().slice(0, options.state.visibleLimit); },
+            // These rows already have canonical readiness flags. Reconciliation would
+            // overwrite their freshly signed URLs with expired snapshot media.
+            applyCustomerList: function (customers, forceRender) { options.applyCustomerList(customers, forceRender, true); },
             isCurrentCampaignCustomer: function (customer) {
                 const asset = options.getAssetState(customer);
                 return options.shouldShowWebsitePhoto(customer) && (asset.hasPhoto || asset.hasMockup);

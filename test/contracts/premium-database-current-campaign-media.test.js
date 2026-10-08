@@ -147,3 +147,29 @@ test('empty, partial and failed visible media reads are throttled and can recove
   assert.equal(calls, 4);
   assert.equal(state.klanten[0].websiteMockup, 'https://media.test/mockup.png');
 });
+
+test('fresh visible URLs are not replaced by expired media in the readiness snapshot', async () => {
+  const snapshots = require('../../assets/premium-database-mail-ready-snapshot');
+  const old = { id: 'ready', bedrijf: 'Bedrijf', websitePhoto: 'https://media.test/expired-photo.png',
+    websiteMockup: 'https://media.test/expired-mockup.png', websitePhotoCreatedAt: '2026-10-07T18:44:00.000Z',
+    signedUrlExpiresAt: '2000-01-01T00:00:00Z', hasPhoto: true, hasMockup: true, mailReadySnapshot: true };
+  const state = { visibleLimit: 25, klanten: [old], mailReadySnapshotLoaded: true, availableSnapshotLoaded: true,
+    mailReadySnapshotCustomers: [old], availableSnapshotCustomers: [], instantlyReadySnapshotCustomers: [] };
+  const controller = createVisibleController({ state, getCustomers: () => state.klanten,
+    shouldShowWebsitePhoto: () => true, getAssetState: () => ({ hasPhoto: true, hasMockup: true }),
+    mergeCustomersWithPhotos, buildCustomerIdentityKey: identityKey,
+    applyCustomerList: (rows, _force, alreadyCanonical) => {
+      state.klanten = alreadyCanonical ? rows : snapshots.reconcileCustomerList(state, rows);
+    },
+    fetchJsonWithTimeout: async () => ({ ok: true, json: async () => ({ ok: true, media: [{
+      customerId: old.id, websitePhoto: 'https://media.test/fresh-photo.png', websiteMockup: 'https://media.test/fresh-mockup.png',
+      websitePhotoCreatedAt: old.websitePhotoCreatedAt, signedUrlExpiresAt: '2099-01-01T00:00:00Z',
+    }] }) }),
+  });
+  assert.equal(await controller.refresh(), true);
+  assert.equal(state.klanten[0].websitePhoto, 'https://media.test/fresh-photo.png');
+  assert.equal(state.klanten[0].websiteMockup, 'https://media.test/fresh-mockup.png');
+  assert.equal(state.klanten[0].signedUrlExpiresAt, '2099-01-01T00:00:00Z');
+  assert.equal(state.klanten[0].mailReadySnapshot, true, 'canonical eligibility stays intact');
+  assert.equal(await controller.refresh(), false);
+});
