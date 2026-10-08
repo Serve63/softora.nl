@@ -503,6 +503,15 @@ function createMailboxComposeRuntime(dependencies = {}) {
       recipientEmail: body.to,
       provider: body.provider,
     });
+    if (body.replyTransport === 'smtp') {
+      const account = getAccount?.(threadProvenance.accountEmail);
+      if (!account?.smtpConfigured || account.smtpIdentityMatches === false) {
+        const error = new Error('Kies een beschikbare eigen mailbox om de bijlagen mee te verzenden.');
+        error.status = 409;
+        error.code = 'MAILBOX_SMTP_UNAVAILABLE';
+        throw error;
+      }
+    }
     if (threadProvenance.provider === 'instantly' && Array.isArray(body.attachments) && body.attachments.length) {
       const error = new Error('Instantly ondersteunt geen bijlagen bij antwoorden; verwijder de bijlage of verstuur via de gewone mailbox.');
       error.status = 400;

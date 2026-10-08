@@ -26,6 +26,7 @@
     let lastSuggestion = '';
     let sendRequestActive = false;
     let attachmentDragDepth = 0;
+    let attachmentSenderOpen = false;
     const configuredSpellingTimeout = Number(options.spellingTimeoutMs);
     const SPELLING_TIMEOUT_MS = configuredSpellingTimeout > 0 ? configuredSpellingTimeout : 8000;
 
@@ -134,7 +135,24 @@
       const result = await options.compose.addAttachments(files, documentRef);
       if (input) input.value = '';
       if (result?.ok === false) options.toast(result.error);
+      await syncAttachmentSender();
       return result;
+    }
+
+    async function syncAttachmentSender() {
+      const instantlyReply = replyContext?.mode === 'reply'
+        && normalize(replyContext.replyIdentity?.provider || replyContext.provider) === 'instantly';
+      const needsSender = instantlyReply && options.compose.getAttachments().length > 0;
+      const notice = documentRef?.getElementById('compose-attachment-delivery');
+      if (notice) notice.hidden = !needsSender;
+      if (!needsSender) {
+        if (attachmentSenderOpen) sender?.reset();
+        attachmentSenderOpen = false;
+        return;
+      }
+      if (attachmentSenderOpen) return;
+      attachmentSenderOpen = true;
+      await sender.open({ owner: replyOwner, preferredAccount: `${replyOwner}@softora.nl` });
     }
 
     function getSpellingButton() {
@@ -334,6 +352,9 @@
 
     function open(optionsOverride = {}) {
       composeGeneration += 1;
+      attachmentSenderOpen = false;
+      const notice = documentRef?.getElementById('compose-attachment-delivery');
+      if (notice) notice.hidden = true;
       abortSpellingRequest();
       spellingUndo = null;
       lastSuggestion = '';
@@ -351,6 +372,7 @@
 
     function close() {
       composeGeneration += 1;
+      attachmentSenderOpen = false;
       abortSpellingRequest();
       spellingUndo = null;
       lastSuggestion = '';
@@ -648,7 +670,11 @@
         const canonicalIdentity = contextAtSend?.replyIdentity && typeof contextAtSend.replyIdentity === 'object'
           ? { ...contextAtSend.replyIdentity }
           : null;
-        const account = contextAtSend?.isFreshMessage ? sender.getSelection().accountEmail
+        const attachments = options.compose.getAttachments();
+        const useSmtpReply = contextAtSend?.mode === 'reply' && attachments.length > 0
+          && normalize(canonicalIdentity?.provider || contextAtSend.provider) === 'instantly';
+        if (useSmtpReply) await syncAttachmentSender();
+        const account = useSmtpReply || contextAtSend?.isFreshMessage ? sender.getSelection().accountEmail
           : contextAtSend?.mode === 'reply' && canonicalIdentity?.accountEmail
           ? options.normalizeEmail(canonicalIdentity.accountEmail)
           : contextAtSend
@@ -667,17 +693,14 @@
           Math.random().toString(36).slice(2),
         ].join(':');
         const provider = sendMode === 'reply'
-          ? String(canonicalIdentity?.provider || contextAtSend?.provider || '').trim().toLowerCase()
+          ? useSmtpReply ? 'smtp' : String(canonicalIdentity?.provider || contextAtSend?.provider || '').trim().toLowerCase()
           : '';
-        const attachments = options.compose.getAttachments();
-        if (provider === 'instantly' && attachments.length) {
-          throw new Error('Instantly ondersteunt geen bijlagen bij antwoorden; verwijder de bijlage of verstuur via de gewone mailbox.');
-        }
         const sendPayload = {
           account,
           owner: sendOwner,
           mode: sendMode,
           idempotencyKey,
+          ...(useSmtpReply ? { replyTransport: 'smtp' } : {}),
           ...(canonicalIdentity ? { replyIdentity: canonicalIdentity } : {}),
           context: {
             conversationId: String(contextAtSend?.conversationId || '').trim(),
@@ -688,13 +711,13 @@
             references: String(contextAtSend?.references || '').trim(),
             ...(canonicalIdentity ? { replyIdentity: canonicalIdentity } : {}),
           },
-          ...(provider
+          ...(provider === 'instantly'
             ? {
                 provider,
                 providerMessageId: String(canonicalIdentity?.providerMessageId || replyContext && replyContext.providerMessageId || '').trim(),
                 providerThreadId: String(canonicalIdentity?.providerThreadId || replyContext && replyContext.providerThreadId || '').trim(),
               }
-            : {}),
+            : provider ? { provider } : {}),
           to,
           cc: fieldValue('c-cc'),
           bcc: fieldValue('c-bcc'),
@@ -838,6 +861,7 @@
           key: `${normalize(sendOwner)}|${normalize(account)}|${identity}`,
           owner: normalize(sendOwner),
           accountEmail: normalize(account),
+          ...(useSmtpReply ? { sourceAccountEmail: normalize(canonicalIdentity.accountEmail) } : {}),
           acceptedAt,
           idempotencyKey,
           mode: sendMode,
@@ -848,7 +872,11 @@
             uid: Number(contextAtSend?.uid || 0) || 0,
             folder: String(contextAtSend?.folder || 'inbox').trim().toLowerCase(),
             storageFolder: String(contextAtSend?.folder || 'inbox').trim().toLowerCase(),
-            accountEmail: normalize(account),
+            accountEmail: normalize(useSmtpReply ? canonicalIdentity.accountEmail : account),
+            ...(useSmtpReply ? {
+              provider: 'instantly', providerMessageId: canonicalIdentity.providerMessageId,
+              providerThreadId: canonicalIdentity.providerThreadId,
+            } : {}),
             owner: normalize(sendOwner),
             providerOwner: normalize(sendOwner),
             messageKey: String(contextAtSend?.messageKey || '').trim(),
@@ -897,7 +925,10 @@
       else if (action === 'undo-spelling') undoSpelling();
       else if (action === 'toggle-copy-fields') options.compose.toggleCopyFields();
       else if (action === 'choose-attachments') documentRef?.getElementById('c-attachments')?.click();
-      else if (action === 'remove-attachment') options.compose.removeAttachment(id);
+      else if (action === 'remove-attachment') {
+        options.compose.removeAttachment(id);
+        void syncAttachmentSender().catch((error) => options.toast(String(error?.message || error)));
+      }
       else if (action === 'reply-mail') reply(options.findMail(id), actionContext.messageKey);
       else if (action === 'new-message') newMessage(options.findMail(id), actionContext.messageKey);
       else return false;

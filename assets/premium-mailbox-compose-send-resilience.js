@@ -188,7 +188,7 @@
       conversationId: normalizeText(replyIdentity.conversationId || context.conversationId),
       replyTargetMessageId,
       references: isReply ? normalizeText(context.references) : '',
-      providerThreadId: !isReply ? '' : normalizeText(
+      providerThreadId: !isReply || provider !== 'instantly' ? '' : normalizeText(
         payload?.providerThreadId || replyIdentity.providerThreadId || ''
       ),
     };
@@ -668,7 +668,14 @@
         outcome.inFlight += 1;
         continue;
       }
-      const attemptPayload = { ...payloadBase, idempotencyKey: marker.idempotencyKey };
+      let attemptPayload = { ...payloadBase, idempotencyKey: marker.idempotencyKey };
+      if (payloadBase.replyTransport === 'smtp' && marker.reconcileProof.provider === 'instantly') {
+        attemptPayload = {
+          ...attemptPayload, provider: 'instantly', account: marker.reconcileProof.accountEmail,
+          providerMessageId: marker.reconcileProof.replyTargetMessageId,
+          providerThreadId: marker.reconcileProof.providerThreadId,
+        };
+      }
       let preflight;
       try {
         preflight = await runPreflight(

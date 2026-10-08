@@ -263,6 +263,43 @@ function createProtocol(options = {}) {
   });
 }
 
+for (const previousStatus of ['processing', 'failed']) test(`SMTP attachment fallback reconciles an Instantly ${previousStatus} reply before any new upload or dispatch`, async () => {
+  const storage = new MemoryStorage();
+  const replyIdentity = {
+    version: 1, provider: 'instantly', owner: 'serve', accountEmail: 'serve@websoftora.com',
+    providerAccountEmail: 'serve@websoftora.com', providerMessageId: 'provider-incoming',
+    providerThreadId: 'provider-thread', sourceMessageId: '<Inbound.Case@Example.nl>',
+    conversationId: 'Conversation:CaseSensitive',
+  };
+  const original = basePayload({ account: replyIdentity.accountEmail, provider: 'instantly', replyIdentity,
+    providerMessageId: replyIdentity.providerMessageId, providerThreadId: replyIdentity.providerThreadId });
+  const reconcileProof = { ...preflightResult(original).reconcileProof,
+    replyTargetMessageId: original.providerMessageId, references: original.providerMessageId };
+  await seedMarker({ storage, payload: original, state: 'dispatching', reconcileProof });
+  const fallback = { ...original, account: 'serve@softora.nl', provider: 'smtp', replyTransport: 'smtp' };
+  delete fallback.providerMessageId;
+  delete fallback.providerThreadId;
+  const requests = [];
+  const protocol = createProtocol({ storage, fetch: async (url, request) => {
+    requests.push(url);
+    assert.ok(url.endsWith('/preflight'));
+    const body = parseRequest(request);
+    if (requests.length > 1) {
+      assert.equal(previousStatus, 'failed');
+      assert.equal(body.provider, 'smtp');
+      const error = new Error('Stop before new SMTP preflight');
+      error.code = 'TEST_NEW_SMTP_PREFLIGHT';
+      throw error;
+    }
+    assert.equal(body.reconcileProof.provider, 'instantly');
+    return response(200, { ok: true, result: preflightResult(body, previousStatus) });
+  } });
+  await assert.rejects(protocol.execute({ payload: fallback, attachments: [],
+    uploadAttachments: async () => { throw new Error('No new upload while the original reply is uncertain'); },
+  }), { code: previousStatus === 'failed' ? 'TEST_NEW_SMTP_PREFLIGHT' : 'MAILBOX_SEND_UNRESOLVED_SCOPE_CONFLICT' });
+  assert.equal(requests.length, previousStatus === 'failed' ? 2 : 1);
+});
+
 function createRealFollowupPreflight(payload, storedMessage) {
   const previewStore = createMailboxSendProvenanceStore();
   let latestIntent;

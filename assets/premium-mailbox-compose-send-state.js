@@ -311,6 +311,7 @@
       account: normalize(payload?.account),
       owner: normalize(payload?.owner),
       provider: normalize(payload?.provider) || 'smtp',
+      ...(payload?.replyTransport ? { replyTransport: normalize(payload.replyTransport) } : {}),
       mode: normalize(payload?.mode),
       providerMessageId: normalizeText(payload?.providerMessageId),
       providerThreadId: normalizeText(payload?.providerThreadId),
@@ -373,6 +374,13 @@
 
   async function createLocalScopeFingerprint(payload, options = {}) {
     const canonical = canonicalFingerprintPayload(payload, []);
+    // Reconcile an uncertain attempt in the original thread before switching delivery.
+    if (canonical.replyTransport === 'smtp' && canonical.replyIdentity.provider === 'instantly') {
+      canonical.account = canonical.replyIdentity.accountEmail;
+      canonical.provider = 'instantly';
+      canonical.providerMessageId = canonical.replyIdentity.providerMessageId;
+      canonical.providerThreadId = canonical.replyIdentity.providerThreadId;
+    }
     return sha256Hex(JSON.stringify({
       account: canonical.account,
       owner: canonical.owner,
