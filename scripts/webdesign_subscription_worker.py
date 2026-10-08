@@ -62,6 +62,12 @@ def require_storage():
     if free < 2 * 1024 ** 3:
         raise LocalCapacity('Nieuwe ontwerpen wachten: minder dan 2 GiB schijfruimte vrij.')
 
+def keep_storage_wait_alive(state, slot):
+    if state.get('job') and time.time() - state.get('storageHeartbeatAt', 0) >= 60:
+        check_job_active(state['job'])
+        state['storageHeartbeatAt'] = time.time()
+        write_state(state, slot)
+
 def bootstrap_failed(folder):
     """A failed CLI start with no model items may retry once, never an uncertain tool run."""
     if any((folder / name).exists() for name in ('design.png', 'design.jpg', 'answer.json', 'startup-retry')):
@@ -469,7 +475,11 @@ def step(slot=0):
     if state.get('phase') not in ('generating', 'deliver'):
         if state.get('phase') == 'prepare' and state.get('retryAt', 0) > time.time():
             return
-        require_storage()
+        try:
+            require_storage()
+        except LocalCapacity:
+            keep_storage_wait_alive(state, slot)
+            raise
     # Quota pauses new image work; already generated results must still upload.
     if state.get('phase') not in ('generating', 'deliver') and subscription_paused():
         return
@@ -504,7 +514,9 @@ def step(slot=0):
                 try:
                     require_storage()
                 except LocalCapacity:
-                    save({'phase': 'generating', 'job': job})
+                    waiting = {'phase': 'generating', 'job': job}
+                    keep_storage_wait_alive(waiting, slot)
+                    save(waiting)
                     return
                 restore_native_result(folder)
             if bootstrap_failed(folder):
@@ -534,6 +546,7 @@ def step(slot=0):
             encode_result(folder)
             state['error'] = False
         except LocalCapacity:
+            keep_storage_wait_alive(state, slot)
             return  # Keep the generation checkpoint until its image can be saved.
         except Exception:
             state['error'] = True

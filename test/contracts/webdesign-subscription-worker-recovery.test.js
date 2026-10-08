@@ -34,10 +34,16 @@ except w.LocalCapacity: pass
 else: raise AssertionError('Full disk must stop before claiming work')
 assert not w.state_file().exists()
 w.write_state({'phase':'prepare','job':job})
+heartbeats=[]
+w.call=lambda route,payload:(heartbeats.append((route,payload)) or {'ok':True,'allowed':True})
 try: w.step()
 except w.LocalCapacity: pass
 else: raise AssertionError('Full disk must retain preparation')
 assert state()['phase'] == 'prepare'
+assert len(heartbeats)==1 and heartbeats[0][1]['heartbeatJobId']==job['id']
+try:w.step()
+except w.LocalCapacity:pass
+assert len(heartbeats)==1
 folder=w.BASE / job['id']; folder.mkdir(); (folder / 'design.jpg').write_bytes(b'saved')
 w.write_state({'phase':'deliver','job':job})
 reports=[]
@@ -152,9 +158,11 @@ test('low storage during recovery preserves the generation checkpoint rather tha
 w.write_state({'phase':'generating','job':job})
 w.generation_running=lambda folder:False
 w.encode_result=lambda folder:(_ for _ in ()).throw(w.LocalCapacity('disk pressure'))
-w.call=forbidden
+heartbeats=[]
+w.call=lambda route,payload:(heartbeats.append(payload) or {'ok':True,'allowed':True})
 w.step()
 assert state()['phase']=='generating'
+assert heartbeats[0]['heartbeatJobId']==job['id']
 `));
 
 test('an incomplete capture rejected before imagegen recovers once using the other provider', () => worker(`
