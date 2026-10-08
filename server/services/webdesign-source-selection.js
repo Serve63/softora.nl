@@ -19,6 +19,9 @@ function sourceHold(row) {
   if (/^De beeldgenerator heeft dit ontwerp geweigerd via het veiligheidsfilter\./.test(message)) {
     return recheck('De beeldgenerator weigerde dit ontwerp via het veiligheidsfilter.');
   }
+  if (/^De screenshotdiensten leverden na drie pogingen/.test(message)) {
+    return { duration: TEMPORARY_MS, reason: 'Screenshotdiensten tijdelijk niet beschikbaar; de website is niet afgekeurd.' };
+  }
   if (/^De homepage-screenshot is geblokkeerd(?:, leeg)? of onleesbaar\./.test(message)) {
     return recheck('Het homepage-bronbeeld was geblokkeerd, leeg of onleesbaar.');
   }

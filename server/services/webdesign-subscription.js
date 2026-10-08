@@ -85,6 +85,8 @@ function createWebdesignSubscriptionService({ repository, aiToolsCoordinator, co
       if (body.error) {
         const finished = await repository.finish(body.jobId, body.claim, body.errorKind === 'subscription-limit'
           ? 'Je abonnementlimiet is bereikt. De wachtrij pauzeert en controleert later opnieuw; er wordt geen API gebruikt.'
+          : body.errorKind === 'reference-fetch'
+            ? 'De screenshotdiensten leverden na drie pogingen geen bruikbaar bronbeeld. Dit is een technische ophaalfout; de bedrijfswebsite is niet afgekeurd. Probeer later opnieuw.'
           : body.errorKind === 'source-reference'
             ? 'De homepage-screenshot is geblokkeerd, leeg of onleesbaar. Er is geen webdesign gemaakt of opgeslagen.'
           : body.errorKind === 'image-safety'

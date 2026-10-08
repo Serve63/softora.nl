@@ -49,6 +49,10 @@ class SubscriptionLimit(RuntimeError):
 class SourceUnusable(RuntimeError):
     pass
 
+class ReferenceUnavailable(SourceUnusable):
+    """Screenshot providers did not deliver a usable image after bounded retries."""
+    pass
+
 def reference_blank(reference):
     # Error, loading and security-check pages are almost entirely white; a design
     # made from them invents a brand. Real homepages stay well below this.
@@ -202,33 +206,42 @@ def subscription_environment():
     return result
 
 def download_reference(job, folder):
-    rejected_reference = False
-    for url in job.get('referenceUrls', []):
-        if not url.startswith(('https://image.thum.io/get/', 'https://s0.wordpress.com/mshots/v1/')):
-            continue
-        try:
-            with urlopen(Request(url, headers={'User-Agent': 'Softora-Webdesign/1.0'}), timeout=90) as response:
-                data = response.read(6_000_001)
-            if len(data) > 6_000_000 or not (data.startswith(b'\x89PNG') or data.startswith(b'\xff\xd8')):
-                rejected_reference = True
+    # Providers may initially return GIF/HTML loading placeholders or blank captures.
+    # These are transport failures, not evidence that the business website is bad.
+    attempts = []
+    for round_index, delay in enumerate((0, 5, 15)):
+        if delay:
+            time.sleep(delay)
+            check_job_active(job)
+        for provider, url in enumerate(job.get('referenceUrls', [])):
+            if not url.startswith(('https://image.thum.io/get/', 'https://s0.wordpress.com/mshots/v1/')):
                 continue
-            reference = folder / 'homepage-reference.png'
-            reference.write_bytes(data)
-            # A valid image response can still contain a 403/loading page.
-            # Try the remaining reference provider before rejecting the source.
+            evidence = {'round': round_index + 1, 'provider': provider}
             try:
-                if reference_blank(reference):
-                    rejected_reference = True
-                    continue
-            except SourceUnusable:
-                rejected_reference = True
-                continue
-            return reference
-        except Exception:
-            continue
-    if rejected_reference:
-        raise SourceUnusable('Geen van de homepage-bronbeelden is bruikbaar.')
-    raise RuntimeError('Geen bruikbaar homepage-bronbeeld beschikbaar.')
+                with urlopen(Request(url, headers={'User-Agent': 'Softora-Webdesign/1.0'}), timeout=90) as response:
+                    evidence['status'] = getattr(response, 'status', None)
+                    data = response.read(6_000_001)
+                evidence['bytes'] = len(data)
+                if len(data) > 6_000_000:
+                    evidence['result'] = 'too-large'
+                elif not (data.startswith(b'\x89PNG') or data.startswith(b'\xff\xd8')):
+                    evidence['result'] = 'not-png-or-jpeg'
+                else:
+                    reference = folder / 'homepage-reference.png'
+                    reference.write_bytes(data)
+                    evidence['result'] = 'blank' if reference_blank(reference) else 'ready'
+            except Exception as error:
+                evidence['result'] = type(error).__name__
+                if isinstance(error, HTTPError):
+                    evidence['status'] = error.code
+            attempts.append(evidence)
+            audit = folder / 'reference-attempts.json'
+            with audit.open('w') as stream:
+                os.chmod(audit, 0o600)
+                json.dump(attempts, stream)
+            if evidence['result'] == 'ready':
+                return reference
+    raise ReferenceUnavailable('Screenshotdiensten leverden na drie pogingen geen bruikbaar bronbeeld.')
 
 def generate(job, folder, slot=0):
     # Do not keep retrying reference downloads for a cancelled/expired job.
@@ -313,7 +326,9 @@ def step(slot=0):
                 # Network/auth preparation may retry without another image request.
                 raise
             state['error'] = not (folder / 'design.png').is_file()
-            if isinstance(error, SourceUnusable):
+            if isinstance(error, ReferenceUnavailable):
+                state['referenceUnavailable'] = True
+            elif isinstance(error, SourceUnusable):
                 state['sourceUnusable'] = True
             if isinstance(error, SubscriptionLimit):
                 state['limit'] = True
@@ -341,6 +356,8 @@ def step(slot=0):
         payload['error'] = 'Codex-generatie onderbroken of niet beschikbaar.'
         if state.get('limit'):
             payload['errorKind'] = 'subscription-limit'
+        elif state.get('referenceUnavailable'):
+            payload['errorKind'] = 'reference-fetch'
         elif state.get('sourceUnusable') or source_reference_blocked(folder):
             payload['errorKind'] = 'source-reference'
         elif image_safety_blocked(folder):

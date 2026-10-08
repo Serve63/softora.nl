@@ -26,6 +26,8 @@ folder = w.BASE / job['id']; folder.mkdir()
 urls = ['https://image.thum.io/get/fixture', 'https://s0.wordpress.com/mshots/v1/fixture']
 job['referenceUrls'] = urls
 calls = []
+w.time.sleep = lambda seconds: None
+w.check_job_active = lambda job: None
 class Response:
  def __init__(self, data): self.data = data
  def __enter__(self): return self
@@ -41,13 +43,12 @@ assert calls == urls and reference.read_bytes() == b'\\x89PNGhomepage'
 w.reference_blank = lambda reference: True
 calls.clear()
 try: w.download_reference(job, folder)
-except w.SourceUnusable: pass
-else: raise AssertionError('Two rejected reference images must stop before generation')
-assert calls == urls
+except w.ReferenceUnavailable: pass
+else: raise AssertionError('Rejected references must stop before generation after bounded retries')
+assert calls == urls * 3
 w.urlopen = lambda *args, **kwargs: (_ for _ in ()).throw(TimeoutError('offline'))
 try: w.download_reference(job, folder)
-except w.SourceUnusable: raise AssertionError('A provider outage must remain retryable')
-except RuntimeError: pass
+except w.ReferenceUnavailable: pass
 else: raise AssertionError('No reference may not start generation')
 `));
 
@@ -310,4 +311,54 @@ current = b'invalid'
 try: w.native_reference_blank(reference)
 except w.SourceUnusable: pass
 else: raise AssertionError('Unreadable source must not be silently accepted')
+`));
+
+
+test('loading placeholders recover after backoff without starting image generation', () => worker(`
+folder = w.BASE / job['id']; folder.mkdir()
+job['referenceUrls'] = ['https://image.thum.io/get/fixture', 'https://s0.wordpress.com/mshots/v1/fixture']
+calls, sleeps, heartbeats = [], [], []
+class Response:
+ def __enter__(self): return self
+ def __exit__(self, *args): pass
+ def read(self, limit): return b'GIF89a loading' if len(calls) <= 2 else b'\\x89PNGready'
+w.urlopen = lambda request, **kw: (calls.append(request.full_url) or Response())
+w.time.sleep = sleeps.append
+w.check_job_active = lambda job: heartbeats.append(job['id'])
+result = w.download_reference(job, folder)
+assert result.read_bytes() == b'\\x89PNGready'
+assert len(calls) == 3 and sleeps == [5] and heartbeats == [job['id']]
+audit = json.loads((folder / 'reference-attempts.json').read_text())
+assert [item['result'] for item in audit] == ['not-png-or-jpeg', 'not-png-or-jpeg', 'ready']
+assert audit[-1]['round'] == 2
+`));
+
+test('cancellation during screenshot backoff stops before another fetch or generation', () => worker(`
+folder = w.BASE / job['id']; folder.mkdir()
+job['referenceUrls'] = ['https://image.thum.io/get/fixture']
+calls = []
+def offline(*args, **kwargs): calls.append('fetch'); raise TimeoutError()
+w.urlopen = offline
+w.time.sleep = lambda seconds: None
+w.check_job_active = lambda job: (_ for _ in ()).throw(w.JobStopped('cancelled'))
+try: w.download_reference(job, folder)
+except w.JobStopped: pass
+else: raise AssertionError('Cancellation must stop retries')
+assert calls == ['fetch']
+`));
+
+test('exhausted screenshot transport reports a technical failure and preserves it across upload retry', () => worker(`
+w.write_state({'phase': 'prepare', 'job': job})
+w.generate = lambda *args: (_ for _ in ()).throw(w.ReferenceUnavailable('providers offline'))
+w.call = lambda *args: (_ for _ in ()).throw(TimeoutError())
+try: w.step()
+except TimeoutError: pass
+assert state()['phase'] == 'deliver' and state()['referenceUnavailable'] is True
+assert not state().get('sourceUnusable')
+reports = []
+w.generate = forbidden
+w.call = lambda route, payload: (reports.append(payload) or {'ok': True, 'done': True})
+w.step()
+assert reports[0]['errorKind'] == 'reference-fetch' and 'dataUrl' not in reports[0]
+assert state() == {}
 `));
