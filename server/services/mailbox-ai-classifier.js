@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
-const { restoreMailboxParagraphs } = require('./mailbox-provider-rich-body');
+const { restoreMailboxDisplayLayout } = require('./mailbox-ai-layout');
 const { readUsage, mergeUsage } = require('./mailbox-ai-usage');
 const contract = require('../../assets/premium-mailbox-ai-presentation');
 const { buildRemovalReview, applyRemovalReview } = require('./mailbox-ai-removal-review');
@@ -108,7 +108,7 @@ function createMailboxAiClassifier({ getApiKey, fetchImpl = globalThis.fetch, ti
       }
     }
     try {
-      const source = { ...originalSource, body: restoreMailboxParagraphs(originalSource.body, originalSource.html) };
+      const source = { ...originalSource, body: restoreMailboxDisplayLayout(originalSource) };
       const request = buildRequest(source), first = await trackedRequest(request);
       const lines = contract.linesOf(source.body), selected = first.value?.signatureLines;
       if (!Array.isArray(selected) || !Array.isArray(first.value?.contacts) || first.value.contacts.length > 40)

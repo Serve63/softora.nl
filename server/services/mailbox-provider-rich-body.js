@@ -170,13 +170,49 @@ function parseProviderHtml(value, { includeImageLabels = false, includeLinkTarge
 
 // Restore only whitespace proven by the corresponding HTML. A divergent plain-text
 // alternative must never be replaced by HTML content, even when HTML looks nicer.
-function restoreMailboxParagraphs(body, html) {
+function restoreMailboxParagraphs(body, html, { allowHtmlOnlyLines = false } = {}) {
   const original = String(body || '');
   if (!html || !original.trim()) return original;
-  const formatted = parseProviderHtml(html, { includeLinkTargets: false }).body;
+  let formatted = parseProviderHtml(html, { includeLinkTargets: false }).body;
   const compact = (value) => String(value).replace(/\s/g, '');
+  // Display-only recovery: a plain alternative may omit complete HTML-only
+  // footer blocks. Match every plain character to whole HTML lines in order;
+  // never import those extra blocks or accept changed/partial line contents.
+  if (allowHtmlOnlyLines && compact(formatted) !== compact(original)) {
+    const target = compact(original), lines = formatted.split('\n');
+    const rows = lines.flatMap((line, index) => compact(line) ? [{ line, index, key: compact(line) }] : []);
+    function align(reverse) {
+      const selected = [], ordered = reverse ? rows.slice().reverse() : rows;
+      let offset = reverse ? target.length : 0;
+      for (const row of ordered) {
+        const start = reverse ? offset - row.key.length : offset;
+        if (start < 0 || target.slice(start, start + row.key.length) !== row.key) continue;
+        selected.push(row);
+        offset = reverse ? start : offset + row.key.length;
+      }
+      return offset === (reverse ? 0 : target.length) ? (reverse ? selected.reverse() : selected) : null;
+    }
+    const forward = align(false), backward = align(true);
+    if (!forward || !backward || forward.length !== backward.length ||
+      forward.some((row, i) => row.index !== backward[i].index)) return original;
+    formatted = forward.map((row, i) => `${i ? (row.index === forward[i - 1].index + 1 ? '\n' : '\n\n') : ''}${row.line}`).join('');
+  }
+  if (compact(formatted) !== compact(original)) return original;
+  if (allowHtmlOnlyLines) {
+    const breaks = (value) => {
+      let offset = 0;
+      const positions = new Set();
+      for (const token of value.match(/\S+|\s+/g) || []) {
+        if (/\S/.test(token)) offset += token.length;
+        else if (token.includes('\n')) positions.add(offset);
+      }
+      return positions;
+    };
+    const existing = breaks(original);
+    return [...breaks(formatted)].some((offset) => !existing.has(offset)) ? formatted : original;
+  }
   const repairsJoinedWords = formatted.split(/\s+/).length > original.trim().split(/\s+/).length;
-  return repairsJoinedWords && compact(formatted) === compact(original) ? formatted : original;
+  return repairsJoinedWords ? formatted : original;
 }
 
 module.exports = {

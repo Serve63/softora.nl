@@ -127,7 +127,7 @@ test('reopening the visible conversation never downgrades it to a version withou
 test('the Mailbox wires the detail snapshot before its page script and captures every complete conversation', () => {
   const repoRoot = path.join(__dirname, '../..');
   const page = fs.readFileSync(path.join(repoRoot, 'premium-mailbox.html'), 'utf8');
-  const adapter = page.indexOf('assets/premium-mailbox-detail-snapshot.js?v=20261006a');
+  const adapter = page.indexOf('assets/premium-mailbox-detail-snapshot.js?v=20261008a');
   assert.ok(page.indexOf('assets/premium-readmodel-store.js?v=20260924c') < adapter);
   assert.ok(page.indexOf('assets/premium-screen-snapshot.js?v=20260924b') < adapter);
   assert.ok(adapter < page.indexOf('assets/premium-mailbox.js?v=20261007a'));
@@ -299,10 +299,10 @@ test('prepared views reject partial/error screens, expire, and evict to a fixed 
 });
 
 
-test('prepared HTML from before the quote-proof correction is never restored after reload', async () => {
+test('prepared HTML from before quote-proof and paragraph recovery is never restored after reload', async () => {
   const h = preparedHarness();
   const view = 'outreach|serve||account|inbox:1';
-  h.records.set('mailbox-prepared-views:v1', { owner: 'serve', value: {
+  for (const key of ['mailbox-prepared-views:v1', 'mailbox-prepared-views:v2']) h.records.set(key, { owner: 'serve', value: {
     entries: [[view, { html: '<article>Old unfiltered quoted history</article>', at: 1000 }]],
   } });
   const current = h.create(); await current.ready;

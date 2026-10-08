@@ -18,7 +18,7 @@
     });
     const identity = getIdentity();
     // Previous rendered HTML can contain quotes that the current renderer now proves.
-    const key = 'mailbox-prepared-views:v2';
+    const key = 'mailbox-prepared-views:v3';
     const maxTotalChars = 3_000_000;
     const maxAgeMs = 24 * 60 * 60 * 1000;
     const views = new Map();
@@ -92,7 +92,7 @@
   function instance() {
     if (!snapshot && global.SoftoraScreenSnapshot) {
       snapshot = global.SoftoraScreenSnapshot.create({
-        key: 'premium-mailbox-detail:v2',
+        key: 'premium-mailbox-detail:v3',
         elements: [{ id: 'mail-detail', html: true }],
         inertIds: ['mail-detail'],
         maxChars: MAX_CHARS,

@@ -1,5 +1,5 @@
 'use strict';
-const { restoreMailboxParagraphs } = require('./mailbox-provider-rich-body');
+const { restoreMailboxDisplayLayout, restoreMailboxAiDecision } = require('./mailbox-ai-layout');
 const contract = require('../../assets/premium-mailbox-ai-presentation');
 const { buildSource, buildRequest, createMailboxAiClassifier } = require('./mailbox-ai-classifier');
 const { createMailboxAiRepository } = require('../repositories/mailbox-ai-presentations');
@@ -9,9 +9,9 @@ function createMailboxAiPresentations({ env = {}, getOpenAiApiKey, getSupabaseCl
   const enabled = () => env.MAILBOX_AI_PRESENTATION_ENABLED === 'true';
   const presentation = (source, row) => ({ version: contract.VERSION, model: contract.MODEL,
     reasoningEffort: 'max', status: row?.status === 'ready' ? 'ready' : row?.status === 'failed' || row?.reason ? 'unavailable' : 'pending',
-    ...(row?.status !== 'ready' && source.html ? { displayBody: restoreMailboxParagraphs(source.body, source.html) } : {}),
+    ...(row?.status !== 'ready' && source.html ? { displayBody: restoreMailboxDisplayLayout(source) } : {}),
     gate: row?.gate === true, reason: row?.reason || (!row ? 'storage' : null),
-    ...(row?.status === 'ready' ? { sourceBody: source.body, decision: row.decision } : {}) });
+    ...(row?.status === 'ready' ? { sourceBody: source.body, decision: restoreMailboxAiDecision(source, row.decision) } : {}) });
   function sourceFor(message) {
     const source = buildSource(message);
     if (!source) return null;
