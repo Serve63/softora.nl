@@ -2660,7 +2660,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /lastPhotoHeaderCount: null/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20261008-design-date/);
   assert.match(pageSource, /assets\/premium-database-webdesign-variant-picker\.js\?v=20260925-v2-only/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261008-lazy-loading/);
   assert.doesNotMatch(webdesignVariantPickerScriptSource, /v1-prompt-only|V1_VARIANT/);
   assert.doesNotMatch(webdesignActionScriptSource, /v1-prompt-only/);
   assert.match(webdesignVariantPickerScriptSource, /V2_VARIANT = "v2-visual-dna"/);
@@ -2921,7 +2921,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   );
   assert.match(pageSource, /assets\/premium-database-photo-batch\.js\?v=20261006-simple/);
   assert.match(pageSource, /assets\/premium-database-webdesign-asset-state\.js\?v=20261008-design-date/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261008-lazy-loading/);
   assert.match(pageSource, /assets\/premium-database-webdesign-preview\.js\?v=20260909-mailsysteem/);
   assert.match(pageSource, /assets\/softora-api-cost-ledger\.js\?v=20260428a/);
   assert.match(pageSource, /assets\/premium-database-photo-storage\.js\?v=20261008-design-date/);
@@ -3080,7 +3080,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /renderPage: scheduleRenderPage/);
   assert.match(webdesignActionScriptSource, /const JOB_ENDPOINT = "\/api\/premium-database\/webdesign-photo-jobs";/);
   assert.match(pageSource, /assets\/premium-database-webdesign-bulk\.js\?v=20261007-source-retry/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261008-lazy-loading/);
   assert.match(webdesignActionScriptSource, /const variant = await picker\.choose\(\);/);
   assert.match(webdesignActionScriptSource, /De V2-webdesigngenerator kon niet worden geladen/);
   assert.match(webdesignActionScriptSource, /normalizeString\(variant\)\.toLowerCase\(\) !== "v2-visual-dna"/);
@@ -3122,7 +3122,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /refreshPhotos: async function \(context\) \{ await loadMailReadySnapshot\(\);/);
   assert.doesNotMatch(pageSource, /refreshPhotos: async function \(context\) \{ const photoMap = await loadCustomerPhotoMap/);
   assert.match(pageSource, /assets\/premium-database-instantly-status\.js\?v=20260923-current-campaigns/);
-  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
+  assert.match(pageSource, /assets\/premium-database-webdesign-action\.js\?v=20261008-lazy-loading/);
   assert.doesNotMatch(webdesignActionScriptSource, /webdesigns klaar en naar Mailklaar verplaatst|Webdesign klaar\. De lead staat nu bij Mailklaar\./);
   assert.match(webdesignActionScriptSource, /costReporter\.consume\(customerIds\)/);
   assert.match(pageSource, /const databaseRenderRuntime = \{ searchHaystackCache: new WeakMap\(\), activeAssetCache: null, scheduledRender: false, searchRenderTimer: null, tableStructureSignature: null \}; const databaseSortedLists = window\.SoftoraDatabaseSortedLists\.create/);
@@ -5255,6 +5255,37 @@ test('premium database webdesign action ignores stale fallback timers from repla
   });
   assert.doesNotMatch(refreshedHtml, /class="photo-fallback-icon"/);
   assert.match(refreshedHtml, /data-photo-loaded="true"/);
+});
+
+test('lazy database previews wait for scrolling and still handle actual image errors', () => {
+  const timers = [];
+  const client = loadDatabaseWebdesignActionClient({ setTimeout(handler) { timers.push(handler); return timers.length; }, clearTimeout() {} });
+  const controller = client.createController({ state: { klanten: [] }, escapeHtml: String,
+    shouldShowWebsitePhoto: () => true, isValidWebsitePhotoDataUrl: (value) => /^https:\/\//.test(value),
+    resolveCustomerWebsiteUrl: () => '', isWebdesignPhotoEligible: () => false,
+    openWebsitePhotoPreview() {}, setStatusMessage() {}, renderPage() {}, refreshPhotos: async () => {},
+  });
+  for (const outcome of ['load', 'error']) {
+    const customer = { id: outcome, websitePhoto: `https://media.test/${outcome}.png` };
+    const key = controller.render(customer).match(/data-photo-key="([^"]+)"/)[1];
+    const attrs = new Map([['data-photo-key', key], ['data-photo-loaded', 'false'], ['data-photo-error', 'false']]);
+    const listeners = {};
+    const image = { loading: 'lazy', complete: false, naturalWidth: 0,
+      addEventListener(event, handler) { listeners[event] = handler; } };
+    const drop = { querySelector: (selector) => selector === '.photo-drop-image' ? image : null,
+      getAttribute: (name) => attrs.get(name) || '', setAttribute: (name, value) => attrs.set(name, String(value)),
+      removeAttribute: (name) => attrs.delete(name), insertAdjacentHTML() {},
+    };
+    const before = timers.length;
+    controller.hydratePhotoDrops({ querySelectorAll: () => [drop] });
+    assert.equal(timers.length, before, 'a deferred lazy image must not start a failure timer before scrolling');
+    assert.equal(attrs.get('data-photo-error'), 'false');
+    image.complete = true;
+    image.naturalWidth = outcome === 'load' ? 1024 : 0;
+    listeners[outcome]();
+    assert.equal(attrs.get('data-photo-loaded'), 'true');
+    assert.equal(attrs.get('data-photo-error'), String(outcome === 'error'));
+  }
 });
 
 test('premium database page combines contact filters into one benaderd step', () => {

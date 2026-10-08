@@ -276,7 +276,7 @@
             drop.setAttribute("data-photo-loading-bound", "true");
             image.addEventListener("load", onLoad, { once: true });
             image.addEventListener("error", fail, { once: true });
-            startFallbackTimer();
+            if (image.loading !== "lazy") startFallbackTimer();
         }
 
         function hydratePhotoDrops(root) {
