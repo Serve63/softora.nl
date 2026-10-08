@@ -10,6 +10,7 @@
     const documentRef = options.document || global.document;
     let generation = 0;
     let loading = false;
+    let ownerFilter = '';
     const field = () => documentRef?.getElementById('c-from');
     const row = () => documentRef?.getElementById('compose-from-field');
 
@@ -18,7 +19,8 @@
       return (options.getAccounts?.() || []).flatMap((account) => {
         const email = normalize(account.email);
         const owner = normalize(options.campaignInbox?.getOwnerByAccount?.(email));
-        if (!email || seen.has(email) || account.smtpConfigured !== true || !['serve', 'martijn'].includes(owner)) return [];
+        if (!email || seen.has(email) || account.smtpConfigured !== true || !['serve', 'martijn'].includes(owner)
+          || (ownerFilter && owner !== ownerFilter)) return [];
         seen.add(email);
         return [{ accountEmail: email, owner }];
       });
@@ -27,6 +29,7 @@
     function reset() {
       generation += 1;
       loading = false;
+      ownerFilter = '';
       if (row()) row().hidden = true;
       if (field()) {
         field().innerHTML = '<option value="">Kies afzender</option>';
@@ -35,8 +38,9 @@
       }
     }
 
-    async function open() {
+    async function open(selection = {}) {
       const requestGeneration = ++generation;
+      ownerFilter = normalize(selection.owner);
       if (!row() || !field()) throw new Error('De afzenderkeuze ontbreekt; vernieuw de mailbox.');
       row().hidden = false;
       loading = true;
@@ -49,7 +53,8 @@
         const accounts = getAccounts();
         field().innerHTML = `<option value="">${accounts.length ? 'Kies afzender' : 'Geen verzendmailbox beschikbaar'}</option>`
           + accounts.map((account) => `<option value="${escapeHtml(account.accountEmail)}">${escapeHtml(account.accountEmail)}</option>`).join('');
-        field().value = '';
+        const preferred = normalize(selection.preferredAccount);
+        field().value = accounts.some((account) => account.accountEmail === preferred) ? preferred : '';
         loading = false;
         field().disabled = !accounts.length;
       } catch (error) {

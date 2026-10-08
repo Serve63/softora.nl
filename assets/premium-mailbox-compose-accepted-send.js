@@ -56,14 +56,15 @@
         getCanonicalMessageIdentities(message).size === 0;
     }
 
-    function recordMatchesMailScope(record, mail) {
+    function recordMatchesMailScope(record, mail, includeReplySource = false) {
       if (!record || !mail) return false;
       const recordAccount = normalize(record.accountEmail);
       const recordOwner = normalize(record.owner);
       const mailAccount = normalize(mail.accountEmail);
       const mailOwner = normalize(options.campaignInbox?.getMessageOwner?.(mail));
       if (!recordAccount || !recordOwner || !mailAccount || !mailOwner) return false;
-      return recordAccount === mailAccount && recordOwner === mailOwner;
+      return recordOwner === mailOwner && (recordAccount === mailAccount
+        || (includeReplySource && record.mode === 'reply' && normalize(record.sourceAccountEmail) === mailAccount));
     }
 
     function candidateMatchesRecordScope(record, candidate) {
@@ -94,7 +95,7 @@
 
     function recordMatchesMail(record, mail) {
       if (!record || !mail) return false;
-      if (!recordMatchesMailScope(record, mail)) return false;
+      if (!recordMatchesMailScope(record, mail, true)) return false;
       const sourceMailId = String(record.sourceMailId || '').trim();
       if (sourceMailId && sourceMailId === String(mail.id || '').trim()) return true;
       const keys = getConversationKeys(mail);

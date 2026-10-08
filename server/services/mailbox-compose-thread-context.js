@@ -86,7 +86,7 @@ function createMailboxComposeThreadContext(deps = {}) {
     };
   }
 
-  async function resolveReplyIdentity({ body = {}, accountEmail, recipientEmail, provider = 'smtp', mode = 'reply' } = {}) {
+  async function resolveReplyIdentity({ body = {}, accountEmail, recipientEmail, provider = 'smtp', mode = 'reply', includeStoredMessage = false } = {}) {
     const normalizedMode = normalizeText(mode || body.mode || 'reply').toLowerCase();
     const identity = normalizeReplyIdentity(body, provider);
     if (normalizedMode !== 'reply') {
@@ -135,6 +135,7 @@ function createMailboxComposeThreadContext(deps = {}) {
         senderName: owner === 'martijn' ? 'Martijn van de Ven' : 'Servé Creusen',
         accountEmail: providerAccountEmail,
         providerAccountEmail,
+        ...(includeStoredMessage ? { storedMessage: stored } : {}),
       };
     }
     const account = identity.accountEmail || normalizeEmail(accountEmail || body.account);
@@ -197,7 +198,7 @@ function createMailboxComposeThreadContext(deps = {}) {
     const mode = normalizeText(body.mode || 'new-message').toLowerCase();
     if (!['reply', 'new-message'].includes(mode)) throw inputError('Ongeldige verzendmodus.', 'MAILBOX_SEND_MODE_INVALID');
     const recipient = normalizeEmail(recipientEmail);
-    const replyIdentity = await resolveReplyIdentity({ body, accountEmail, recipientEmail, provider, mode });
+    const replyIdentity = await resolveReplyIdentity({ body, accountEmail, recipientEmail, provider, mode, includeStoredMessage: true });
     const account = replyIdentity.accountEmail;
     const { owner, senderName } = replyIdentity;
     const context = body.context && typeof body.context === 'object' ? body.context : {};
@@ -217,6 +218,27 @@ function createMailboxComposeThreadContext(deps = {}) {
       const providerThreadId = replyIdentity.providerThreadId;
       if (!providerMessageId || !providerThreadId) {
         throw inputError('De exacte Instantly-thread ontbreekt.', 'INSTANTLY_REPLY_THREAD_REQUIRED', 409);
+      }
+      if (body.replyTransport === 'smtp') {
+        const smtpAccount = normalizeEmail(body.account);
+        const smtpIdentity = resolveOwner(smtpAccount, owner);
+        const stored = replyIdentity.storedMessage;
+        const messageId = normalizeMessageId(stored?.messageId);
+        const clientMessageId = normalizeMessageId(replyIdentity.sourceMessageId);
+        if (getMailboxMessageDirection(stored) !== 'received'
+          || normalizeEmail(stored?.email) !== recipient
+          || !/^<[^<>\s@]+@[^<>\s@]+>$/.test(messageId)
+          || (clientMessageId && clientMessageId !== messageId)) {
+          throw inputError('Het ontvangen Instantly-bericht kan niet veilig als mailboxantwoord worden gebruikt.', 'MAILBOX_REPLY_TARGET_MISMATCH', 409);
+        }
+        const references = Array.from(new Set([
+          ...parseReferences(stored.references), ...parseReferences(stored.inReplyTo), messageId,
+        ])).join(' ');
+        return {
+          ...base, accountEmail: smtpAccount, senderName: smtpIdentity.senderName,
+          provider: 'smtp', providerThreadId: '', replyTargetMessageId: messageId,
+          references, correspondenceSourceMessageId: messageId,
+        };
       }
       return { ...base, provider: 'instantly', providerThreadId, replyTargetMessageId: providerMessageId, references: providerMessageId };
     }
@@ -271,16 +293,18 @@ function createMailboxComposeThreadContext(deps = {}) {
     const recipient = normalizeEmail(recipientEmail || body.to);
     const context = body.context && typeof body.context === 'object' ? body.context : {};
     const replyIdentity = normalizeReplyIdentity(body, provider);
-    if (mode === 'reply' && replyIdentity.provider === 'instantly') {
+    const smtpInstantlyReply = mode === 'reply' && replyIdentity.provider === 'instantly'
+      && body.replyTransport === 'smtp';
+    if (mode === 'reply' && replyIdentity.provider === 'instantly' && !smtpInstantlyReply) {
       throw inputError(
         'Instantly ondersteunt geen bijlagen bij antwoorden.',
         'INSTANTLY_ATTACHMENTS_UNSUPPORTED'
       );
     }
-    const account = mode === 'reply'
+    const account = mode === 'reply' && !smtpInstantlyReply
       ? normalizeEmail(replyIdentity.accountEmail || accountEmail || body.account)
       : normalizeEmail(accountEmail || body.account);
-    const resolved = resolveOwner(account, body.owner);
+    const resolved = resolveOwner(account, smtpInstantlyReply ? replyIdentity.owner : body.owner);
     const conversationId = normalizeText(
       mode === 'reply' ? replyIdentity.conversationId || context.conversationId : context.conversationId
     ).slice(0, 2000);
