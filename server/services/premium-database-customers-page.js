@@ -47,6 +47,7 @@ function createPremiumDatabaseCustomersPageCoordinator(deps = {}) {
         identityKey: normalizeString(row.identityKey),
         websitePhoto: normalizeString(row.websitePhotoUrl),
         websitePhotoName: normalizeString(row.fileName),
+        websitePhotoCreatedAt: normalizeString(row.websitePhotoCreatedAt),
         websiteMockup: normalizeString(row.websiteMockupUrl),
         websiteMockupName: normalizeString(row.websiteMockupName),
         signedUrlExpiresAt: normalizeString(row.signedUrlExpiresAt),
