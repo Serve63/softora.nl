@@ -65,6 +65,9 @@ test('concurrent claim polls share one scan and a lost response reuses durable p
   assert.equal((await f.poll()).waiting, true);
   pending.resolve(scan);
   const result = await first;
+  assert.match(result.job.prompt, /EIGEN FOTOGRAFIE, HERKENBAAR MERK/);
+  assert.match(result.job.prompt, /Genereer alle fotografie.*zelfstandig/);
+  assert.match(result.job.prompt, /Behoud de bestaande merkkleuren/);
   assert.deepEqual((await f.poll(f.service())).job, result.job);
   assert.equal(f.scans(), 1);
   assert.equal(f.row().payload.retained, 'keep');
