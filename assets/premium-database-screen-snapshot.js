@@ -26,7 +26,7 @@
     function viewOf(state) {
         const current = state || {};
         return JSON.stringify([current.activeStatus || "", current.query || "", current.sortKey || "",
-            current.sortAsc === true, Number(current.visibleLimit) || 0]);
+            current.sortAsc === true, Number(current.visibleLimit) || 0, current.designDate || "", current.designDateOrder || ""]);
     }
 
     function isPreparing(state) {
@@ -46,7 +46,7 @@
         let active = null, activeView = "", legacy = null;
         function instance(state) {
             if (!create) return null;
-            const standard = !state.query && state.sortKey === "distance" && state.sortAsc === true && state.visibleLimit === 25;
+            const standard = !state.designDate && !state.designDateOrder && !state.query && state.sortKey === "distance" && state.sortAsc === true && state.visibleLimit === 25;
             const slot = standard && statuses.has(state.activeStatus) ? state.activeStatus : "custom";
             if (!snapshots.has(slot)) snapshots.set(slot, create({
                 key: "premium-database:v2:" + slot, elements: ELEMENTS, inertIds: INERT_IDS, maxChars: 180000

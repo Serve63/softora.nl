@@ -336,7 +336,7 @@ function createSoftoraDataOpsUiStateBridge(deps = {}) {
         mockupChunkCount: mockupChunks.length,
         websitePhotoUrl,
         websiteMockupUrl: normalizeString(entry.websiteMockupUrl || entry.mockupUrl),
-        websitePhotoName: normalizeString(entry.fileName || entry.legacyMeta?.websitePhotoName) || 'Websitefoto',
+        websitePhotoName: normalizeString(entry.fileName || entry.legacyMeta?.websitePhotoName) || 'Websitefoto', websitePhotoCreatedAt: normalizeString(entry.websitePhotoCreatedAt),
         websiteMockupName: normalizeString(entry.websiteMockupName || entry.legacyMeta?.websiteMockupName),
         webdesignMailProvider: normalizeString(entry.legacyMeta?.webdesignMailProvider),
         senderEmail: normalizeString(entry.legacyMeta?.senderEmail),

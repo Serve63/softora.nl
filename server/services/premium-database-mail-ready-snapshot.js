@@ -255,7 +255,7 @@ function normalizePhotoFlag(row = {}) {
     hasMockup:
       row.hasMockup === true ||
       normalizeString(row.websiteMockup || row.mockup || row.websiteMockupImage) !== '',
-    updatedAt: normalizeString(row.updatedAt || row.updated_at),
+    updatedAt: normalizeString(row.updatedAt || row.updated_at), websitePhotoCreatedAt: normalizeString(row.websitePhotoCreatedAt),
   };
 }
 
@@ -403,7 +403,7 @@ function buildSnapshotCustomer(row = {}, photoFlag = {}) {
     status,
     databaseStatus: status,
     verantwoordelijk: pickRowValue(row, ['verantwoordelijk', 'responsible']),
-    updatedAt: getRowUpdatedAt(row) || normalizeString(photoFlag.updatedAt),
+    updatedAt: getRowUpdatedAt(row) || normalizeString(photoFlag.updatedAt), websitePhotoCreatedAt: normalizeString(photoFlag.websitePhotoCreatedAt),
     hasPhoto: true,
     hasMockup: true,
     websitePhotoAssetReady: true, webdesignMailProvider: photoFlag.webdesignMailProvider || 'softora',
@@ -453,7 +453,7 @@ function enrichSnapshotCustomersWithSignedMedia(customers = [], signedRows = [])
     return {
       ...customer,
       websitePhoto,
-      websitePhotoName: normalizeString(signed.fileName),
+      websitePhotoName: normalizeString(signed.fileName), websitePhotoCreatedAt: normalizeString(signed.websitePhotoCreatedAt || customer.websitePhotoCreatedAt),
       websiteMockup,
       websiteMockupName: normalizeString(signed.websiteMockupName),
       signedUrlExpiresAt: normalizeString(signed.signedUrlExpiresAt),

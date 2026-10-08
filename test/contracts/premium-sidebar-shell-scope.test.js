@@ -298,7 +298,7 @@ test('premium database consistency assets stay outside the static sidebar', () =
   assert.ok(source.indexOf('assets/premium-database-lead-delete.js?v=20260925-design-remove') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-customers-loader.js?v=20261007-bulk-capacity') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-table-helpers.js?v=20261001-email-guard') > asideEnd);
-  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20261007-bulk-capacity') > asideEnd);
+  assert.ok(source.indexOf('assets/premium-database-mail-ready-snapshot.js?v=20261008-design-date') > asideEnd);
   assert.ok(source.indexOf('assets/premium-database-mail-ready-menu.js?v=20260921-restore-ui') > asideEnd);
   assert.match(source, /assets\/premium-database-mail-ready-menu\.css\?v=20260914-provider/);
   assert.ok(source.indexOf('assets/premium-database-webdesign-variant-picker.js?v=20260925-v2-only') > asideEnd);
@@ -1441,14 +1441,14 @@ test('SEO uses the shared black heading and outer frame without changing the sid
 test('database loading repair keeps its premium shell and serves matching design eligibility assets', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
   assert.ok(extractSidebarLinkTargets(source).database);
-  assert.match(source, /premium-database-screen-snapshot\.js\?v=20260927a/);
+  assert.match(source, /premium-database-screen-snapshot\.js\?v=20261008-design-date/);
   assert.match(source, /<button id="instantlyQueueImportButton" type="button" class="sf-btn">Uploaden<\/button><input id="instantlyQueueImportFile"/);
   assert.ok(source.indexOf('id="instantlyQueueImportButton"') < source.indexOf('<table id="databaseTable">'), 'the upload control reserves its final space before scripts run');
   assert.match(source, /premium-database-boot\.js\?v=20260923-provider-readmodel/);
   assert.match(source, /premium-database-readiness\.js\?v=20261003-complete-count/);
   assert.match(source, /premium-database-system-mail-count\.js\?v=20261003-complete-count/);
-  assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20261007-bulk-capacity/);
-  assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20260914-provider/);
+  assert.match(source, /premium-database-mail-ready-snapshot\.js\?v=20261008-design-date/);
+  assert.match(source, /premium-database-webdesign-asset-state\.js\?v=20261008-design-date/);
   assert.match(source, /premium-database-webdesign-action\.js\?v=20261006-scan-errors/);
   assert.match(source, /premium-database-table-helpers\.js\?v=20261001-email-guard/);
   assert.match(source, /const count = databaseTableHelpers\.getPhotoHeaderCount\(customers, \{ showPhotoColumn: showPhotoColumn, activeStatus: state\.activeStatus,/);
