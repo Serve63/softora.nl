@@ -2313,7 +2313,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
   assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20261007-bulk-capacity/);
   assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20261008-design-date/);
-  assert.match(pageSource, /assets\/premium-database-current-campaign-media\.js\?v=20261008-design-date/);
+  assert.match(pageSource, /assets\/premium-database-current-campaign-media\.js\?v=20261008-visible-previews/);
   assert.match(pageSource, /currentCampaignMediaController\.refresh\(\)/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(options = \{\}\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(/);
   assert.match(snapshotSource, /const ENDPOINT = "\/api\/premium-database\/mail-ready-snapshot";/);
@@ -3287,7 +3287,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /syncKey: CUSTOMER_DB_SYNC_KEY/);
   assert.doesNotMatch(pageSource, /const availableImportController = window\.SoftoraDatabaseAvailableImport\.createController\(\{ state: state, importController: databaseImportController, setStatusMessage: setStatusMessage \}\); availableImportController\.bind\(\);/);
   assert.doesNotMatch(pageSource, /function renderAvailableImportControls\(\) \{/);
-  assert.match(pageSource, /function renderPage\(\) \{ renderTable\(\); window\.SoftoraDatabaseScreenSnapshot\?\.capture\(state\); \}/);
+  assert.match(pageSource, /function renderPage\(\) \{ renderTable\(\); window\.SoftoraDatabaseScreenSnapshot\?\.capture\(state\); if \(!state\.photoRestorePending\) void visibleDatabaseMediaController\.refresh\(\); \}/);
   assert.match(pageSource, /function mapCsvRowToCustomer\(headers, row, index, options\) \{/);
   assert.match(pageSource, /const defaultStatus = normalizeDatabaseStatus\(options && options\.defaultStatus \|\| "benaderbaar"\);/);
   assert.match(availableImportScriptSource, /actions\.id = "databaseImportActions";/);

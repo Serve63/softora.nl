@@ -8,6 +8,18 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(__dirname, '../..', relativePath), 'utf8');
 }
 
+test('database preview hydration stays scoped to visible rows behind the existing premium route', () => {
+  const page = readRepoFile('premium-database.html');
+  const media = readRepoFile('assets/premium-database-current-campaign-media.js');
+  const routes = readRepoFile('server/routes/premium-database-import.js');
+  assert.match(page, /getCustomers: function \(\) \{ return getSortedCustomers\(getFilteredCustomers\(\)\); \}/);
+  assert.match(media, /options\.getCustomers\(\)\.slice\(0, options\.state\.visibleLimit\)/);
+  assert.match(page, /if \(!state\.photoRestorePending\) void visibleDatabaseMediaController\.refresh\(\)/);
+  assert.match(page, /onSettled: scheduleRenderPage/);
+  assert.match(routes, /app\.get\('\/api\/premium-database\/current-campaign-media', requirePremiumApiAccess/);
+  assert.match(page, /data-static-sidebar="1"/);
+});
+
 test('personnel dark mode preserves the shared sidebar, legacy palettes and public scope', () => {
   const theme = readRepoFile('assets/personnel-theme.js');
   const css = readRepoFile('assets/personnel-appearance.css');
