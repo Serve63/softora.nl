@@ -27,6 +27,27 @@ function createHelpers(overrides = {}) {
   });
 }
 
+test('preview photography stays original while brand and subject remain recognizable with or without references', () => {
+  for (const referenceImageCount of [0, 1, 2]) {
+    const prompt = createHelpers().buildWebsitePreviewPromptFromScan({
+      host: 'kattenopvang.example', referenceImageCount,
+      verifiedBrandPalette: ['#8b2252', '#f8f7f4'],
+      visualCues: ['Kat op een stoel in zacht ochtendlicht'],
+    });
+    assert.match(prompt, /EIGEN FOTOGRAFIE, HERKENBAAR MERK/);
+    assert.match(prompt, /Neem geen bronfoto over.*afbeeldings-URL.*screenshotfragment/);
+    assert.match(prompt, /Genereer alle fotografie.*zelfstandig/);
+    assert.match(prompt, /geen herkenbare nabootsing van een specifieke bronfoto/);
+    assert.match(prompt, /Alleen spiegelen.*enkele gewijzigde details is onvoldoende/);
+    assert.match(prompt, /Een kat mag een kat blijven/);
+    assert.match(prompt, /niet om dezelfde kat in dezelfde pose en setting/);
+    assert.match(prompt, /Verander niet uit voorzichtigheid de branche, onderwerpen of merkpersoonlijkheid/);
+    assert.match(prompt, /Presenteer nieuw bedachte personen.*niet als het echte team/);
+    assert.match(prompt, /In de screenshot bevestigde merkkleuren: #8b2252 \| #f8f7f4/);
+    assert.match(prompt, /Bij gelijkenis herbedenk je de scène en compositie, niet de merkidentiteit/);
+  }
+});
+
 test('website generation helpers build preview prompt, brief and filename from scan data', () => {
   const helpers = createHelpers();
   const scan = {
