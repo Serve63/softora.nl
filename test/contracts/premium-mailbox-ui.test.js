@@ -202,7 +202,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20261007a/);
-  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20261007a/);
+  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20261009a/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20261006a/);
   assert.match(page, /assets\/premium-mailbox-read\.js\?v=20261006a/);
@@ -235,7 +235,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.ok(page.indexOf('premium-mailbox-attachment-digest.js?v=20260828c') < page.indexOf('premium-mailbox-compose-send-state.js?v=20261008b'));
   assert.ok(page.indexOf('premium-mailbox-compose-send-state.js?v=20261008b') < page.indexOf('premium-mailbox-compose-send-resilience.js?v=20261008b'));
   assert.ok(page.indexOf('premium-mailbox-compose-send-resilience.js?v=20261008b') < page.indexOf('premium-mailbox-compose-accepted-send.js?v=20261008b'));
-  assert.ok(page.indexOf('premium-mailbox-compose-accepted-send.js?v=20261008b') < page.indexOf('premium-mailbox-compose-controller.js?v=20261008b'));
+  assert.ok(page.indexOf('premium-mailbox-compose-accepted-send.js?v=20261008b') < page.indexOf('premium-mailbox-compose-controller.js?v=20261009a'));
   assert.equal(typeof composeSendStateModule.selectMarker, 'function');
   assert.equal(typeof composeSendResilienceModule.create, 'function');
   assert.equal(typeof attachmentDigestModule.bind, 'function');
@@ -5713,7 +5713,7 @@ test('premium mailbox compose gebruikt Softora styling zonder dubbele verwijderk
   assert.match(pageSource, /assets\/premium-mailbox-compose-send-state\.js\?v=20261008b/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-send-resilience\.js\?v=20261008b/);
   assert.match(pageSource, /assets\/premium-mailbox-compose-accepted-send\.js\?v=20261008b/);
-  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20261008b/);
+  assert.match(pageSource, /assets\/premium-mailbox-compose-controller\.js\?v=20261009a/);
   assert.doesNotMatch(pageSource, /class="btn-discard"/);
   assert.doesNotMatch(pageSource, />Verwijderen<\/button>/);
 });
@@ -10145,7 +10145,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
     'de vervolgknop hoort na de resultatenlijst te staan'
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
-  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20261007a/);
+  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20261009a/);
   assert.match(pageSource, /premium-mailbox\.js\?v=20261007a/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);

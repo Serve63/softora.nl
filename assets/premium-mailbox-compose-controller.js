@@ -3,6 +3,8 @@
     ? require('./premium-mailbox-compose-accepted-send.js') : null);
   const sendResilienceModule = global.SoftoraMailboxComposeSendResilience || (typeof require === 'function'
     ? require('./premium-mailbox-compose-send-resilience.js') : null);
+  const discoveryModule = global.SoftoraMailboxDiscovery || (typeof require === 'function'
+    ? require('./premium-mailbox-discovery.js') : null);
 
   function create(options = {}) {
     const documentRef = options.document || global.document;
@@ -442,6 +444,32 @@
       const source = exact || mail;
       const action = options.campaignInbox.getConversationAction?.(exact ? { ...exact, threadMessages: [] } : mail);
       if (!action || action.kind !== 'new-message') return;
+      const dossier = discoveryModule?.getContactDossier(mail, {
+        accountEmails: [getMailAccount(mail)], activeFolder: options.getActiveFolder?.(),
+        campaignInbox: options.campaignInbox,
+      });
+      const aliasAction = dossier?.newMessageAction;
+      const aliasReply = aliasAction?.messageKey && aliasAction.messageKey === action.messageKey
+        ? aliasAction.replyTargetMessage : null;
+      if (aliasReply) {
+        // A blank message to a provider alias must retain the received reply's
+        // exact identity, rather than reuse the original company's recipient.
+        try {
+          options.compose.resetOptionalFields();
+          setReplyContext(aliasReply);
+          replyContext.sourceMailId = String(mail.id || '').trim();
+          const toField = documentRef?.getElementById('c-to');
+          const subjectField = documentRef?.getElementById('c-subject');
+          if (toField) toField.value = options.display.getReplyToAddress(aliasReply, {
+            activeFolder: options.getActiveFolder(), account: replyContext.accountEmail,
+          });
+          if (subjectField) subjectField.value = aliasReply.subject;
+          open({ keepContext: true });
+        } catch (error) {
+          options.toast(String(error?.message || error));
+        }
+        return;
+      }
       sender?.reset();
       options.compose.resetOptionalFields();
       replyContext = options.compose.buildNewMessageContext(source, {

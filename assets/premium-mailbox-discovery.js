@@ -64,10 +64,19 @@
       .sort((left, right) => new Date(right?.date || 0).getTime() - new Date(left?.date || 0).getTime())
       .map((message) => String(message?.from || '').trim())
       .find((name) => name && normalizeEmail(name) !== contactEmail) || contactEmail || 'Contactdossier';
+    const scope = createContactTimelineScope(contactEmail, {
+      accountEmails: [...accounts, getTimelineAccount(mail)].filter(Boolean),
+      canonicalOwner: campaignInbox?.getMessageOwner?.(mail),
+      getMessageOwner: campaignInbox?.getMessageOwner,
+    });
     const newMessageAction = campaignInbox?.sortMessagesNewestFirst?.(messages).reduce((selected, message) => {
-      if (selected || resolveExternalContact(message, accounts) !== contactEmail) return selected;
+      if (selected) return selected;
       const action = campaignInbox.getConversationAction?.({ ...message, threadMessages: [] });
-      return action?.kind === 'new-message' ? action : null;
+      if (action?.kind !== 'new-message') return null;
+      if (resolveExternalContact(message, accounts) === contactEmail) return action;
+      const replyTargetMessage = campaignInbox.sortMessagesNewestFirst(messages).find((seed) =>
+        getRoutedContact(seed, accounts) === contactEmail && isInstantlyContactAncestor(message, seed, scope));
+      return replyTargetMessage ? { ...action, replyTargetMessage } : null;
     }, null) || null;
     return { active, contactEmail, title, newMessageAction };
   }
@@ -161,7 +170,27 @@
     return { accounts, canonicalOwner, contact, getOwner, matches, valid };
   }
 
+  function isInstantlyContactAncestor(candidate, seed, scope) {
+    const account = normalizeEmail(candidate?.accountEmail);
+    const thread = String(candidate?.providerThreadId || '');
+    const candidateDate = new Date(candidate?.date || candidate?.receivedAt || '').getTime();
+    const seedDate = new Date(seed?.date || seed?.receivedAt || '').getTime();
+    const metadataMatches = (message) => normalizeEmail(message?.provider) === 'instantly' &&
+      normalizeEmail(message?.accountEmail) === account &&
+      normalizeEmail(message?.providerAccountEmail) === account &&
+      normalizePersonalOwner(message?.providerOwner) === scope.canonicalOwner &&
+      Boolean(String(message?.providerMessageId || '').trim()) &&
+      String(message?.providerThreadId || '') === thread && scope.matches(message) &&
+      message?.automatedReplyEvidence !== true && !message?.generationSupersededAt &&
+      ['', 'no'].includes(normalizeEmail(message?.autoSubmitted));
+    return Boolean(account && thread.trim() && metadataMatches(candidate) && metadataMatches(seed) &&
+      normalizeEmail(candidate?.direction) === 'sent' && normalizeEmail(seed?.direction) === 'received' &&
+      normalizeEmail(candidate?.email) === account && Number.isFinite(candidateDate) &&
+      Number.isFinite(seedDate) && candidateDate <= seedDate);
+  }
+
   function isDirectionalContactAncestor(candidate, seed, scope) {
+    if (isInstantlyContactAncestor(candidate, seed, scope)) return true;
     const candidateAccount = getTimelineAccount(candidate);
     const seedAccount = getTimelineAccount(seed);
     const candidateThread = getTechnicalThreadKey(candidate);

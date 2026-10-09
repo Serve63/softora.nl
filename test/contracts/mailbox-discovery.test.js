@@ -652,6 +652,88 @@ test('contacttijdlijn faalt gesloten zonder ownerresolver of zonder expliciete a
   assert.equal(emptyAccounts.contactTimelineRejectedCount, 2);
 });
 
+function instantlyAliasFixture() {
+  const metadata = {
+    provider: 'instantly', accountEmail: 'martijn@websoftora.com',
+    providerAccountEmail: 'martijn@websoftora.com', providerOwner: 'martijn',
+    providerThreadId: 'Opaque-Thread-A', conversationId: 'instantly:martijn:Opaque-Thread-A',
+  };
+  const original = {
+    ...metadata, id: 'instantly:original', mailboxId: 'instantly:original',
+    messageId: '<original@example.test>', providerMessageId: 'original',
+    folder: 'sent', storageFolder: 'instantly', direction: 'sent',
+    email: metadata.accountEmail, to: 'info@company.example',
+    subject: 'Kleine vraag', date: '2026-10-08T07:00:00Z', body: 'Ons oorspronkelijke bericht 😁',
+  };
+  const reply = {
+    ...metadata, id: 'instantly:reply', mailboxId: 'instantly:reply',
+    messageId: '<reply@example.test>', providerMessageId: 'reply',
+    folder: 'inbox', storageFolder: 'instantly', direction: 'received',
+    email: 'person@personal.example', to: metadata.accountEmail,
+    subject: 'Re: Kleine vraag', date: '2026-10-09T09:00:00Z',
+  };
+  return { original, reply };
+}
+
+test('Instantly contacttijdlijn bewaart een bewezen eerdere mail naar een ander adres zonder RFC-headers', () => {
+  const { original, reply } = instantlyAliasFixture();
+  const options = {
+    accountEmails: [reply.accountEmail], canonicalOwner: 'martijn',
+    getMessageOwner: campaignInbox.getMessageOwner,
+  };
+  for (const changes of [
+    { provider: 'smtp' }, { providerThreadId: 'other-thread' },
+    { providerThreadId: original.providerThreadId.toLowerCase() },
+    { accountEmail: 'martijnven@websoftora.com' }, { providerAccountEmail: 'serve@websoftora.com' },
+    { providerOwner: 'serve' }, { providerOwner: '' }, { providerMessageId: '' },
+    { providerThreadId: '' }, { direction: 'received', folder: 'inbox', email: 'colleague@company.example' },
+    { email: 'serve@websoftora.com' }, { date: '2026-10-10T09:00:00Z' },
+    { date: '' }, { automatedReplyEvidence: true }, { generationSupersededAt: '2026-10-09T10:00:00Z' },
+  ]) {
+    const root = { ...reply, threadMessages: [original, { ...original, ...changes, id: 'unrelated', messageId: '<unrelated@example.test>' }] };
+    discoveryUi.mergeContactTimeline(root, [reply], reply.email, 2, options);
+    assert.deepEqual(root.threadMessages.map((message) => message.id), [original.id], JSON.stringify(changes));
+    assert.equal(root.contactTimelineTotal, 2);
+    assert.equal(root.threadMessages[0].to, 'info@company.example');
+  }
+  for (const changes of [{ providerOwner: '' }, { providerAccountEmail: '' }, { providerMessageId: '' }, { date: '' }]) {
+    const root = { ...reply, ...changes, threadMessages: [original] };
+    discoveryUi.mergeContactTimeline(root, [{ ...root, threadMessages: [] }], reply.email, 1, options);
+    assert.deepEqual(root.threadMessages, [], JSON.stringify(changes));
+  }
+});
+
+test('een Instantly antwoordalias houdt Nieuw bericht sturen bij de actuele ontvanger en exacte reply-identiteit', () => {
+  const { original, reply } = instantlyAliasFixture();
+  const root = { ...reply, threadMessages: [original], contactTimelineLoaded: true };
+  const dossier = discoveryUi.getContactDossier(root, {
+    accountEmails: ['martijn@softora.nl'], activeFolder: 'outreach', campaignInbox,
+  });
+  assert.equal(dossier.newMessageAction?.kind, 'new-message');
+  assert.equal(dossier.newMessageAction.replyTargetMessage.messageId, reply.messageId);
+  const fields = new Map(['c-to', 'c-subject', 'c-body', 'compose-overlay'].map((id) => [id, {
+    value: '', classList: { add() {}, remove() {} }, setAttribute() {}, removeAttribute() {},
+  }]));
+  let selectedSource = null;
+  const controller = composeController.create({
+    document: { getElementById: (id) => fields.get(id) || null, querySelector: () => null },
+    compose: {
+      buildReplyContext(source) { selectedSource = source; return { ...source, mode: 'reply' }; },
+      buildNewMessageContext() { assert.fail('Een antwoordalias mag niet opnieuw naar het oude bedrijfsadres sturen'); },
+      resetOptionalFields() {}, reset() {},
+    },
+    campaignInbox, display: { getReplyToAddress: (source) => source.email, formatDetailSubject: (value) => value },
+    getActiveFolder: () => 'outreach', getAccount: () => reply.accountEmail, getOwner: () => 'martijn',
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    composeWindow: { reset() {} }, toast(message) { throw new Error(message); },
+  });
+  controller.newMessage(root, dossier.newMessageAction.messageKey);
+  assert.equal(fields.get('c-to').value, reply.email);
+  assert.equal(selectedSource.providerMessageId, reply.providerMessageId);
+  assert.equal(selectedSource.providerAccountEmail, reply.accountEmail);
+  assert.equal(fields.get('c-body').value, '');
+});
+
 test('contacttijdlijn behoudt een exacte alias bij eerste laadpagina en telt append maar eenmaal', async () => {
   const elements = {
     'mailbox-search-input': createElement(),
