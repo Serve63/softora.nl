@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const path = require('node:path');
 const { randomBytes } = require('node:crypto');
 const { createPremiumDatabaseCustomersArchiveResponder } = require('../../server/services/premium-database-customers-archive');
 const customersClient = require('../../assets/premium-database-customers-loader');
@@ -19,7 +20,7 @@ function snapshotHarness() {
   let next = 0;
   const window = { console: { warn() {} }, setTimeout(fn) { timers.set(++next, fn); return next; },
     clearTimeout(id) { timers.delete(id); } };
-  vm.runInNewContext(fs.readFileSync(require.resolve('../../assets/premium-database-mail-ready-snapshot'), 'utf8'), { window });
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets/premium-database-mail-ready-snapshot.js'), 'utf8'), { window });
   const state = { klanten: [{ id: 'one' }], remoteCustomersLoaded: true, photoRestorePending: false,
     dataLoading: true, canonicalInventoryReady: false };
   let requests = 0, renders = 0, fail = true;
@@ -67,7 +68,7 @@ test('customer recovery after the snapshot settles rechecks readiness even when 
   h.state.dataUnavailable = true;
   h.state.photoRestoreFailed = true;
   let renders = 0;
-  const page = fs.readFileSync(require.resolve('../../premium-database.html'), 'utf8');
+  const page = fs.readFileSync(path.join(__dirname, '../../premium-database.html'), 'utf8');
   const applySource = page.match(/function applyCustomerList\([^\n]+/)[0];
   const apply = vm.runInNewContext('(' + applySource + ')', {
     state: h.state, window: { SoftoraDatabaseMailReadySnapshot: h.client }, databaseRenderRuntime: {},
@@ -100,7 +101,7 @@ test('JSON deadline includes a body stalled after successful response headers', 
   const timers = new Map();
   const window = { setTimeout(fn) { timers.set(++timerId, fn); return timerId; }, clearTimeout(id) { timers.delete(id); },
     async fetch(_url, options) { signal = options.signal; return { ok: true, status: 200, json: () => new Promise(() => {}) }; } };
-  vm.runInNewContext(fs.readFileSync(require.resolve('../../assets/premium-database-resilience'), 'utf8'), { window, AbortController });
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../assets/premium-database-resilience.js'), 'utf8'), { window, AbortController });
   const pending = window.SoftoraDatabaseResilience.fetchJsonWithTimeout('/read-only', {}, 1000);
   const rejection = assert.rejects(pending, /reageert niet op tijd/);
   await new Promise(resolve => setImmediate(resolve));
