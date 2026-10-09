@@ -127,7 +127,7 @@ const CRM_COST_CONTENT_ITEM = Object.freeze({
   ]
 }),
   publishedAt: '2026-07-19',
-  updatedAt: '2026-09-24',
+  updatedAt: '2026-10-09',
   image: Object.freeze({
     src: '/assets/seo-content/crm-totale-kostenopbouw-mkb-softora.jpg',
     alt: 'Visuele CRM-kostenopbouw met software, inrichting, datamigratie, koppelingen, adoptie en doorlopend beheer over meerdere jaren.',
@@ -147,7 +147,7 @@ const CRM_COST_CONTENT_ITEM = Object.freeze({
     Object.freeze({
       heading: 'Begin niet met een prijslijst, maar met dezelfde CRM-scope',
       paragraphs: Object.freeze([
-        'De vraag wat een CRM-systeem kost heeft geen eerlijk standaardantwoord. Een team dat alleen contacten, taken en een eenvoudige pipeline nodig heeft, koopt iets anders dan een bedrijf met meerdere verkooproutes, rollen, offertes, planningen en koppelingen. Zonder gelijke scope vergelijk je bedragen die bij verschillende oplossingen horen.',
+        Object.freeze({ text: "De vraag wat een CRM-systeem kost heeft geen eerlijk standaardantwoord. Een team dat alleen contacten, taken en een eenvoudige pipeline nodig heeft, koopt iets anders dan een bedrijf met meerdere verkooproutes, rollen, offertes, planningen en koppelingen. Zonder gelijke scope vergelijk je bedragen die bij verschillende oplossingen horen. Is nog onduidelijk welk type systeem nodig is? Bekijk eerst het verschil tussen ERP en CRM en begrens daarna de kostenvergelijking.", links: Object.freeze([Object.freeze({ anchor: 'verschil tussen ERP en CRM', href: '/blog/erp-vs-crm', availableFrom: '2026-10-09' })]) }),
         'Leg daarom eerst vast welke procesuitkomst het CRM moet dragen. Beschrijf bijvoorbeeld hoe een aanvraag binnenkomt, wie de lead beoordeelt, welke fases zichtbaar moeten zijn, wanneer een taak ontstaat en welke rapportage het team nodig heeft. Noteer daarnaast het aantal gebruikers, databronnen, koppelingen en uitzonderingen. Pas dan kun je een standaardpakket, ingericht platform en CRM op maat op dezelfde opdracht beoordelen.',
       ]),
     }),
