@@ -601,7 +601,14 @@ test('mailbox index store joins exact active Instantly threads without a broad b
               account_email: 'serve-sender@example.com',
               provider_thread_id: 'provider-active-thread',
               provider_message_id: 'provider-active-reply',
+              provider_owner: 'serve',
               date: '2026-06-06T12:00:00.000Z',
+            }, {
+              account_email: 'serve-sender@example.com',
+              provider_thread_id: 'provider-missing-history',
+              provider_message_id: 'provider-missing-original-reply',
+              provider_owner: 'serve',
+              date: '2026-06-07T12:00:00.000Z',
             }],
             error: null,
           });
@@ -628,15 +635,19 @@ test('mailbox index store joins exact active Instantly threads without a broad b
     accountEmails: ['serve-sender@example.com'],
   });
 
-  assert.equal(messages.length, 2);
+  assert.equal(messages.length, 3);
   assert.equal(messages[0].providerMessageId, 'provider-active-sent');
   assert.equal(messages[0].providerThreadId, 'provider-active-thread');
   assert.equal(messages[1].providerMessageId, 'provider-active-reply');
   assert.equal(messages[1].folder, 'inbox');
+  assert.equal(messages[2].providerMessageId, 'provider-missing-original-reply');
+  assert.equal(messages[2].providerThreadId, 'provider-missing-history');
+  assert.equal(messages[2].providerOwner, 'serve');
+  assert.equal(messages[2].providerAccountEmail, 'serve-sender@example.com');
   assert.equal(
     calls.some((call) => (
       call[0] === 'select' &&
-      call[2] === 'account_email,provider_thread_id:payload->>providerThreadId,provider_message_id:payload->>providerMessageId,date'
+      call[2] === 'account_email,provider_thread_id:payload->>providerThreadId,provider_message_id:payload->>providerMessageId,provider_owner:payload->>providerOwner,date'
     )),
     true
   );
