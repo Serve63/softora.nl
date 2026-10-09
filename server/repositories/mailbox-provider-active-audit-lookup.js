@@ -21,7 +21,7 @@ function createMailboxProviderActiveAuditLookup(options = {}) {
         `list-provider-active-thread-ids:${normalizedProvider}:${offset}`,
         (client) => client
           .from(tableName)
-          .select('account_email,provider_thread_id:payload->>providerThreadId,provider_message_id:payload->>providerMessageId,date')
+          .select('account_email,provider_thread_id:payload->>providerThreadId,provider_message_id:payload->>providerMessageId,provider_owner:payload->>providerOwner,date')
           .eq('folder', normalizedProvider)
           .in('account_email', normalizedAccounts)
           .eq('payload->>direction', 'received')
@@ -40,6 +40,7 @@ function createMailboxProviderActiveAuditLookup(options = {}) {
         if (!latestIncomingByThread.has(key) && normalizeString(row.provider_message_id)) {
           latestIncomingByThread.set(key, {
             providerMessageId: normalizeString(row.provider_message_id),
+            providerOwner: normalizeString(row.provider_owner).toLowerCase(),
             date: normalizeString(row.date),
           });
         }
@@ -92,6 +93,18 @@ function createMailboxProviderActiveAuditLookup(options = {}) {
         folder: 'inbox',
         direction: 'received',
         date: latest.date,
+      });
+    });
+    // Include received-only threads as durable recovery candidates. Requiring
+    // an existing original sent row here silently lost deferred histories.
+    latestIncomingByThread.forEach((latest, key) => {
+      if (incomingSummaries.has(key) || !['serve', 'martijn'].includes(latest.providerOwner)) return;
+      const separator = key.indexOf('|');
+      const accountEmail = key.slice(0, separator);
+      incomingSummaries.set(key, {
+        accountEmail, providerAccountEmail: accountEmail, providerOwner: latest.providerOwner,
+        providerThreadId: key.slice(separator + 1), providerMessageId: latest.providerMessageId,
+        folder: 'inbox', direction: 'received', date: latest.date,
       });
     });
     return [...sentMessages, ...incomingSummaries.values()];

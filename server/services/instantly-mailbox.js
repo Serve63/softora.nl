@@ -8,6 +8,7 @@ const {
   buildOriginalMessageSource,
   extractLeadId,
   hydrateIndexedThreadMessageEvidence,
+  hasMissingThreadHistory,
   latestQuoteAuditReplyId,
   needsQuotedBodyAudit,
 } = require('./instantly-original-message-source');
@@ -397,6 +398,7 @@ function createInstantlyMailboxService(deps = {}) {
         limit: 100,
         eaccount: exactAccountEmail,
         search: `thread:${exactThreadId}`,
+        latest_of_thread: false,
         sort_order: 'asc',
       },
     });
@@ -762,7 +764,7 @@ function createInstantlyMailboxService(deps = {}) {
         const pendingThreadHydrations = Array.from(threadCandidates.entries())
           .filter(([key, candidate]) => {
             const indexedMessages = indexedThreadMessages.get(key) || [];
-            const hasMissingThreadMember = indexedMessages.length <= 1;
+            const hasMissingThreadMember = hasMissingThreadHistory(indexedMessages);
             const needsExactProviderBody = needsQuotedBodyAudit(indexedMessages) ||
               indexedMessages.some((message) => (
               message.folder === 'sent' &&
@@ -774,12 +776,13 @@ function createInstantlyMailboxService(deps = {}) {
             ));
             return providerApi.canAudit(key, candidate.providerMessageId) && (hasMissingThreadMember || needsExactProviderBody);
           })
+          .sort(([leftKey, left], [rightKey, right]) => Number(hasMissingThreadHistory(indexedThreadMessages.get(rightKey))) - Number(hasMissingThreadHistory(indexedThreadMessages.get(leftKey))) || Date.parse(right.date || 0) - Date.parse(left.date || 0))
           .slice(0, normalizedConfig.richBodyAuditLimit);
         let historyDeferred = false;
         for (const [key, candidate] of pendingThreadHydrations) {
           if (!providerApi.canStartAudit()) { historyDeferred = true; break; }
           const indexedMessages = indexedThreadMessages.get(key) || [];
-          const hasMissingThreadMember = indexedMessages.length <= 1;
+          const hasMissingThreadMember = hasMissingThreadHistory(indexedMessages);
           const needsExactProviderBody = needsQuotedBodyAudit(indexedMessages) ||
             indexedMessages.some((message) => (
             message.folder === 'sent' &&
@@ -1178,7 +1181,7 @@ function createInstantlyMailboxService(deps = {}) {
     reply,
     resolveAccountRecord,
     syncOwner,
-    listThreadMessages: async ({ threadId, accountEmail }) => extractInstantlyItems(await apiRequest('emails', { query: { limit: 100, eaccount: normalizeEmail(accountEmail), search: `thread:${normalizeText(threadId)}` } })).map(normalizeInstantlyMessage).filter(Boolean),
+    listThreadMessages: async ({ threadId, accountEmail }) => extractInstantlyItems(await apiRequest('emails', { query: { limit: 100, eaccount: normalizeEmail(accountEmail), search: `thread:${normalizeText(threadId)}`, latest_of_thread: false } })).map(normalizeInstantlyMessage).filter(Boolean),
   };
 }
 

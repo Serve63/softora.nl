@@ -1257,6 +1257,73 @@ test('one sync audits every active rich-body candidate within the bounded audit 
   );
 });
 
+test('stored Instantly replies without sent history are recovered after the incremental window has passed', async () => {
+  for (const outsideWindow of [false, true]) {
+    const store = createStore();
+    const rawReply = incoming({ id: 'deferred-reply', thread_id: 'deferred-thread' });
+    const rawSent = incoming({
+      id: 'deferred-sent', thread_id: 'deferred-thread', email_type: '1',
+      from_address_email: 'serve-sender@example.com', to_address_email_list: ['prospect@example.org'],
+      timestamp_email: '2026-07-24T10:00:00Z',
+      body: { text: 'Dit is de oorspronkelijke campagneboodschap, met genoeg eigen inhoud om exact te kunnen vergelijken.' },
+    });
+    const { service, requests } = buildService({
+      store,
+      fetchJsonWithTimeout: async (url) => {
+        const parsed = new URL(url);
+        return { response: { ok: true, status: 200 }, data: { items:
+          parsed.searchParams.get('search') === 'thread:deferred-thread' ? [rawSent, rawReply] : [],
+        } };
+      },
+    });
+    const reply = service.normalizeInstantlyMessage(rawReply);
+    store.rows.push(reply, service.normalizeInstantlyMessage(incoming({ ...rawReply, id: 'deferred-reply-2' })));
+    const listStoredMessages = store.listProviderMessages;
+    if (outsideWindow) {
+      store.listProviderMessages = async () => [];
+      store.listProviderActiveConversationAuditMessages = async () => [reply];
+    }
+    // The ordinary sync has no new provider records; recovery must use durable history.
+    await service.syncOwner('serve');
+    assert.equal(store.rows.some((message) => message.providerMessageId === rawSent.id), true);
+    const recovery = requests.find((request) => new URL(request.url).searchParams.get('search') === 'thread:deferred-thread');
+    assert.ok(recovery);
+    assert.equal(new URL(recovery.url).searchParams.get('latest_of_thread'), 'false');
+    assert.equal(new URL(recovery.url).searchParams.get('eaccount'), 'serve-sender@example.com');
+    store.listProviderMessages = listStoredMessages;
+    assert.equal((await service.listOwnerConversations('serve'))[0].threadMessages.some((message) => message.folder === 'sent'), true);
+  }
+});
+
+test('missing Instantly history takes priority over optional body audits without increasing the provider read budget', async () => {
+  const store = createStore();
+  const rawReply = incoming({ id: 'priority-reply', thread_id: 'priority-thread' });
+  const { service, requests } = buildService({
+    store,
+    fetchJsonWithTimeout: async (url) => {
+      const parsed = new URL(url);
+      return { response: { ok: true, status: 200 }, data: { items:
+        parsed.searchParams.get('search') === 'thread:priority-thread' ? [rawReply] : [],
+      } };
+    },
+  });
+  for (let index = 0; index < 20; index += 1) {
+    store.rows.push(service.normalizeInstantlyMessage(incoming({
+      id: `older-original-${index}`, thread_id: `older-thread-${index}`, email_type: '1',
+      from_address_email: 'serve-sender@example.com', to_address_email_list: [`older-${index}@example.org`],
+    })), service.normalizeInstantlyMessage(incoming({
+      id: `older-reply-${index}`, thread_id: `older-thread-${index}`,
+      timestamp_email: '2026-07-23T10:00:00Z',
+    })));
+  }
+  store.rows.push(service.normalizeInstantlyMessage(rawReply));
+  const result = await service.syncOwner('serve');
+  const audits = requests.filter((request) => new URL(request.url).searchParams.get('search')?.startsWith('thread:'));
+  assert.equal(new URL(audits[0]?.url).searchParams.get('search'), 'thread:priority-thread');
+  assert.ok(requests.length <= 18);
+  assert.equal(result.historyDeferred, true);
+});
+
 test('active Instantly replies outside the newest 2000-message window are still audited exactly', async () => {
   const targetReceived = incoming({
     id: 'outside-window-received',

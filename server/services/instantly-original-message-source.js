@@ -166,6 +166,11 @@ function needsQuotedBodyAudit(messages = []) {
   });
 }
 
+function hasMissingThreadHistory(messages = []) {
+  return messages.some((message) => message?.folder !== 'sent' && message?.direction !== 'sent') &&
+    !messages.some((message) => message?.folder === 'sent' || message?.direction === 'sent');
+}
+
 function buildIndexedThreadAuditState(options = {}) {
   const indexedThreadMessages = new Map();
   const threadCandidates = options.threadCandidates instanceof Map
@@ -193,7 +198,9 @@ function buildIndexedThreadAuditState(options = {}) {
         message.providerOriginalBodyEvidenceKnown !== true
       )
     ));
-    if (incoming && (needsExactProviderBody || needsQuotedBodyAudit(messages)) &&
+    // A deferred first hydration must remain eligible after the incremental
+    // provider window moves on, including threads with multiple inbound replies.
+    if (incoming && (hasMissingThreadHistory(messages) || needsExactProviderBody || needsQuotedBodyAudit(messages)) &&
       !threadCandidates.has(key)) {
       threadCandidates.set(key, incoming);
     }
@@ -630,6 +637,7 @@ module.exports = {
   extractQuotedOriginalBody,
   extractLeadId,
   hydrateIndexedThreadMessageEvidence,
+  hasMissingThreadHistory,
   latestQuoteAuditReplyId,
   mergeActiveConversationAuditMessages,
   needsQuotedBodyAudit,
