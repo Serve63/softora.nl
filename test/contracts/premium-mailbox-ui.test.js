@@ -202,7 +202,7 @@ test('mailbox gebruikt de juiste browsertitel', () => {
   assert.match(page, /assets\/premium-mailbox-logical-delete\.js\?v=20260820a/);
   assert.match(page, /assets\/premium-mailbox-images\.js\?v=20260921c/);
   assert.match(page, /assets\/premium-mailbox\.js\?v=20261007a/);
-  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20261009a/);
+  assert.match(page, /assets\/premium-mailbox-discovery\.js\?v=20261009b/);
   assert.match(page, /assets\/premium-browser-storage\.js\?v=20260828b/);
   assert.match(page, /assets\/premium-mailbox-state-outbox\.js\?v=20261006a/);
   assert.match(page, /assets\/premium-mailbox-read\.js\?v=20261006a/);
@@ -2370,6 +2370,88 @@ test('mailbox toont legacy snapshotmedia nooit kort voordat de exacte body gelad
   assert.equal(detail.hasAttribute('inert'), true);
   assert.doesNotMatch(html, /korte indruk van de eerste versie/);
   assert.doesNotMatch(html, /salontof\.nl-preview/);
+});
+
+test('Instantly contactalias bewaart historie en verzendactie na echte index- en UI-normalisatie', async () => {
+  const { createMailboxIndexStore } = require('../../server/services/mailbox-index-store');
+  const { createMailboxDiscoveryRepository } = require('../../server/repositories/mailbox-discovery');
+  const account = 'martijn@websoftora.com';
+  const contact = 'person@personal.example';
+  const thread = 'Opaque-Thread-A';
+  const timestamps = [new Date(Date.now() - 86400000).toISOString(), new Date().toISOString()];
+  const rows = ['sent', 'received'].map((direction, index) => ({
+    message_key: `instantly|alias-${index}`, provider_id: `instantly:alias-${index}`,
+    account_email: account, folder: 'instantly', date: timestamps[index],
+    sender_name: index ? contact : 'Martijn', sender_email: index ? contact : account,
+    recipients_text: index ? account : 'info@company.example',
+    subject: 'Kleine vraag', has_body: true, body_truncated: false,
+    external_contact_email: index ? contact : 'info@company.example', canonical_owner: 'martijn',
+    technical_thread_key: `instantly:martijn:${thread}`,
+    payload: { provider: 'instantly', providerMessageId: `alias-${index}`,
+      providerThreadId: thread, providerAccountEmail: account, providerOwner: 'martijn', direction },
+  }));
+  const indexStore = createMailboxIndexStore();
+  const repository = createMailboxDiscoveryRepository({
+    isSupabaseConfigured: () => true,
+    getSupabaseClient: () => ({ rpc: async () => ({ data: rows }) }),
+    normalizeMessageRow: indexStore.normalizeMessageRow,
+  });
+  const response = await repository.contactTimeline({ accountEmails: [account], contactEmail: contact });
+  assert.ok(response.messages.every((message) => message.direction === undefined));
+  const mailbox = loadMailboxHelpersForTest();
+  await mailbox.ready;
+  const [original, reply] = response.messages.map((message) => mailbox.normalizeMailboxApiMessage(message));
+  assert.equal(original.direction, '');
+  assert.equal(original.folder, 'sent');
+  assert.equal(reply.folder, 'inbox');
+  assert.equal(original.receivedAt, timestamps[0]);
+  assert.equal(reply.receivedAt, timestamps[1]);
+  assert.equal(Number.isFinite(Date.parse(reply.date)), false, 'date is uitsluitend de weergavedatum');
+  assert.equal(original.messageId, '', 'providerhistorie heeft geen RFC-headers nodig');
+  const options = { accountEmails: [account], canonicalOwner: 'martijn', getMessageOwner: campaignInboxModule.getMessageOwner };
+  const root = { ...reply };
+  discoveryModule.mergeContactTimeline(root, [original, reply], contact, 2, options);
+  assert.equal(root.contactTimelineTotal, 2);
+  assert.equal(root.contactTimelineRejectedCount, 0);
+  assert.equal(root.threadMessages.length, 1);
+  assert.equal(root.threadMessages[0].to, 'info@company.example');
+  const dossier = discoveryModule.getContactDossier(root, { accountEmails: [account], activeFolder: 'outreach', campaignInbox: campaignInboxModule });
+  assert.equal(dossier.newMessageAction?.replyTargetMessage.providerMessageId, reply.providerMessageId);
+
+  mailbox.setMails([root]);
+  await mailbox.openMail(root.id, { skipBodyFetch: true, skipThreadBodyFetch: true, skipContactTimeline: true, skipReadPersist: true });
+  const html = mailbox.getElement('mail-detail').innerHTML;
+  assert.match(html, /2 berichten/);
+  assert.match(html, /Nieuw bericht sturen/);
+  assert.match(html, /info@company\.example/);
+  assert.match(html, /person@personal\.example/);
+
+  const controller = composeControllerModule.create({
+    document: { getElementById: mailbox.getElement, querySelector: () => null },
+    compose: { ...composeModule, resetOptionalFields() {}, reset() {} },
+    campaignInbox: campaignInboxModule, display: mailbox.display,
+    getActiveFolder: () => 'outreach', getAccount: () => account, getOwner: () => 'martijn',
+    normalizeEmail: (value) => String(value || '').trim().toLowerCase(),
+    composeWindow: { reset() {} }, toast(message) { assert.fail(message); },
+  });
+  controller.newMessage(root, dossier.newMessageAction.messageKey);
+  assert.equal(mailbox.getElement('c-to').value, contact);
+  assert.equal(mailbox.getElement('c-body').value, '');
+  assert.equal(controller.getContext().mode, 'reply');
+  assert.equal(controller.getContext().providerMessageId, reply.providerMessageId);
+  assert.equal(controller.getContext().providerThreadId, thread);
+  assert.equal(controller.getContext().providerAccountEmail, account);
+
+  for (const changes of [
+    { providerThreadId: thread.toLowerCase() }, { providerAccountEmail: 'serve@websoftora.com' },
+    { providerOwner: 'serve' }, { folder: 'inbox', email: 'colleague@company.example' },
+    { receivedAt: new Date(Date.now() + 86400000).toISOString() },
+    { receivedAt: '', internalDate: '', date: 'Vandaag' }, { automatedReplyEvidence: true },
+  ]) {
+    const rejectedRoot = { ...reply };
+    discoveryModule.mergeContactTimeline(rejectedRoot, [{ ...original, ...changes }, reply], contact, 2, options);
+    assert.equal(rejectedRoot.threadMessages.length, 0, JSON.stringify(changes));
+  }
 });
 
 test('Salon TOF contactdossier toont contacttitel en één nieuwe-berichtactie boven twaalf berichten', async () => {
@@ -10145,7 +10227,7 @@ test('premium mailbox search heeft geen kruisjes en pagineert pas onder de resul
     'de vervolgknop hoort na de resultatenlijst te staan'
   );
   assert.match(pageSource, /class="mail-results-scroll" id="mail-results-scroll"/);
-  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20261009a/);
+  assert.match(pageSource, /premium-mailbox-discovery\.js\?v=20261009b/);
   assert.match(pageSource, /premium-mailbox\.js\?v=20261007a/);
   assert.doesNotMatch(discoverySource, /clearButton|mailbox-search-clear/);
   assert.match(discoverySource, /if \(searchLoading && append\) return false/);

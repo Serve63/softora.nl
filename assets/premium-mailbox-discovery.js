@@ -170,11 +170,22 @@
     return { accounts, canonicalOwner, contact, getOwner, matches, valid };
   }
 
+  function getTimelineMessageTimestamp(message) {
+    // UI date is a display label. Use the individual message's preserved
+    // timestamp, never a contact's activity/latest-message summary.
+    return [message?.receivedAt, message?.internalDate, message?.date]
+      .map((value) => Date.parse(value || '')).find(Number.isFinite);
+  }
+
   function isInstantlyContactAncestor(candidate, seed, scope) {
     const account = normalizeEmail(candidate?.accountEmail);
     const thread = String(candidate?.providerThreadId || '');
-    const candidateDate = new Date(candidate?.date || candidate?.receivedAt || '').getTime();
-    const seedDate = new Date(seed?.date || seed?.receivedAt || '').getTime();
+    const candidateDate = getTimelineMessageTimestamp(candidate);
+    const seedDate = getTimelineMessageTimestamp(seed);
+    // The index translates provider direction into sent/inbox; UI decoration
+    // retains that folder even when the explicit direction is absent.
+    const candidateDirection = normalizeEmail(candidate?.direction || candidate?.folder);
+    const seedDirection = normalizeEmail(seed?.direction || seed?.folder);
     const metadataMatches = (message) => normalizeEmail(message?.provider) === 'instantly' &&
       normalizeEmail(message?.accountEmail) === account &&
       normalizeEmail(message?.providerAccountEmail) === account &&
@@ -184,7 +195,7 @@
       message?.automatedReplyEvidence !== true && !message?.generationSupersededAt &&
       ['', 'no'].includes(normalizeEmail(message?.autoSubmitted));
     return Boolean(account && thread.trim() && metadataMatches(candidate) && metadataMatches(seed) &&
-      normalizeEmail(candidate?.direction) === 'sent' && normalizeEmail(seed?.direction) === 'received' &&
+      candidateDirection === 'sent' && ['received', 'inbox'].includes(seedDirection) &&
       normalizeEmail(candidate?.email) === account && Number.isFinite(candidateDate) &&
       Number.isFinite(seedDate) && candidateDate <= seedDate);
   }
