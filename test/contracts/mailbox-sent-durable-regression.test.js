@@ -30,6 +30,13 @@ const referenceAncestorsMigration = fs.readFileSync(path.resolve(
   __dirname,
   '../../supabase/migrations/20260907170516_mailbox_contact_reference_ancestors.sql'
 ), 'utf8');
+const instantlyContactAncestorsMigration = fs.readFileSync(path.resolve(
+  __dirname,
+  '../../supabase/migrations/20261009143650_mailbox_instantly_contact_ancestors.sql'
+), 'utf8');
+const fullHistoryMigration = fs.readFileSync(path.resolve(
+  __dirname, '../../supabase/migrations/20260817102256_mailbox_full_history_search.sql'
+), 'utf8');
 const uidGenerationMigration = fs.readFileSync(path.resolve(
   __dirname,
   '../../supabase/migrations/20260821202054_mailbox_uid_generation_epoch_v2.sql'
@@ -369,6 +376,104 @@ async function insertProvenance(database, input) {
     input.status, input.acceptedAt || null,
   ]);
 }
+
+test('Instantly antwoord vanuit een ander adres behoudt alleen bewezen eerdere outbound en gedeelde hide/restore-scope', async () => {
+  const database = await createTimelineDatabase();
+  const account = 'martijn@websoftora.com';
+  const contact = 'person@personal.example';
+  const metadata = {
+    provider: 'instantly', providerAccountEmail: account, providerOwner: 'martijn',
+    providerThreadId: 'Opaque-Thread-A', providerCampaignId: 'campaign-a',
+  };
+  const original = {
+    key: 'provider-original', accountEmail: account, folder: 'instantly', uid: 0,
+    providerId: 'instantly:original', messageId: '<original@example.test>',
+    senderEmail: account, recipients: 'info@company.example', subject: 'Kleine vraag',
+    body: 'Het oorspronkelijke voorstel 😁', date: '2026-10-08T07:00:00Z',
+    searchDocument: 'info@company.example',
+    payload: { ...metadata, providerMessageId: 'original', direction: 'sent' },
+  };
+  try {
+    await database.exec(functionSqlFrom(fullHistoryMigration, 'softora_mailbox_technical_thread_key'));
+    await insertPhysical(database, original);
+    await insertPhysical(database, {
+      ...original, key: 'provider-reply', providerId: 'instantly:reply', messageId: '<reply@example.test>',
+      senderEmail: contact, recipients: account, date: '2026-10-09T09:00:00Z', searchDocument: contact,
+      payload: { ...metadata, providerMessageId: 'reply', direction: 'received' },
+    });
+    for (const [index, changes] of [
+      { payload: { provider: 'smtp' } }, { payload: { providerThreadId: 'other-thread' } },
+      { payload: { providerThreadId: metadata.providerThreadId.toLowerCase() } },
+      { accountEmail: 'martijnven@websoftora.com', payload: { providerAccountEmail: 'martijnven@websoftora.com' } },
+      { accountEmail: 'serve@websoftora.com', senderEmail: 'serve@websoftora.com', payload: { providerAccountEmail: 'serve@websoftora.com', providerOwner: 'serve' } },
+      { payload: { providerAccountEmail: 'serve@websoftora.com' } },
+      { payload: { providerOwner: 'serve' } }, { payload: { providerOwner: '' } },
+      { payload: { providerMessageId: '' } }, { payload: { providerThreadId: '' } },
+      { senderEmail: 'colleague@company.example', payload: { direction: 'received' } },
+      { senderEmail: 'serve@websoftora.com' }, { date: '2026-10-10T09:00:00Z' }, { date: null },
+      { payload: { automatedReplyEvidence: true } }, { payload: { autoSubmitted: 'auto-replied' } },
+    ].entries()) {
+      await insertPhysical(database, {
+        ...original, ...changes, key: `unrelated-${index}`, messageId: `<unrelated-${index}@example.test>`,
+        providerId: `instantly:unrelated-${index}`,
+        payload: { ...original.payload, providerMessageId: `unrelated-${index}`, ...changes.payload },
+      });
+    }
+    await insertPhysical(database, { ...original, key: 'superseded', messageId: '<superseded@example.test>' });
+    await database.query("update public.softora_mailbox_messages set generation_superseded_at=now() where message_key='superseded'");
+    const timeline = () => database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,50,0)
+    `, [account, contact]);
+    assert.deepEqual((await timeline()).rows.map((row) => row.message_key), ['provider-reply'], 'reproduce missing provider alias before migration');
+    await database.exec(instantlyContactAncestorsMigration);
+    await database.exec(instantlyContactAncestorsMigration);
+    assert.deepEqual((await timeline()).rows.map((row) => row.message_key), ['provider-reply', 'provider-original']);
+    const page = await database.query(`
+      select * from public.softora_mailbox_contact_timeline(array[$1]::text[],$2,1,1)
+    `, [account, contact]);
+    assert.equal(page.rows[0].message_key, 'provider-original');
+    assert.equal(Number(page.rows[0].total_count), 2);
+    assert.equal(page.rows[0].recipients_text, 'info@company.example');
+    assert.equal((await database.query(
+      'select body_text from public.softora_mailbox_messages where message_key=$1', [original.key]
+    )).rows[0].body_text, original.body);
+
+    for (const [field, value] of [['providerOwner', ''], ['providerAccountEmail', ''], ['providerMessageId', '']]) {
+      await database.query("update public.softora_mailbox_messages set payload=jsonb_set(payload,array[$1]::text[],to_jsonb($2::text)) where message_key='provider-reply'", [field, value]);
+      assert.ok(!(await timeline()).rows.some((row) => row.message_key === original.key), `invalid seed ${field}`);
+      await database.query("update public.softora_mailbox_messages set payload=jsonb_set(payload,array[$1]::text[],to_jsonb($2::text)) where message_key='provider-reply'", [field, field === 'providerMessageId' ? 'reply' : metadata[field]]);
+    }
+    const hidden = await database.query(`
+      select * from public.softora_set_mailbox_contact_visibility(
+        array[$1]::text[],$2,$1,'instantly',0,'instantly:reply',2,true
+      )
+    `, [account, contact]);
+    assert.deepEqual(hidden.rows.map((row) => row.message_key).sort(), ['provider-original', 'provider-reply']);
+    assert.equal((await timeline()).rows.length, 0);
+    const restored = await database.query(`
+      select * from public.softora_set_mailbox_contact_visibility(
+        array[$1]::text[],$2,$1,'instantly',0,'instantly:reply',0,false
+      )
+    `, [account, contact]);
+    assert.deepEqual(restored.rows.map((row) => row.message_key).sort(), ['provider-original', 'provider-reply']);
+    assert.equal((await timeline()).rows.length, 2);
+    const privileges = (await database.query(`
+      select prosecdef, provolatile,
+        has_function_privilege('anon',oid,'execute') anon_execute,
+        has_function_privilege('authenticated',oid,'execute') authenticated_execute,
+        has_function_privilege('service_role',oid,'execute') service_execute
+      from pg_proc where oid='public.softora_mailbox_contact_scope(text[],text)'::regprocedure
+    `)).rows[0];
+    assert.deepEqual(privileges, { prosecdef: false, provolatile: 's', anon_execute: false, authenticated_execute: false, service_execute: true });
+    await database.exec(functionSqlFrom(referenceAncestorsMigration, 'softora_mailbox_contact_scope').replace(
+      '  ), allowed_alias_origins as materialized (', '  ), allowed_alias_origins AS MATERIALIZED ('
+    ));
+    await assert.rejects(database.exec(instantlyContactAncestorsMigration), /ancestry anchors do not match/);
+    assert.deepEqual((await timeline()).rows.map((row) => row.message_key), ['provider-reply']);
+  } finally {
+    await database.close();
+  }
+});
 
 test('accepted-sendfallback blijft owner-exact, bodyvast, deduped, pagineerbaar en atomisch verbergbaar', async () => {
   const database = await createTimelineDatabase();

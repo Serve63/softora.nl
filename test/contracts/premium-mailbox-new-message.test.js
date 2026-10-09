@@ -58,7 +58,7 @@ test('de verzendknop boven de mails opent een losse composer met expliciete afze
   assert.equal((page.match(/data-mailbox-action="compose-new-mail"/g) || []).length, 1);
   assert.doesNotMatch(page, /topbar-compose/);
   assert.match(page, /id="compose-from-field" hidden><label[^>]*for="c-from">Van<\/label><select id="c-from" required disabled>/);
-  assert.ok(page.indexOf('premium-mailbox-compose-sender.js?v=20261008b') < page.indexOf('premium-mailbox-compose-controller.js?v=20261008b'));
+  assert.ok(page.indexOf('premium-mailbox-compose-sender.js?v=20261008b') < page.indexOf('premium-mailbox-compose-controller.js?v=20261009a'));
   const wiring = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox.js'), 'utf8');
   assert.match(wiring, /getAccounts: \(\) => mailboxAccounts, whenAccountsReady: \(\) => mailboxAccountsLoad/);
 });
