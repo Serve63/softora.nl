@@ -248,7 +248,7 @@ test('customer loader keeps the network-only path when no signed-in identity is 
 test('Mailsysteem loads the read model store before the customer loader', () => {
   const page = fs.readFileSync(path.join(repoRoot, 'premium-database.html'), 'utf8');
   const storeTag = page.indexOf('<script src="assets/premium-readmodel-store.js?v=20260924c"></script>');
-  const loaderTag = page.indexOf('assets/premium-database-customers-loader.js?v=20261007-bulk-capacity');
+  const loaderTag = page.indexOf('assets/premium-database-customers-loader.js?v=20261009-load-recovery');
   assert.ok(storeTag > 0);
   assert.ok(storeTag < loaderTag);
 });

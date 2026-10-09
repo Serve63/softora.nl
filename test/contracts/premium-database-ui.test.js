@@ -503,7 +503,8 @@ test('premium database keeps bootstrap rows hidden until the canonical inventory
   assert.match(pageSource, /customersBootstrapPayload && customersBootstrapPayload\.source\) === "orders"[\s\S]*return \[\];/);
   assert.doesNotMatch(pageSource, /function serializeCustomerList/);
   assert.match(pageSource, /function customerListsDiffer\(nextCustomers\) \{ return state\.klanten !== nextCustomers; \}/);
-  assert.match(pageSource, /function applyCustomerList\(nextCustomers, forceRender, alreadyCanonical, deferRender\) \{ const reconciledCustomers = alreadyCanonical \? nextCustomers : window\.SoftoraDatabaseMailReadySnapshot\.reconcileCustomerList\(state, nextCustomers\);/);
+  assert.match(pageSource, /function applyCustomerList\(nextCustomers, forceRender, alreadyCanonical, deferRender\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.applyCustomerList/);
+  assert.match(mailReadySnapshotSource, /const reconciled = alreadyCanonical \? nextCustomers : reconcileCustomerList\(state, nextCustomers\);/);
   assert.match(pageSource, /applyCustomerList\(sortedCustomers, false, true, deferRender\); if \(deferRender\) await currentCampaignMediaController\.refresh\(\); else void currentCampaignMediaController\.refresh\(\); window\.performance\?\.mark\?\.\("softora:database:applied"\);/);
   assert.match(mailReadySnapshotSource, /config\.applyCustomerList\(hasCanonicalCustomers \? mergeWithCanonicalSnapshots[\s\S]*combinedSnapshotCustomers, false, hasCanonicalCustomers, deferBootRender\);/);
   assert.match(pageSource, /mailReady: raw && raw\.mailReady === true, mailReadySnapshot: raw && raw\.mailReadySnapshot === true, availableSnapshot: raw && raw\.availableSnapshot === true,/);
@@ -1828,7 +1829,8 @@ test('mail-ready snapshot client never publishes a missing available page', asyn
   });
 
   assert.equal(loaded, false);
-  assert.equal(state.mailReadySnapshotPending, true);
+  assert.equal(state.mailReadySnapshotPending, false, 'without a retry timer a failed request is settled');
+  assert.equal(state.dataUnavailable, true);
   assert.equal(state.availableSnapshotTotal, 2);
   assert.deepEqual(state.availableSnapshotCustomers.map((customer) => customer.id), ['safe-1', 'safe-2']);
 });
@@ -2297,7 +2299,7 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   const resilienceSource = fs.readFileSync(resiliencePath, 'utf8');
   const snapshotSource = fs.readFileSync(snapshotPath, 'utf8');
 
-  assert.match(pageSource, /assets\/premium-database-resilience\.js\?v=20260604b/);
+  assert.match(pageSource, /assets\/premium-database-resilience\.js\?v=20261009-load-recovery/);
   assert.match(resilienceSource, /const DEFAULT_TIMEOUT_MS = 4000;/);
   assert.match(resilienceSource, /const unavailableMessage = "Supabase-data tijdelijk niet geladen\. Je data is niet verwijderd; probeer zo opnieuw\.";/);
   assert.match(resilienceSource, /function withTimeout\(task, timeoutMs, message\) \{/);
@@ -2311,8 +2313,8 @@ test('premium database toont Supabase-hapering zonder data als leeg te presenter
   assert.match(pageSource, /dataLoading: true,/);
   assert.match(pageSource, /dataUnavailable: false,/);
   assert.match(pageSource, /mailReadySnapshotLoaded: false, mailReadySnapshotStale: false, mailReadySnapshotTotal: null, mailReadySnapshotGeneratedAtMs: 0, mailReadySnapshotFailed: false, mailReadySnapshotPending: false, mailReadySnapshotRetryTimer: null, mailReadySnapshotRetryAttempt: 0, mailReadySnapshotCustomers: \[\],/);
-  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20261007-bulk-capacity/);
-  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20261008-design-date/);
+  assert.match(pageSource, /assets\/premium-database-customers-loader\.js\?v=20261009-load-recovery/);
+  assert.match(pageSource, /assets\/premium-database-mail-ready-snapshot\.js\?v=20261009-load-recovery/);
   assert.match(pageSource, /assets\/premium-database-current-campaign-media\.js\?v=20261008-visible-previews-v2/);
   assert.match(pageSource, /currentCampaignMediaController\.refresh\(\)/);
   assert.match(pageSource, /async function loadMailReadySnapshot\(options = \{\}\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.loadAndPublish\(/);

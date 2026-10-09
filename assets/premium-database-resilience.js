@@ -45,12 +45,20 @@
                 controller.abort();
             }, safeTimeoutMs);
         }
-        return withTimeout(global.fetch(url, requestOptions).catch(function (error) {
+        return withTimeout(async function () {
+            const response = await global.fetch(url, requestOptions);
+            if (response.status === 204 || response.status === 304) return response;
+            // Fetch resolves at headers. Keep the same deadline and abort signal
+            // alive until the complete JSON body has arrived as well.
+            const payload = await response.json();
+            return { ok: response.ok, status: response.status, headers: response.headers,
+                json: function () { return Promise.resolve(payload); } };
+        }, safeTimeoutMs, "Supabase-data reageert niet op tijd.").catch(function (error) {
             if (error && error.name === "AbortError") {
                 throw new Error("Supabase-data reageert niet op tijd.");
             }
             throw error;
-        }), safeTimeoutMs, "Supabase-data reageert niet op tijd.").finally(function () {
+        }).finally(function () {
             if (timeoutId) global.clearTimeout(timeoutId);
         });
     }

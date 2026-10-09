@@ -11,6 +11,8 @@
     const NEXT_PAGE_TIMEOUT_MS = 90000;
     const PAGE_CONCURRENCY = 3;
     const RESTORE_RETRY_DELAYS_MS = [2000, 6000, 15000, 30000];
+    const pendingLoads = new WeakMap();
+    const pendingPublications = new WeakMap();
 
     function isSnapshotMailReadyCustomer(customer) {
         return Boolean(customer && customer.mailReadySnapshot === true && customer.mailReady === true);
@@ -332,6 +334,7 @@
         state.canonicalCountReady = true;
         state.dataLoading = false;
         state.dataUnavailable = false;
+        state.photoRestoreFailed = false;
         return true;
     }
 
@@ -344,6 +347,17 @@
         state.mailReadySnapshotRetryAttempt = 0;
     }
 
+    function applyCustomerList(options) {
+        const { state, nextCustomers, forceRender, alreadyCanonical, deferRender, customerListsDiffer, databaseRenderRuntime, renderPage } = options;
+        const reconciled = alreadyCanonical ? nextCustomers : reconcileCustomerList(state, nextCustomers);
+        const changed = Boolean(forceRender) || customerListsDiffer(reconciled);
+        databaseRenderRuntime.searchHaystackCache = new WeakMap();
+        state.klanten = reconciled;
+        const wasReady = state.canonicalInventoryReady;
+        markCanonicalInventoryReady(state);
+        if ((changed || !wasReady) && !deferRender) renderPage();
+    }
+
     function scheduleRetry(config) {
         const state = config && config.state;
         if (!state || state.mailReadySnapshotRetryTimer || typeof global.setTimeout !== "function") return;
@@ -354,7 +368,7 @@
         state.mailReadySnapshotRetryAttempt = attempt + 1;
         state.mailReadySnapshotRetryTimer = global.setTimeout(function () {
             state.mailReadySnapshotRetryTimer = null;
-            void load(Object.assign({}, config, { retry: true }));
+            void loadAndPublish(Object.assign({}, config, { retry: true }));
         }, delay);
     }
 
@@ -466,18 +480,22 @@
         for (let offset = PAGE_LIMIT; offset < maxRows; offset += PAGE_LIMIT) offsets.push(offset);
         const pages = [];
         let cursor = 0;
+        let failure = null;
         async function worker() {
-            while (cursor < offsets.length) {
+            while (cursor < offsets.length && !failure) {
                 const offset = offsets[cursor];
                 cursor += 1;
-                const page = await fetchSnapshotPage(config, PAGE_LIMIT, offset, NEXT_PAGE_TIMEOUT_MS);
-                if (page.total !== firstPage.total || page.availableTotal !== firstPage.availableTotal || page.instantlyReadyTotal !== firstPage.instantlyReadyTotal || page.snapshotVersion !== firstPage.snapshotVersion) {
-                    throw new Error("Mailklare snapshot veranderde tijdens paginering; er wordt opnieuw geladen.");
-                }
-                pages.push({ offset: offset, rows: page.rows, availableRows: page.availableRows, instantlyReadyRows: page.instantlyReadyRows });
+                try {
+                    const page = await fetchSnapshotPage(config, PAGE_LIMIT, offset, NEXT_PAGE_TIMEOUT_MS);
+                    if (page.total !== firstPage.total || page.availableTotal !== firstPage.availableTotal || page.instantlyReadyTotal !== firstPage.instantlyReadyTotal || page.snapshotVersion !== firstPage.snapshotVersion) {
+                        throw new Error("Mailklare snapshot veranderde tijdens paginering; er wordt opnieuw geladen.");
+                    }
+                    pages.push({ offset: offset, rows: page.rows, availableRows: page.availableRows, instantlyReadyRows: page.instantlyReadyRows });
+                } catch (error) { failure = error; }
             }
         }
         await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker));
+        if (failure) throw failure;
         const sortedPages = pages.sort(function (left, right) { return left.offset - right.offset; });
         return {
             rows: firstPage.rows.concat(sortedPages.flatMap(function (page) { return page.rows; })),
@@ -486,7 +504,7 @@
         };
     }
 
-    async function load(options) {
+    async function loadAttempt(options) {
         const config = options || {}, state = config.state;
         if (!state) return false;
         const fetchJsonWithTimeout = config.fetchJsonWithTimeout || (global.SoftoraDatabaseResilience && global.SoftoraDatabaseResilience.fetchJsonWithTimeout);
@@ -528,6 +546,8 @@
             return true;
         } catch (error) {
             state.mailReadySnapshotFailed = true;
+            state.mailReadySnapshotPending = false;
+            if (!state.canonicalInventoryReady) { state.dataLoading = false; state.dataUnavailable = true; }
             scheduleRetry(config);
             const logger = config.logger || global.console;
             if (logger && typeof logger.warn === "function") logger.warn("Mailklare snapshot tijdelijk overgeslagen:", error);
@@ -535,13 +555,26 @@
         }
     }
 
-    async function loadAndPublish(options) {
-        const loaded = await load(options);
-        if (loaded) {
-            markCanonicalInventoryReady(options.state);
+    function load(options) {
+        const state = options && options.state;
+        if (!state) return Promise.resolve(false);
+        if (pendingLoads.has(state)) return pendingLoads.get(state);
+        const promise = loadAttempt(options).finally(function () { pendingLoads.delete(state); });
+        pendingLoads.set(state, promise);
+        return promise;
+    }
+
+    function loadAndPublish(options) {
+        const state = options && options.state;
+        if (!state) return Promise.resolve(false);
+        if (pendingPublications.has(state)) return pendingPublications.get(state);
+        const promise = load(options).then(function (loaded) {
+            if (loaded) markCanonicalInventoryReady(state);
             if (!(options.deferRenderDuringBoot === true && options.state?.photoRestorePending === true) && typeof options.renderPage === "function") options.renderPage();
-        }
-        return loaded;
+            return loaded;
+        }).finally(function () { pendingPublications.delete(state); });
+        pendingPublications.set(state, promise);
+        return promise;
     }
 
     function normalizeAvailableSnapshotRows(rows, offset, normalizeCustomer) {
@@ -556,6 +589,6 @@
         }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotInstantlyReadyCustomer: isSnapshotInstantlyReadyCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, isBootstrapSnapshotCountPayloadCoherent: isBootstrapSnapshotCountPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, normalizeInstantlyReadyCustomer: normalizeInstantlyReadySnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, reconcileCustomerList: reconcileCustomerList, isCanonicalCustomerListCoherent: isCanonicalCustomerListCoherent, getDisplayCount: getDisplayCount, getCanonicalInventoryStatus: getCanonicalInventoryStatus, getCanonicalResultCountText: getCanonicalResultCountText, markCanonicalInventoryReady: markCanonicalInventoryReady, load: load, loadAndPublish: loadAndPublish };
+    global.SoftoraDatabaseMailReadySnapshot = { applyCustomerList: applyCustomerList, endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotInstantlyReadyCustomer: isSnapshotInstantlyReadyCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, isBootstrapSnapshotCountPayloadCoherent: isBootstrapSnapshotCountPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, normalizeInstantlyReadyCustomer: normalizeInstantlyReadySnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, reconcileCustomerList: reconcileCustomerList, isCanonicalCustomerListCoherent: isCanonicalCustomerListCoherent, getDisplayCount: getDisplayCount, getCanonicalInventoryStatus: getCanonicalInventoryStatus, getCanonicalResultCountText: getCanonicalResultCountText, markCanonicalInventoryReady: markCanonicalInventoryReady, load: load, loadAndPublish: loadAndPublish };
     if (typeof module !== "undefined" && module.exports) module.exports = global.SoftoraDatabaseMailReadySnapshot;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -180,21 +180,57 @@
         });
     }
 
+    async function readArchiveParts(config, descriptor) {
+        const bytes = Number(descriptor.bytes), count = Number(descriptor.count);
+        const version = String(descriptor.version || "");
+        if (!Number.isSafeInteger(bytes) || bytes < 1 || bytes > 32000000 ||
+            !Number.isInteger(count) || count !== Math.ceil(bytes / 750000) || !/^[a-f0-9]{64}$/.test(version) ||
+            typeof global.DecompressionStream !== "function") throw new Error("Ongeldige archiefdelen.");
+        const packed = new Uint8Array(bytes);
+        let cursor = 0, failure = null;
+        async function worker() {
+            while (cursor < count && !failure) {
+                const index = cursor++;
+                try {
+                    const response = await config.fetchJsonWithTimeout(ARCHIVE_ENDPOINT + "?part=" + index + "&version=" + version,
+                        { method: "GET", cache: "no-store", credentials: "same-origin" }, REQUEST_TIMEOUT_MS);
+                    const payload = await response.json();
+                    const part = payload && payload.archivePart;
+                    if (!response.ok || payload.ok !== true || !part || part.version !== version ||
+                        part.index !== index || part.count !== count || part.bytes !== bytes || typeof part.data !== "string" ||
+                        part.data.length > 1000000) throw new Error("Archiefdeel is onvolledig of gewijzigd.");
+                    const decoded = global.atob(part.data);
+                    if (decoded.length !== Math.min(750000, bytes - index * 750000)) throw new Error("Archiefdeel heeft een onjuiste lengte.");
+                    for (let pos = 0; pos < decoded.length; pos++) packed[index * 750000 + pos] = decoded.charCodeAt(pos);
+                } catch (error) { failure = error; }
+            }
+        }
+        await Promise.all([worker(), worker()]);
+        if (failure) throw failure;
+        const digest = await global.crypto.subtle.digest("SHA-256", packed);
+        if (Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("") !== version) {
+            throw new Error("Archiefcontrole mislukt; er worden geen gedeeltelijke klanten getoond.");
+        }
+        return new Response(new Blob([packed]).stream().pipeThrough(new global.DecompressionStream("gzip"))).json();
+    }
+
     async function fetchArchive(config) {
         const validator = readValidator(config);
-        const requestOptions = { method: "GET", cache: "no-cache", credentials: "same-origin" };
-        if (validator) requestOptions.headers = { "X-Softora-Archive-Validator": validator };
+        const requestOptions = { method: "GET", cache: "no-cache", credentials: "same-origin", headers: { "X-Softora-Archive-Parts": "1" } };
+        if (validator) requestOptions.headers["X-Softora-Archive-Validator"] = validator;
         let response = await config.fetchJsonWithTimeout(ARCHIVE_ENDPOINT, requestOptions, REQUEST_TIMEOUT_MS);
         if (response.status === 304) {
             response = await config.fetchJsonWithTimeout(ARCHIVE_ENDPOINT, {
-                method: "GET", cache: "reload", credentials: "same-origin"
+                method: "GET", cache: "reload", credentials: "same-origin", headers: { "X-Softora-Archive-Parts": "1" }
             }, REQUEST_TIMEOUT_MS);
         }
-        const payload = await response.json().catch(function () { return {}; });
+        let payload = await response.json().catch(function () { return {}; });
+        const multipart = (response.ok || response.status === 413) && payload.archiveParts;
+        if (multipart) payload = await readArchiveParts(config, multipart);
         const total = Number(payload.total);
         const customers = Array.isArray(payload.customers) ? payload.customers : [];
         const version = String(payload.snapshotVersion || "").trim();
-        if (!response.ok || payload.ok !== true || payload.completeDataset !== true ||
+        if ((!response.ok && !multipart) || payload.ok !== true || payload.completeDataset !== true ||
             !Number.isInteger(total) || total < 0 || total > MAX_CUSTOMERS || !version ||
             customers.length !== total || dedupeCustomers(customers).length !== total) {
             throw new Error("Volledig klantdatabase-archief is niet beschikbaar.");
@@ -209,15 +245,19 @@
         for (let offset = PAGE_LIMIT; offset < total; offset += PAGE_LIMIT) offsets.push(offset);
         const pages = [];
         let cursor = 0;
+        let failure = null;
         async function worker() {
-            while (cursor < offsets.length) {
+            while (cursor < offsets.length && !failure) {
                 const offset = offsets[cursor];
                 cursor += 1;
-                const page = await fetchPage(config, offset, PAGE_LIMIT, false);
-                pages.push({ offset: offset, customers: page.customers });
+                try {
+                    const page = await fetchPage(config, offset, PAGE_LIMIT, false);
+                    pages.push({ offset: offset, customers: page.customers });
+                } catch (error) { failure = error; }
             }
         }
         await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, offsets.length) }, worker));
+        if (failure) throw failure;
         return pages.sort(function (left, right) { return left.offset - right.offset; }).flatMap(function (page) {
             return page.customers;
         });

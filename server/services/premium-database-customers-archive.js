@@ -2,6 +2,7 @@ const { gzip } = require('node:zlib');
 const { promisify } = require('node:util');
 const { createHash } = require('node:crypto');
 const { MAX_DATABASE_CUSTOMERS: MAX_CUSTOMERS } = require('../config/premium-database-limits');
+const { describeArchive, sendArchivePart } = require('./premium-database-archive-parts');
 
 const gzipAsync = promisify(gzip);
 const PAGE_LIMIT = 1000;
@@ -71,13 +72,9 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
       customers, total, snapshotVersion: version });
     const serializedAt = nowMs();
     const buffer = await gzipAsync(Buffer.from(json, 'utf8'), { level: 6 });
-    if (buffer.length > MAX_ARCHIVE_BYTES) {
-      const error = new Error('Klantdatabase-archief is te groot voor een enkele respons.');
-      error.statusCode = 413;
-      throw error;
-    }
+    const parts = describeArchive(buffer, nowMs());
     const encodedAt = nowMs();
-    return { buffer, total, version, method, loadMs: loadedAt - startedAt,
+    return { buffer, parts, total, version, method, loadMs: loadedAt - startedAt,
       encodeMs: encodedAt - loadedAt, serializeMs: serializedAt - loadedAt,
       gzipMs: encodedAt - serializedAt, verifyMs, ...readTimings };
   }
@@ -157,6 +154,10 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
     }
     const startedAt = nowMs();
     try {
+      const partRequested = req?.query?.part !== undefined;
+      // Parts are slices of one already-verified immutable archive, never live
+      // offset pages. A different server/build must match the exact byte hash.
+      if (partRequested && cachedArchive) return sendArchivePart(req, res, cachedArchive, nowMs());
       let archive = cachedArchive;
       let cacheHit = false;
       let sharedBuild = false;
@@ -188,6 +189,14 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
           }).finally(() => { buildPromise = null; });
         }
         archive = await buildPromise;
+      }
+      if (partRequested) return sendArchivePart(req, res, archive, nowMs());
+      if (archive.buffer.length > MAX_ARCHIVE_BYTES) {
+        archive.parts.createdAt = nowMs();
+        res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+        const supportsParts = req?.get?.('X-Softora-Archive-Parts') === '1' || req?.headers?.['x-softora-archive-parts'] === '1';
+        return res.status(supportsParts ? 200 : 413).json({ ok: supportsParts,
+          error: supportsParts ? undefined : 'Klantdatabase-archief is te groot voor een enkele respons.', archiveParts: archive.parts });
       }
       const loadMs = cacheHit ? nowMs() - startedAt : archive.loadMs;
       const encodeMs = cacheHit ? 0 : archive.encodeMs;
