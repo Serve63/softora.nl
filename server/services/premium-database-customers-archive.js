@@ -195,7 +195,8 @@ function createPremiumDatabaseCustomersArchiveResponder({ dataOpsStore, nowMs = 
         archive.parts.createdAt = nowMs();
         res.setHeader('Cache-Control', 'private, no-store, max-age=0');
         const supportsParts = req?.get?.('X-Softora-Archive-Parts') === '1' || req?.headers?.['x-softora-archive-parts'] === '1';
-        return res.status(supportsParts ? 200 : 413).json({ ok: supportsParts, archiveParts: archive.parts });
+        return res.status(supportsParts ? 200 : 413).json({ ok: supportsParts,
+          error: supportsParts ? undefined : 'Klantdatabase-archief is te groot voor een enkele respons.', archiveParts: archive.parts });
       }
       const loadMs = cacheHit ? nowMs() - startedAt : archive.loadMs;
       const encodeMs = cacheHit ? 0 : archive.encodeMs;
