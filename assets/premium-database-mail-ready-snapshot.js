@@ -347,6 +347,17 @@
         state.mailReadySnapshotRetryAttempt = 0;
     }
 
+    function applyCustomerList(options) {
+        const { state, nextCustomers, forceRender, alreadyCanonical, deferRender, customerListsDiffer, databaseRenderRuntime, renderPage } = options;
+        const reconciled = alreadyCanonical ? nextCustomers : reconcileCustomerList(state, nextCustomers);
+        const changed = Boolean(forceRender) || customerListsDiffer(reconciled);
+        databaseRenderRuntime.searchHaystackCache = new WeakMap();
+        state.klanten = reconciled;
+        const wasReady = state.canonicalInventoryReady;
+        markCanonicalInventoryReady(state);
+        if ((changed || !wasReady) && !deferRender) renderPage();
+    }
+
     function scheduleRetry(config) {
         const state = config && config.state;
         if (!state || state.mailReadySnapshotRetryTimer || typeof global.setTimeout !== "function") return;
@@ -578,6 +589,6 @@
         }).filter(function (customer) { return customer && customer.id; }));
     }
 
-    global.SoftoraDatabaseMailReadySnapshot = { endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotInstantlyReadyCustomer: isSnapshotInstantlyReadyCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, isBootstrapSnapshotCountPayloadCoherent: isBootstrapSnapshotCountPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, normalizeInstantlyReadyCustomer: normalizeInstantlyReadySnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, reconcileCustomerList: reconcileCustomerList, isCanonicalCustomerListCoherent: isCanonicalCustomerListCoherent, getDisplayCount: getDisplayCount, getCanonicalInventoryStatus: getCanonicalInventoryStatus, getCanonicalResultCountText: getCanonicalResultCountText, markCanonicalInventoryReady: markCanonicalInventoryReady, load: load, loadAndPublish: loadAndPublish };
+    global.SoftoraDatabaseMailReadySnapshot = { applyCustomerList: applyCustomerList, endpoint: ENDPOINT, isSnapshotMailReadyCustomer: isSnapshotMailReadyCustomer, isSnapshotAvailableCustomer: isSnapshotAvailableCustomer, isSnapshotInstantlyReadyCustomer: isSnapshotInstantlyReadyCustomer, isSnapshotFoundCustomer: isSnapshotFoundCustomer, isFoundSnapshotCategoryCoherent: isFoundSnapshotCategoryCoherent, isSnapshotPayloadCoherent: isSnapshotPayloadCoherent, isBootstrapSnapshotPayloadCoherent: isBootstrapSnapshotPayloadCoherent, isBootstrapSnapshotCountPayloadCoherent: isBootstrapSnapshotCountPayloadCoherent, normalizeCustomer: normalizeSnapshotCustomer, normalizeAvailableCustomer: normalizeAvailableSnapshotCustomer, normalizeInstantlyReadyCustomer: normalizeInstantlyReadySnapshotCustomer, dedupeCustomers: dedupeCustomers, mergeAssetFlags: mergeAssetFlags, moveCustomerToAvailable: moveCustomerToAvailable, mergeWithCanonicalSnapshots: mergeWithCanonicalSnapshots, reconcileCustomerList: reconcileCustomerList, isCanonicalCustomerListCoherent: isCanonicalCustomerListCoherent, getDisplayCount: getDisplayCount, getCanonicalInventoryStatus: getCanonicalInventoryStatus, getCanonicalResultCountText: getCanonicalResultCountText, markCanonicalInventoryReady: markCanonicalInventoryReady, load: load, loadAndPublish: loadAndPublish };
     if (typeof module !== "undefined" && module.exports) module.exports = global.SoftoraDatabaseMailReadySnapshot;
 })(typeof window !== "undefined" ? window : globalThis);

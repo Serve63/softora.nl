@@ -1870,7 +1870,7 @@
         }
         async function loadMailReadySnapshot(options = {}) { return window.SoftoraDatabaseMailReadySnapshot.loadAndPublish({ renderPage: renderPage, databaseHadBootstrapCustomers: databaseHadBootstrapCustomers, state: state, normalizeCustomer: normalizeCustomer, applyCustomerList: applyCustomerList, fetchJsonWithTimeout: window.SoftoraDatabaseResilience.fetchJsonWithTimeout, logger: console, compactAvailableDuringBoot: options.boot === true, deferRenderDuringBoot: options.boot === true }); }
         function customerListsDiffer(nextCustomers) { return state.klanten !== nextCustomers; }
-        function applyCustomerList(nextCustomers, forceRender, alreadyCanonical, deferRender) { const reconciledCustomers = alreadyCanonical ? nextCustomers : window.SoftoraDatabaseMailReadySnapshot.reconcileCustomerList(state, nextCustomers); const changed = Boolean(forceRender) || customerListsDiffer(reconciledCustomers); databaseRenderRuntime.searchHaystackCache = new WeakMap(); state.klanten = reconciledCustomers; const wasReady = state.canonicalInventoryReady; window.SoftoraDatabaseMailReadySnapshot.markCanonicalInventoryReady(state); if ((changed || !wasReady) && !deferRender) renderPage(); }
+        function applyCustomerList(nextCustomers, forceRender, alreadyCanonical, deferRender) { return window.SoftoraDatabaseMailReadySnapshot.applyCustomerList({ state, nextCustomers, forceRender, alreadyCanonical, deferRender, customerListsDiffer, databaseRenderRuntime, renderPage }); }
         function persistCustomerList(customers) {
             const normalizedCustomers = sortCustomers(customers).filter(function (item) {
                 return !isDerivedOrderPlaceholderCustomer(item);

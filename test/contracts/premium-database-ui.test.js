@@ -503,7 +503,8 @@ test('premium database keeps bootstrap rows hidden until the canonical inventory
   assert.match(pageSource, /customersBootstrapPayload && customersBootstrapPayload\.source\) === "orders"[\s\S]*return \[\];/);
   assert.doesNotMatch(pageSource, /function serializeCustomerList/);
   assert.match(pageSource, /function customerListsDiffer\(nextCustomers\) \{ return state\.klanten !== nextCustomers; \}/);
-  assert.match(pageSource, /function applyCustomerList\(nextCustomers, forceRender, alreadyCanonical, deferRender\) \{ const reconciledCustomers = alreadyCanonical \? nextCustomers : window\.SoftoraDatabaseMailReadySnapshot\.reconcileCustomerList\(state, nextCustomers\);/);
+  assert.match(pageSource, /function applyCustomerList\(nextCustomers, forceRender, alreadyCanonical, deferRender\) \{ return window\.SoftoraDatabaseMailReadySnapshot\.applyCustomerList/);
+  assert.match(mailReadySnapshotSource, /const reconciled = alreadyCanonical \? nextCustomers : reconcileCustomerList\(state, nextCustomers\);/);
   assert.match(pageSource, /applyCustomerList\(sortedCustomers, false, true, deferRender\); if \(deferRender\) await currentCampaignMediaController\.refresh\(\); else void currentCampaignMediaController\.refresh\(\); window\.performance\?\.mark\?\.\("softora:database:applied"\);/);
   assert.match(mailReadySnapshotSource, /config\.applyCustomerList\(hasCanonicalCustomers \? mergeWithCanonicalSnapshots[\s\S]*combinedSnapshotCustomers, false, hasCanonicalCustomers, deferBootRender\);/);
   assert.match(pageSource, /mailReady: raw && raw\.mailReady === true, mailReadySnapshot: raw && raw\.mailReadySnapshot === true, availableSnapshot: raw && raw\.availableSnapshot === true,/);
