@@ -27,6 +27,8 @@ const { CHATBOT_ACCEPTATIE_CONTENT_ITEM } = require('./seo-content-chatbot-accep
 const { CRM_MIGRATIE_CONTENT_ITEM } = require('./seo-content-crm-migratie');
 const { WEBSITE_SNELHEID_CONTENT_ITEM } = require('./seo-content-website-snelheid');
 
+const { ERP_CRM_CONTENT_ITEM } = require('./seo-content-erp-crm');
+
 const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   INTERNE_LINKSTRUCTUUR_CONTENT_ITEM,
   BEDRIJFSSOFTWARE_KOSTEN_CONTENT_ITEM,
@@ -56,6 +58,7 @@ const SEO_CONTENT_QUALITY_V2_ITEMS = Object.freeze([
   CHATBOT_ACCEPTATIE_CONTENT_ITEM,
   CRM_MIGRATIE_CONTENT_ITEM,
   WEBSITE_SNELHEID_CONTENT_ITEM,
+  ERP_CRM_CONTENT_ITEM,
 ]);
 
 module.exports = {

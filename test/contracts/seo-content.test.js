@@ -708,7 +708,8 @@ test('CRM-kostengids gebruikt precies twee eigen beelden en natuurlijke inkomend
   assert.equal(item.qualityVersion, 2);
   assert.equal(item.sections.length, 8);
   assert.equal(item.publishedAt, '2026-07-19');
-  assert.equal(item.updatedAt, '2026-09-24');
+  assert.equal(item.updatedAt, '2026-10-09');
+  assert.match(html, /<a href="\/blog\/erp-vs-crm">verschil tussen ERP en CRM<\/a>/);
   assert.equal(item.growthEventKind, 'other_growth_action');
   assert.equal(item.growthEventAt, '2026-09-24');
   assert.equal(item.keywordEvidence.callsUsed, 4);
