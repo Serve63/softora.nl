@@ -10,6 +10,10 @@ sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location('worker', 'scripts/webdesign_subscription_worker.py')
 w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
 w.BASE = pathlib.Path(tempfile.mkdtemp())
+real_storage_guard = w.require_storage
+w.require_storage = lambda: None
+real_identity_guard = w.assert_output_identity
+w.assert_output_identity = lambda folder: None
 job = {'id': 'recovery-job-1234567890123456', 'claim': '11111111-1111-1111-1111-111111111111', 'prompt': 'fixture'}
 def forbidden(*args, **kwargs): raise AssertionError('Unexpected external action')
 w.reference_blank = lambda reference: False
@@ -20,6 +24,146 @@ ${script}
 `], { cwd: path.join(__dirname, '../..'), encoding: 'utf8', timeout: 10000 });
   assert.equal(result.status, 0, result.stderr || result.stdout);
 }
+
+test('disk pressure stops new claims and preserves preparation while allowing an existing JPEG to upload', () => worker(`
+w.shutil.disk_usage = lambda path: types.SimpleNamespace(free=100 * 1024 * 1024)
+w.require_storage = real_storage_guard
+w.call = forbidden
+try: w.step()
+except w.LocalCapacity: pass
+else: raise AssertionError('Full disk must stop before claiming work')
+assert not w.state_file().exists()
+w.write_state({'phase':'prepare','job':job})
+heartbeats=[]
+w.call=lambda route,payload:(heartbeats.append((route,payload)) or {'ok':True,'allowed':True})
+try: w.step()
+except w.LocalCapacity: pass
+else: raise AssertionError('Full disk must retain preparation')
+assert state()['phase'] == 'prepare'
+assert len(heartbeats)==1 and heartbeats[0][1]['heartbeatJobId']==job['id']
+try:w.step()
+except w.LocalCapacity:pass
+assert len(heartbeats)==1
+folder=w.BASE / job['id']; folder.mkdir(); (folder / 'design.jpg').write_bytes(b'saved')
+w.write_state({'phase':'deliver','job':job})
+reports=[]
+w.call=lambda route,payload: (reports.append(payload) or {'ok':True,'done':True})
+w.step()
+assert state() == {} and reports[0]['dataUrl']
+`));
+
+test('a full log disk cannot kill a worker slot while it waits for storage recovery', () => worker(`
+w.step=lambda slot:(_ for _ in ()).throw(w.LocalCapacity('disk pressure'))
+w.print=lambda *args,**kwargs:(_ for _ in ()).throw(OSError(28,'No space left on device'))
+slept=[]
+def sleep(seconds):
+ slept.append(seconds);raise StopIteration('test loop complete')
+w.time.sleep=sleep
+try:w.worker_loop(0)
+except StopIteration:pass
+assert slept==[15]
+`));
+
+test('a failed bootstrap waits and retries once with the same claim, then reports persistent failure', () => worker(`
+w.write_state({'phase':'prepare','job':job})
+attempts=[]
+def crash(task, folder, slot):
+ attempts.append(task['claim'])
+ w.write_state({'phase':'generating','job':task},slot)
+ (folder / 'codex-events.jsonl').write_text(json.dumps({'type':'thread.started','thread_id':'bootstrap-fixture'})+'\\n'+json.dumps({'type':'turn.started'}))
+ (folder / 'process-result.json').write_text(json.dumps({'returncode':-9}))
+ raise RuntimeError('CLI exited before any model item')
+w.generate=crash
+w.call=forbidden
+w.step()
+assert state()['phase']=='prepare' and len(attempts)==1
+w.step()
+assert len(attempts)==1
+s=state();s['retryAt']=0;w.write_state(s)
+reports=[]
+w.call=lambda route,payload:(reports.append(payload) or {'ok':True,'done':True})
+w.step()
+assert attempts==[job['claim'],job['claim']] and state()=={}
+assert reports[0]['error'] and 'dataUrl' not in reports[0]
+`));
+
+test('bootstrap retry refuses model activity, uncertainty, timeout and existing output', () => worker(`
+folder=w.BASE/job['id'];folder.mkdir()
+outcome=folder/'process-result.json';events=folder/'codex-events.jsonl'
+outcome.write_text(json.dumps({'returncode':1}))
+for entry in [{'type':'item.started','item':{'type':'command_execution'}},{'type':'error'},{'type':'turn.completed'}]:
+ events.write_text(json.dumps(entry));assert not w.bootstrap_failed(folder)
+events.write_text(json.dumps({'type':'turn.started'}))
+outcome.write_text(json.dumps({'returncode':1,'timeout':True}));assert not w.bootstrap_failed(folder)
+outcome.write_text(json.dumps({'returncode':1}))
+(folder/'design.png').write_bytes(b'output');assert not w.bootstrap_failed(folder)
+`));
+
+test('duplicate cleanup requires a byte-identical native original and retains upload JPEG', () => worker(`
+folder=w.BASE/job['id'];folder.mkdir()
+original=w.BASE/'.codex/generated_images/thread/image.png';original.parent.mkdir(parents=True);original.write_bytes(b'original')
+w.Path.home=lambda:w.BASE
+copy=folder/'design.png';copy.write_bytes(b'different')
+(folder/'design.jpg').write_bytes(b'upload')
+(folder/'codex-events.jsonl').write_text(str(original))
+w.remove_verified_working_copy(folder);assert copy.exists()
+copy.write_bytes(b'original');w.remove_verified_working_copy(folder)
+assert not copy.exists() and original.read_bytes()==b'original' and (folder/'design.jpg').read_bytes()==b'upload'
+assert json.loads((folder/'native-original.json').read_text())['path']==str(original)
+`));
+
+test('a native PNG left by a crashed copy is restored by thread identity without another model request', () => worker(`
+folder=w.BASE/job['id'];folder.mkdir()
+w.Path.home=lambda:w.BASE
+directory=w.BASE/'.codex/generated_images/native-fixture';directory.mkdir(parents=True)
+data=b'\\x89PNG\\r\\n\\x1a\\n'+b'x'*1100+b'\\0\\0\\0\\0IENDabcd'
+(directory/'output.png').write_bytes(data)
+(folder/'codex-events.jsonl').write_text(json.dumps({'type':'thread.started','thread_id':'native-fixture'})+'\\n')
+w.check_job_active=lambda task:None
+w.codex_binary=forbidden
+encoded=[]
+w.encode_result=lambda target:encoded.append((target/'design.png').read_bytes())
+w.generate(job,folder)
+assert encoded==[data] and state()['phase']=='generating'
+`));
+
+test('native recovery refuses empty, ambiguous and unrelated thread outputs', () => worker(`
+folder=w.BASE/job['id'];folder.mkdir()
+w.Path.home=lambda:w.BASE
+directory=w.BASE/'.codex/generated_images/native-fixture';directory.mkdir(parents=True)
+(folder/'codex-events.jsonl').write_text(json.dumps({'type':'thread.started','thread_id':'native-fixture'})+'\\n')
+(directory/'output.png').write_bytes(b'')
+w.restore_native_result(folder);assert not (folder/'design.png').exists()
+data=b'\\x89PNG\\r\\n\\x1a\\n'+b'x'*1100+b'\\0\\0\\0\\0IENDabcd'
+(directory/'output.png').write_bytes(data);(directory/'other.png').write_bytes(data)
+w.restore_native_result(folder);assert not (folder/'design.png').exists()
+(folder/'codex-events.jsonl').write_text(json.dumps({'type':'thread.started','thread_id':'another-thread'})+'\\n')
+w.restore_native_result(folder);assert not (folder/'design.png').exists()
+`));
+
+test('an image copied from another job is rejected even when its format and colors could pass', () => worker(`
+folder=w.BASE/job['id'];folder.mkdir()
+w.Path.home=lambda:w.BASE
+native=w.BASE/'.codex/generated_images/own-thread';native.mkdir(parents=True)
+(native/'image.png').write_bytes(b'own-result')
+(folder/'codex-events.jsonl').write_text(json.dumps({'type':'thread.started','thread_id':'own-thread'})+'\\n')
+(folder/'design.png').write_bytes(b'another-company')
+try:real_identity_guard(folder)
+except RuntimeError:pass
+else:raise AssertionError('Another company image must never upload')
+(folder/'design.png').write_bytes(b'own-result');real_identity_guard(folder)
+`));
+
+test('low storage during recovery preserves the generation checkpoint rather than reporting failure', () => worker(`
+w.write_state({'phase':'generating','job':job})
+w.generation_running=lambda folder:False
+w.encode_result=lambda folder:(_ for _ in ()).throw(w.LocalCapacity('disk pressure'))
+heartbeats=[]
+w.call=lambda route,payload:(heartbeats.append(payload) or {'ok':True,'allowed':True})
+w.step()
+assert state()['phase']=='generating'
+assert heartbeats[0]['heartbeatJobId']==job['id']
+`));
 
 test('an incomplete capture rejected before imagegen recovers once using the other provider', () => worker(`
 folder = w.BASE / job['id']; folder.mkdir()
