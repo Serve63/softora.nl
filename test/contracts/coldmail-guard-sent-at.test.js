@@ -8,7 +8,7 @@ const {
 } = require('../../server/services/coldmail-guard-sent-at');
 
 test('coldmail guard sent timestamp model prefers immutable delivery evidence over mutation time', () => {
-  assert.equal(COLDMAIL_SENT_TIMESTAMP_MODEL, 'delivery-evidence-v1');
+  assert.equal(COLDMAIL_SENT_TIMESTAMP_MODEL, 'delivery-evidence-v2');
   assert.equal(resolveColdmailGuardSentAt({
     payload: { sentAt: '2026-08-17T08:00:00.000Z' },
     last_seen_at: '2026-08-17T08:01:00.000Z',
@@ -44,4 +44,24 @@ test('coldmail guard sent timestamp model selects the latest valid historical pa
       { sentAt: '2026-08-17T08:33:07.000Z' },
     ],
   }), '2026-08-17T08:33:07.000Z');
+});
+
+test('coldmail guard sent timestamp model ignores suppression mutations as send time', () => {
+  const suppressedAt = '2026-10-10T21:06:11.173445+00:00';
+  assert.equal(resolveColdmailGuardSentAt({
+    payload: { sectorSuppression: { at: suppressedAt } },
+    last_seen_at: '2026-10-10 21:06:11.173445+00',
+    created_at: '2026-09-30T09:00:00.000Z',
+    updated_at: '2026-10-10 21:06:11.173445+00',
+  }), '2026-09-30T09:00:00.000Z');
+  assert.equal(resolveColdmailGuardSentAt({
+    suppressed_at: '2026-10-10T21:06:11.000Z',
+    last_seen_at: '2026-10-10T21:06:11.000Z',
+    created_at: '2026-09-30T09:00:00.000Z',
+  }), '2026-09-30T09:00:00.000Z');
+  assert.equal(resolveColdmailGuardSentAt({
+    payload: { sectorSuppression: { at: suppressedAt } },
+    last_seen_at: '2026-10-10T05:18:19.140Z',
+    created_at: '2026-10-09T15:00:28.000Z',
+  }), '2026-10-10T05:18:19.140Z');
 });
