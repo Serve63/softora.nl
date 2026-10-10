@@ -46,6 +46,12 @@ test('platform architecture registry and CI gate are protected quality code', ()
   assert.match(readRepoFile('docs/quality-protocol.md'), /check:platform-architecture/);
 });
 
+test('AGENTS.md verbiedt zichtbaar verspringen en tussentijdse laadteksten', () => {
+  const instructions = readRepoFile('AGENTS.md');
+  assert.match(instructions, /Niets mag zichtbaar verspringen of "inladen"/);
+  assert.match(instructions, /definitieve formaat/);
+});
+
 test('nieuwe personeelspagina’s volgen de gedeelde kop en kleurvariabelen', () => {
   const instructions = readRepoFile('AGENTS.md');
   assert.match(instructions, /Begin nieuwe personeelspagina's met `templates\/premium-personnel-page\.html`/);
