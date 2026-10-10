@@ -22,9 +22,9 @@ test('contactdossier staat in de eerste detailrender voordat de contacthistorie 
   const before = JSON.stringify(mail);
   const html = discovery.renderTimelineSummary(mail, String, dossier);
   assert.match(html, /<strong>Contactdossier:<\/strong>/);
-  assert.match(html, /3 berichten geladen · contact@example\.test/);
+  assert.match(html, /3 berichten · 1 onderwerp · contact@example\.test/);
   assert.match(html, /data-contact-summary-state="partial"/);
-  assert.doesNotMatch(html, /0 onderwerpen|Oudere berichten laden/);
+  assert.doesNotMatch(html, /0 onderwerpen|Oudere berichten laden|geladen/);
   assert.equal(JSON.stringify(mail), before, 'een samenvatting mag niet doen alsof de volledige tijdlijn geladen is');
 });
 
@@ -34,7 +34,7 @@ test('samenvatting houdt dezelfde regel voor, na en bij een mislukte contacthist
     const html = discovery.renderTimelineSummary({ ...mail, ...pending }, String, dossier);
     assert.match(html, /class="mail-contact-summary"/);
     assert.match(html, /class="mail-contact-summary-text"/);
-    assert.match(html, /3 berichten geladen/);
+    assert.match(html, /3 berichten · 1 onderwerp/);
   }
   const ready = discovery.renderTimelineSummary({
     ...mail, contactTimelineLoaded: true, contactTimelineTotal: 3, contactTimelineThreadCount: 1,
@@ -52,8 +52,7 @@ test('eerste telling telt geen dubbele berichten, quotes of nog niet opgehaalde 
   mail.body = 'Een mail met geciteerde vorige berichten.';
   mail.threadMessages.push({ ...mail.threadMessages[0], messageId: 'SECOND@EXAMPLE.TEST' }, { body: 'Een losse quote zonder berichtidentiteit' });
   const html = discovery.renderTimelineSummary(mail, String, dossier);
-  assert.match(html, /3 berichten geladen/);
-  assert.doesNotMatch(html, /onderwerp/);
+  assert.match(html, /3 berichten · 1 onderwerp/);
 });
 
 test('gewone mailboxmappen krijgen geen contactdossier en paginering blijft beschikbaar na laden', () => {
@@ -71,4 +70,19 @@ test('contactsamenvatting en paginering behouden een regelhoogte wanneer aantall
   assert.match(page, /\.mail-contact-summary button \{[^}]*padding: 0;[^}]*line-height: inherit;/);
   const script = fs.readFileSync(path.join(__dirname, '../../assets/premium-mailbox.js'), 'utf8');
   assert.match(script, /renderTimelineSummary\?\.\(m, escapeHtml, contactDossier\)/);
+});
+
+test('contactdossierregel verspringt niet: zelfde tekst voor en na het laden, nooit een laadtekst', () => {
+  const { mail, dossier } = fixture();
+  const text = (html) => html.replace(/data-contact-summary-state="[^"]*"/, '');
+  const before = discovery.renderTimelineSummary(mail, String, dossier);
+  const after = discovery.renderTimelineSummary({
+    ...mail, contactTimelineLoaded: true, contactTimelineTotal: 3, contactTimelineThreadCount: 1,
+  }, String, dossier);
+  assert.equal(text(before), text(after));
+  const refreshing = discovery.renderTimelineSummary({
+    ...mail, contactTimelineLoaded: true, contactTimelineNeedsRefresh: true, contactTimelineTotal: 7, contactTimelineThreadCount: 2,
+  }, String, dossier);
+  assert.match(refreshing, /7 berichten · 2 onderwerpen · contact@example\.test/, 'laatst bekende telling blijft staan tijdens verversen');
+  for (const html of [before, after, refreshing]) assert.doesNotMatch(html, /geladen|laden\.\.\.|laden…/i);
 });

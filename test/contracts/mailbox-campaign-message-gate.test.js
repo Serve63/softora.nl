@@ -113,7 +113,7 @@ test('een leeg dossier verzint geen historie en telt alleen het al geopende beri
   assert.deepEqual(root.threadMessages, []);
   const summary = discovery.renderTimelineSummary(root, String);
   assert.match(summary, /data-contact-summary-state="partial"/);
-  assert.match(summary, /1 bericht geladen/);
+  assert.match(summary, /1 bericht · 1 onderwerp/);
   assert.doesNotMatch(summary, /0 berichten|0 onderwerpen|state="complete"/);
   assert.match(discovery.renderTimelineSummary({ ...root, contactTimelineTotal: 1, contactTimelineThreadCount: 1 }, String), /1 bericht · 1 onderwerp/);
 });

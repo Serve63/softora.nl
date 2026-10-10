@@ -1317,7 +1317,7 @@ test('een lege eerste contactpagina bewaart bekende historie en herstelt bij de 
     assert.equal(mail.contactTimelineNeedsRefresh, true);
     assert.equal(mail.contactTimelineLoading, false);
     assert.equal(renders, 0);
-    assert.match(discoveryUi.renderTimelineSummary(mail, String, { active: true }), /2 berichten geladen/);
+    assert.match(discoveryUi.renderTimelineSummary(mail, String, { active: true }), /2 berichten · 2 onderwerpen/);
     assert.equal(await controller.prepareCompleteContactTimelineForHide(mail), false);
 
     response = { ok: true, totalCount: 2, messages: [{ ...mail, threadMessages: undefined }, parent] };
@@ -1341,7 +1341,7 @@ test('een oud nulberichtendossier wordt opnieuw gelezen en nooit als compleet ge
     folder: 'inbox', email: 'contact@example.test', to: 'serve@softora.nl',
     contactTimelineLoaded: true, contactTimelineTotal: 0, contactTimelineNeedsRefresh: false,
   };
-  assert.match(discoveryUi.renderTimelineSummary(mail, String), /1 bericht geladen/);
+  assert.match(discoveryUi.renderTimelineSummary(mail, String), /1 bericht · 1 onderwerp/);
   let requests = 0;
   const controller = discoveryUi.create({
     document: { getElementById: () => null, querySelector: () => null },

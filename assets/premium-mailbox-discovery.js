@@ -358,17 +358,25 @@
     if (!mail || typeof escapeHtml !== 'function' || (!mail.contactTimelineLoaded && !dossier.active)) return '';
     const complete = mail.contactTimelineLoaded === true && !mail.contactTimelineNeedsRefresh && Number(mail.contactTimelineTotal) > 0;
     const contact = String(dossier.contactEmail || mail.externalContactEmail || '').trim();
+    const formatCounts = (messages, threads) => (messages
+      ? `${messages} ${messages === 1 ? 'bericht' : 'berichten'} · ${threads} ${threads === 1 ? 'onderwerp' : 'onderwerpen'}`
+      : '');
     let summary;
-    if (complete) {
-      const messages = Math.max(0, Number(mail.contactTimelineTotal) || 0);
-      const threads = Math.max(0, Number(mail.contactTimelineThreadCount) || 0);
-      summary = `${messages} ${messages === 1 ? 'bericht' : 'berichten'} · ${threads} ${threads === 1 ? 'onderwerp' : 'onderwerpen'}`;
+    if (Number(mail.contactTimelineTotal) > 0) {
+      // Volledige of laatst bekende telling: blijft staan tijdens een verversing.
+      summary = formatCounts(
+        Math.max(0, Number(mail.contactTimelineTotal) || 0),
+        Math.max(1, Number(mail.contactTimelineThreadCount) || 0)
+      );
     } else {
-      // Count only the message identities already on screen. This is not yet
-      // the full contact total, and must not mark the timeline as loaded.
-      const messages = new Set([mail, ...(Array.isArray(mail.threadMessages) ? mail.threadMessages : [])]
-        .map(getTimelineMessageIdentity).filter(Boolean)).size;
-      summary = messages ? `${messages} ${messages === 1 ? 'bericht' : 'berichten'} geladen` : '';
+      // Nog geen contacttelling: tel wat al op scherm staat, in hetzelfde formaat als
+      // de definitieve regel zodat er niets verspringt. Markeert de tijdlijn niet als geladen.
+      const onScreen = [mail, ...(Array.isArray(mail.threadMessages) ? mail.threadMessages : [])];
+      const messages = new Set(onScreen.map(getTimelineMessageIdentity).filter(Boolean)).size;
+      const threads = new Set(onScreen
+        .map((message) => String(message?.technicalThreadKey || message?.threadId || '').trim())
+        .filter(Boolean)).size;
+      summary = formatCounts(messages, Math.max(1, threads));
     }
     summary = [summary, contact].filter(Boolean).join(' · ');
     const more = complete && mail.contactTimelineNextCursor
