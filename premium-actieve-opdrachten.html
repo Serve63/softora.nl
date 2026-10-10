@@ -400,35 +400,7 @@
         }
 
         .summary-value.accent { color: var(--accent-light); }
-        #sumDelivered { color: var(--text-primary); }
-
-        .summary-value--active-breakdown {
-            display: inline-flex;
-            align-items: baseline;
-            flex-wrap: wrap;
-            gap: 0;
-        }
-
-        .summary-active-sep {
-            color: var(--text-secondary);
-            font-weight: 600;
-        }
-
-        .summary-active-total {
-            color: var(--accent-light);
-        }
-
-        .summary-active-business {
-            color: var(--service-business-blue);
-        }
-
-        .summary-active-voice {
-            color: var(--green);
-        }
-
-        .summary-active-chatbot {
-            color: var(--yellow);
-        }
+        #sumActive, #sumDelivered { color: var(--text-primary); }
 
         .summary-icon {
             width: 48px;
@@ -1532,15 +1504,7 @@
                 <div class="summary-card">
                     <div>
                         <div class="summary-label">Actieve Opdrachten</div>
-                        <div class="summary-value summary-value--active-breakdown" id="sumActive" aria-label="Actieve opdrachten: 0, bedrijfssoftware: 0, voicesoftware: 0, chatbot: 0">
-                            <span class="summary-active-total" data-sum-active-total>0</span>
-                            <span class="summary-active-sep" aria-hidden="true"> - </span>
-                            <span class="summary-active-business" data-sum-active-business>0</span>
-                            <span class="summary-active-sep" aria-hidden="true"> - </span>
-                            <span class="summary-active-voice" data-sum-active-voice>0</span>
-                            <span class="summary-active-sep" aria-hidden="true"> - </span>
-                            <span class="summary-active-chatbot" data-sum-active-chatbot>0</span>
-                        </div>
+                        <div class="summary-value" id="sumActive" aria-label="Actieve opdrachten: 0">0</div>
                     </div>
                     <div class="summary-icon">
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
@@ -1575,6 +1539,6 @@
             </div>
         </main>
     </div>
-    <!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets/premium-screen-readiness.js?v=20260923a"></script><script src="assets/premium-active-orders-readiness.js?v=20261002a"></script><script src="assets/premium-ui-state-client.js?v=20260924a"></script><script src="assets/premium-active-orders-boot.js?v=20260922c"></script><script src="assets/premium-active-orders-assignee.js?v=20260505a"></script><script src="assets/premium-active-orders-customer-db.js?v=20260510a"></script><script src="assets/premium-active-orders-summary.js?v=20261002a"></script><script src="assets/premium-actieve-opdrachten.js?v=20261002c"></script><script src="assets/premium-active-orders-edit-data.js?v=20260922b"></script>
+    <!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets/premium-screen-readiness.js?v=20260923a"></script><script src="assets/premium-active-orders-readiness.js?v=20261002a"></script><script src="assets/premium-ui-state-client.js?v=20260924a"></script><script src="assets/premium-active-orders-boot.js?v=20260922c"></script><script src="assets/premium-active-orders-assignee.js?v=20260505a"></script><script src="assets/premium-active-orders-customer-db.js?v=20260510a"></script><script src="assets/premium-active-orders-summary.js?v=20261002a"></script><script src="assets/premium-actieve-opdrachten.js?v=20261010a"></script><script src="assets/premium-active-orders-edit-data.js?v=20260922b"></script>
 </body>
 </html>

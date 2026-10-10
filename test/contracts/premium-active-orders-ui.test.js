@@ -59,7 +59,7 @@ test('premium actieve opdrachten tonen compacte kaarten zonder persoonlijk filte
   assert.doesNotMatch(scriptSource, /order-delivery|order-assignee|assigneeEl/);
   assert.match(scriptSource, /window\.SoftoraActiveOrdersSummary\.summarize\(orderIds/);
 
-  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-screen-readiness\.js\?v=20260923a"><\/script><script src="assets\/premium-active-orders-readiness\.js\?v=20261002a"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script><script src="assets\/premium-active-orders-boot\.js\?v=20260922c"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-summary\.js\?v=20261002a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20261002c"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260922b"><\/script>/);
+  assert.match(pageSource, /<!-- SOFTORA_ACTIVE_ORDERS_BOOTSTRAP --><script src="assets\/premium-screen-readiness\.js\?v=20260923a"><\/script><script src="assets\/premium-active-orders-readiness\.js\?v=20261002a"><\/script><script src="assets\/premium-ui-state-client\.js\?v=20260924a"><\/script><script src="assets\/premium-active-orders-boot\.js\?v=20260922c"><\/script><script src="assets\/premium-active-orders-assignee\.js\?v=20260505a"><\/script><script src="assets\/premium-active-orders-customer-db\.js\?v=20260510a"><\/script><script src="assets\/premium-active-orders-summary\.js\?v=20261002a"><\/script><script src="assets\/premium-actieve-opdrachten\.js\?v=20261010a"><\/script><script src="assets\/premium-active-orders-edit-data\.js\?v=20260922b"><\/script>/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-order-open-leads\.js/);
   assert.doesNotMatch(pageSource, /assets\/premium-active-order-manual-open-leads\.js/);
   assert.match(pageSource, /<button class="topbar-btn magnetic" type="button" id="createOrderBtn">[\s\S]*?Aanmaken[\s\S]*?<\/button>/);
@@ -403,4 +403,30 @@ test('opdrachtentellers gebruiken de volledige omschrijving nadat het persoonlij
     resolveOrderUiState(order) { return { isBuilt: Boolean(order.isBuilt) }; },
   });
   assert.deepEqual(summary, { total: 2, business: 1, voice: 0, chatbot: 0 });
+});
+
+
+test('actieve opdrachtenteller toont één totaal met dezelfde donkere kleur als opgeleverd', () => {
+  const { pageSource, scriptSource } = readActiveOrdersSources();
+  assert.match(pageSource, /<div class="summary-value" id="sumActive" aria-label="Actieve opdrachten: 0">0<\/div>/);
+  assert.match(pageSource, /#sumActive, #sumDelivered \{ color: var\(--text-primary\); \}/);
+  assert.doesNotMatch(pageSource, /summary-active-|summary-value--active-breakdown|data-sum-active-/);
+  assert.doesNotMatch(scriptSource, /renderSumActiveBreakdown|data-sum-active-/);
+  assert.match(scriptSource, /renderSumActiveCount\(summary\.total\);/);
+
+  const vm = require('node:vm');
+  const renderSource = scriptSource.match(/function renderSumActiveCount\(total\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(renderSource);
+  const counter = {
+    textContent: '5 - 1 - 0 - 0',
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+  };
+  const context = vm.createContext({ document: { getElementById() { return counter; } } });
+  vm.runInContext(renderSource, context);
+  for (const total of [5, 0, 6]) {
+    context.renderSumActiveCount(total);
+    assert.equal(counter.textContent, String(total));
+    assert.equal(counter.attributes['aria-label'], `Actieve opdrachten: ${total}`);
+  }
 });
