@@ -1212,7 +1212,8 @@ test('conversiegerichte-websitegids bewaakt de route tot bevestigde overdracht',
   });
 
   assert.equal(item.qualityVersion, 2);
-  assert.equal(item.updatedAt, '2026-09-06');
+  assert.equal(item.updatedAt, '2026-10-10');
+  assert.equal(item.publishedAt, '2026-05-20');
   assert.equal(item.growthEventKind, 'other_growth_action');
   assert.equal(item.title, 'Conversiegerichte website: 5 controlepunten');
   assert.equal(item.targetMoneyPage, '/website-laten-maken');
@@ -1225,14 +1226,20 @@ test('conversiegerichte-websitegids bewaakt de route tot bevestigde overdracht',
   assert.ok(fs.statSync(imagePath).size < 300 * 1024);
   assert.match(html, /<link rel="canonical" href="https:\/\/www\.softora\.nl\/blog\/wat-is-een-conversiegerichte-website">/);
   assert.match(html, /<meta name="robots" content="index, follow, max-image-preview:large">/);
-  assert.match(html, /"dateModified":"2026-09-06"/);
+  assert.match(html, /"dateModified":"2026-10-10"/);
+  assert.match(html, /"datePublished":"2026-05-20"/);
   assert.match(html, /"@type":"FAQPage"/);
   assert.match(html, /De 5 controlepunten in één minuut/);
   assert.match(html, /Leg per route vijf bewijspunten vast/);
   assert.match(html, /Een mooie bedankpagina zonder aantoonbare ontvangst is geen voltooide conversie/);
   assert.match(html, /href="\/website-laten-maken">website laten maken<\/a>/);
   assert.match(html, /href="\/blog\/website-laten-maken-kosten-2026">kostengids<\/a>/);
-  assert.match(html, /href="\/vergelijkingen\/website-laten-maken-vs-zelf-maken">vergelijking tussen laten maken en zelf maken<\/a>/);
+  assert.match(html, /href="\/blog\/website-offerte-vergelijken">checklist voor websiteoffertes<\/a>/);
+  assert.doesNotMatch(html, /website-laten-maken-vs-zelf-maken|vergelijking tussen laten maken en zelf maken/);
+  const articleHtml = require('../../server/services/seo-articles-presentation').renderArticleHtml(item);
+  const liveHtml = require('../../server/services/public-landing-retirement').replaceRetiredPublicLinks(articleHtml);
+  assert.match(liveHtml, /href="\/blog\/website-offerte-vergelijken">checklist voor websiteoffertes<\/a>/);
+  assert.doesNotMatch(liveHtml, /website-laten-maken-vs-zelf-maken|vergelijking tussen laten maken en zelf maken/);
   assert.match(html, /href="\/blog\/website-leadgeneratie-mkb-meten"><span>Websiteleadgeneratie meten<\/span><\/a>/);
   assert.match(html, /href="\/blog\/website-offerte-vergelijken"><span>Website-offertes vergelijken<\/span><\/a>/);
   assert.equal((html.match(/<figure class="artikel-img">/g) || []).length, 1);

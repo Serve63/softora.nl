@@ -36,7 +36,7 @@ const CONVERSION_WEBSITE_CONTENT_ITEM = Object.freeze({
   growthEventKind: 'other_growth_action',
   growthEventAt: '2026-09-06',
   publishedAt: '2026-05-20',
-  updatedAt: '2026-09-06',
+  updatedAt: '2026-10-10',
   image: Object.freeze({
     src: '/assets/seo-content/conversiegerichte-website-bewijsroute-softora.jpg',
     alt: 'Fysieke route met vijf stappen van bezoekersvraag en bewijs naar actie en bevestigde menselijke overdracht.',
@@ -72,15 +72,16 @@ const CONVERSION_WEBSITE_CONTENT_ITEM = Object.freeze({
       paragraphs: Object.freeze([
         'Een pagina mag meerdere nuttige links hebben, zolang één primaire taak herkenbaar blijft. Iemand die een definitie zoekt, is niet altijd klaar voor een offerte. Geef daarom eerst het beslisinzicht dat bij de zoekvraag hoort en bied daarna een logische commerciële route. Gerelateerde uitleg mag helpen om onzekerheid weg te nemen, maar mag de bezoeker niet in een cirkel van bijna dezelfde pagina’s sturen.',
         Object.freeze({
-          text: 'Maak de rol van nabije pagina’s expliciet. De kostengids helpt om scope en prijsopbouw te onderzoeken. De vergelijking tussen laten maken en zelf maken helpt om eigenaarschap en uitvoeringsvorm te kiezen. Deze kennisbankpagina blijft eigenaar van de diagnose vóór ontwerp of reparatie: welke route moet werken en wanneer is de overdracht aantoonbaar geslaagd?',
+          text: 'Maak de rol van nabije pagina’s expliciet. De kostengids helpt om scope en prijsopbouw te onderzoeken. De checklist voor websiteoffertes helpt om scope, eigenaarschap en acceptatieafspraken van voorstellen naast elkaar te leggen. Deze kennisbankpagina blijft eigenaar van de diagnose vóór ontwerp of reparatie: welke route moet werken en wanneer is de overdracht aantoonbaar geslaagd?',
           links: Object.freeze([
             Object.freeze({
               anchor: 'kostengids',
               href: '/blog/website-laten-maken-kosten-2026',
             }),
             Object.freeze({
-              anchor: 'vergelijking tussen laten maken en zelf maken',
-              href: '/vergelijkingen/website-laten-maken-vs-zelf-maken',
+              anchor: 'checklist voor websiteoffertes',
+              href: '/blog/website-offerte-vergelijken',
+              availableFrom: '2026-07-18',
             }),
           ]),
         }),
