@@ -719,25 +719,11 @@ function setOrderFilter(nextFilter) {
     applyOrderFilter();
 }
 
-function renderSumActiveBreakdown(total, business, voice, chatbot) {
+function renderSumActiveCount(total) {
     const root = document.getElementById('sumActive');
     if (!root) return;
-    const totalEl = root.querySelector('[data-sum-active-total]');
-    const businessEl = root.querySelector('[data-sum-active-business]');
-    const voiceEl = root.querySelector('[data-sum-active-voice]');
-    const chatbotEl = root.querySelector('[data-sum-active-chatbot]');
-    if (totalEl && businessEl && voiceEl && chatbotEl) {
-        totalEl.textContent = String(total);
-        businessEl.textContent = String(business);
-        voiceEl.textContent = String(voice);
-        chatbotEl.textContent = String(chatbot);
-        root.setAttribute(
-            'aria-label',
-            `Actieve opdrachten: ${total}, bedrijfssoftware: ${business}, voicesoftware: ${voice}, chatbot: ${chatbot}`
-        );
-    } else {
-        root.textContent = String(total);
-    }
+    root.textContent = String(total);
+    root.setAttribute('aria-label', `Actieve opdrachten: ${total}`);
 }
 
 function clearDemoOrdersOnLoad() {
@@ -755,7 +741,7 @@ function clearDemoOrdersOnLoad() {
         delete orders[id];
     });
 
-    renderSumActiveBreakdown(0, 0, 0, 0);
+    renderSumActiveCount(0);
     const sumTotal = document.getElementById('sumTotal');
     if (sumTotal) sumTotal.textContent = '€0';
     const sumDelivered = document.getElementById('sumDelivered');
@@ -800,7 +786,7 @@ function refreshOrderSummaryCards() {
     const summary = window.SoftoraActiveOrdersSummary.summarize(orderIds, {
         orders, getCustomOrderById, resolveOrderUiState
     });
-    renderSumActiveBreakdown(summary.total, summary.business, summary.voice, summary.chatbot);
+    renderSumActiveCount(summary.total);
     const openValue = cards.reduce((sum, card) => {
         const id = getOrderFilterGroupForCard(card) === 'in_progress' ? Number(String(card?.id || '').replace('order-', '')) : NaN;
         const order = orders[id];
