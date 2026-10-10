@@ -400,6 +400,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
       'updated_at',
       'last_seen_at',
       'created_at',
+      'suppressed_at',
       'status',
       'permanent',
     ].forEach((field) => {
@@ -438,7 +439,7 @@ function createOutboundRecipientGuardStore(deps = {}) {
     const channel = normalizeString(options.channel);
     const keyType = hasRecipientEmailFilter ? 'email' : normalizeString(options.keyType);
     const updatedSince = normalizeString(options.updatedSince);
-    const selectColumns = 'reservation_id,guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,payload,created_at,updated_at,last_seen_at';
+    const selectColumns = 'reservation_id,guard_key,key_type,key_value,provider,channel,sender_email,recipient_email,recipient_domain,recipient_company_key,recipient_id,recipient_company,status,source,actor,permanent,payload,created_at,updated_at,last_seen_at,suppressed_at';
     const buildQuery = () => {
       let query = client
         .from(table)
